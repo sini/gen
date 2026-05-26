@@ -21,12 +21,12 @@ These terms are shared across multiple libraries.
 | Term | Definition | Used by | Academic provenance |
 |------|-----------|---------|-------------------|
 | **Attributes** | Computed values on graph nodes. Demand-driven, memoized by Nix laziness. | gen-scope, den | Knuth 1968; Sloane 2010 |
-| **Collections** | Named multi-contributor aggregation points with a merge strategy. Multiple sources contribute; a combine function merges. | gen-schema, gen-scope, den | Sloane 2010 "collection attributes"; Hedin 2003 (JastAdd) |
+| **Collections** | Named multi-contributor aggregation points with a merge strategy. Multiple sources contribute; a combine function merges. | gen-schema, gen-scope, den | Sloane 2010 "collection attributes"; Van Wyk 2010 (Silver) |
 | **Combinators** | Composition primitives that build attributes from other attributes or queries from other queries. | gen-scope, gen-graph | Sloane 2010 (attribute combinators); Arntzenius 2016 (monotonic query combinators) |
-| **Traits** | Type classification and dispatch. One type, dispatch in merge. | gen-aspects | Palmer 2024 (intensional functions, flat typing) |
+| **Traits** | Type classification and dispatch. One type, dispatch in merge. | gen-aspects | Palmer 2024 (intensional functions); den interpretation |
 | **Nodes** | Vertices in a scope graph or abstract graph. Entities and aspects. | gen-scope, gen-graph, gen-schema | Neron 2015; Mokhov 2017 |
 | **Edges** | Labeled relationships between nodes: P (parent/lexical), I (import/composition), custom labels. | gen-scope, gen-graph, gen-schema | Neron 2015; van Antwerpen 2018 |
-| **Constraints** | Pruning rules that restrict resolution or composition. Propagate via graph ancestry. | gen-aspects, den | van Antwerpen 2016 (Statix) |
+| **Constraints** | Pruning rules that restrict resolution or composition. Propagate via graph ancestry. | gen-aspects, den | van Antwerpen 2016 (constraint-based scope graphs) |
 | **Identity** | Program-point identity for conservative equality of functions and entities. | gen, gen-aspects, gen-derive, gen-schema | Palmer 2024 §2.2 |
 | **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-derive | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
 | **Rules** | Guarded transformation units: condition + action producer + identity. | gen-derive | Forgy 1982 (RETE); Ehrig 2006 |
@@ -47,10 +47,10 @@ Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
 | **Continuations** | Registered callbacks that fire when an index key has unprocessed values during `converge`. | Palmer 2024 §3 |
 | **Converge** | Fixed-point loop: fire all continuations on unprocessed values, repeat until stable. Safety guard at 1000 iterations. | Palmer 2024 §3 |
 | **Intensional Functions** | Callable attrsets with `name` for identity comparison and inspectable `closure`. | Palmer 2024 §2.2-2.3 |
-| **Intensional Equality** | Conservative equality by program point — same `name` = equal, regardless of closure contents. | Palmer 2024 Theorem 5.12 |
+| **Intensional Equality** | Conservative equality by program point — same `name` = equal, regardless of closure contents. | Palmer 2024 §2.3, Theorem 1 (relies on Lemma 5.12) |
 | **Record** | Attrset-with-shadow-stack representation supporting scoped labels. O(1) select. | Leijen 2005 |
 | **Scoped Labels** | Duplicate labels form a stack — extension pushes, restriction pops, exposing previous values. | Leijen 2005 §2 |
-| **Mixin** | Delta-over-parent composition: `combine (delta parent) parent`. | Bracha & Cook 1990 §2-4 |
+| **Mixin** | Composition operator with two orientations: Smalltalk (delta wins over parent) and Beta (parent wins). gen uses Smalltalk: `combine (delta parent) parent`. | Bracha & Cook 1990 §2-4 |
 | **Compose** | Associative mixin composition operator (⋆). | Bracha & Cook 1990 |
 | **Either** | Sum type: `right` (success) or `left` (error). Used in validation pipelines. | — |
 | **Validator** | Named predicate with error message. `mkValidator name pred message`. | — |
@@ -69,7 +69,7 @@ Typed record registries with extension, validation, introspection, and scope-gra
 | **Instance Registry** | `attrsOf` instance type with apply pipeline (validate → derive → apply). | — |
 | **Extension** | Any module can extend any kind. Extensions merge through deferred module merge. | — |
 | **Base Module** | Module injected into every kind automatically. Static, set at `mkSchemaOption` call time. | — |
-| **Collections** | Named data fields extracted from kind definitions before module merge, exposed on result. Built-in: `methods`, `validators`. | Sloane 2010 |
+| **Collections** | Named data fields extracted from kind definitions before module merge, exposed on result. Built-in: `methods`, `validators`. | Van Wyk 2010 (Silver collection attributes) |
 | **Computed Fields** | Derived values computed from collection content and raw definitions. | — |
 | **Refs** | Cross-registry references between kinds. Two modes: deferred (bound at registry time) and direct (resolved immediately). | — |
 | **Deferred Ref** | Ref declared on the kind (as string), bound to a concrete registry via `refs` on `mkInstanceRegistry`. | — |
@@ -92,14 +92,14 @@ Pure aspect types: traits, classification, identity. No pipeline.
 | Term | Definition | Provenance |
 |------|-----------|------------|
 | **Aspects** | Submodules with structural identity and freeform content. Composable configuration units. | Batory 2005 (AHEAD feature algebra) |
-| **Traits** | The aspect type: one type, dispatch in merge. Attrsets and module functions → submodule; guard functions → `functionTo` wrapper. | Palmer 2024 (flat typing) |
-| **Classes** | Registered output targets (NixOS, darwin, homeManager). Explicit `deferredModule` options. Content exits the scope graph into external evaluation. | Tarr 1999 (multi-dimensional separation of concerns) |
+| **Traits** | The aspect type: one type, dispatch in merge. Attrsets and module functions → submodule; guard functions → `functionTo` wrapper. | Palmer 2024 (intensional functions); den interpretation of §5.1 |
+| **Classes** | Registered output targets (NixOS, darwin, homeManager). Explicit `deferredModule` options. Content exits the scope graph into external evaluation. | Tarr 1999 (multi-dimensional separation of concerns; "hyperspace" terminology from Ossher & Tarr 2001) |
 | **Classification** | `canTake`: determines if a function is a module-fn (evaluated immediately) or guard-fn (deferred). | Palmer 2024 |
 | **Guard Functions** | Context-dependent aspects: `{ host, ... }: { nixos = ...; }`. Detected via `canTake`, wrapped via `functionTo`. | Reynolds 1972 (defunctionalization) |
 | **Module Functions** | Functions evaluated immediately by the submodule: `{ config, ... }: { ... }`, `{ aspect, ... }: { ... }`. | — |
 | **Identity (aspect)** | Program-point identity from `key`, `aspectPath`, `pathKey`. Powers diamond dedup. | Palmer 2024 §2.2 |
 | **Includes** | Forward I edges — outbound composition references between aspects. | Neron 2015 |
-| **neededBy** | Reverse I edges — inbound injection declarations. Static, not inside parametric bodies. | Hedin 2003 (JastAdd inter-type declarations) |
+| **neededBy** | Reverse I edges — inbound injection declarations. Static, not inside parametric bodies. | Inspired by JastAdd's aspect-oriented extension (Hedin 2003); reverse-edge semantics are den-specific |
 | **Configuration (cnf)** | Hooks: `classes`, `moduleArgs`, `aspectModules`, `metaModules`. Consumer provides these to customize aspect behavior. | — |
 | **Nested Aspects** | Non-structural, non-class keys on an aspect become sub-aspects with their own identity. | — |
 | **Key Classification** | Trifecta: class key (registered class → module fragment), collection key (registered collection → data), nested key (unregistered → sub-aspect). | — |
@@ -113,13 +113,13 @@ Demand-driven Higher-Order Attribute Grammar evaluator over algebraic scope grap
 | **Nodes** | Minimal descriptors: `{ id, type, parent, decls }`. | Neron 2015 |
 | **Roots** | Entry-point nodes. Provided to `eval` directly or built via `buildNodes`. | — |
 | **Children** | Synthesized nodes produced by the `children` attribute. HOAG: tree structure is a computable attribute. | Vogt 1989 |
-| **Derived Children** | Second-stage synthesized nodes from `derived-children`. Can read sibling attributes. | Vogt 1989 §2.4 (NTA stratification) |
+| **Derived Children** | Second-stage synthesized nodes from `derived-children`. Can read sibling attributes. | Extends Vogt 1989 NTAs (§2.4) with two-stage stratification; stratification is gen-scope's design |
 | **Attributes** | Named computations on nodes. Defined in `attributes` parameter to `eval`. Memoized via `_eval`. | Knuth 1968; Sloane 2010 |
 | **_eval** | Co-located memoization cache on each node. Lazy attrset of attribute computations. | Sloane 2010 (CachedAttribute) |
 | **Inherit'** | Parent-chain walker. Walks upward until `resolve` returns non-null. Cycle-safe. | Knuth 1968 (inherited attributes) |
 | **InheritAll** | Accumulates values along entire parent chain. | — |
 | **Circular** | Fixed-point iteration attribute. `init` → iterate `f` → converge via `eq`. | Sloane 2010; Arntzenius 2016 |
-| **CollectionAttr** | Traversal-based aggregation attribute. Traverse modes: `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"label:<name>"`, or custom function. | Sloane 2010 (collection attributes) |
+| **CollectionAttr** | Traversal-based aggregation attribute. Traverse modes: `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"label:<name>"`, or custom function. | Van Wyk 2010 (Silver collection attributes); Sloane 2010 (planned, §7) |
 | **Query** | Neron resolution: local → imports → parent with specificity D < I < P. | Neron 2015 |
 | **QueryAll** | All reachable results without shadowing. For ambiguity detection. | Neron 2015 |
 | **ParamAttr** | Parameterized attribute: `f self id param`. | Sloane 2010 §3 |
@@ -130,7 +130,7 @@ Demand-driven Higher-Order Attribute Grammar evaluator over algebraic scope grap
 | **parseParent** | ID → parent ID function. Mandatory for fleet scale (O(depth) vs O(n) resolution). | — |
 | **Selective Materialization** | `subtreeOf`, `nodesOfType`, `allNodesWhere` — constrained tree forcing. | — |
 | **Shadow** | Inner shadows outer (key-based). Resolution specificity: D < I < P. | Neron 2015 |
-| **Well-Formedness** | Scope graph validity. No ambiguous resolution. | van Antwerpen 2018 |
+| **Well-Formedness** | Scope graph validity. No ambiguous resolution. | Neron 2015 (WF predicate); generalized in van Antwerpen 2016 |
 
 ### gen-graph — Accessor-Based Graph Queries
 
@@ -138,7 +138,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
-| **Accessor Record** | Attrset of functions describing graph structure: `{ edges, parent, nodes, nodeData }`. | Radul 2009 (propagator pattern) |
+| **Accessor Record** | Attrset of functions describing graph structure: `{ edges, parent, nodes, nodeData }`. | gen-graph design; callers own data, queries compose via function arguments |
 | **edges** | `id → [id]` — outgoing edge targets. | — |
 | **parent** | `id → id \| null` — immediate parent. | — |
 | **nodes** | `[id]` — all node IDs. Required by global operations. | — |
@@ -146,7 +146,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 | **Traversal (lazy)** | Visits only reachable nodes. `reachableFrom`, `reachableWhere`, `canReach`, `selfReachable`, `ancestorsOf`, `pathsBetween`. | — |
 | **Global Analysis** | Enumerates all nodes. `cycles`, `dependents`, `dependentsOf`, `impactOf`, `transpose`. | — |
 | **Materialize** | Builds edge map `{ id → [id] }` from accessor record. One-time scan. | — |
-| **Edge Map** | Materialized `{ id → [id] }` attrset. Target for set operations: `unionEdges`, `intersectEdges`, `differenceEdges`, `selectEdges`. | Mokhov 2017 |
+| **Edge Map** | Materialized `{ id → [id] }` attrset. Target for set operations: `unionEdges`, `intersectEdges`, `differenceEdges`, `selectEdges`. | gen-graph design; algebraic foundation from Mokhov 2017 |
 | **Transitive Closure** | Full edge map preserving all reachability. Fixpoint over `compose`. | — |
 | **Transitive Reduction** | Minimal edge map preserving reachability. O(1) inner membership via attrset. | — |
 | **Fixpoint (graph)** | Iterates `step` on `seed` until stable. Throws on non-monotonic steps. | Arntzenius 2016 |
@@ -182,9 +182,9 @@ Inject external bindings into NixOS module functions with collision detection an
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
-| **Bindings** | Named external values injected into module functions via partial application. | Reynolds 1972 |
-| **Wrapping** | Partial application of bindings into a module's args. `builtins.functionArgs` introspection determines injection targets. | Reynolds 1972 |
-| **Merge Strategy** | Resolution policy when a binding name collides with a module-system arg: `bind-wins`, `system-wins`, `error`. | Leijen 2005 (scoped labels) |
+| **Bindings** | Named external values injected into module functions via partial application. | Reynolds 1972 (closure environments and partial application) |
+| **Wrapping** | Partial application of bindings into a module's args. `builtins.functionArgs` introspection determines injection targets. | Reynolds 1972 (deferred evaluation via closure inspection) |
+| **Merge Strategy** | Resolution policy when a binding name collides with a module-system arg: `bind-wins`, `system-wins`, `error`. | Leijen 2005 (free extension over strict extension; scoped label selection) |
 | **Thunk** | Config-dependent deferred value. `{ __configThunk = true; __fn = fn; }`. Resolved inside `evalModules` when `config` is available. | — |
 | **Contract** | Lazy assertion on a binding value. Checked on demand, not at wrap time. `contract.mk`, `contract.hasFields`, `contract.isType`, `contract.nonEmpty`. | Chitil 2012 (lazy contracts) |
 | **Provenance** | Source-tracking metadata surfaced in blame messages. `{ source; scope?; }`. | Findler 2002 (blame tracking) |
@@ -204,19 +204,19 @@ Production rule system with stratified phases and fixpoint convergence.
 | **Rule** | Guarded transformation unit: condition + action producer + identity. | Forgy 1982 (RETE); Ehrig 2006 |
 | **Condition** | Predicate determining when a rule fires. Opaque in core — caller provides `match`. | Forgy 1982 (RETE LHS) |
 | **Action** | Opaque tagged value produced when a rule fires. Caller provides `classify` to route to phases. | Forgy 1982 (RETE RHS) |
-| **Phase** | Named dispatch group with DAG ordering. `entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`. | Arntzenius 2016 (stratification) |
+| **Phase** | Named dispatch group with DAG ordering. `entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`. | Classical Datalog stratification; monotonicity from Arntzenius 2016 |
 | **Match** | Testing a condition against a position: `condition → id → ctx → bool`. | Ehrig 2006 (match morphism) |
 | **Dispatch** | One-shot: fire matching rules, group actions by phase in topological order. NAC → match → override → priority → exclusive → fire → classify → group. | — |
 | **Fixpoint (derive)** | Convergent dispatch loop: dispatch → extract feedback → widen context → check stability → repeat. Identified rules fire at most once across iterations. | Arntzenius 2016; Radul 2009 |
 | **NAC** | Negative Application Condition — pattern that must NOT match. First-class `nac` field, checked before condition. | Ehrig 2006 |
-| **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Batory 2005 (AHEAD feature refinement) |
+| **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Inspired by Batory 2005 (AHEAD feature composition); override semantics are gen-derive's design |
 | **Priority** | Numeric precedence (higher fires first). `exclusive` mode: only highest-priority group fires. | — |
 | **Specificity** | Selector constraint term count. Adapter tier only, via `selectorSpecificity`. | CSS Selectors (specificity) |
 | **Conflict Resolution** | Three-tier: override suppression → priority sort → specificity → additive ties. | — |
 | **fromFunction** | Converts a Nix function into a rule. `builtins.functionArgs` as condition. Detects `mkIntensional`. | Palmer 2024 |
 | **fromFunctionMatch** | Default match implementation for `fromFunction` rules. Checks required args present in context. | — |
 | **mkActions** | Generates tagged action constructors + `classify` from phase declarations. | — |
-| **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Batory 2005 (AHEAD) |
+| **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-derive's design |
 | **Adapter** | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution. | — |
 
 ---
@@ -329,7 +329,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 |---------|---------|------------|
 | gen-schema | `schema.types.refined` — predicates co-located with types, `lazy = true` defers to access | Chitil 2012; Rondon 2008 |
 | gen-bind | `contract.mk` — assertions fire only when bound value demanded | Chitil 2012 |
-| gen-aspects | `deferredModule` — class content as lazy constructor, inspectable before forcing | Lorenzen 2025 |
+| gen-aspects | `deferredModule` — class content as lazy constructor, inspectable before forcing | Lorenzen 2025 §1-2.3 |
 
 ---
 
@@ -338,33 +338,32 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 | Author(s) | Year | Paper | Gen ecosystem usage |
 |-----------|------|-------|-------------------|
 | Knuth | 1968 | Semantics of context-free languages | Attributes (inherited, synthesized) |
-| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Guard defunctionalization (gen-aspects), signature-directed binding (gen-bind) |
-| Kahn | 1974 | Semantics of a simple language for parallel programming | Demand-driven evaluation model, named channels |
+| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization (gen-aspects guard wrapping), closure environments (gen-bind partial application) |
+| Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
 | Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen), schema mixins (gen-schema) |
 | Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-derive) |
-| Vogt et al. | 1989 | Higher-order attribute grammars | Dynamic node synthesis (gen-scope children/derived-children) |
+| Vogt et al. | 1989 | Higher-order attribute grammars | Non-terminal attributes / dynamic node synthesis (gen-scope children); derived-children extends this |
 | Cardelli | 1997 | Program fragments, linking, and modularization | Module signatures (gen-bind), NixOS module bridge (gen-schema) |
 | Hedin | 2000 | Reference attributed grammars | Cross-node import edges (gen-scope) |
 | Findler & Felleisen | 2002 | Contracts for higher-order functions | Blame tracking (gen-bind, gen-schema) |
-| Hedin & Magnusson | 2003 | JastAdd | Collection attributes, demand-driven AG evaluation |
-| Bracha & Ungar | 2004 | Mirrors | Pluggable composition via partial application (gen-bind) |
-| Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra, rule composition (gen-derive), aspects as features |
+| Hedin & Magnusson | 2003 | JastAdd — an aspect-oriented compiler construction system | Demand-driven AG evaluation, aspect-oriented modular extension (inspires neededBy) |
+| Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra (inspires gen-derive rule composition), aspects as features |
 | Leijen | 2005 | Extensible records with scoped labels | Record algebra (gen), merge resolution (gen-bind) |
 | Ehrig et al. | 2006 | Fundamentals of algebraic graph transformation | Graph rewriting rules, NACs (gen-derive) |
 | Rondon et al. | 2008 | Liquid Types | Refinement predicates (gen-schema) |
-| Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence (gen-derive, gen-graph), accessor pattern (gen-graph) |
+| Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence / quiescence (gen-derive, gen-graph) |
 | Berry & Boudol | 1990 | The chemical abstract machine | Rules as reactions (gen-derive) |
-| Sloane et al. | 2010 | A pure embedding of attribute grammars (Kiama) | Attribute combinators, collection attributes, circular attributes (gen-scope) |
+| Sloane et al. | 2010 | A pure embedding of attribute grammars (Kiama) | Attribute combinators, CachedAttribute, paramAttr, circular attributes (gen-scope); collection attributes planned (§7) |
 | Van Wyk et al. | 2010 | Silver | Forwarding, collection attributes |
 | Chitil | 2012 | Practical typed lazy contracts | Lazy contracts (gen-bind, gen-schema) |
 | Neron et al. | 2015 | A theory of name resolution | Scope graphs, P/I edges, resolution (gen-scope, gen-select) |
-| van Antwerpen et al. | 2016 | Statix | Constraint-based resolution, well-formedness (gen-scope) |
-| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic query combinators, stratification (gen-derive, gen-graph) |
-| Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope), edge map operations (gen-graph) |
-| van Antwerpen et al. | 2018 | Scopes as types | Custom edge labels, structural subtyping (gen-scope) |
-| Palmer et al. | 2024 | Intensional functions | Identity, flat typing, search monad, intensional equality (gen, gen-aspects, gen-derive, gen-select) |
-| Lorenzen et al. | 2025 | First-order laziness | Lazy constructors (gen-aspects deferredModule) |
-| Tarr et al. | 1999 | N degrees of separation | Multi-dimensional concerns, classes as dimensions |
-| Kiczales et al. | 1997 | Aspect-oriented programming | Pointcuts/advice/join points as conceptual ancestors |
+| van Antwerpen et al. | 2016 | A constraint language for static semantic analysis based on scope graphs | Constraint-based scope graph resolution, well-formedness generalization |
+| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-derive, gen-graph); phase stratification inspired by classical Datalog |
+| Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope); algebraic foundation for gen-graph |
+| van Antwerpen et al. | 2018 | Scopes as types (introduces Statix) | Custom edge labels, structural subtyping, Statix DSL (gen-scope) |
+| Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen, gen-aspects, gen-derive, gen-select) |
+| Lorenzen et al. | 2025 | First-order laziness | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects deferredModule) |
+| Tarr et al. | 1999 | N degrees of separation | Multi-dimensional separation of concerns (classes as dimensions) |
+| Kiczales et al. | 1997 | Aspect-oriented programming | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ) |
 | Apel et al. | 2009 | An overview of feature-oriented software development | Feature-oriented decomposition |
 | Thum et al. | 2014 | Analysis strategies for software product lines | Feature interaction detection |
