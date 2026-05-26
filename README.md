@@ -13,7 +13,6 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 - [Core Ideas](#core-ideas)
 - [Theoretical Foundations](#theoretical-foundations)
 - [Documentation](#documentation)
-- [License](#license)
 
 ## Libraries
 
@@ -74,7 +73,3 @@ See [TERMINOLOGY.md](TERMINOLOGY.md) for the complete vocabulary with provenance
 
 - [TERMINOLOGY.md](TERMINOLOGY.md) — Unified vocabulary across all 8 libraries with academic provenance
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Composition model, data flow, performance architecture, design constraints
-
-## License
-
-MIT
