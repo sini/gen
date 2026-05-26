@@ -2,6 +2,24 @@
 
 A consistent vocabulary grounded in academic literature, spanning all eight gen libraries and the den framework that consumes them.
 
+## Table of Contents
+
+- [Design Principles](#design-principles)
+- [Core Terms](#core-terms)
+- [Per-Library Vocabulary](#per-library-vocabulary)
+  - [gen-algebra](#gen-algebra--pure-primitives)
+  - [gen-schema](#gen-schema--typed-record-registries)
+  - [gen-aspects](#gen-aspects--aspect-type-system)
+  - [gen-scope](#gen-scope--hoag-evaluator)
+  - [gen-graph](#gen-graph--accessor-based-graph-queries)
+  - [gen-select](#gen-select--selector-algebra)
+  - [gen-bind](#gen-bind--module-binding)
+  - [gen-derive](#gen-derive--stratified-rule-dispatch)
+- [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
+- [Classes: The Output Dimension](#classes-the-output-dimension)
+- [Cross-Cutting Patterns](#cross-cutting-patterns)
+- [Academic References](#academic-references)
+
 ## Design Principles
 
 1. **Every term has academic provenance.** No novel coinages for library concepts. Novel names only in user-facing effect vocabularies where clarity to non-academics takes priority.

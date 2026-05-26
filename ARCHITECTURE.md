@@ -2,6 +2,15 @@
 
 How the eight gen libraries compose to form a framework-building toolkit for Nix.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Dependency Graph](#dependency-graph)
+- [Library Roles](#library-roles)
+- [Composition Patterns](#composition-patterns)
+- [Performance Architecture](#performance-architecture)
+- [Design Constraints](#design-constraints)
+
 ## Overview
 
 The gen ecosystem is a set of decoupled Nix libraries that together provide the infrastructure for building demand-driven, graph-structured configuration frameworks. Each library owns one concern. The coupling point is the **consumer** (e.g., den), not the libraries themselves.

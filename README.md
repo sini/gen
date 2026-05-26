@@ -6,6 +6,15 @@ Each library owns one concern — types, evaluation, queries, binding, dispatch 
 
 The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/home-manager configuration framework. But the gen libraries are generic — they have no knowledge of NixOS, system configuration, or den-specific concepts.
 
+## Table of Contents
+
+- [Libraries](#libraries)
+- [Architecture](#architecture)
+- [Core Ideas](#core-ideas)
+- [Theoretical Foundations](#theoretical-foundations)
+- [Documentation](#documentation)
+- [License](#license)
+
 ## Libraries
 
 | Library | What it does | Tests | Deps |
