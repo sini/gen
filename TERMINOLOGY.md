@@ -23,14 +23,14 @@ A consistent vocabulary grounded in academic literature, spanning all eight gen 
 ## Design Principles
 
 1. **Every term has academic provenance.** No novel coinages for library concepts. Novel names only in user-facing effect vocabularies where clarity to non-academics takes priority.
-2. **Same pattern, same name.** gen-schema collections and den collections are the same abstract pattern (multi-contributor aggregation with merge) at different levels (definition-time vs evaluation-time).
-3. **Traits are for types, attributes are for values, collections are for aggregation, combinators are for composition.** Four orthogonal concerns, four terms, no overlap.
-4. **The graph vocabulary (nodes, edges, constraints) is the structural substrate.** Everything else operates ON the graph.
-5. **Prefix conventions are consistent across the ecosystem:**
+1. **Same pattern, same name.** gen-schema collections and den collections are the same abstract pattern (multi-contributor aggregation with merge) at different levels (definition-time vs evaluation-time).
+1. **Traits are for types, attributes are for values, collections are for aggregation, combinators are for composition.** Four orthogonal concerns, four terms, no overlap.
+1. **The graph vocabulary (nodes, edges, constraints) is the structural substrate.** Everything else operates ON the graph.
+1. **Prefix conventions are consistent across the ecosystem:**
    - `_key` on module-system configs = internal computed/read-only options (e.g., `_topology`, `_strict`, `_module`)
    - `__key` on plain attrsets = framework markers and pipeline internals (e.g., `__functor`, `__isWrappedFn`, `__sel`)
 
----
+______________________________________________________________________
 
 ## Core Terms
 
@@ -50,7 +50,7 @@ These terms are shared across multiple libraries.
 | **Rules** | Guarded transformation units: condition + action producer + identity. | gen-derive | Forgy 1982 (RETE); Ehrig 2006 |
 | **Fixpoint** | Convergent iteration until a stability condition holds. | gen-derive, gen-graph, gen-scope | Arntzenius 2016; Radul 2009 |
 
----
+______________________________________________________________________
 
 ## Per-Library Vocabulary
 
@@ -133,7 +133,7 @@ Demand-driven Higher-Order Attribute Grammar evaluator over algebraic scope grap
 | **Children** | Synthesized nodes produced by the `children` attribute. HOAG: tree structure is a computable attribute. | Vogt 1989 |
 | **Derived Children** | Second-stage synthesized nodes from `derived-children`. Can read sibling attributes. | Extends Vogt 1989 NTAs (§2.4) with two-stage stratification; stratification is gen-scope's design |
 | **Attributes** | Named computations on nodes. Defined in `attributes` parameter to `eval`. Memoized via `_eval`. | Knuth 1968; Sloane 2010 |
-| **_eval** | Co-located memoization cache on each node. Lazy attrset of attribute computations. | Sloane 2010 (CachedAttribute) |
+| **\_eval** | Co-located memoization cache on each node. Lazy attrset of attribute computations. | Sloane 2010 (CachedAttribute) |
 | **Inherit'** | Parent-chain walker. Walks upward until `resolve` returns non-null. Cycle-safe. | Knuth 1968 (inherited attributes) |
 | **InheritAll** | Accumulates values along entire parent chain. | — |
 | **Circular** | Fixed-point iteration attribute. `init` → iterate `f` → converge via `eq`. | Sloane 2010; Arntzenius 2016 |
@@ -237,7 +237,7 @@ Production rule system with stratified phases and fixpoint convergence.
 | **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-derive's design |
 | **Adapter** | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution. | — |
 
----
+______________________________________________________________________
 
 ## Den v2 Vocabulary (Consumer)
 
@@ -282,7 +282,7 @@ Den wires the eight gen libraries with domain-specific semantics. These terms ar
 | `pipe.target [aspects]` | Delivery: only these aspects receive |
 | `pipe.channel "Y"` | Redirect to different collection |
 
----
+______________________________________________________________________
 
 ## Classes: The Output Dimension
 
@@ -304,7 +304,7 @@ Aspect key → classified as:
   └── nested key (unregistered)                      → sub-aspect → recurse
 ```
 
----
+______________________________________________________________________
 
 ## Cross-Cutting Patterns
 
@@ -349,7 +349,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 | gen-bind | `contract.mk` — assertions fire only when bound value demanded | Chitil 2012 |
 | gen-aspects | `deferredModule` — class content as lazy constructor, inspectable before forcing | Lorenzen 2025 §1-2.3 |
 
----
+______________________________________________________________________
 
 ## Academic References
 

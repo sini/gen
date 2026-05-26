@@ -56,7 +56,7 @@ gen-bind    (independent — takes { lib } only)
 - Record algebra (scoped labels, mixin composition)
 - Module tier: identity hashing, validators, strict modules, ref types
 
-Every other gen-* library that needs identity or validation imports gen-algebra. The pure tier has zero dependencies — not even nixpkgs.
+Every other gen-\* library that needs identity or validation imports gen-algebra. The pure tier has zero dependencies — not even nixpkgs.
 
 ### Type System Layer
 
@@ -219,8 +219,8 @@ The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules tha
 ## Design Constraints
 
 1. **No circular library dependencies.** The dependency DAG is strictly acyclic.
-2. **Libraries don't import each other's flake inputs.** gen-select doesn't import gen-scope; it provides adapters that accept gen-scope's result shape.
-3. **Actions are opaque.** gen-derive doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
-4. **Conditions are opaque (in core).** gen-derive's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
-5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
-6. **Pure tier has zero deps.** gen-algebra's pure tier (search, intensional, record) works without nixpkgs. Libraries that only need identity/search import the pure tier.
+1. **Libraries don't import each other's flake inputs.** gen-select doesn't import gen-scope; it provides adapters that accept gen-scope's result shape.
+1. **Actions are opaque.** gen-derive doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
+1. **Conditions are opaque (in core).** gen-derive's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
+1. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
+1. **Pure tier has zero deps.** gen-algebra's pure tier (search, intensional, record) works without nixpkgs. Libraries that only need identity/search import the pure tier.
