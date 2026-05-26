@@ -1,5 +1,7 @@
 # gen — A Framework-Building Toolkit for Nix
 
+[![CI](https://github.com/sini/gen/actions/workflows/ci.yml/badge.svg)](https://github.com/sini/gen/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 The gen ecosystem is a set of decoupled Nix libraries for building demand-driven, graph-structured configuration frameworks.
 
 Each library owns one concern — types, evaluation, queries, binding, dispatch — and communicates through accessor functions and plain attrsets. The libraries compose at the consumer level, not through deep coupling. You can use gen-graph for graph queries without touching gen-scope, or gen-schema for typed registries without knowing about aspects.
