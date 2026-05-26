@@ -14,8 +14,8 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 └────┬───────┬───────┬───────┬───────┬───────┬───────┬───────┬───┘
      │       │       │       │       │       │       │       │
      ▼       ▼       ▼       ▼       ▼       ▼       ▼       ▼
-   gen    gen-     gen-     gen-    gen-    gen-    gen-    gen-
-         schema  aspects   scope   graph  select   bind   derive
+   gen-   gen-     gen-     gen-    gen-    gen-    gen-    gen-
+  algebra schema  aspects   scope   graph  select   bind   derive
 ```
 
 ## Dependency Graph
@@ -23,10 +23,10 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 Libraries have minimal inter-dependencies. Most are independent.
 
 ```
-gen (pure primitives — zero deps)
-├── gen-schema (imports gen)
-├── gen-select (imports gen pure tier)
-│   └── gen-derive (imports gen + gen-select adapter tier)
+gen-algebra (pure primitives — zero deps)
+├── gen-schema (imports gen-algebra)
+├── gen-select (imports gen-algebra pure tier)
+│   └── gen-derive (imports gen-algebra + gen-select adapter tier)
 │
 gen-aspects (independent — takes { lib } only)
 gen-scope   (independent — takes { lib } only)
@@ -34,20 +34,20 @@ gen-graph   (independent — takes { lib } only)
 gen-bind    (independent — takes { lib } only)
 ```
 
-**Five of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen for identity/validation/refs. gen-select depends on gen pure tier for intensional equality. gen-derive depends on gen + gen-select for its adapter tier (core tier needs gen only).
+**Five of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen-algebra for identity/validation/refs. gen-select depends on gen-algebra pure tier for intensional equality. gen-derive depends on gen-algebra + gen-select for its adapter tier (core tier needs gen-algebra only).
 
 ## Library Roles
 
 ### Foundation Layer
 
-**gen** — Pure primitives shared across the ecosystem.
+**gen-algebra** — Pure primitives shared across the ecosystem.
 
 - Search monad (indexed state threading with convergence)
 - Intensional functions (program-point identity, conservative equality)
 - Record algebra (scoped labels, mixin composition)
 - Module tier: identity hashing, validators, strict modules, ref types
 
-Every other gen-* library that needs identity or validation imports gen. The pure tier has zero dependencies — not even nixpkgs.
+Every other gen-* library that needs identity or validation imports gen-algebra. The pure tier has zero dependencies — not even nixpkgs.
 
 ### Type System Layer
 
@@ -169,11 +169,11 @@ Three fixpoint loops, each at a different level:
 
 | Level | Library | What converges | Triggered by |
 |-------|---------|---------------|-------------|
-| Value | gen (search.converge) | Index state + continuations | Search monad operations |
+| Value | gen-algebra (search.converge) | Index state + continuations | Search monad operations |
 | Structure | gen-scope (circular attr) | Attribute values on nodes | Circular dependencies between attributes |
 | Dispatch | gen-derive (fixpoint) | Rule context + fired set | Enrichment actions that widen context |
 
-The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules that may trigger gen-scope attribute recomputation, which in turn may trigger gen search convergence. Nix's lazy evaluation ensures only demanded values are computed.
+The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules that may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
 
 ## Performance Architecture
 
@@ -214,4 +214,4 @@ The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules tha
 3. **Actions are opaque.** gen-derive doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
 4. **Conditions are opaque (in core).** gen-derive's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
 5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
-6. **Pure tier has zero deps.** gen's pure tier (search, intensional, record) works without nixpkgs. Libraries that only need identity/search import the pure tier.
+6. **Pure tier has zero deps.** gen-algebra's pure tier (search, intensional, record) works without nixpkgs. Libraries that only need identity/search import the pure tier.

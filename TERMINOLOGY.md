@@ -27,7 +27,7 @@ These terms are shared across multiple libraries.
 | **Nodes** | Vertices in a scope graph or abstract graph. Entities and aspects. | gen-scope, gen-graph, gen-schema | Neron 2015; Mokhov 2017 |
 | **Edges** | Labeled relationships between nodes: P (parent/lexical), I (import/composition), custom labels. | gen-scope, gen-graph, gen-schema | Neron 2015; van Antwerpen 2018 |
 | **Constraints** | Pruning rules that restrict resolution or composition. Propagate via graph ancestry. | gen-aspects, den | van Antwerpen 2016 (constraint-based scope graphs) |
-| **Identity** | Program-point identity for conservative equality of functions and entities. | gen, gen-aspects, gen-derive, gen-schema | Palmer 2024 §2.2 |
+| **Identity** | Program-point identity for conservative equality of functions and entities. | gen-algebra, gen-aspects, gen-derive, gen-schema | Palmer 2024 §2.2 |
 | **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-derive | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
 | **Rules** | Guarded transformation units: condition + action producer + identity. | gen-derive | Forgy 1982 (RETE); Ehrig 2006 |
 | **Fixpoint** | Convergent iteration until a stability condition holds. | gen-derive, gen-graph, gen-scope | Arntzenius 2016; Radul 2009 |
@@ -36,7 +36,7 @@ These terms are shared across multiple libraries.
 
 ## Per-Library Vocabulary
 
-### gen — Pure Primitives
+### gen-algebra — Pure Primitives
 
 Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
 
@@ -50,7 +50,7 @@ Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
 | **Intensional Equality** | Conservative equality by program point — same `name` = equal, regardless of closure contents. | Palmer 2024 §2.3, Theorem 1 (relies on Lemma 5.12) |
 | **Record** | Attrset-with-shadow-stack representation supporting scoped labels. O(1) select. | Leijen 2005 |
 | **Scoped Labels** | Duplicate labels form a stack — extension pushes, restriction pops, exposing previous values. | Leijen 2005 §2 |
-| **Mixin** | Composition operator with two orientations: Smalltalk (delta wins over parent) and Beta (parent wins). gen uses Smalltalk: `combine (delta parent) parent`. | Bracha & Cook 1990 §2-4 |
+| **Mixin** | Composition operator with two orientations: Smalltalk (delta wins over parent) and Beta (parent wins). gen-algebra uses Smalltalk: `combine (delta parent) parent`. | Bracha & Cook 1990 §2-4 |
 | **Compose** | Associative mixin composition operator (⋆). | Bracha & Cook 1990 |
 | **Either** | Sum type: `right` (success) or `left` (error). Used in validation pipelines. | — |
 | **Validator** | Named predicate with error message. `mkValidator name pred message`. | — |
@@ -154,7 +154,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 
 ### gen-select — Selector Algebra
 
-Pattern matching over attributed graph positions. Depends on gen pure tier only.
+Pattern matching over attributed graph positions. Depends on gen-algebra pure tier only.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -304,11 +304,11 @@ gen-select's `adapters.scope.mkContext` bridges gen-scope → gen-select context
 
 ### Intensional Identity
 
-Consistent across gen (foundation), gen-aspects (aspect identity), gen-derive (rule dedup), and gen-select (selector equality).
+Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-derive (rule dedup), and gen-select (selector equality).
 
 | Library | Creates | Compares | Uses |
 |---------|---------|----------|------|
-| gen | `mkIntensional name closure fn` | `intensionalEq a b` | Search continuation dedup |
+| gen-algebra | `mkIntensional name closure fn` | `intensionalEq a b` | Search continuation dedup |
 | gen-aspects | `key`, `aspectPath`, `pathKey` | — | Diamond dedup in fold-based collect |
 | gen-derive | `fromFunction` detects `mkIntensional` | Rule identity dedup across fixpoint iterations | Convergent dispatch |
 | gen-select | `sel.when` detects intensional via three-field check | `selectorEq` delegates to `intensionalEq` | Selector equality |
@@ -319,7 +319,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 
 | Library | Entry point | Monotonicity | Dedup |
 |---------|------------|-------------|-------|
-| gen (search) | `converge` | Index keys grow monotonically | Intensional continuation dedup |
+| gen-algebra (search) | `converge` | Index keys grow monotonically | Intensional continuation dedup |
 | gen-graph | `fixpoint { seed, step }` | Edge count must not shrink (throws) | Edge map equality |
 | gen-derive | `fixpoint { rules, context, ... }` | Context widens monotonically | Identified rules fire once globally |
 
@@ -340,7 +340,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 | Knuth | 1968 | Semantics of context-free languages | Attributes (inherited, synthesized) |
 | Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization (gen-aspects guard wrapping), closure environments (gen-bind partial application) |
 | Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
-| Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen), schema mixins (gen-schema) |
+| Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen-algebra), schema mixins (gen-schema) |
 | Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-derive) |
 | Vogt et al. | 1989 | Higher-order attribute grammars | Non-terminal attributes / dynamic node synthesis (gen-scope children); derived-children extends this |
 | Cardelli | 1997 | Program fragments, linking, and modularization | Module signatures (gen-bind), NixOS module bridge (gen-schema) |
@@ -348,7 +348,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 | Findler & Felleisen | 2002 | Contracts for higher-order functions | Blame tracking (gen-bind, gen-schema) |
 | Hedin & Magnusson | 2003 | JastAdd — an aspect-oriented compiler construction system | Demand-driven AG evaluation, aspect-oriented modular extension (inspires neededBy) |
 | Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra (inspires gen-derive rule composition), aspects as features |
-| Leijen | 2005 | Extensible records with scoped labels | Record algebra (gen), merge resolution (gen-bind) |
+| Leijen | 2005 | Extensible records with scoped labels | Record algebra (gen-algebra), merge resolution (gen-bind) |
 | Ehrig et al. | 2006 | Fundamentals of algebraic graph transformation | Graph rewriting rules, NACs (gen-derive) |
 | Rondon et al. | 2008 | Liquid Types | Refinement predicates (gen-schema) |
 | Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence / quiescence (gen-derive, gen-graph) |
@@ -361,7 +361,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 | Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-derive, gen-graph); phase stratification inspired by classical Datalog |
 | Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope); algebraic foundation for gen-graph |
 | van Antwerpen et al. | 2018 | Scopes as types (introduces Statix) | Custom edge labels, structural subtyping, Statix DSL (gen-scope) |
-| Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen, gen-aspects, gen-derive, gen-select) |
+| Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-derive, gen-select) |
 | Lorenzen et al. | 2025 | First-order laziness | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects deferredModule) |
 | Tarr et al. | 1999 | N degrees of separation | Multi-dimensional separation of concerns (classes as dimensions) |
 | Kiczales et al. | 1997 | Aspect-oriented programming | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ) |
