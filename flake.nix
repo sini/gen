@@ -12,11 +12,21 @@
     import-tree.url = "github:sini/import-tree";
     git-hooks-nix.url = "github:cachix/git-hooks.nix";
     git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    gen-algebra.url = "github:sini/gen-algebra";
+    gen-schema.url = "github:sini/gen-schema";
+    gen-aspects.url = "github:sini/gen-aspects";
+    gen-scope.url = "github:sini/gen-scope";
+    gen-graph.url = "github:sini/gen-graph";
+    gen-select.url = "github:sini/gen-select";
+    gen-bind.url = "github:sini/gen-bind";
+    gen-derive.url = "github:sini/gen-derive";
   };
 
-  outputs =
-    inputs:
-    {
-      lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
-    };
+  outputs = inputs: {
+    lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
+    lib.mkGenLibs = import ./lib/mkGenLibs.nix { genInputs = inputs; };
+
+    flakeModules.genLibs = ./flakeModules/genLibs.nix;
+  };
 }
