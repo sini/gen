@@ -36,11 +36,32 @@ in
 
     perSystem =
       {
+        self',
+        config,
         pkgs,
         system,
         ...
       }:
       {
+        # Pre-commit hooks: format check + unit tests
+        pre-commit = {
+          check.enable = false;
+          settings.hooks = {
+            treefmt = {
+              enable = true;
+              package = self'.formatter;
+            };
+            ci = {
+              enable = true;
+              name = "ci";
+              description = "Run nix-unit tests";
+              entry = "${inputs.nix-unit.packages.${system}.default}/bin/nix-unit --flake ./ci#tests";
+              files = "\\.nix$";
+              pass_filenames = false;
+            };
+          };
+        };
+
         treefmt = {
           projectRootFile = ".git/config";
           flakeCheck = false;
@@ -68,6 +89,8 @@ in
         '';
 
         devshells.default = {
+          devshell.startup.git-hooks.text = config.pre-commit.installationScript;
+
           packages = [
             inputs.nix-unit.packages.${system}.default
           ];

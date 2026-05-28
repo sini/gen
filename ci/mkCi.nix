@@ -11,6 +11,9 @@
 #     specialArgs = { inherit schemaLib genLib; };
 #   };
 { inputs }:
+let
+  genInputs = inputs;
+in
 {
   inputs,
   name,
@@ -34,6 +37,7 @@ inputs.flake-parts.lib.mkFlake
       inputs.treefmt-nix.flakeModule
       inputs.devshell.flakeModule
       inputs.flake-root.flakeModule
+      genInputs.git-hooks-nix.flakeModule
       ./flakeModule.nix
       (import-tree testModules)
     ];
