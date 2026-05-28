@@ -14,7 +14,7 @@
 let
   genInputs = inputs;
   # Resolve an input: prefer consumer's (via follows) if present, fall back to gen's.
-  resolve = name: inputs.${name} or genInputs.${name};
+  resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name};
 in
 {
   inputs,
