@@ -34,16 +34,16 @@ Libraries have minimal inter-dependencies. Most are independent.
 ```
 gen-algebra (pure primitives — zero deps)
 ├── gen-schema (imports gen-algebra)
+│   └── gen-aspects (imports gen-schema)
 ├── gen-select (imports gen-algebra pure tier)
 │   └── gen-derive (imports gen-algebra + gen-select adapter tier)
 │
-gen-aspects (independent — takes { lib } only)
 gen-scope   (independent — takes { lib } only)
 gen-graph   (independent — takes { lib } only)
 gen-bind    (independent — takes { lib } only)
 ```
 
-**Five of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen-algebra for identity/validation/refs. gen-select depends on gen-algebra pure tier for intensional equality. gen-derive depends on gen-algebra + gen-select for its adapter tier (core tier needs gen-algebra only).
+**Four of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen-algebra for identity/validation/refs. gen-aspects depends on gen-schema for pluggable entry types via `mkType`. gen-select depends on gen-algebra pure tier for intensional equality. gen-derive depends on gen-algebra + gen-select for its adapter tier (core tier needs gen-algebra only).
 
 ## Library Roles
 
@@ -53,7 +53,7 @@ gen-bind    (independent — takes { lib } only)
 
 - Search monad (indexed state threading with convergence)
 - Intensional functions (program-point identity, conservative equality)
-- Record algebra (scoped labels, mixin composition)
+- Record algebra (scoped labels, mixin composition, `foldLayers` for per-field-strategy fold)
 - Module tier: identity hashing, validators, strict modules, ref types
 
 Every other gen-\* library that needs identity or validation imports gen-algebra. The pure tier has zero dependencies — not even nixpkgs.
@@ -62,13 +62,13 @@ Every other gen-\* library that needs identity or validation imports gen-algebra
 
 **gen-schema** — Typed record registries.
 
-Declares **kinds** (record types), creates **instance registries**, handles strict validation, identity hashing, cross-instance references, collections, computed fields, refinement contracts, mixins, methods, and introspection. The apply pipeline is: validate → derive → apply.
+Declares **kinds** (record types), creates **instance registries**, handles strict validation, identity hashing, cross-instance references, collections, computed fields, refinement contracts, mixins, methods, and introspection. The apply pipeline is: validate → derive → apply. The `mkType` parameter on `mkSchemaEntryType` supports pluggable entry types, allowing downstream libraries (e.g., gen-aspects) to define their own schema-backed types.
 
 Consumers use gen-schema to define their entity model (hosts, users, services, etc.) with typed, validated, extensible registries.
 
 **gen-aspects** — Aspect type system.
 
-Defines the **aspectType**: one type, dispatch in merge (Palmer flat typing). Classifies aspect keys into classes (output targets), collections (data aggregation), and nested aspects (recursive). Provides guard function detection (`canTake`), program-point identity, and configuration hooks (`cnf`).
+Defines the **aspectType**: one type, dispatch in merge (Palmer flat typing). Classifies aspect keys into classes (output targets), collections (data aggregation), and nested aspects (recursive). Provides guard function detection (`canTake`), program-point identity, and configuration hooks (`cnf`). Uses gen-schema's `mkType` for `mkAspectSchema` (schema-backed aspect registries) and provides `flatten` for recursive tree-to-flat-registry conversion by path identity.
 
 Consumers use gen-aspects to define their composition units — the aspects that cut across entity boundaries and output dimensions.
 
@@ -76,7 +76,7 @@ Consumers use gen-aspects to define their composition units — the aspects that
 
 **gen-scope** — HOAG evaluator.
 
-Demand-driven evaluation over scope graphs. Provides `eval` which takes roots + attributes + parseParent and returns `{ node, get, allNodes }`. The `_eval` memoization cache co-located on every node ensures O(1) amortized attribute access. Supports inherited attributes (parent chain), synthesized attributes (children), circular attributes (fixpoint), collection attributes (traversal aggregation), and Neron resolution (D < I < P specificity).
+Demand-driven evaluation over scope graphs. Provides `eval` which takes roots + attributes + parseParent and returns `{ node, get, allNodes }`. The `_eval` memoization cache co-located on every node ensures O(1) amortized attribute access. Supports inherited attributes (parent chain), synthesized attributes (children), circular attributes (fixpoint), collection attributes (traversal aggregation with traverse modes including `"neron"` for D > I > P ordered collection), and Neron resolution (D < I < P specificity).
 
 This is the evaluation substrate — it computes values over the graph that other libraries query.
 

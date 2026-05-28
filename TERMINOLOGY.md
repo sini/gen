@@ -75,6 +75,7 @@ Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
 | **Identity Module** | NixOS module injecting deterministic `id_hash` (SHA-256) from primitive options. | — |
 | **Strict Module** | Freeform type that rejects undeclared keys with fix guidance. | — |
 | **Ref Type** | Cross-registry reference type. Input: string key. Output: resolved instance. | — |
+| **foldLayers** | Per-field-strategy fold over ordered layers. Each field declares its own merge strategy; layers are folded in order. Settings composition primitive. | Leijen 2005 (scoped labels generalized to per-field merge) |
 
 ### gen-schema — Typed Record Registries
 
@@ -101,11 +102,12 @@ Typed record registries with extension, validation, introspection, and scope-gra
 | **Blame** | Field-level error attribution for contract violations. `schema.blame`. | Findler 2002 |
 | **Mixin (schema)** | Reusable schema fragment with `requires`/`provides` fields and structural compatibility. `schema.mkMixin`. | Bracha & Cook 1990 |
 | **Derive** | Post-evaluation enrichment hook on registries. Runs after validation. | — |
+| **mkType** | Pluggable entry type parameter on `mkSchemaEntryType`. Allows downstream libraries to define schema-backed types with custom submodule structure. | — |
 | **Emit Module** | Bridge from record-algebra records to NixOS modules. `schema.emitModule`. | Cardelli 1997 |
 
 ### gen-aspects — Aspect Type System
 
-Pure aspect types: traits, classification, identity. No pipeline.
+Aspect type system with gen-schema integration. Traits, classification, identity, schema-backed registries.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -120,6 +122,8 @@ Pure aspect types: traits, classification, identity. No pipeline.
 | **neededBy** | Reverse I edges — inbound injection declarations. Static, not inside parametric bodies. | Inspired by JastAdd's aspect-oriented extension (Hedin 2003); reverse-edge semantics are den-specific |
 | **Configuration (cnf)** | Hooks: `classes`, `moduleArgs`, `aspectModules`, `metaModules`. Consumer provides these to customize aspect behavior. | — |
 | **Nested Aspects** | Non-structural, non-class keys on an aspect become sub-aspects with their own identity. | — |
+| **mkAspectSchema** | Schema-backed aspect registry using gen-schema's `mkType`. Integrates aspect types into gen-schema's kind/instance/validation infrastructure. | — |
+| **Flatten** | Recursive aspect tree → flat registry by path identity. Collapses nested aspect hierarchies into a single-level attrset keyed by path. | — |
 | **Key Classification** | Trifecta: class key (registered class → module fragment), collection key (registered collection → data), nested key (unregistered → sub-aspect). | — |
 
 ### gen-scope — HOAG Evaluator
@@ -137,7 +141,8 @@ Demand-driven Higher-Order Attribute Grammar evaluator over algebraic scope grap
 | **Inherit'** | Parent-chain walker. Walks upward until `resolve` returns non-null. Cycle-safe. | Knuth 1968 (inherited attributes) |
 | **InheritAll** | Accumulates values along entire parent chain. | — |
 | **Circular** | Fixed-point iteration attribute. `init` → iterate `f` → converge via `eq`. | Sloane 2010; Arntzenius 2016 |
-| **CollectionAttr** | Traversal-based aggregation attribute. Traverse modes: `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"label:<name>"`, or custom function. | Van Wyk 2010 (Silver collection attributes); Sloane 2010 (planned, §7) |
+| **CollectionAttr** | Traversal-based aggregation attribute. Traverse modes: `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"label:<name>"`, `"neron"`, or custom function. | Van Wyk 2010 (Silver collection attributes); Sloane 2010 (planned, §7) |
+| **Neron Traverse** | `"neron"` traverse mode on `collectionAttr`. Collects contributions in D > I > P order — all contributions from matching scopes, complementing `query`'s single-result resolution. | Neron 2015 |
 | **Query** | Neron resolution: local → imports → parent with specificity D < I < P. | Neron 2015 |
 | **QueryAll** | All reachable results without shadowing. For ambiguity detection. | Neron 2015 |
 | **ParamAttr** | Parameterized attribute: `f self id param`. | Sloane 2010 §3 |

@@ -20,32 +20,32 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 
 | Library | What it does | Tests | Deps |
 |---------|-------------|-------|------|
-| [gen-algebra](https://github.com/sini/gen-algebra) | Search monad, intensional functions, record algebra, validators | 40 | none |
-| [gen-schema](https://github.com/sini/gen-schema) | Typed registries: kinds, instances, refs, collections, refinements, mixins | 129 | gen-algebra |
-| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system: traits, classification, identity, class dispatch | 40 | none |
-| [gen-scope](https://github.com/sini/gen-scope) | HOAG evaluator: demand-driven attributes over scope graphs | 145 | none |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Search monad, intensional functions, record algebra, validators | 117 | none |
+| [gen-schema](https://github.com/sini/gen-schema) | Typed registries: kinds, instances, refs, collections, refinements, mixins | 304 | gen-algebra |
+| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system: traits, classification, identity, class dispatch | 67 | gen-schema |
+| [gen-scope](https://github.com/sini/gen-scope) | HOAG evaluator: demand-driven attributes over scope graphs | 152 | none |
 | [gen-graph](https://github.com/sini/gen-graph) | Graph queries: accessor-based traversal, reachability, cycles, fixpoint | 105 | none |
 | [gen-select](https://github.com/sini/gen-select) | Selector algebra: compositional pattern matching over graph positions | 163 | gen-algebra |
 | [gen-bind](https://github.com/sini/gen-bind) | Module binding: inject args into NixOS modules, contracts, blame | 40+ | none |
 | [gen-derive](https://github.com/sini/gen-derive) | Rule dispatch: stratified phases, fixpoint convergence, conflict resolution | 55 | gen-algebra, gen-select |
 
-**Total: 717+ tests across 8 libraries.**
+**Total: 1003+ tests across 8 libraries.**
 
 ## Architecture
 
 ```
 gen-algebra (pure primitives)
 ├── gen-schema (typed registries)
+│   └── gen-aspects (aspect types)
 ├── gen-select (selector algebra)
 │   └── gen-derive (rule dispatch)
 │
-gen-aspects (aspect types)          ← independent
 gen-scope   (HOAG evaluator)        ← independent
 gen-graph   (graph queries)         ← independent
 gen-bind    (module binding)        ← independent
 ```
 
-Five of eight libraries have zero gen-ecosystem dependencies. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full composition model, data flow, and performance architecture.
+Four of eight libraries have zero gen-ecosystem dependencies. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full composition model, data flow, and performance architecture.
 
 ## Core Ideas
 
