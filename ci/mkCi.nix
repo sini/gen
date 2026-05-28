@@ -13,6 +13,8 @@
 { inputs }:
 let
   genInputs = inputs;
+  # Resolve an input: prefer consumer's (via follows) if present, fall back to gen's.
+  resolve = name: inputs.${name} or genInputs.${name};
 in
 {
   inputs,
@@ -22,7 +24,7 @@ in
 }:
 let
   inherit (inputs.nixpkgs) lib;
-  import-tree = import inputs.import-tree;
+  import-tree = import (resolve "import-tree");
 in
 inputs.flake-parts.lib.mkFlake
   {
@@ -34,10 +36,10 @@ inputs.flake-parts.lib.mkFlake
   }
   {
     imports = [
-      inputs.treefmt-nix.flakeModule
-      inputs.devshell.flakeModule
-      inputs.flake-root.flakeModule
-      genInputs.git-hooks-nix.flakeModule
+      (resolve "treefmt-nix").flakeModule
+      (resolve "devshell").flakeModule
+      (resolve "flake-root").flakeModule
+      (resolve "git-hooks-nix").flakeModule
       ./flakeModule.nix
       (import-tree testModules)
     ];
