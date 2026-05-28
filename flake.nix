@@ -17,7 +17,6 @@
   outputs =
     inputs:
     {
-      flakeModules.ci = ./ci/flakeModule.nix;
       lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
     };
 }

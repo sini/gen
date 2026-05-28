@@ -13,8 +13,6 @@
 { inputs }:
 let
   genInputs = inputs;
-  # Resolve an input: prefer consumer's (via follows) if present, fall back to gen's.
-  resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name};
 in
 {
   inputs,
@@ -24,13 +22,15 @@ in
 }:
 let
   inherit (inputs.nixpkgs) lib;
+  # Resolve an input: prefer consumer's if present, fall back to gen's.
+  resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name};
   import-tree = import (resolve "import-tree");
 in
-inputs.flake-parts.lib.mkFlake
+(resolve "flake-parts").lib.mkFlake
   {
     inherit inputs;
     specialArgs = {
-      inherit name;
+      inherit name genInputs;
     }
     // specialArgs;
   }

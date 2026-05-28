@@ -7,9 +7,13 @@
   config,
   lib,
   inputs,
+  genInputs,
   name,
   ...
 }:
+let
+  resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name};
+in
 let
   tests = config.flake.tests;
 
@@ -55,7 +59,7 @@ in
               enable = true;
               name = "ci";
               description = "Run nix-unit tests";
-              entry = "${inputs.nix-unit.packages.${system}.default}/bin/nix-unit --flake ./ci#tests";
+              entry = "${(resolve "nix-unit").packages.${system}.default}/bin/nix-unit --flake ./ci#tests";
               files = "\\.nix$";
               pass_filenames = false;
             };
@@ -92,7 +96,7 @@ in
           devshell.startup.git-hooks.text = config.pre-commit.installationScript;
 
           packages = [
-            inputs.nix-unit.packages.${system}.default
+            (resolve "nix-unit").packages.${system}.default
           ];
 
           env = [
