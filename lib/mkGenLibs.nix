@@ -19,8 +19,8 @@ let
   # gen-graph: functor, call with { lib }
   graph = genInputs.gen-graph { inherit lib; };
 
-  # gen-bind: .lib flake output (already instantiated with nixpkgs from its flake)
-  bind = genInputs.gen-bind.lib;
+  # gen-bind: import with consumer's lib for version coherence
+  bind = import "${genInputs.gen-bind}/nix/lib" { inherit lib; };
 
   # --- libraries with cross-deps ---
 
