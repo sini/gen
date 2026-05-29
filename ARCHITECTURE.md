@@ -152,20 +152,20 @@ The accessor pattern is the zero-cost bridge between libraries:
 result = engine.eval { roots; attributes; parseParent; };
 
 # gen-graph queries through gen-scope's accessors — O(1) per cached attr
-graphLib.reachableFrom {
+genGraph.reachableFrom {
   edges = id: result.get id "imports";   # hits _eval cache
 } "host:igloo"
 
 # gen-select matches through gen-scope's accessors
-ctx = selectLib.adapters.scope.mkContext {
+ctx = genSelect.adapters.scope.mkContext {
   node = result.node;
   get = result.get;
 };
-selectLib.matches (sel.attrs { type = "host"; }) "host:igloo" ctx
+genSelect.matches (sel.attrs { type = "host"; }) "host:igloo" ctx
 
 # gen-derive uses gen-select adapter for rule conditions
-deriveLib.dispatch {
-  match = deriveLib.adapters.select.mkMatch selectLib;
+genDerive.dispatch {
+  match = genDerive.adapters.select.mkMatch genSelect;
   # ...
 };
 ```

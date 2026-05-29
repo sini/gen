@@ -8,7 +8,7 @@
 #     inherit inputs;
 #     name = "gen-schema";
 #     testModules = ./tests;
-#     specialArgs = { inherit schemaLib genLib; };
+#     specialArgs = { inherit genSchema genAlgebra; };
 #   };
 { inputs }:
 let
