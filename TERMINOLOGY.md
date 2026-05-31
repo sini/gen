@@ -29,6 +29,7 @@ A consistent vocabulary grounded in academic literature, spanning all eight gen 
 1. **Prefix conventions are consistent across the ecosystem:**
    - `_key` on module-system configs = internal computed/read-only options (e.g., `_topology`, `_strict`, `_module`)
    - `__key` on plain attrsets = framework markers and pipeline internals (e.g., `__functor`, `__isWrappedFn`, `__sel`)
+1. **No wasted work, by construction (Lévy 1978).** Laziness discharges Lévy's type-1 obligation (never evaluate a discarded subexpression) for free (Barendregt 1987); first-order acyclic scope/attribute evaluation never instantiates Lévy's type-2 (interior-sharing) problem. So no optimal-reduction engine is needed — `_eval`/dedup is Wadsworth DAG sharing, not interior sharing.
 
 ______________________________________________________________________
 
