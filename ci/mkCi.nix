@@ -19,6 +19,7 @@ in
   name,
   testModules,
   specialArgs ? { },
+  extraModules ? [ ],
 }:
 let
   inherit (inputs.nixpkgs) lib;
@@ -42,5 +43,6 @@ in
       (resolve "git-hooks-nix").flakeModule
       ./flakeModule.nix
       (import-tree testModules)
-    ];
+    ]
+    ++ extraModules;
   }
