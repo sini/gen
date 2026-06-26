@@ -13,6 +13,7 @@
     git-hooks-nix.url = "github:cachix/git-hooks.nix";
     git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+    gen-prelude.url = "github:sini/gen-prelude";
     gen-algebra.url = "github:sini/gen-algebra";
     gen-schema.url = "github:sini/gen-schema";
     gen-aspects.url = "github:sini/gen-aspects";

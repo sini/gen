@@ -1,6 +1,6 @@
 # mkGenLibs: two-stage instantiation of the gen library ecosystem.
 #
-# Stage 1 (definition time): captures genInputs containing the 8 gen-* flake inputs.
+# Stage 1 (definition time): captures genInputs containing the 9 gen-* flake inputs.
 # Stage 2 (consumer time): takes { lib } and returns the fully-wired library set.
 #
 # This split exists because consumers don't have gen-algebra, gen-schema, etc. as
@@ -9,6 +9,9 @@
 { lib }:
 let
   # --- independent libraries (no cross-deps) ---
+
+  # gen-prelude: pure utilities, zero deps (the nixpkgs-lib-free base). Takes no args.
+  prelude = import "${genInputs.gen-prelude}/lib" { };
 
   # gen-algebra: functor, call with { lib }
   algebra = genInputs.gen-algebra { inherit lib; };
@@ -50,6 +53,7 @@ let
 in
 {
   inherit
+    prelude
     algebra
     schema
     aspects
