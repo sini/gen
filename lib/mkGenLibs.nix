@@ -22,8 +22,9 @@ let
   # gen-graph: functor, call with { lib }
   graph = genInputs.gen-graph { inherit lib; };
 
-  # gen-bind: import with consumer's lib for version coherence
-  bind = import "${genInputs.gen-bind}/nix/lib" { inherit lib; };
+  # gen-bind: nixpkgs-lib-free, built from gen-prelude (module-system-aware via
+  # locally-vendored convention helpers, not nixpkgs.lib).
+  bind = import "${genInputs.gen-bind}/lib" { inherit prelude; };
 
   # --- libraries with cross-deps ---
 
@@ -39,16 +40,13 @@ let
     inherit lib;
   };
 
-  # gen-select: takes { lib, genAlgebra }
-  select = import "${genInputs.gen-select}/lib" {
-    inherit lib;
-    genAlgebra = algebra.pure;
-  };
+  # gen-select: zero dependencies (intensionalEq inlined; no lib, no gen-algebra).
+  select = import "${genInputs.gen-select}/lib" { };
 
   # gen-derive: takes { lib, genAlgebra }
   derive = import "${genInputs.gen-derive}/lib" {
     inherit lib;
-    genAlgebra = algebra.pure;
+    genAlgebra = algebra.lib;
   };
 in
 {

@@ -17,9 +17,9 @@ in
   inherit genAlgebra genSchema genAspects genScope genGraph genSelect genBind genDerive;
 
   # Shortcuts for the most common primitives
-  inherit (genAlgebra.pure) mkIntensional intensionalEq;
+  inherit (genAlgebra.lib) mkIntensional intensionalEq;
   inherit (genAlgebra) either;
   inherit (genSchema) mkValidator; # relocated from gen-algebra 2026-06-26
-  record = genAlgebra.pure.record;
-  search = genAlgebra.pure.search;
+  record = genAlgebra.lib.record;
+  search = genAlgebra.lib.search;
 }
