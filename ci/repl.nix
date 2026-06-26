@@ -18,7 +18,8 @@ in
 
   # Shortcuts for the most common primitives
   inherit (genAlgebra.pure) mkIntensional intensionalEq;
-  inherit (genAlgebra) mkValidator either;
+  inherit (genAlgebra) either;
+  inherit (genSchema) mkValidator; # relocated from gen-algebra 2026-06-26
   record = genAlgebra.pure.record;
   search = genAlgebra.pure.search;
 }
