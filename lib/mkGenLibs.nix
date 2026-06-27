@@ -43,11 +43,9 @@ let
   # gen-select: zero dependencies (intensionalEq inlined; no lib, no gen-algebra).
   select = import "${genInputs.gen-select}/lib" { };
 
-  # gen-derive: takes { lib, genAlgebra }
-  derive = import "${genInputs.gen-derive}/lib" {
-    inherit lib;
-    genAlgebra = algebra.lib;
-  };
+  # gen-derive: nixpkgs-lib-free + gen-algebra-free (the dead gen-algebra dep was
+  # dropped; toposort/filterAttrs/imap0/unique come from gen-prelude).
+  derive = import "${genInputs.gen-derive}/lib" { inherit prelude; };
 in
 {
   inherit
