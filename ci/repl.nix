@@ -1,25 +1,39 @@
 # gen ecosystem REPL — all libraries in scope.
+# Every gen flake exposes a `.lib` value output (the canonical convention), so each
+# library is reached uniformly via `(getFlake "gen-X").lib`.
 let
   nixpkgs = import (builtins.getFlake "nixpkgs") { };
   inherit (nixpkgs) lib;
 
-  genAlgebra = import (builtins.getFlake "gen-algebra") { inherit lib; };
+  genAlgebra = (builtins.getFlake "gen-algebra").lib;
   genSchema = (builtins.getFlake "gen-schema").lib;
-  genAspects = import "${builtins.getFlake "gen-aspects"}/lib" { inherit lib; };
-  genScope = import (builtins.getFlake "gen-scope") { inherit lib; };
-  genGraph = import (builtins.getFlake "gen-graph") { inherit lib; };
-  genSelect = import "${builtins.getFlake "gen-select"}/lib" { inherit lib; };
+  genAspects = (builtins.getFlake "gen-aspects").lib;
+  genScope = (builtins.getFlake "gen-scope").lib;
+  genGraph = (builtins.getFlake "gen-graph").lib;
+  genSelect = (builtins.getFlake "gen-select").lib;
   genBind = (builtins.getFlake "gen-bind").lib;
-  genDerive = import "${builtins.getFlake "gen-derive"}/lib" { inherit lib; };
+  genDerive = (builtins.getFlake "gen-derive").lib;
 in
 {
   inherit lib;
-  inherit genAlgebra genSchema genAspects genScope genGraph genSelect genBind genDerive;
+  inherit
+    genAlgebra
+    genSchema
+    genAspects
+    genScope
+    genGraph
+    genSelect
+    genBind
+    genDerive
+    ;
 
-  # Shortcuts for the most common primitives
-  inherit (genAlgebra.lib) mkIntensional intensionalEq;
-  inherit (genAlgebra) either;
+  # Shortcuts for the most common primitives (gen-algebra is the flat value set).
+  inherit (genAlgebra)
+    mkIntensional
+    intensionalEq
+    either
+    record
+    search
+    ;
   inherit (genSchema) mkValidator; # relocated from gen-algebra 2026-06-26
-  record = genAlgebra.lib.record;
-  search = genAlgebra.lib.search;
 }
