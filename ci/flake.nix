@@ -8,6 +8,7 @@
     gen-select.url = "github:sini/gen-select";
     gen-bind.url = "github:sini/gen-bind";
     gen-derive.url = "github:sini/gen-derive";
+    gen-resolve.url = "github:sini/gen-resolve";
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-root.url = "github:srid/flake-root";

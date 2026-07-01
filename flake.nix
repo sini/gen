@@ -22,6 +22,7 @@
     gen-select.url = "github:sini/gen-select";
     gen-bind.url = "github:sini/gen-bind";
     gen-derive.url = "github:sini/gen-derive";
+    gen-resolve.url = "github:sini/gen-resolve";
   };
 
   outputs = inputs: {

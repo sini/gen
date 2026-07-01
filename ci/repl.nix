@@ -13,6 +13,7 @@ let
   genSelect = (builtins.getFlake "gen-select").lib;
   genBind = (builtins.getFlake "gen-bind").lib;
   genDerive = (builtins.getFlake "gen-derive").lib;
+  genResolve = (builtins.getFlake "gen-resolve").lib;
 in
 {
   inherit lib;
@@ -25,6 +26,7 @@ in
     genSelect
     genBind
     genDerive
+    genResolve
     ;
 
   # Shortcuts for the most common primitives (gen-algebra is the flat value set).

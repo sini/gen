@@ -17,4 +17,5 @@ _:
   aspects = genInputs.gen-aspects.lib;
   select = genInputs.gen-select.lib;
   derive = genInputs.gen-derive.lib;
+  resolve = genInputs.gen-resolve.lib;
 }
