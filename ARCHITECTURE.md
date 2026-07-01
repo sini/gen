@@ -36,14 +36,14 @@ gen-algebra (pure primitives — zero deps)
 ├── gen-schema (imports gen-algebra)
 │   └── gen-aspects (imports gen-schema)
 ├── gen-select (imports gen-algebra pure tier)
-│   └── gen-derive (imports gen-algebra + gen-select adapter tier)
+│   └── gen-dispatch (imports gen-algebra + gen-select adapter tier)
 │
 gen-scope   (independent — takes { lib } only)
 gen-graph   (independent — takes { lib } only)
 gen-bind    (independent — takes { lib } only)
 ```
 
-**Four of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen-algebra for identity/validation/refs. gen-aspects depends on gen-schema for pluggable entry types via `mkType`. gen-select depends on gen-algebra pure tier for intensional equality. gen-derive depends on gen-algebra + gen-select for its adapter tier (core tier needs gen-algebra only).
+**Four of eight libraries have zero gen-ecosystem dependencies.** gen-schema depends on gen-algebra for identity/validation/refs. gen-aspects depends on gen-schema for pluggable entry types via `mkType`. gen-select depends on gen-algebra pure tier for intensional equality. gen-dispatch depends on gen-algebra + gen-select for its adapter tier (core tier needs gen-algebra only).
 
 ## Library Roles
 
@@ -98,7 +98,7 @@ Injects external values into NixOS module functions. Handles three module shapes
 
 ### Dispatch Layer
 
-**gen-derive** — Stratified rule dispatch.
+**gen-dispatch** — Stratified rule dispatch.
 
 Production rule system: rules (condition + action producer + identity) dispatched across stratified phases with DAG ordering. Fixpoint convergence loop handles monotonic context widening. Conflict resolution: override → priority → specificity → additive. Adapter tier bridges gen-select selectors as conditions.
 
@@ -117,7 +117,7 @@ Production rule system: rules (condition + action producer + identity) dispatche
    gen-scope: eval builds nodes, computes attributes demand-driven
 
 4. Rules dispatch policies
-   gen-derive: rules fire on context, produce effects, converge via fixpoint
+   gen-dispatch: rules fire on context, produce effects, converge via fixpoint
 
 5. Selectors match positions
    gen-select: neededBy, pipe.gather, policy guards use selectors as predicates
@@ -136,7 +136,7 @@ Entity declarations (user input)
   → gen-schema registries (typed, validated, referenced)
   → gen-scope graph nodes (minimal descriptors with decls)
   → gen-scope eval (demand-driven attribute computation)
-       ├─ gen-derive dispatch (policy rules fire, produce effects)
+       ├─ gen-dispatch dispatch (policy rules fire, produce effects)
        ├─ gen-select matches (selectors filter graph positions)
        └─ gen-graph queries (reachability, cycles, impact)
   → gen-bind wrapping (computed values → NixOS module args)
@@ -163,9 +163,9 @@ ctx = genSelect.adapters.scope.mkContext {
 };
 genSelect.matches (sel.attrs { type = "host"; }) "host:igloo" ctx
 
-# gen-derive uses gen-select adapter for rule conditions
-genDerive.dispatch {
-  match = genDerive.adapters.select.mkMatch genSelect;
+# gen-dispatch uses gen-select adapter for rule conditions
+genDispatch.dispatch {
+  match = genDispatch.adapters.select.mkMatch genSelect;
   # ...
 };
 ```
@@ -180,9 +180,9 @@ Three fixpoint loops, each at a different level:
 |-------|---------|---------------|-------------|
 | Value | gen-algebra (search.converge) | Index state + continuations | Search monad operations |
 | Structure | gen-scope (circular attr) | Attribute values on nodes | Circular dependencies between attributes |
-| Dispatch | gen-derive (fixpoint) | Rule context + fired set | Enrichment actions that widen context |
+| Dispatch | gen-dispatch (fixpoint) | Rule context + fired set | Enrichment actions that widen context |
 
-The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules that may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
+The consumer (den) coordinates these: gen-dispatch's fixpoint dispatches rules that may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
 
 ## Performance Architecture
 
@@ -192,7 +192,7 @@ The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules tha
 |---------|-----------|-------|
 | gen-scope | `_eval` attrset co-located on each node | Per-node, per-attribute |
 | gen-graph | Accessor functions (caller's responsibility) | Delegates to source (gen-scope `_eval` when wired) |
-| gen-derive | `fired` set across fixpoint iterations | Per-dispatch-session |
+| gen-dispatch | `fired` set across fixpoint iterations | Per-dispatch-session |
 | gen-select | None (stateless predicate evaluation) | Each match is fresh but data access hits gen-scope cache |
 
 ### Cost Model
@@ -220,7 +220,7 @@ The consumer (den) coordinates these: gen-derive's fixpoint dispatches rules tha
 
 1. **No circular library dependencies.** The dependency DAG is strictly acyclic.
 1. **Libraries don't import each other's flake inputs.** gen-select doesn't import gen-scope; it provides adapters that accept gen-scope's result shape.
-1. **Actions are opaque.** gen-derive doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
-1. **Conditions are opaque (in core).** gen-derive's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
+1. **Actions are opaque.** gen-dispatch doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
+1. **Conditions are opaque (in core).** gen-dispatch's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
 1. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
 1. **Pure tier has zero deps.** gen-algebra's pure tier (search, intensional, record) works without nixpkgs. Libraries that only need identity/search import the pure tier.

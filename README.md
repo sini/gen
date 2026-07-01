@@ -27,7 +27,7 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 | [gen-graph](https://github.com/sini/gen-graph) | Graph queries: accessor-based traversal, reachability, cycles, fixpoint | 105 | none |
 | [gen-select](https://github.com/sini/gen-select) | Selector algebra: compositional pattern matching over graph positions | 163 | gen-algebra |
 | [gen-bind](https://github.com/sini/gen-bind) | Module binding: inject args into NixOS modules, contracts, blame | 40+ | none |
-| [gen-derive](https://github.com/sini/gen-derive) | Rule dispatch: stratified phases, fixpoint convergence, conflict resolution | 55 | gen-algebra, gen-select |
+| [gen-dispatch](https://github.com/sini/gen-dispatch) | Rule dispatch: stratified phases, fixpoint convergence, conflict resolution | 55 | gen-algebra, gen-select |
 
 **Total: 1003+ tests across 8 libraries.**
 
@@ -38,7 +38,7 @@ gen-algebra (pure primitives)
 ├── gen-schema (typed registries)
 │   └── gen-aspects (aspect types)
 ├── gen-select (selector algebra)
-│   └── gen-derive (rule dispatch)
+│   └── gen-dispatch (rule dispatch)
 │
 gen-scope   (HOAG evaluator)        ← independent
 gen-graph   (graph queries)         ← independent
@@ -53,9 +53,9 @@ Four of eight libraries have zero gen-ecosystem dependencies. See [ARCHITECTURE.
 
 **Accessors, not data.** gen-graph takes `{ edges = id: [...]; }` — functions, not materialized maps. gen-select takes `{ data = id: {...}; parent = id: ...; }`. When wired to gen-scope's memoized `result.get`, accessor calls are O(1) after first evaluation. Zero redundant computation between libraries.
 
-**Identity everywhere.** Palmer's intensional functions (program-point identity + conservative equality) power dedup across the ecosystem: search continuation dedup (gen-algebra), aspect diamond dedup (gen-aspects), rule identity dedup in fixpoint loops (gen-derive), selector equality (gen-select).
+**Identity everywhere.** Palmer's intensional functions (program-point identity + conservative equality) power dedup across the ecosystem: search continuation dedup (gen-algebra), aspect diamond dedup (gen-aspects), rule identity dedup in fixpoint loops (gen-dispatch), selector equality (gen-select).
 
-**Actions are opaque.** gen-derive dispatches rules and groups actions by phase, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
+**Actions are opaque.** gen-dispatch dispatches rules and groups actions by phase, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
 
 ## Theoretical Foundations
 

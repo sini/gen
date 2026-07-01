@@ -18,6 +18,6 @@ in
     genGraph = genLibs.graph;
     genSelect = genLibs.select;
     genBind = genLibs.bind;
-    genDerive = genLibs.derive;
+    genDispatch = genLibs.dispatch;
   };
 }

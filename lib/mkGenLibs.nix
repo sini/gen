@@ -16,6 +16,6 @@ _:
   schema = genInputs.gen-schema.lib;
   aspects = genInputs.gen-aspects.lib;
   select = genInputs.gen-select.lib;
-  derive = genInputs.gen-derive.lib;
+  dispatch = genInputs.gen-dispatch.lib;
   resolve = genInputs.gen-resolve.lib;
 }

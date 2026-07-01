@@ -12,7 +12,7 @@ let
   genGraph = (builtins.getFlake "gen-graph").lib;
   genSelect = (builtins.getFlake "gen-select").lib;
   genBind = (builtins.getFlake "gen-bind").lib;
-  genDerive = (builtins.getFlake "gen-derive").lib;
+  genDispatch = (builtins.getFlake "gen-dispatch").lib;
   genResolve = (builtins.getFlake "gen-resolve").lib;
 in
 {
@@ -25,7 +25,7 @@ in
     genGraph
     genSelect
     genBind
-    genDerive
+    genDispatch
     genResolve
     ;
 

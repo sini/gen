@@ -14,7 +14,7 @@ A consistent vocabulary grounded in academic literature, spanning all eight gen 
   - [gen-graph](#gen-graph--accessor-based-graph-queries)
   - [gen-select](#gen-select--selector-algebra)
   - [gen-bind](#gen-bind--module-binding)
-  - [gen-derive](#gen-derive--stratified-rule-dispatch)
+  - [gen-dispatch](#gen-dispatch--stratified-rule-dispatch)
 - [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
 - [Classes: The Output Dimension](#classes-the-output-dimension)
 - [Cross-Cutting Patterns](#cross-cutting-patterns)
@@ -46,10 +46,10 @@ These terms are shared across multiple libraries.
 | **Nodes** | Vertices in a scope graph or abstract graph. Entities and aspects. | gen-scope, gen-graph, gen-schema | Neron 2015; Mokhov 2017 |
 | **Edges** | Labeled relationships between nodes: P (parent/lexical), I (import/composition), custom labels. | gen-scope, gen-graph, gen-schema | Neron 2015; van Antwerpen 2018 |
 | **Constraints** | Pruning rules that restrict resolution or composition. Propagate via graph ancestry. | gen-aspects, den | van Antwerpen 2016 (constraint-based scope graphs) |
-| **Identity** | Program-point identity for conservative equality of functions and entities. | gen-algebra, gen-aspects, gen-derive, gen-schema | Palmer 2024 §2.2 |
-| **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-derive | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
-| **Rules** | Guarded transformation units: condition + action producer + identity. | gen-derive | Forgy 1982 (RETE); Ehrig 2006 |
-| **Fixpoint** | Convergent iteration until a stability condition holds. | gen-derive, gen-graph, gen-scope | Arntzenius 2016; Radul 2009 |
+| **Identity** | Program-point identity for conservative equality of functions and entities. | gen-algebra, gen-aspects, gen-dispatch, gen-schema | Palmer 2024 §2.2 |
+| **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-dispatch | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
+| **Rules** | Guarded transformation units: condition + action producer + identity. | gen-dispatch | Forgy 1982 (RETE); Ehrig 2006 |
+| **Fixpoint** | Convergent iteration until a stability condition holds. | gen-dispatch, gen-graph, gen-scope | Arntzenius 2016; Radul 2009 |
 
 ______________________________________________________________________
 
@@ -219,7 +219,7 @@ Inject external bindings into NixOS module functions with collision detection an
 | **Arg Stripping** | Removes bound arg names from a module's advertised formal args. Prevents `evalModules` from probing `_module.args` for bound names. | — |
 | **Module Shapes** | Three shapes: function (`{ arg, ... }: { ... }`), imports attrset (`{ imports = [...]; }`), plain attrset (`{ config = ...; }`). | — |
 
-### gen-derive — Stratified Rule Dispatch
+### gen-dispatch — Stratified Rule Dispatch
 
 Production rule system with stratified phases and fixpoint convergence.
 
@@ -233,14 +233,14 @@ Production rule system with stratified phases and fixpoint convergence.
 | **Dispatch** | One-shot: fire matching rules, group actions by phase in topological order. NAC → match → override → priority → exclusive → fire → classify → group. | — |
 | **Fixpoint (derive)** | Convergent dispatch loop: dispatch → extract feedback → widen context → check stability → repeat. Identified rules fire at most once across iterations. | Arntzenius 2016; Radul 2009 |
 | **NAC** | Negative Application Condition — pattern that must NOT match. First-class `nac` field, checked before condition. | Ehrig 2006 |
-| **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Inspired by Batory 2005 (AHEAD feature composition); override semantics are gen-derive's design |
+| **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Inspired by Batory 2005 (AHEAD feature composition); override semantics are gen-dispatch's design |
 | **Priority** | Numeric precedence (higher fires first). `exclusive` mode: only highest-priority group fires. | — |
 | **Specificity** | Selector constraint term count. Adapter tier only, via `selectorSpecificity`. | CSS Selectors (specificity) |
 | **Conflict Resolution** | Three-tier: override suppression → priority sort → specificity → additive ties. | — |
 | **fromFunction** | Converts a Nix function into a rule. `builtins.functionArgs` as condition. Detects `mkIntensional`. | Palmer 2024 |
 | **fromFunctionMatch** | Default match implementation for `fromFunction` rules. Checks required args present in context. | — |
 | **mkActions** | Generates tagged action constructors + `classify` from phase declarations. | — |
-| **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-derive's design |
+| **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-dispatch's design |
 | **Adapter** | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution. | — |
 
 ______________________________________________________________________
@@ -328,13 +328,13 @@ gen-select's `adapters.scope.mkContext` bridges gen-scope → gen-select context
 
 ### Intensional Identity
 
-Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-derive (rule dedup), and gen-select (selector equality).
+Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-dispatch (rule dedup), and gen-select (selector equality).
 
 | Library | Creates | Compares | Uses |
 |---------|---------|----------|------|
 | gen-algebra | `mkIntensional name closure fn` | `intensionalEq a b` | Search continuation dedup |
 | gen-aspects | `key`, `aspectPath`, `pathKey` | — | Diamond dedup in fold-based collect |
-| gen-derive | `fromFunction` detects `mkIntensional` | Rule identity dedup across fixpoint iterations | Convergent dispatch |
+| gen-dispatch | `fromFunction` detects `mkIntensional` | Rule identity dedup across fixpoint iterations | Convergent dispatch |
 | gen-select | `sel.when` detects intensional via three-field check | `selectorEq` delegates to `intensionalEq` | Selector equality |
 
 ### Fixpoint Convergence
@@ -345,7 +345,7 @@ Three libraries implement fixpoint loops, each with domain-appropriate semantics
 |---------|------------|-------------|-------|
 | gen-algebra (search) | `converge` | Index keys grow monotonically | Intensional continuation dedup |
 | gen-graph | `fixpoint { seed, step }` | Edge count must not shrink (throws) | Edge map equality |
-| gen-derive | `fixpoint { rules, context, ... }` | Context widens monotonically | Identified rules fire once globally |
+| gen-dispatch | `fixpoint { rules, context, ... }` | Context widens monotonically | Identified rules fire once globally |
 
 ### Lazy Evaluation Contracts
 
@@ -365,27 +365,27 @@ ______________________________________________________________________
 | Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization (gen-aspects guard wrapping), closure environments (gen-bind partial application) |
 | Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
 | Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen-algebra), schema mixins (gen-schema) |
-| Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-derive) |
+| Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-dispatch) |
 | Vogt et al. | 1989 | Higher-order attribute grammars | Non-terminal attributes / dynamic node synthesis (gen-scope children); derived-children extends this |
 | Cardelli | 1997 | Program fragments, linking, and modularization | Module signatures (gen-bind), NixOS module bridge (gen-schema) |
 | Hedin | 2000 | Reference attributed grammars | Cross-node import edges (gen-scope) |
 | Findler & Felleisen | 2002 | Contracts for higher-order functions | Blame tracking (gen-bind, gen-schema) |
 | Hedin & Magnusson | 2003 | JastAdd — an aspect-oriented compiler construction system | Demand-driven AG evaluation, aspect-oriented modular extension (inspires neededBy) |
-| Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra (inspires gen-derive rule composition), aspects as features |
+| Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra (inspires gen-dispatch rule composition), aspects as features |
 | Leijen | 2005 | Extensible records with scoped labels | Record algebra (gen-algebra), merge resolution (gen-bind) |
-| Ehrig et al. | 2006 | Fundamentals of algebraic graph transformation | Graph rewriting rules, NACs (gen-derive) |
+| Ehrig et al. | 2006 | Fundamentals of algebraic graph transformation | Graph rewriting rules, NACs (gen-dispatch) |
 | Rondon et al. | 2008 | Liquid Types | Refinement predicates (gen-schema) |
-| Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence / quiescence (gen-derive, gen-graph) |
-| Berry & Boudol | 1990 | The chemical abstract machine | Rules as reactions (gen-derive) |
+| Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence / quiescence (gen-dispatch, gen-graph) |
+| Berry & Boudol | 1990 | The chemical abstract machine | Rules as reactions (gen-dispatch) |
 | Sloane et al. | 2010 | A pure embedding of attribute grammars (Kiama) | Attribute combinators, CachedAttribute, paramAttr, circular attributes (gen-scope); collection attributes planned (§7) |
 | Van Wyk et al. | 2010 | Silver | Forwarding, collection attributes |
 | Chitil | 2012 | Practical typed lazy contracts | Lazy contracts (gen-bind, gen-schema) |
 | Neron et al. | 2015 | A theory of name resolution | Scope graphs, P/I edges, resolution (gen-scope, gen-select) |
 | van Antwerpen et al. | 2016 | A constraint language for static semantic analysis based on scope graphs | Constraint-based scope graph resolution, well-formedness generalization |
-| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-derive, gen-graph); phase stratification inspired by classical Datalog |
+| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-dispatch, gen-graph); phase stratification inspired by classical Datalog |
 | Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope); algebraic foundation for gen-graph |
 | van Antwerpen et al. | 2018 | Scopes as types (introduces Statix) | Custom edge labels, structural subtyping, Statix DSL (gen-scope) |
-| Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-derive, gen-select) |
+| Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-dispatch, gen-select) |
 | Lorenzen et al. | 2025 | First-order laziness | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects deferredModule) |
 | Tarr et al. | 1999 | N degrees of separation | Multi-dimensional separation of concerns (classes as dimensions) |
 | Kiczales et al. | 1997 | Aspect-oriented programming | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ) |
