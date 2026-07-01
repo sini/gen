@@ -1,12 +1,13 @@
 # gen Ecosystem Terminology
 
-A consistent vocabulary grounded in academic literature, spanning all eight gen libraries and the den framework that consumes them.
+A consistent vocabulary grounded in academic literature, spanning the gen libraries and the den framework that consumes them.
 
 ## Table of Contents
 
 - [Design Principles](#design-principles)
 - [Core Terms](#core-terms)
 - [Per-Library Vocabulary](#per-library-vocabulary)
+  - [gen-prelude](#gen-prelude--pure-utility-base)
   - [gen-algebra](#gen-algebra--pure-primitives)
   - [gen-schema](#gen-schema--typed-record-registries)
   - [gen-aspects](#gen-aspects--aspect-type-system)
@@ -14,7 +15,8 @@ A consistent vocabulary grounded in academic literature, spanning all eight gen 
   - [gen-graph](#gen-graph--accessor-based-graph-queries)
   - [gen-select](#gen-select--selector-algebra)
   - [gen-bind](#gen-bind--module-binding)
-  - [gen-dispatch](#gen-dispatch--stratified-rule-dispatch)
+  - [gen-dispatch](#gen-dispatch--relational-rule-dispatch-step)
+  - [gen-resolve](#gen-resolve--rag-evaluator--convergence-loop)
 - [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
 - [Classes: The Output Dimension](#classes-the-output-dimension)
 - [Cross-Cutting Patterns](#cross-cutting-patterns)
@@ -49,15 +51,24 @@ These terms are shared across multiple libraries.
 | **Identity** | Program-point identity for conservative equality of functions and entities. | gen-algebra, gen-aspects, gen-dispatch, gen-schema | Palmer 2024 §2.2 |
 | **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-dispatch | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
 | **Rules** | Guarded transformation units: condition + action producer + identity. | gen-dispatch | Forgy 1982 (RETE); Ehrig 2006 |
-| **Fixpoint** | Convergent iteration until a stability condition holds. | gen-dispatch, gen-graph, gen-scope | Arntzenius 2016; Radul 2009 |
+| **Fixpoint** | Convergent iteration until a stability condition holds. The dispatch convergence loop lives in gen-resolve (via `gen-scope.circular`), not in gen-dispatch. | gen-resolve, gen-graph, gen-scope | Arntzenius 2016; Radul 2009; Sloane 2010 §2.2 |
 
 ______________________________________________________________________
 
 ## Per-Library Vocabulary
 
+### gen-prelude — Pure Utility Base
+
+The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-rebuild are all built on it (Class B), which is what makes them nixpkgs-lib-free.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Prelude** | Vendored utility base: `builtins` re-exports + a curated subset of `lib` reimplemented without nixpkgs. | — |
+| **Dependency class** | Honest tiering: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib, **D** nixpkgs-lib + gen-dep. | — |
+
 ### gen-algebra — Pure Primitives
 
-Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
+Foundation library. **Fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. The old module tier (identity/strict/ref constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema. Exports record, search, either, intensional identity.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -73,9 +84,9 @@ Foundation library. Two tiers: pure (zero deps) and module (requires `lib`).
 | **Compose** | Associative mixin composition operator (⋆). | Bracha & Cook 1990 |
 | **Either** | Sum type: `right` (success) or `left` (error). Used in validation pipelines. | — |
 | **Validator** | Named predicate with error message. `mkValidator name pred message`. | — |
-| **Identity Module** | NixOS module injecting deterministic `id_hash` (SHA-256) from primitive options. | — |
-| **Strict Module** | Freeform type that rejects undeclared keys with fix guidance. | — |
-| **Ref Type** | Cross-registry reference type. Input: string key. Output: resolved instance. | — |
+| **Identity Module** | NixOS module injecting deterministic `id_hash` (SHA-256) from primitive options. *(Relocated to gen-schema — needs `lib.types`/`evalModules`.)* | — |
+| **Strict Module** | Freeform type that rejects undeclared keys with fix guidance. *(Relocated to gen-schema.)* | — |
+| **Ref Type** | Cross-registry reference type. Input: string key. Output: resolved instance. *(Relocated to gen-schema.)* | — |
 | **foldLayers** | Per-field-strategy fold over ordered layers. Each field declares its own merge strategy; layers are folded in order. Settings composition primitive. | Leijen 2005 (scoped labels generalized to per-field merge) |
 
 ### gen-schema — Typed Record Registries
@@ -174,11 +185,13 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 | **Transitive Closure** | Full edge map preserving all reachability. Fixpoint over `compose`. | — |
 | **Transitive Reduction** | Minimal edge map preserving reachability. O(1) inner membership via attrset. | — |
 | **Fixpoint (graph)** | Iterates `step` on `seed` until stable. Throws on non-monotonic steps. | Arntzenius 2016 |
+| **phaseOrder** | Ordering front-door (`order.nix`): a forward producers-first order over the condensation. A cycle or self-loop throws. This is where gen-dispatch's phase ordering moved; `dispatch` consumes the result as `phaseOrder :: [phaseName]`. | Sloane 2010 (dependency-driven scheduling) |
+| **entry\*** | Ordering constraints feeding `phaseOrder`: `entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`. Formerly on gen-derive; now gen-graph's. | — |
 | **Mock** | Test helpers: `mkGraph`, `fromNodeMap`, `fixtures` (diamond, chain, cyclic, tree, serviceGraph, disconnected). | — |
 
 ### gen-select — Selector Algebra
 
-Pattern matching over attributed graph positions. Depends on gen-algebra pure tier only.
+Pattern matching over attributed graph positions. Uses gen-algebra's intensional identity; otherwise nixpkgs-lib-free (built on gen-prelude).
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -219,19 +232,19 @@ Inject external bindings into NixOS module functions with collision detection an
 | **Arg Stripping** | Removes bound arg names from a module's advertised formal args. Prevents `evalModules` from probing `_module.args` for bound names. | — |
 | **Module Shapes** | Three shapes: function (`{ arg, ... }: { ... }`), imports attrset (`{ imports = [...]; }`), plain attrset (`{ config = ...; }`). | — |
 
-### gen-dispatch — Stratified Rule Dispatch
+### gen-dispatch — Relational Rule Dispatch STEP
 
-Production rule system with stratified phases and fixpoint convergence.
+Pure relational rule dispatch. It is deliberately just the **step**: it does *not* own the convergence loop (that is gen-resolve, via `gen-scope.circular`) and does *not* sort phases (that is gen-graph's `phaseOrder`). Depends only on gen-prelude. (Renamed from gen-derive; a GitHub redirect keeps old refs resolving.)
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
 | **Rule** | Guarded transformation unit: condition + action producer + identity. | Forgy 1982 (RETE); Ehrig 2006 |
 | **Condition** | Predicate determining when a rule fires. Opaque in core — caller provides `match`. | Forgy 1982 (RETE LHS) |
 | **Action** | Opaque tagged value produced when a rule fires. Caller provides `classify` to route to phases. | Forgy 1982 (RETE RHS) |
-| **Phase** | Named dispatch group with DAG ordering. `entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`. | Classical Datalog stratification; monotonicity from Arntzenius 2016 |
+| **Phase** | Named dispatch group. Ordering is supplied externally: `dispatch` takes a pre-ordered `phaseOrder :: [phaseName]` (from gen-graph's `phaseOrder`/`entry*`) and does not sort internally. | Classical Datalog stratification; monotonicity from Arntzenius 2016 |
 | **Match** | Testing a condition against a position: `condition → id → ctx → bool`. | Ehrig 2006 (match morphism) |
-| **Dispatch** | One-shot: fire matching rules, group actions by phase in topological order. NAC → match → override → priority → exclusive → fire → classify → group. | — |
-| **Fixpoint (derive)** | Convergent dispatch loop: dispatch → extract feedback → widen context → check stability → repeat. Identified rules fire at most once across iterations. | Arntzenius 2016; Radul 2009 |
+| **Dispatch** | One-shot step: fire matching rules over the caller-supplied `phaseOrder`, group actions by phase. Result `orderedPhases` = present-only subsequence of `phaseOrder`. NAC → match → override → priority → exclusive → fire → classify → group. | — |
+| **dispatchStep / dispatchInit** | The step paired with an external loop. `gen-scope.circular { init = dispatchInit ctx; eq; } (dispatchStep { inherit dispatch; } cfg)` (driven by gen-resolve) reproduces the old gen-derive fixpoint byte-identically. | Kleene ascent (Sloane 2010 §2.2); Arntzenius 2016; Radul 2009 |
 | **NAC** | Negative Application Condition — pattern that must NOT match. First-class `nac` field, checked before condition. | Ehrig 2006 |
 | **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Inspired by Batory 2005 (AHEAD feature composition); override semantics are gen-dispatch's design |
 | **Priority** | Numeric precedence (higher fires first). `exclusive` mode: only highest-priority group fires. | — |
@@ -243,11 +256,22 @@ Production rule system with stratified phases and fixpoint convergence.
 | **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-dispatch's design |
 | **Adapter** | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution. | — |
 
+### gen-resolve — RAG Evaluator + Convergence Loop
+
+Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** that the dispatch step lacks. Class B: five gen siblings (gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind).
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Attribute Schedule** | Static schedule for demand-driven RAG evaluation over the scope graph. | Knuth 1968 (attribute schedule) |
+| **HOAG Gate** | Higher-order gate on schedule expansion. | Vogt 1989 (HOAG) |
+| **Two-Stratum Partition** | Cold/warm fold into `gen-scope.eval`: a static schedule stratum and a convergence stratum. | Knuth 1968; Vogt 1989 |
+| **Convergence Loop** | The Kleene-ascent loop (`gen-scope.circular`) that drives gen-dispatch's `dispatchStep` to a fixpoint. Reproduces the old gen-derive fixpoint byte-identically. | Sloane 2010 §2.2 (Kleene ascent) |
+
 ______________________________________________________________________
 
 ## Den v2 Vocabulary (Consumer)
 
-Den wires the eight gen libraries with domain-specific semantics. These terms are den-specific, not part of gen.
+Den wires the gen libraries with domain-specific semantics. These terms are den-specific, not part of gen.
 
 ### Structural (building the graph)
 
@@ -334,18 +358,19 @@ Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-d
 |---------|---------|----------|------|
 | gen-algebra | `mkIntensional name closure fn` | `intensionalEq a b` | Search continuation dedup |
 | gen-aspects | `key`, `aspectPath`, `pathKey` | — | Diamond dedup in fold-based collect |
-| gen-dispatch | `fromFunction` detects `mkIntensional` | Rule identity dedup across fixpoint iterations | Convergent dispatch |
+| gen-dispatch | `fromFunction` detects `mkIntensional` | Rule identity dedup across loop iterations (loop driven by gen-resolve) | Convergent dispatch |
 | gen-select | `sel.when` detects intensional via three-field check | `selectorEq` delegates to `intensionalEq` | Selector equality |
 
 ### Fixpoint Convergence
 
-Three libraries implement fixpoint loops, each with domain-appropriate semantics:
+Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 
 | Library | Entry point | Monotonicity | Dedup |
 |---------|------------|-------------|-------|
 | gen-algebra (search) | `converge` | Index keys grow monotonically | Intensional continuation dedup |
 | gen-graph | `fixpoint { seed, step }` | Edge count must not shrink (throws) | Edge map equality |
-| gen-dispatch | `fixpoint { rules, context, ... }` | Context widens monotonically | Identified rules fire once globally |
+| gen-scope | `circular { init, f, eq }` | Attribute values converge under `eq` | `_eval` memoization |
+| gen-resolve | `gen-scope.circular` over `dispatchStep` | Context widens monotonically | Identified rules fire once globally |
 
 ### Lazy Evaluation Contracts
 
