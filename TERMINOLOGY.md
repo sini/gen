@@ -127,7 +127,7 @@ Aspect type system with gen-schema integration. Traits, classification, identity
 | **Traits** | The aspect type: one type, dispatch in merge. Attrsets and module functions → submodule; guard functions → `functionTo` wrapper. | Palmer 2024 (intensional functions); den interpretation of §5.1 |
 | **Classes** | Registered output targets (NixOS, darwin, homeManager). Explicit `deferredModule` options. Content exits the scope graph into external evaluation. | Tarr 1999 (multi-dimensional separation of concerns; "hyperspace" terminology from Ossher & Tarr 2001) |
 | **Classification** | `canTake`: determines if a function is a module-fn (evaluated immediately) or guard-fn (deferred). | Palmer 2024 |
-| **Guard Functions** | Context-dependent aspects: `{ host, ... }: { nixos = ...; }`. Detected via `canTake`, wrapped via `functionTo`. | Reynolds 1972 (defunctionalization) |
+| **Guard Functions** | Context-dependent aspects: `{ host, ... }: { nixos = ...; }`. Detected via `canTake`, wrapped via `functionTo` (tagged, still-callable functors — analogy to, not implementation of, defunctionalization). | Palmer 2024 (intensional reflection); Reynolds 1972 §6 (analogy) |
 | **Module Functions** | Functions evaluated immediately by the submodule: `{ config, ... }: { ... }`, `{ aspect, ... }: { ... }`. | — |
 | **Identity (aspect)** | Program-point identity from `key`, `aspectPath`, `pathKey`. Powers diamond dedup. | Palmer 2024 §2.2 |
 | **Includes** | Forward I edges — outbound composition references between aspects. | Neron 2015 |
@@ -387,7 +387,7 @@ ______________________________________________________________________
 | Author(s) | Year | Paper | Gen ecosystem usage |
 |-----------|------|-------|-------------------|
 | Knuth | 1968 | Semantics of context-free languages | Attributes (inherited, synthesized) |
-| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization (gen-aspects guard wrapping), closure environments (gen-bind partial application) |
+| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization-by-analogy (gen-aspects guard wrapping — functor, arrow retained), closure environments §5 (gen-bind partial application) |
 | Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
 | Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen-algebra), schema mixins (gen-schema) |
 | Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-dispatch) |
