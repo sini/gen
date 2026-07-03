@@ -22,26 +22,33 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 |---------|------|
 | [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base (builtins re-exports + vendored lib utils) |
 | [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives (record, search monad, either, intensional identity) |
-| [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) |
-| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch) |
+| [gen-types](https://github.com/sini/gen-types) | Pure structural type checker (`verify`-only leaf checkers — the checking half of the module system) |
+| [gen-merge](https://github.com/sini/gen-merge) | Byte-mode module merge engine (`evalModuleTree` — a nixpkgs-lib-free `lib.evalModules`; the merge half) |
+| [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) — re-hosted on gen-merge + gen-types |
+| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch) — re-hosted on gen-merge + gen-schema |
 | [gen-scope](https://github.com/sini/gen-scope) | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes) |
 | [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
 | [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions) |
 | [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject external args into NixOS modules) |
 | [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified phases, conflict resolution) |
 | [gen-resolve](https://github.com/sini/gen-resolve) | Demand-driven RAG evaluator over scope graphs (attribute schedule + convergence loop) |
+| [gen-flake](https://github.com/sini/gen-flake) | The single nixpkgs boundary (compose purely → inject resolved VALUES → build NixOS systems) |
 | [gen-rebuild](https://github.com/sini/gen-rebuild) | Pure-Nix incremental rebuilder (change propagation, AFFECTED set) |
 | [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
 
-The hub exposes `mkGenLibs` with ten keys — `prelude`, `algebra`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
+The hub exposes `mkGenLibs` with thirteen keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve`, `flake` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
 
 ## Architecture
 
 ```
 gen-prelude  (pure nixpkgs-lib-free utility base)
 gen-algebra  (pure primitives)
-├── gen-schema   (typed registries)        ← + nixpkgs-lib
-│   └── gen-aspects (aspect types)         ← + nixpkgs-lib
+
+# module-system substrate (all nixpkgs-lib-free)
+gen-types    (structural checker)          ← gen-prelude
+gen-merge    (byte-mode evalModuleTree)    ← gen-prelude, gen-types
+├── gen-schema   (typed registries)        ← gen-prelude, gen-merge, gen-algebra
+│   └── gen-aspects (aspect types)         ← gen-prelude, gen-merge, gen-schema
 │
 gen-scope    (HOAG evaluator)              ← gen-prelude
 gen-graph    (graph queries + ordering)    ← gen-prelude
@@ -51,9 +58,12 @@ gen-dispatch (rule dispatch step)          ← gen-prelude
 gen-rebuild  (incremental rebuilder)       ← gen-prelude
 gen-resolve  (RAG evaluator + loop)        ← gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind
 gen-vars     (vars/secrets)                ← standalone
+
+# the ONE nixpkgs boundary (compose purely → inject VALUES → build systems)
+gen-flake    (value-injection terminal)    ← import-tree, gen-merge, gen-schema, gen-aspects, gen-bind, nixpkgs
 ```
 
-Most libraries are nixpkgs-lib-free, built on `gen-prelude`. Only `gen-schema` and `gen-aspects` remain tethered to `nixpkgs-lib` (pending the pure-gen grammar re-host). See [ARCHITECTURE.md](ARCHITECTURE.md) for the full composition model, data flow, and performance architecture.
+The whole ecosystem is now **nixpkgs-lib-free**: gen-schema and gen-aspects were re-hosted onto gen-merge + gen-types (their `lib/` no longer touches `lib.evalModules` / `lib.types`, byte-identically to the old nixpkgs-driven versions). Full nixpkgs enters at exactly one place — `gen-flake`, the terminal that injects resolved values into a consumer's nixpkgs eval and builds NixOS systems. See [ARCHITECTURE.md](ARCHITECTURE.md) for the two-plane split, composition model, data flow, and performance architecture.
 
 ## Core Ideas
 
@@ -66,6 +76,8 @@ Most libraries are nixpkgs-lib-free, built on `gen-prelude`. Only `gen-schema` a
 **Step, loop, and ordering are separate concerns.** gen-dispatch is the pure relational dispatch *step* (guard→effect rules); it never sorts phases and never loops. Phase ordering is a forward producers-first order computed by gen-graph (`phaseOrder` over condensation), and the convergence *loop* lives in gen-resolve via `gen-scope.circular` (Kleene ascent). `dispatchStep`/`dispatchInit` pair the step with any loop.
 
 **Actions are opaque.** gen-dispatch dispatches rules over a caller-supplied `phaseOrder` and groups actions by phase, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
+
+**Compose purely, inject VALUES.** The module system is a pure plane: gen module trees are composed by gen-merge's byte-mode `evalModuleTree` (a nixpkgs-lib-free `lib.evalModules`), checked by gen-types, over the gen-schema/gen-aspects grammar — all without nixpkgs. gen-flake is the single terminal that crosses into nixpkgs: it injects the resolved config VALUES into a consumer's nixpkgs eval via `_module.args` (the query surface), then builds NixOS systems. **The invariant: gen TYPES never leave the pure eval; only VALUES cross.** A gen type rides as inert data inside `_module.args` (a consumer can read `genValues.schema.<kind>.options.<f>.type.name`) yet never enters the consumer's options tree, so nixpkgs never type-walks it. This is value-injection, not type-driving — the same one-way trade [adios](https://github.com/adisbladis/adios) takes. A pure engine cannot be driven by foreign nixpkgs-module libraries.
 
 ## Theoretical Foundations
 

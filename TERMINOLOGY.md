@@ -9,6 +9,8 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
 - [Per-Library Vocabulary](#per-library-vocabulary)
   - [gen-prelude](#gen-prelude--pure-utility-base)
   - [gen-algebra](#gen-algebra--pure-primitives)
+  - [gen-types](#gen-types--structural-type-checker)
+  - [gen-merge](#gen-merge--byte-mode-merge-engine)
   - [gen-schema](#gen-schema--typed-record-registries)
   - [gen-aspects](#gen-aspects--aspect-type-system)
   - [gen-scope](#gen-scope--hoag-evaluator)
@@ -17,6 +19,7 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
   - [gen-bind](#gen-bind--module-binding)
   - [gen-dispatch](#gen-dispatch--relational-rule-dispatch-step)
   - [gen-resolve](#gen-resolve--rag-evaluator--convergence-loop)
+  - [gen-flake](#gen-flake--value-injection-boundary)
 - [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
 - [Classes: The Output Dimension](#classes-the-output-dimension)
 - [Cross-Cutting Patterns](#cross-cutting-patterns)
@@ -52,6 +55,9 @@ These terms are shared across multiple libraries.
 | **Selectors** | Compositional pattern matching predicates over graph positions. | gen-select, gen-dispatch | CSS Selectors Level 4; XPath 3.1; Neron 2015 |
 | **Rules** | Guarded transformation units: condition + action producer + identity. | gen-dispatch | Forgy 1982 (RETE); Ehrig 2006 |
 | **Fixpoint** | Convergent iteration until a stability condition holds. The dispatch convergence loop lives in gen-resolve (via `gen-scope.circular`), not in gen-dispatch. | gen-resolve, gen-graph, gen-scope | Arntzenius 2016; Radul 2009; Sloane 2010 §2.2 |
+| **Byte-mode** | Reproducing nixpkgs' order-sensitive `lib.evalModules` merge OUTPUT byte-for-byte on the gen surface, gated by an equivalence oracle. The cut-over conformance contract; distinct from the deferred confluent/structural merge mode. | gen-merge | nixpkgs module system; identity-dedup spike §3 |
+| **Value-injection** | Composing purely, then injecting resolved config VALUES (never gen TYPES) into a consumer's nixpkgs eval via `_module.args`. The invariant: a pure engine cannot be driven by foreign nixpkgs-module libraries, so only values cross. | gen-flake | adios (adisbladis) — `compose → value → nixpkgs` prior art |
+| **Two-plane split** | The composition plane (pure, nixpkgs-lib-free: `gen-types → gen-merge → { gen-schema, gen-aspects }`) vs the terminal plane (nixpkgs: `gen-flake.mkSystems`). One sanctioned crossing. | gen-merge, gen-flake | — |
 
 ______________________________________________________________________
 
@@ -59,7 +65,7 @@ ______________________________________________________________________
 
 ### gen-prelude — Pure Utility Base
 
-The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-rebuild are all built on it (Class B), which is what makes them nixpkgs-lib-free.
+The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-types, gen-merge, gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-rebuild are all built on it (Class B). With the module-system substrate (`gen-types → gen-merge`) now hosting gen-schema and gen-aspects, the whole library level is nixpkgs-lib-free — full nixpkgs enters only at the gen-flake terminal.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -89,9 +95,45 @@ Foundation library. **Fully pure** — a single `lib` tier (the former `pure` ti
 | **Ref Type** | Cross-registry reference type. Input: string key. Output: resolved instance. *(Relocated to gen-schema.)* | — |
 | **foldLayers** | Per-field-strategy fold over ordered layers. Each field declares its own merge strategy; layers are folded in order. Settings composition primitive. | Leijen 2005 (scoped labels generalized to per-field merge) |
 
+### gen-types — Structural Type Checker
+
+The checking half of the pure-gen module system. A type is a predicate boundary — `verify` returns `null` (inhabits) or an error string (blame). No merge, no priority, no fixpoint. `nixpkgs.lib`-free (Class B, gen-prelude).
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Checker** | The type record `{ name; verify; check; __name; __id; }`. `verify : v → null | err`; `check : v: v2:` throws-or-passes. | Findler 2002 (contracts as boundaries) |
+| **verify / check** | `verify` = the predicate boundary (null = ok). `check` = validate-and-pass-through (throws the blame on failure). | Findler 2002 |
+| **Primitives** | `string`/`str`, `int`, `bool`, `float`, `number`, `path`, `pathLike`, `attrs`, `list`, `function`, `derivation`, `null`, `any`, `never`. | `builtins.is*` |
+| **Combinators** | `option`, `listOf`, `attrsOf`, `union`, `intersection`, `enum`, `tuple`, `optionalAttr`. Errors thread context through nesting. | structural typing |
+| **struct** | Record checker + `.override { total?; unknown?; verify?; }`. `unknown = false` = closed world (reject undeclared keys). | structural / width subtyping |
+| **Refined** | Base checker + predicate contracts (`{ check; message; }`); base verified first, then predicates single-pass. `refinements` = `tcpPort`/`nonEmpty`/`positive`. | Rondon 2008 (Liquid Types); Findler 2002 |
+| **strict** | `strict knownNames` — the pure-checking form of closed-world key rejection (was `mkStrictModule`'s freeform throw). | structural width closure |
+| **Validators** | `mkValidator`/`runValidators`/`formatErrors`/`defaultOnError` — named predicate contracts over a kind's instances → `Either`. | Findler 2002 (blame) |
+| **Intensional Identity** | `__id` = sha256 of the type name; two checkers are equal iff names agree (name-only ceiling — no closure/structural comparison). `typeEq`/`intensionalEq`. | Palmer 2024 §2.3 |
+| **Frugality** | Happy path = single pass (`all` short-circuits); failure re-scans only to locate the first offender; structs allocate no intermediate attrset on success. | design requirement |
+
+### gen-merge — Byte-Mode Merge Engine
+
+The merge half of the pure-gen module system. `evalModuleTree` reproduces `lib.evalModules` + `lib.types`-merge output byte-for-byte on den's surface, with zero nixpkgs. `nixpkgs.lib`-free (Class B: gen-prelude; injects gen-types as `types`).
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **evalModuleTree** | The engine. One call = one `lib.evalModules` = one local `prelude.fix`. `{ modules; specialArgs?; check?; prefix?; } → { config; options; type; }`. | nixpkgs `mergeModules'` |
+| **The 7-item primitive** | The surface den's grammar/registry reduces to: typed options+defaults; freeform `lazyAttrsOf`/`attrsOf`; per-key `name`+`_module.args`; the self-ref `config` fixpoint; `imports` collection; the `(loc,defs)` custom-merge hook; `deferredModule` as tagged lazy data (`functionTo` omitted). | design spec §1 |
+| **mergeDefs** | The shared fold: discharge properties → filter overrides (min-priority wins) → dispatch to `type.merge` (structural) or `mergeLeaf` (scalar) → `verify` at the leaf. The `(loc, defs)` contract the whole engine rides. | nixpkgs `type.merge` |
+| **Priority subset** | ONE override rule (lowest priority-number wins; ties merge) over `mkForce`(50)/bare(100)/`mkOverride N`/`mkDefault`(1000)/`mkOptionDefault`(1500), plus `mkMerge`/`mkIf`. Priority numbers match nixpkgs exactly. | design spec §7 (grepped, closed) |
+| **Dropped ORDER pass** | The nixpkgs order pass (`mkOrder`/`mkBefore`/`mkAfter`) and exotic named overrides are deliberately absent — zero uses on the surface. Equal-priority defs merge in reverse module order (byte-identical to nixpkgs-without-`mkOrder`). | design spec §7 |
+| **Structural strategies** | The merge-bearing types (`submodule`/`listOf`/`attrsOf`/`lazyAttrsOf`/`deferredModule`/`nullOr`/`either`/`oneOf`/`raw`/`anything`) — each carries `.merge loc defs`. Leaf checkers come from gen-types. | nixpkgs `lib.types` |
+| **types namespace** | `genMerge.types` = gen-types leaf checkers ⊎ gen-merge strategies — the `lib.types` drop-in the re-host points at (`lib.types.X → genMerge.types.X`). | — |
+| **Nested option paths (#16)** | `options.a.b.c = mkOption {…}` builds a nested option TREE; a second module's `options.a.b.d` recurses beside it; leaf/group collision throws; undeclared-key check is per group level. | nixpkgs `mergeOptionDecls` |
+| **Path-leaf import (#20)** | A bare path in the module list is `import`ed and re-entered (and a path inside `imports` too) — enables `(import-tree dir).files` fed straight to `evalModuleTree`. | nixpkgs path-module import |
+| **deferredModule** | A lazy, import-usable module value, NEVER forced by composition — handed opaque to the terminal (the two-plane invariant). | Lorenzen 2025 §2.3 |
+| **Byte-identity oracle** | `ci/tests/oracle.nix`: `evalModuleTree.config == lib.evalModules.config` on parameterized fixtures, with mutation-teeth (an oracle that can't fail is decorative). | design spec §3 |
+| **Swappable kernel** | The per-option combine is a parameter; byte-mode passes the nixpkgs-faithful kernel. The deferred structural mode later swaps a confluent-join kernel without changing the engine skeleton. | design spec §6/§8 |
+
 ### gen-schema — Typed Record Registries
 
-Typed record registries with extension, validation, introspection, and scope-graph bridge.
+Typed record registries with extension, validation, introspection, and scope-graph bridge. Re-hosted onto gen-merge + gen-types (`lib/` is nixpkgs-lib-free); takes `{ prelude, merge, algebra }`.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -119,7 +161,7 @@ Typed record registries with extension, validation, introspection, and scope-gra
 
 ### gen-aspects — Aspect Type System
 
-Aspect type system with gen-schema integration. Traits, classification, identity, schema-backed registries.
+Aspect type system with gen-schema integration. Traits, classification, identity, schema-backed registries. Re-hosted onto gen-merge + gen-schema (`lib/` is nixpkgs-lib-free); takes `{ prelude, merge, schema }`. The grammar (`types.nix`) produces the aspect node set without `lib.evalModules`; `aspectType`'s Palmer one-type-dispatch-in-merge rides gen-merge's `mkOptionType { merge }`.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -267,6 +309,24 @@ Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** tha
 | **Two-Stratum Partition** | Cold/warm fold into `gen-scope.eval`: a static schedule stratum and a convergence stratum. | Knuth 1968; Vogt 1989 |
 | **Convergence Loop** | The Kleene-ascent loop (`gen-scope.circular`) that drives gen-dispatch's `dispatchStep` to a fixpoint. Reproduces the old gen-derive fixpoint byte-identically. | Sloane 2010 §2.2 (Kleene ascent) |
 
+### gen-flake — Value-Injection Boundary
+
+The single sanctioned crossing from the pure composition plane into nixpkgs. Its pure core (`compose`/`injectArgs`) is nixpkgs-lib-free; only the terminal (`mkSystems`) and flake-parts module touch nixpkgs.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **compose** | `{ tree ? null; modules ? []; specialArgs ? {}; } → { values; classContent; hostContent; }`. Loads a gen module tree (a bare path list via the import-tree fork) and resolves it PURELY via `gen-merge.evalModuleTree`. | — |
+| **values** | The resolved fixpoint config (`result.config`): instances, `id_hash`, resolved refs, flattened surfaces. The injection payload — VALUES, not types. | — |
+| **classContent** | `genAspects.flatten values.aspects` — the flat aspect registry keyed by path; each entry carries per-class `deferredModule` fields, unforced. The query surface. | — |
+| **hostContent** | The per-host `(class, host)` projection: `{ <host> = { bindings = { host = <instance>; }; classes = { <class> = [ deferredModule ]; }; }; }`, driven by each host's `aspects` membership. The build surface. | — |
+| **injectArgs** | `composed → { _module.args.genValues = composed.values; }`. Packages resolved VALUES as a plain query module — pure, no gen type crosses. | — |
+| **genValues** | The injected arg name — the resolved config values a consumer's nixpkgs modules query (`{ genValues, ... }: … genValues.hosts.<h>.addr …`). | — |
+| **mkSystems** | `{ hostContent; nixpkgs; extraModules ? {}; } → { <host> = nixosSystem; }`. The terminal: `gen-bind.wrapAll` partial-applies the `host` binding into the `nixos` class deferredModules, then `nixpkgs.lib.nixosSystem` builds them. The ONE file that touches nixpkgs. | Reynolds 1972 (partial application) |
+| **nodes** | The colmena-style cross-terminal accessor in `mkSystems` specialArgs — the whole set of built systems, lazy (`nodes.<peer>.config.…`). | — |
+| **flakeModules.default** | Flake-parts ergonomics: one `imports` gives the injected query surface (top-level + `perSystem` args) and `flake.nixosConfigurations` from one compose. `options.gen = { tree; modules; specialArgs; inject; nixpkgs; extraModules; composed; }`. | — |
+| **The invariant** | gen TYPES never leave the pure eval; only VALUES cross. A gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet never enters a consumer's options tree (`nixosConfigurations.<h>.options ? schema == false`), so nixpkgs never type-walks it. | value-injection; adios prior art |
+| **Reader escape hatch** | For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values, keep your own terminal reading `genValues`. | — |
+
 ______________________________________________________________________
 
 ## Den v2 Vocabulary (Consumer)
@@ -387,19 +447,19 @@ ______________________________________________________________________
 | Author(s) | Year | Paper | Gen ecosystem usage |
 |-----------|------|-------|-------------------|
 | Knuth | 1968 | Semantics of context-free languages | Attributes (inherited, synthesized) |
-| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization-by-analogy (gen-aspects guard wrapping — functor, arrow retained), closure environments §5 (gen-bind partial application) |
+| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization-by-analogy (gen-aspects guard wrapping — functor, arrow retained), closure environments §5 (gen-bind partial application, gen-flake `mkSystems` binding via `wrapAll`) |
 | Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
 | Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen-algebra), schema mixins (gen-schema) |
 | Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-dispatch) |
 | Vogt et al. | 1989 | Higher-order attribute grammars | Non-terminal attributes / dynamic node synthesis (gen-scope children); derived-children extends this |
 | Cardelli | 1997 | Program fragments, linking, and modularization | Module signatures (gen-bind), NixOS module bridge (gen-schema) |
 | Hedin | 2000 | Reference attributed grammars | Cross-node import edges (gen-scope) |
-| Findler & Felleisen | 2002 | Contracts for higher-order functions | Blame tracking (gen-bind, gen-schema) |
+| Findler & Felleisen | 2002 | Contracts for higher-order functions | Blame tracking (gen-bind, gen-schema); the checker-as-boundary and post-merge leaf `verify` (gen-types, gen-merge) |
 | Hedin & Magnusson | 2003 | JastAdd — an aspect-oriented compiler construction system | Demand-driven AG evaluation, aspect-oriented modular extension (inspires neededBy) |
 | Batory | 2005 | Feature-oriented programming and the AHEAD tool suite | Feature algebra (inspires gen-dispatch rule composition), aspects as features |
 | Leijen | 2005 | Extensible records with scoped labels | Record algebra (gen-algebra), merge resolution (gen-bind) |
 | Ehrig et al. | 2006 | Fundamentals of algebraic graph transformation | Graph rewriting rules, NACs (gen-dispatch) |
-| Rondon et al. | 2008 | Liquid Types | Refinement predicates (gen-schema) |
+| Rondon et al. | 2008 | Liquid Types | Refinement predicates (gen-schema, gen-types) |
 | Radul & Sussman | 2009 | Art of the propagator | Monotonic convergence / quiescence (gen-dispatch, gen-graph) |
 | Berry & Boudol | 1990 | The chemical abstract machine | Rules as reactions (gen-dispatch) |
 | Sloane et al. | 2010 | A pure embedding of attribute grammars (Kiama) | Attribute combinators, CachedAttribute, paramAttr, circular attributes (gen-scope); collection attributes planned (§7) |
@@ -411,7 +471,7 @@ ______________________________________________________________________
 | Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope); algebraic foundation for gen-graph |
 | van Antwerpen et al. | 2018 | Scopes as types (introduces Statix) | Custom edge labels, structural subtyping, Statix DSL (gen-scope) |
 | Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-dispatch, gen-select) |
-| Lorenzen et al. | 2025 | First-order laziness | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects deferredModule) |
+| Lorenzen et al. | 2025 | First-order laziness | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects/gen-merge deferredModule) |
 | Tarr et al. | 1999 | N degrees of separation | Multi-dimensional separation of concerns (classes as dimensions) |
 | Kiczales et al. | 1997 | Aspect-oriented programming | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ) |
 | Apel et al. | 2009 | An overview of feature-oriented software development | Feature-oriented decomposition |
