@@ -1,5 +1,9 @@
 {
   inputs = {
+    # ── PURE side (the guarded thing): published re-host mains ──
+    gen-prelude.url = "github:sini/gen-prelude";
+    gen-types.url = "github:sini/gen-types";
+    gen-merge.url = "github:sini/gen-merge";
     gen-algebra.url = "github:sini/gen-algebra";
     gen-schema.url = "github:sini/gen-schema";
     gen-aspects.url = "github:sini/gen-aspects";
@@ -9,6 +13,17 @@
     gen-bind.url = "github:sini/gen-bind";
     gen-dispatch.url = "github:sini/gen-dispatch";
     gen-resolve.url = "github:sini/gen-resolve";
+
+    # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host byte-parity oracles ──
+    # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`) + gen-aspects (`{ lib, schema }`),
+    # pinned to their pre-re-host revs (the last commit before the pure re-host changed the signature).
+    gen-schema-orig.url = "github:sini/gen-schema/2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6";
+    gen-aspects-orig.url = "github:sini/gen-aspects/87bf758169bc1d7f3336132f22e7fe38c5adf954";
+    # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
+    # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
+    nixpkgs-lib.url = "github:nix-community/nixpkgs.lib/db3f255737b94216eb71cce308e2912cf6bc2d7c";
+
+    # nixpkgs is the RUNNER only (treefmt, runCommand check derivations) — full nixpkgs required.
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-root.url = "github:srid/flake-root";
@@ -27,6 +42,51 @@
     }:
     let
       inherit (nixpkgs) lib;
+
+      # ── re-host byte-parity oracles (permanent regression) ──
+      # PURE side tracks the published re-host mains; REFERENCE side is the frozen original
+      # nixpkgs-signature libs driven through the pinned nixpkgs.lib. A future gen-merge / re-host
+      # change that breaks byte-parity (incl the id_hash SHA) makes these checks fail.
+      byteParity = import ./rehost-byte-parity.nix {
+        inherit (inputs)
+          gen-prelude
+          gen-types
+          gen-merge
+          gen-algebra
+          gen-schema
+          gen-aspects
+          gen-schema-orig
+          gen-aspects-orig
+          ;
+        lib = inputs.nixpkgs-lib.lib;
+      };
+      denParity = import ./rehost-den-parity.nix {
+        inherit (inputs)
+          gen-prelude
+          gen-types
+          gen-merge
+          gen-algebra
+          gen-schema
+          gen-schema-orig
+          ;
+        lib = inputs.nixpkgs-lib.lib;
+      };
+
+      # Keys that MUST be `true` for parity to hold (the regression gate).
+      byteParityKeys = [
+        "all-identical"
+        "both-evaluated"
+        "teeth-mutation-diverges"
+        "den-realism"
+      ];
+      denParityKeys = [
+        "parity-schema"
+        "parity-instances"
+        "both-evaluated"
+        "teeth-mutation"
+        "teeth-parity"
+        "parity-nested"
+      ];
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = lib.systems.flakeExposed;
@@ -37,6 +97,14 @@
         inputs.flake-root.flakeModule
       ];
 
+      # Raw oracle results (system-independent, pure eval) for eyeballing:
+      #   nix eval ./ci#lib.parity.byte --json | jq
+      #   nix eval ./ci#lib.parity.den  --json | jq
+      flake.lib.parity = {
+        byte = byteParity;
+        den = denParity;
+      };
+
       perSystem =
         {
           config,
@@ -44,7 +112,42 @@
           system,
           ...
         }:
+        let
+          # Build a check derivation: prints the oracle result (incl id_hash sample + teeth), and
+          # FAILS the build if any required key is not `true` — a permanent byte-parity regression.
+          mkParityCheck =
+            name: result: keys:
+            let
+              gate = lib.genAttrs keys (k: result.${k});
+              allOk = builtins.all (k: result.${k} == true) keys;
+              report = builtins.toJSON {
+                inherit allOk;
+                results = gate;
+                sample = result.sample or { };
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "PARITY REGRESSION — re-host is no longer byte-identical to the nixpkgs stack" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+        in
         {
+          checks = {
+            rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
+            rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
+          };
+
           treefmt = {
             projectRootFile = ".git/config";
             flakeCheck = false;
