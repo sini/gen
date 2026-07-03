@@ -20,4 +20,5 @@ _:
   select = genInputs.gen-select.lib;
   dispatch = genInputs.gen-dispatch.lib;
   resolve = genInputs.gen-resolve.lib;
+  flake = genInputs.gen-flake.lib;
 }
