@@ -10,6 +10,8 @@ _:
 {
   prelude = genInputs.gen-prelude.lib;
   algebra = genInputs.gen-algebra.lib;
+  types = genInputs.gen-types.lib;
+  merge = genInputs.gen-merge.lib;
   scope = genInputs.gen-scope.lib;
   graph = genInputs.gen-graph.lib;
   bind = genInputs.gen-bind.lib;

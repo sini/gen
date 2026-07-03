@@ -15,6 +15,8 @@
 
     gen-prelude.url = "github:sini/gen-prelude";
     gen-algebra.url = "github:sini/gen-algebra";
+    gen-types.url = "github:sini/gen-types";
+    gen-merge.url = "github:sini/gen-merge";
     gen-schema.url = "github:sini/gen-schema";
     gen-aspects.url = "github:sini/gen-aspects";
     gen-scope.url = "github:sini/gen-scope";
