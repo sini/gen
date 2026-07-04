@@ -22,6 +22,13 @@
 UPDATE_FILE=""
 if [[ "${1:-}" == "--update" ]]; then
   UPDATE_FILE=${2:?--update needs a file path}
+  # Require both splice markers up front (before the ~2-min measurement): a missing END would let
+  # the awk truncate the file at the splice (tail data loss); a missing BEGIN would silently no-op.
+  if ! grep -q '<!-- BEGIN PERF-BENCH -->' "$UPDATE_FILE" 2>/dev/null \
+    || ! grep -q '<!-- END PERF-BENCH -->' "$UPDATE_FILE" 2>/dev/null; then
+    echo "no PERF-BENCH markers in $UPDATE_FILE" >&2
+    exit 2
+  fi
 fi
 
 tmp=$(mktemp -d)
