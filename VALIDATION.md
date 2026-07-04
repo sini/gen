@@ -7,9 +7,23 @@ no claim appears here without a way to reproduce it.
 The two load-bearing proofs are the **byte-parity oracles**: they hold the pure-gen module system
 (gen-prelude → gen-types → gen-merge → re-hosted gen-schema/gen-aspects, all nixpkgs-lib-free)
 byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. They
-run as permanent regressions on `nix flake check ./ci` in this hub. Everything else — 1,745
-per-library unit tests, the purity scanners, the config-thunk deferral regression, and the
-performance gates — is enumerated in the same reproducible form.
+run as permanent regressions on `nix flake check ./ci` in this hub. Everything else — the
+per-library unit suites (counted in the §2 table), the purity scanners, the config-thunk deferral
+regression, and the performance gates — is enumerated in the same reproducible form.
+
+A few terms used throughout, for readers new to the ecosystem:
+
+- **den** — the primary consumer, a NixOS / nix-darwin / home-manager configuration framework
+  ([github:denful/den](https://github.com/denful/den)); its real registry and aspect shapes are the
+  realism bar these oracles measure against.
+- **re-host** — the change that ported gen-schema and gen-aspects off `nixpkgs.lib` onto gen-merge +
+  gen-types, so they no longer call `lib.evalModules` / `lib.types` — byte-identically to the old
+  nixpkgs-driven versions. "The re-host" throughout refers to that migration.
+- **byte-mode** — gen-merge's merge engine (`evalModuleTree`) reproduces the nixpkgs module-merge
+  **output** byte-for-byte over the surface den exercises, without `nixpkgs.lib`
+  ([gen-merge README](https://github.com/sini/gen-merge)).
+- **quirk** — a den pipe/effect that can carry a value depending on the final rendered config; §4
+  proves such values ride the engine unforced.
 
 Run the whole hub-side proof set:
 
@@ -167,9 +181,10 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 `lib.evalModules`/`lib.types` **replacement**, so it must not call them. This is enforced, not
 asserted in prose.
 
-- **The token-scanner (12 libraries).** Each of gen-merge, gen-schema, gen-aspects, gen-algebra,
+- **The token-scanner (13 libraries).** Each of gen-merge, gen-schema, gen-aspects, gen-algebra,
   gen-graph, gen-scope, gen-select, gen-bind, gen-dispatch, gen-resolve, gen-rebuild, and gen-flake
-  carries `ci/tests/purity.nix` (gen-types names it `ci/tests/types-purity.nix`). The test reads
+  carries `ci/tests/purity.nix`, and gen-types carries the same scanner as
+  `ci/tests/types-purity.nix` — 13 in all. The test reads
   every `lib/**.nix` (plus the root `flake.nix` / `default.nix`), strips comments, and asserts zero
   occurrences of the nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`,
   `lib.evalModules`, `evalModules`, `{ lib }`, `{ lib,`. The library's own API names
@@ -199,8 +214,8 @@ pull it.
   `config`/`osConfig`, unknowable until the terminal fixpoint — ride the byte-mode engine as
   **opaque, unforced** data through both the composition merge and a mid-pipeline route/forward
   re-eval, and force **byte-identically** at the terminal (which reads the fixpoint `config` and
-  the owner `osConfig`) to what den's nixpkgs `lib.evalModules` produces. This is the den-hoag
-  prerequisite (#22).
+  the owner `osConfig`) to what den's nixpkgs `lib.evalModules` produces. This is a prerequisite
+  for den-hoag, den's next-generation internals.
 - **Artifact:** `gen-merge` `ci/tests/deferral.nix` (12 tests). It models den's marker
   (`{ __configThunk; __fn; }`) with a `probe = throw "forced too early"` poison payload, carries it
   through a three-stage pipeline (compose → route → terminal), and runs the identical scenario
@@ -219,13 +234,19 @@ pull it.
 
 The performance twin of the parity oracles. `nix run ./ci#perf-bench` drives `ci/perf-bench.nix`
 (the pure stack vs the pinned-nixpkgs stack, scaled ~200× over the oracle fixtures) through
-`nix-instantiate --eval` + `NIX_SHOW_STATS` and gates on three families: **parity** (every cell's
-sha256 projection digest must match across stacks — a "fast but wrong" change cannot pass, tying
-the perf corpus to the validation bar), **ratio** (pure cpu ≤ 0.85× ref, pure thunks/alloc
-≤ 0.90× ref at the largest size, as machine-independent same-process ratios), and **linearity**
-(pure counters grow ≤ 5.5× across a ×4 size step — the net that caught the 2026-07-04 O(k²)
-`unique` key-union bug). A gate breach exits non-zero with the offending table. Full numbers and
-methodology are in [BENCHMARKS.md](BENCHMARKS.md); harness rationale is in
+`nix-instantiate --eval` + `NIX_SHOW_STATS` and gates on three families:
+
+- **parity** — every cell's sha256 projection digest must match across stacks, so a "fast but
+  wrong" change cannot pass; this ties the perf corpus to the same validation bar as §1.
+- **ratio** — the pure stack must stay faster and lighter than the nixpkgs stack (cpu plus thunk
+  and allocation counters, compared as machine-independent same-process ratios) at the largest
+  workload size.
+- **linearity** — the pure stack's counters must grow no worse than linearly across a ×4 size
+  step; this is the net that caught the 2026-07-04 O(k²) `unique` key-union bug.
+
+A gate breach exits non-zero with the offending table. The exact thresholds — retuned in lockstep
+with engine changes, so kept in one place — and the full baseline numbers live in
+[BENCHMARKS.md](BENCHMARKS.md); the harness rationale and the threshold-update policy are in
 [`ci/README.md`](ci/README.md).
 
 ## 6. Re-run everything
@@ -251,6 +272,14 @@ nix flake check ./ci                                  # the suite + purity as a 
 nix develop ./ci -c nix-unit --flake ./ci#tests       # the N/N count, running every test
 ```
 
-The full library set is: gen-prelude, gen-algebra, gen-types, gen-merge, gen-schema, gen-aspects,
-gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, gen-resolve, gen-flake, gen-rebuild,
-gen-vars.
+Or run a single sub-proof directly:
+
+```bash
+# purity scanner (any pure lib; gen-types uses .types-purity)
+nix develop ./ci -c nix-unit --flake ./ci#tests.purity
+# the config-thunk deferral regression (in the gen-merge repo)
+nix develop ./ci -c nix-unit --flake ./ci#tests.deferral
+```
+
+The full library set — each with its revision and test count — is the table in
+[§2](#2-per-library-unit-suites).
