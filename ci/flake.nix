@@ -141,11 +141,47 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # ── perf-regression bench (the PERFORMANCE twin of the parity oracles) ──
+          # `nix run ./ci#perf-bench` — drives ci/perf-bench.nix (pure vs pinned-nixpkgs stack)
+          # through nix-instantiate + NIX_SHOW_STATS and gates on parity / cpu+counter ratios /
+          # counter linearity. An app, not a check derivation: timing needs an un-sandboxed
+          # evaluator run. CI runs it as a dedicated workflow step.
+          perfSrcs = pkgs.writeText "perf-srcs.nix" ''
+            {
+              "gen-prelude" = "${inputs.gen-prelude}";
+              "gen-types" = "${inputs.gen-types}";
+              "gen-merge" = "${inputs.gen-merge}";
+              "gen-algebra" = "${inputs.gen-algebra}";
+              "gen-schema" = "${inputs.gen-schema}";
+              "gen-aspects" = "${inputs.gen-aspects}";
+              "gen-schema-orig" = "${inputs.gen-schema-orig}";
+              "gen-aspects-orig" = "${inputs.gen-aspects-orig}";
+              "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
+            }
+          '';
+          perfBench = pkgs.writeShellApplication {
+            name = "gen-perf-bench";
+            runtimeInputs = [
+              pkgs.nix
+              pkgs.jq
+              pkgs.gawk
+            ];
+            text = ''
+              export PERF_WORKLOADS=${./perf-bench.nix}
+              export PERF_SRCS=${perfSrcs}
+            ''
+            + builtins.readFile ./perf-bench.sh;
+          };
         in
         {
           checks = {
             rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
+          };
+
+          apps.perf-bench = {
+            type = "app";
+            program = "${perfBench}/bin/gen-perf-bench";
           };
 
           treefmt = {
@@ -186,6 +222,13 @@
                 help = "Interactive REPL with all gen libraries loaded";
                 command = ''
                   nix repl --impure --file "$FLAKE_ROOT/ci/repl.nix"
+                '';
+              }
+              {
+                name = "perf-bench";
+                help = "Run the module-system perf-regression bench (pure vs nixpkgs stack)";
+                command = ''
+                  nix run "$FLAKE_ROOT/ci#perf-bench"
                 '';
               }
             ];

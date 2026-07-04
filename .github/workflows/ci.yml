@@ -16,3 +16,21 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix fmt -- --ci
+
+  # Validation: re-host byte-parity oracles (pure stack == frozen nixpkgs stack, incl id_hash).
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix flake check ./ci
+
+  # Performance: perf-regression gates (parity at scale + cpu/counter ratios + linearity).
+  perf-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix run ./ci#perf-bench
