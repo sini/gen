@@ -14,6 +14,7 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 - [Architecture](#architecture)
 - [Core Ideas](#core-ideas)
 - [Theoretical Foundations](#theoretical-foundations)
+- [Trust artifacts](#trust-artifacts)
 - [Documentation](#documentation)
 
 ## Libraries
@@ -92,6 +93,13 @@ The ecosystem is grounded in attribute grammar theory, scope graph formalism, an
 - **Rule systems** — Forgy (1982, RETE), Ehrig (2006), Arntzenius (2016, Datafun)
 
 See [TERMINOLOGY.md](TERMINOLOGY.md) for the complete vocabulary with provenance.
+
+## Trust artifacts
+
+Two regenerable, CI-enforced artifacts back the performance and correctness claims in this repo:
+
+- [BENCHMARKS.md](BENCHMARKS.md) — evaluation-time performance of the pure-gen module system vs the frozen nixpkgs reference stack, byte-parity-gated; the live section regenerates from the CI perf harness (`nix run ./ci#perf-bench`).
+- [VALIDATION.md](VALIDATION.md) — the byte-parity oracles proving the pure stack is byte-identical to the nixpkgs stack, down to the `id_hash` SHA (`nix flake check ./ci`).
 
 ## Documentation
 

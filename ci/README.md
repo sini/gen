@@ -31,6 +31,8 @@ catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule
 registries), `schemaHosts` (gen-schema kind + instances incl id_hash), `aspects` (gen-aspects
 tree with flatten), `startup` (fixed cost, report-only).
 
+The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md` (rewrites only the marker-delimited section, then re-canonicalizes the file with the same mdformat CI uses).
+
 Three gate families (thresholds at the top of `perf-bench.sh`):
 
 - **parity** — every cell's sha256 projection digest must match across stacks. Ties the perf

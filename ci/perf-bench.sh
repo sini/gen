@@ -1,6 +1,12 @@
 # gen perf-regression bench — drives ci/perf-bench.nix (pure vs reference stack) through
 # nix-instantiate + NIX_SHOW_STATS, checks regression gates, prints a markdown report.
 #
+# Usage:
+#   gen-perf-bench                     — report to stdout, enforce gates (exit 1 on regression)
+#   gen-perf-bench --update FILE.md    — same, and splice the report into FILE.md's
+#                                        <!-- BEGIN PERF-BENCH --> / <!-- END PERF-BENCH --> block
+#                                        (the live BENCHMARKS.md section)
+#
 # Injected by the flake app wrapper:
 #   PERF_WORKLOADS — store path of the workload corpus (ci/perf-bench.nix)
 #   PERF_SRCS      — store path of a .nix attrset mapping lib names → source store paths
@@ -12,6 +18,11 @@
 #
 # cpu is the median of $REPS runs (same-process ratio, robust to host speed); thunk/alloc counters
 # are deterministic per nix version, taken from the last rep.
+
+UPDATE_FILE=""
+if [[ "${1:-}" == "--update" ]]; then
+  UPDATE_FILE=${2:?--update needs a file path}
+fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -36,6 +47,8 @@ COUNTER_RATIO_MAX=0.90
 GROWTH_MAX=5.5
 
 declare -A CPU THUNKS ALLOC DIG
+declare -A CR TR AR PAR
+declare -A LIN_SMALL LIN_BIG LIN_TG LIN_AG
 FAILURES=()
 
 run_cell() {
@@ -57,6 +70,7 @@ run_cell() {
 ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
 lte() { awk "BEGIN{exit !(($1) <= ($2))}"; }
 
+# ── measure ──────────────────────────────────────────────────────────────────
 echo "collecting: ${#MATRIX[@]} cells × 2 stacks × $REPS reps ..." >&2
 for row in "${MATRIX[@]}"; do
   read -r w n _tags <<<"$row"
@@ -64,57 +78,90 @@ for row in "${MATRIX[@]}"; do
   run_cell "$w" "$n" ref
 done
 
-echo
-echo "## gen module-system perf bench (pure vs pinned nixpkgs.lib stack)"
-echo
-echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
-echo "|---|---:|---:|---:|---:|---:|---:|---|"
-
+# ── compute ratios + gate outcomes (no printing; emit_report reads these) ──────
 for row in "${MATRIX[@]}"; do
   read -r w n tags <<<"$row"
-  cr=$(ratio "${CPU[$w,$n,pure]}" "${CPU[$w,$n,ref]}")
-  tr=$(ratio "${THUNKS[$w,$n,pure]}" "${THUNKS[$w,$n,ref]}")
-  ar=$(ratio "${ALLOC[$w,$n,pure]}" "${ALLOC[$w,$n,ref]}")
+  CR["$w,$n"]=$(ratio "${CPU[$w,$n,pure]}" "${CPU[$w,$n,ref]}")
+  TR["$w,$n"]=$(ratio "${THUNKS[$w,$n,pure]}" "${THUNKS[$w,$n,ref]}")
+  AR["$w,$n"]=$(ratio "${ALLOC[$w,$n,pure]}" "${ALLOC[$w,$n,ref]}")
   if [[ "${DIG[$w,$n,pure]}" == "${DIG[$w,$n,ref]}" && -n "${DIG[$w,$n,pure]}" ]]; then
-    par="ok"
+    PAR["$w,$n"]="ok"
   else
-    par="MISMATCH"
+    PAR["$w,$n"]="MISMATCH"
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
-  printf '| %s | %s | %.3f | %.3f | %s | %s | %s | %s |\n' \
-    "$w" "$n" "${CPU[$w,$n,ref]}" "${CPU[$w,$n,pure]}" "$cr" "$tr" "$ar" "$par"
-
   if [[ ",$tags," == *",r,"* ]]; then
-    lte "$cr" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu $cr > $CPU_RATIO_MAX")
-    lte "$tr" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks $tr > $COUNTER_RATIO_MAX")
-    lte "$ar" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc $ar > $COUNTER_RATIO_MAX")
+    lte "${CR[$w,$n]}" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu ${CR[$w,$n]} > $CPU_RATIO_MAX")
+    lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
+    lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
   fi
 done
 
-echo
-echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
-echo
-echo "| workload | sizes | thunk growth | alloc growth |"
-echo "|---|---|---:|---:|"
-small_n=""
 for w in scalar registry schemaHosts aspects; do
+  small_n=""
+  big_n=""
   for row in "${MATRIX[@]}"; do
     read -r rw rn tags <<<"$row"
     [[ "$rw" == "$w" && ",$tags," == *",small,"* ]] && small_n=$rn
     [[ "$rw" == "$w" && ",$tags," == *",big,"* ]] && big_n=$rn
   done
-  tg=$(ratio "${THUNKS[$w,$big_n,pure]}" "${THUNKS[$w,$small_n,pure]}")
-  ag=$(ratio "${ALLOC[$w,$big_n,pure]}" "${ALLOC[$w,$small_n,pure]}")
-  printf '| %s | %s → %s | %s | %s |\n' "$w" "$small_n" "$big_n" "$tg" "$ag"
-  lte "$tg" "$GROWTH_MAX" || FAILURES+=("linearity: $w thunks grew ${tg}× over a 4× size step")
-  lte "$ag" "$GROWTH_MAX" || FAILURES+=("linearity: $w alloc grew ${ag}× over a 4× size step")
+  LIN_SMALL["$w"]=$small_n
+  LIN_BIG["$w"]=$big_n
+  LIN_TG["$w"]=$(ratio "${THUNKS[$w,$big_n,pure]}" "${THUNKS[$w,$small_n,pure]}")
+  LIN_AG["$w"]=$(ratio "${ALLOC[$w,$big_n,pure]}" "${ALLOC[$w,$small_n,pure]}")
+  lte "${LIN_TG[$w]}" "$GROWTH_MAX" || FAILURES+=("linearity: $w thunks grew ${LIN_TG[$w]}× over a 4× size step")
+  lte "${LIN_AG[$w]}" "$GROWTH_MAX" || FAILURES+=("linearity: $w alloc grew ${LIN_AG[$w]}× over a 4× size step")
 done
 
-echo
-if [[ ${#FAILURES[@]} -eq 0 ]]; then
-  echo "ALL GATES PASSED (parity + ratio + linearity)"
-else
-  echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed:"
-  printf '  - %s\n' "${FAILURES[@]}"
+# ── report (pure printing from the computed values above) ──────────────────────
+emit_report() {
+  echo
+  echo "## gen module-system perf bench (pure vs pinned nixpkgs.lib stack)"
+  echo
+  echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
+  echo "|---|---:|---:|---:|---:|---:|---:|---|"
+  for row in "${MATRIX[@]}"; do
+    read -r w n _tags <<<"$row"
+    printf '| %s | %s | %.3f | %.3f | %s | %s | %s | %s |\n' \
+      "$w" "$n" "${CPU[$w,$n,ref]}" "${CPU[$w,$n,pure]}" \
+      "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
+  done
+  echo
+  echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
+  echo
+  echo "| workload | sizes | thunk growth | alloc growth |"
+  echo "|---|---|---:|---:|"
+  for w in scalar registry schemaHosts aspects; do
+    printf '| %s | %s → %s | %s | %s |\n' \
+      "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
+  done
+  echo
+  if [[ ${#FAILURES[@]} -eq 0 ]]; then
+    echo "ALL GATES PASSED (parity + ratio + linearity)"
+  else
+    echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed:"
+    printf '  - %s\n' "${FAILURES[@]}"
+  fi
+}
+
+emit_report | tee "$tmp/report.md"
+
+# ── optional: splice the report into a doc's marker block ─────────────────────
+# The FAILURES exit fires AFTER the splice — a failing run still records what it measured.
+# Tables are emitted compact (`|---|---:|`), the form treefmt's mdformat leaves untouched, so a
+# re-run diffs only the timing values inside the markers (counters are deterministic).
+if [[ -n "$UPDATE_FILE" ]]; then
+  # report.md opens with a blank line and closes on the gate summary; the trailing `print ""`
+  # supplies the blank line mdformat wants before the closing HTML comment, so the spliced block
+  # is already treefmt-clean.
+  awk -v rep="$tmp/report.md" '
+    /<!-- BEGIN PERF-BENCH -->/ { print; while ((getline l < rep) > 0) print l; print ""; skip=1; next }
+    /<!-- END PERF-BENCH -->/   { skip=0 }
+    !skip { print }
+  ' "$UPDATE_FILE" >"$UPDATE_FILE.tmp" && mv "$UPDATE_FILE.tmp" "$UPDATE_FILE"
+fi
+
+if [[ ${#FAILURES[@]} -ne 0 ]]; then
+  echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed (see report above)" >&2
   exit 1
 fi
