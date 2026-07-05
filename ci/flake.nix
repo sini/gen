@@ -31,6 +31,8 @@
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     devshell.url = "github:numtide/devshell";
     devshell.inputs.nixpkgs.follows = "nixpkgs";
+    git-hooks-nix.url = "github:cachix/git-hooks.nix";
+    git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -95,6 +97,7 @@
         inputs.treefmt-nix.flakeModule
         inputs.devshell.flakeModule
         inputs.flake-root.flakeModule
+        inputs.git-hooks-nix.flakeModule
       ];
 
       # Raw oracle results (system-independent, pure eval) for eyeballing:
@@ -107,6 +110,7 @@
 
       perSystem =
         {
+          self',
           config,
           pkgs,
           system,
@@ -174,6 +178,19 @@
           };
         in
         {
+          # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
+          # ../mkCi.nix → flakeModule.nix and get a `ci` nix-unit hook), the hub is the
+          # parity/perf harness: it exposes flake `checks` + a perf `app`, NOT a nix-unit
+          # `tests` output. So it must NOT carry the shared `ci` hook (`nix-unit --flake
+          # ./ci#tests` would fail "does not provide attribute 'tests'"). Format-only here.
+          pre-commit = {
+            check.enable = false;
+            settings.hooks.treefmt = {
+              enable = true;
+              package = self'.formatter;
+            };
+          };
+
           checks = {
             rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
@@ -202,6 +219,8 @@
           };
 
           devshells.default = {
+            devshell.startup.git-hooks.text = config.pre-commit.installationScript;
+
             env = [
               {
                 name = "FLAKE_ROOT";
