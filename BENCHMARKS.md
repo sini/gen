@@ -28,6 +28,8 @@ Post-fix pure-gen vs the nixpkgs reference stack, median cpu on den composition 
 
 `thunks×`/`alloc×` are nixpkgs ÷ pure-gen (higher = pure allocates less). Scaling is linear on both stacks; pure-gen's per-item slope is lower everywhere. Engine size: gen-merge `lib/` is 936 lines vs nixpkgs `modules.nix` + `types.nix` at 4225 lines. The audit also caught and fixed one quadratic key-union bug (`prelude.unique`, O(k²)) that the linearity gate now guards against permanently.
 
+The dedicated **`classShare`** workload (in the live report below) measures [gen-class](https://github.com/sini/gen-class)'s tier-2 `applyCoreFixed` against gen-merge's fixed-input kernel: reconstructing a class member by handing the engine a pre-merged shared core skips the discharge/fold/verify **spine** for that loc, building only **~0.17×** the full re-merge's thunk graph (a ~5.8× spine reduction, byte-identical, permanently gated ≤ 0.30 against the A1 1.89×→2.48× spine-tax band).
+
 ## Compat mode
 
 A `hybrid` stack — the gen-merge engine driven with **real** nixpkgs `lib.types`/`mkOption`/`mkDefault`, zero adapter code — runs the same corpus byte-identically, because nixpkgs option types already speak the `(loc, defs)` merge contract and its property tags are byte-compatible with gen-merge's priority pass:
@@ -139,25 +141,34 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 |---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.013 | 0.006 | 0.476 | 0.240 | 0.329 | ok |
-| scalar | 2000 | 0.030 | 0.020 | 0.687 | 0.783 | 0.655 | ok |
-| scalar | 8000 | 0.091 | 0.060 | 0.660 | 0.787 | 0.656 | ok |
-| registry | 500 | 0.048 | 0.026 | 0.541 | 0.454 | 0.378 | ok |
-| registry | 2000 | 0.170 | 0.077 | 0.453 | 0.454 | 0.378 | ok |
-| lazyRegistry | 2000 | 0.166 | 0.083 | 0.498 | 0.455 | 0.379 | ok |
-| schemaHosts | 400 | 0.066 | 0.037 | 0.564 | 0.570 | 0.491 | ok |
-| schemaHosts | 1600 | 0.221 | 0.131 | 0.592 | 0.571 | 0.491 | ok |
-| aspects | 400 | 0.097 | 0.038 | 0.388 | 0.334 | 0.278 | ok |
-| aspects | 1600 | 0.356 | 0.126 | 0.354 | 0.334 | 0.278 | ok |
+| startup | 1 | 0.011 | 0.010 | 0.946 | 0.247 | 0.330 | ok |
+| scalar | 2000 | 0.034 | 0.023 | 0.671 | 0.821 | 0.670 | ok |
+| scalar | 8000 | 0.095 | 0.066 | 0.691 | 0.825 | 0.672 | ok |
+| registry | 500 | 0.049 | 0.024 | 0.489 | 0.480 | 0.390 | ok |
+| registry | 2000 | 0.168 | 0.079 | 0.467 | 0.481 | 0.390 | ok |
+| lazyRegistry | 2000 | 0.168 | 0.083 | 0.496 | 0.481 | 0.391 | ok |
+| schemaHosts | 400 | 0.067 | 0.043 | 0.641 | 0.589 | 0.500 | ok |
+| schemaHosts | 1600 | 0.231 | 0.135 | 0.584 | 0.590 | 0.500 | ok |
+| aspects | 400 | 0.101 | 0.040 | 0.391 | 0.348 | 0.284 | ok |
+| aspects | 1600 | 0.355 | 0.127 | 0.358 | 0.349 | 0.284 | ok |
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 
 | workload | sizes | thunk growth | alloc growth |
 |---|---|---:|---:|
-| scalar | 2000 → 8000 | 3.991 | 3.984 |
-| registry | 500 → 2000 | 3.993 | 3.989 |
-| schemaHosts | 400 → 1600 | 3.991 | 3.989 |
+| scalar | 2000 → 8000 | 3.991 | 3.986 |
+| registry | 500 → 2000 | 3.993 | 3.987 |
+| schemaHosts | 400 → 1600 | 3.992 | 3.989 |
 | aspects | 400 → 1600 | 3.993 | 3.989 |
+
+### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
+
+| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
+|---|---:|---:|---:|---:|---:|---|
+| 400 | 1232695 | 211559 | 0.172 | 0.188 | 0.241 | ok |
+| 1600 | 4923895 | 839759 | 0.171 | 0.220 | 0.238 | ok |
+
+thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.969× (gate ≤ 5.5)
 
 ALL GATES PASSED (parity + ratio + linearity)
 

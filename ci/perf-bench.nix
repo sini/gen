@@ -10,10 +10,15 @@
 # (ci/flake.nix), which drives it through `nix-instantiate --eval` + NIX_SHOW_STATS per cell.
 # Baselines + gate rationale: ci/README.md and the 2026-07-04 benchmark report
 # (den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md).
+#
+# The `classShare` workload (gen-class tier 2, spec §2.5) is the ODD ONE OUT: its two "stacks" are
+# `pure-full` / `pure-fixed` (both the PURE engine), NOT pure/ref. It IGNORES the shared provider `P`
+# (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
+# the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects"
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, gen-class, nixpkgs-lib } — store paths as strings
+  stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed")
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "classShare"
   n,
 }:
 let
@@ -33,6 +38,12 @@ let
     inherit prelude;
     merge = genMerge;
     schema = genSchemaNew;
+  };
+  # gen-class wired for tier 2 (the injected gen-merge kernel enables `applyCoreFixed`). Only the
+  # `classShare` workload touches this; every pure/ref cell ignores it.
+  genClass = import "${srcs.gen-class}/lib" {
+    inherit prelude;
+    merge = genMerge;
   };
 
   lib = import "${srcs.nixpkgs-lib}/lib";
@@ -278,7 +289,132 @@ let
       ;
   };
 
-  projection = workloads.${workload} P;
+  # ── classShare — the gen-class tier-2 fixed-input spine gate (spec §2.5) ──────────────────
+  # A homogeneous class of `members` nodes that all share one DESIGNED core: an n-instance typed
+  # `attrsOf(submodule)` registry — the same spine-heavy shape as the `registry` workload, the whole
+  # of which is the byte-identical shared projection. Each member adds only a cheap sibling axis.
+  #
+  #   pure-full   : evaluate every member's FULL module tree — each independently re-merges the
+  #                 n-instance registry (the honest no-sharing baseline: `members × merge(n)`).
+  #   pure-fixed  : build the core ONCE (a single real merge → `coreValues`), then reconstruct each
+  #                 member via `applyCoreFixed`, whose sole-def core marker makes gen-merge SKIP the
+  #                 discharge/fold/verify spine for the registry loc (`1 × merge(n) + members × axis`).
+  #
+  # Both stacks return the SAME list of projections byte-identically (the in-bench byte gate asserts
+  # digest equality); the fixed/full counter ratio is the measured spine reduction (perf-bench.sh gates
+  # it against the A1 band — 1.89×→2.48× fixed-input reference, spec §2.5). Sole-def / no-default /
+  # sibling-axis all satisfy the T7 firing contract so the skip actually fires (deterministic per
+  # gen-class ci/tests/apply-fixed.nix).
+  classShare =
+    let
+      members = 6; # a fixed homogeneous class (mirrors the corpus 6-agent class); n scales the core
+      memberIdx = builtins.genList (i: i) members;
+
+      # the designed core: an n-instance typed registry (registry-workload shape, layered defs)
+      sub = {
+        options = {
+          addr = genMerge.mkOption { type = genMerge.types.str; };
+          role = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "app";
+          };
+          port = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 80;
+          };
+          tags = genMerge.mkOption {
+            type = genMerge.types.listOf genMerge.types.str;
+            default = [ ];
+          };
+        };
+      };
+      # NB: NO `default` on the `hosts` option — a default appends a second def and demotes the sole
+      # core marker to fall-through (still byte-identical, but no spine skip). The config always defines it.
+      hostsDecl = {
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.attrsOf (genMerge.types.submodule sub);
+        };
+      };
+      hostsCfg1 = {
+        config.hosts = toAttrs (i: {
+          name = "h${toString i}";
+          value = {
+            addr = "10.0.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
+            tags = [
+              "t${toString i}"
+              "zone-${toString (i / 100)}"
+            ];
+          };
+        });
+      };
+      hostsCfg2 = {
+        config.hosts = toAttrsIf even (i: {
+          name = "h${toString i}";
+          value = {
+            role = genMerge.mkForce "db";
+            port = 8000 + i;
+          };
+        });
+      };
+      coreRegistryModules = [
+        hostsDecl
+        hostsCfg1
+        hostsCfg2
+      ];
+
+      # THE expensive merge, computed ONCE — the fully-realized registry the class shares. Only
+      # pure-fixed forces this (via `core`); pure-full never references it (laziness ⇒ no double-pay).
+      coreValues = (genMerge.evalModuleTree { modules = coreRegistryModules; }).config.hosts;
+      core = genClass.mkCoreRecord {
+        class = genClass.mkClass {
+          key = "hostclass";
+          members = map (i: "node-${toString i}") memberIdx;
+        };
+        projection = "hosts";
+        # attrNames is already lexically sorted (Nix guarantee) ⇒ satisfies mkCoreRecord's
+        # sorted-sharedKeys contract without a redundant O(n log n) re-sort.
+        sharedKeys = builtins.attrNames coreValues;
+        values = coreValues;
+      };
+
+      # per-member axis: a cheap sibling loc (a DIFFERENT option from the projection, per the firing
+      # contract) — the only thing that differs across members, so the class is non-degenerate.
+      nodeIdDecl = {
+        options.nodeId = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      axisModule = i: { config.nodeId = "node-${toString i}"; };
+
+      memberFull =
+        i:
+        (genMerge.evalModuleTree {
+          modules = coreRegistryModules ++ [
+            nodeIdDecl
+            (axisModule i)
+          ];
+        }).config;
+      memberFixed =
+        i:
+        (genClass.applyCoreFixed {
+          inherit core;
+          modules = [
+            nodeIdDecl
+            (axisModule i)
+          ];
+        }).config;
+
+      projOf = if stack == "pure-fixed" then memberFixed else memberFull;
+    in
+    map (
+      i:
+      let
+        c = projOf i;
+      in
+      {
+        inherit (c) hosts nodeId;
+      }
+    ) memberIdx;
+
+  projection = if workload == "classShare" then classShare else workloads.${workload} P;
   json = builtins.toJSON projection;
 in
 {

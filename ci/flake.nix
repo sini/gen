@@ -13,6 +13,9 @@
     gen-bind.url = "github:sini/gen-bind";
     gen-dispatch.url = "github:sini/gen-dispatch";
     gen-resolve.url = "github:sini/gen-resolve";
+    # gen-class: the class-share mechanism lib; perf-bench drives its tier-2 `applyCoreFixed`
+    # against gen-merge's fixed-input kernel (the `classShare` workload — spec §2.5).
+    gen-class.url = "github:sini/gen-class";
 
     # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host byte-parity oracles ──
     # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`) + gen-aspects (`{ lib, schema }`),
@@ -160,6 +163,7 @@
               "gen-aspects" = "${inputs.gen-aspects}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
               "gen-aspects-orig" = "${inputs.gen-aspects-orig}";
+              "gen-class" = "${inputs.gen-class}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';

@@ -31,6 +31,14 @@ catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule
 registries), `schemaHosts` (gen-schema kind + instances incl id_hash), `aspects` (gen-aspects
 tree with flatten), `startup` (fixed cost, report-only).
 
+`classShare` is a separate workload with its own dedicated harness section (it is NOT in the
+pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
+[gen-class](https://github.com/sini/gen-class)'s tier-2 `applyCoreFixed` against gen-merge's
+fixed-input kernel. `pure-full` re-merges an n-instance shared `attrsOf(submodule)` registry per
+member (the no-sharing baseline); `pure-fixed` builds that core once and reconstructs each member via
+the sole-def core marker, so gen-merge SKIPS the discharge/fold/verify spine for the shared loc. Both
+return the same projections byte-identically. See the design spec §2.5.
+
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section and emits the tables already in mdformat's canonical compact form (`|---|---:|`), so treefmt leaves the block untouched — the script never invokes a formatter.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
@@ -44,6 +52,14 @@ Three gate families (thresholds at the top of `perf-bench.sh`):
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
   ≥ 12×). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
   (fixed in gen-merge `976a87a`): pre-fix, scalar allocation grew ~11.5× over a 4× step.
+
+The `classShare` section adds its own two gates (own thresholds, not the pure/ref ones):
+
+- **byte gate** — `pure-full` and `pure-fixed` must produce byte-identical projections at every size
+  (the perf-scale twin of gen-class's `gateCore`): a fixed-input skip that changed the bytes cannot pass.
+- **spine reduction** (`CLASSSHARE_RATIO_MAX = 0.30`) — `pure-fixed` thunks ≤ `pure-full` thunks × 0.30
+  at each size, i.e. the fixed-input path must build ≤ 30% of the full re-merge's thunk graph. Plus its
+  own thunk linearity check (both stacks ≤ `GROWTH_MAX` over the 4× step).
 
 ### Baseline (2026-07-04, Nix 2.34.7, gen-merge 976a87a)
 
@@ -59,6 +75,28 @@ Linearity at baseline: 3.98–3.99× on every workload (exactly linear).
 
 Full methodology, the pre-fix quadratic data, and the interpretation against the hola/zen priors:
 `den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md` (papers archive).
+
+### classShare baseline (2026-07-05, Nix 2.34.7, gen-merge 2ad1099, gen-class 218c54f)
+
+Fixed-input (`pure-fixed`) vs full re-merge (`pure-full`), 6-member class, ratios = fixed ÷ full:
+
+| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
+|---|---:|---:|---:|---:|---:|---|
+| 400 | 1,232,695 | 211,559 | 0.172 | 0.188 | 0.32 | ok |
+| 1600 | 4,923,895 | 839,759 | 0.171 | 0.220 | 0.24 | ok |
+
+Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
+
+**Threshold rationale (`CLASSSHARE_RATIO_MAX = 0.30`).** The gate is on `nrThunks` — the deterministic
+count of the thunk graph the fixed-input kernel skips building (alloc and cpu are reported for context,
+not gated: cpu is non-deterministic and the thunk count is the canonical spine indicator, cf. the
+linearity net). Measured fixed/full thunk ratio ≈ 0.17 (a ~5.8× spine reduction, stable across both
+sizes). The floor 0.30 = measured + ~75% relative headroom, and enforces ≥ 3.33× — comfortably past the
+A1 **fixed-input reference of 2.48×** (ratio 0.403), the upper end of the 1.89×→2.48× spine-tax band
+(design spec §2.5). So an erosion of the spine reduction below the A1 band fires the gate long before it
+approaches "no reduction" — "any reduction" is explicitly not a pass. Per the update-in-PR policy below,
+a legitimate engine change that shifts this ratio updates the constant in the same PR citing a fresh run;
+the workload is never deleted to make it pass.
 
 ### Updating thresholds / workloads
 
