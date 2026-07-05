@@ -48,7 +48,80 @@ The workloads are not the same, and this is the point: adios-flake measures a **
 
 ## Fleet-scale results
 
-Measured next (roadmap A1). The composition-plane wins above compound across N hosts × M aspects at fleet scale, where hola Plane-2a located the eval-work mass. A fleet-eval regression harness will pin those numbers here once it is byte-gated and wired into CI. Intentionally empty until then.
+The composition-plane numbers above are **self-contained in this repo's CI** — isolated
+den shapes, gated by `nix run ./ci#perf-bench`. The fleet-scale numbers below are measured
+in a separate lab, against a real fleet: the **audit path is gen → hola → nix-config**. The
+[hola](https://github.com/sini/hola) measurement lab (public) forces the den fleet pinned by
+[nix-config](https://github.com/sini/nix-config) (public, `8f84aa6`) — three real
+heterogeneous hosts (bitstream/unstable, blade + cortex/master) — under deterministic
+evaluator counters, byte-gated first. Full protocol, threats to validity, and prior
+reconciliation are in the A1 report and hola's
+[MEASUREMENT.md](https://github.com/sini/hola/blob/d643a8d/ci/bench/MEASUREMENT.md); the
+numbers are pinned in
+[`ci/bench/baselines/`](https://github.com/sini/hola/tree/d643a8d/ci/bench/baselines) and
+frozen as permanent regressions by
+[`fleet-gates.sh`](https://github.com/sini/hola/blob/d643a8d/ci/bench/fleet-gates.sh)
+(CI-green at hola `d643a8d`, run `28727988245`).
+
+The headline: **the fleet dedup opportunity is plane-shaped**, and the three planes are not
+in tension — large on the deploy-time (cross-eval) plane, already free on the in-eval
+declaration plane, small-but-real on the in-eval realization plane.
+
+### The G6 split — composition is a minority of the terminal (nix 2.34.7)
+
+Composition (a derivation-free walk of the merged option tree) / terminal
+(`system.build.toplevel.drvPath`), per exact-pinned counter. These are **two non-nested
+projections of the same eval** — a comparison of two projections, **not** a part/whole share
+of the terminal's own composition work (reconcile, do not equate):
+
+| host | nrFunctionCalls | //-copies (merge storm) |
+|---|---:|---:|
+| bitstream | 55.2% | 13.7% |
+| blade | 40.3% | 4.1% |
+| cortex | 36.1% | 3.9% |
+| **fleet (Σ/Σ)** | **42.5%** | **5.2%** |
+
+Fleet-wide, composition is only **5.2%** of the terminal's `//`-merge storm — ~95% of merge
+cost lives in value/derivation realization, corroborating the prior `hola perf` time profile
+(cortex terminal ≈ 94% derivation construction). Re-run:
+`nix run ./ci#fleet-stats -- --arms baseline-composition,baseline-toplevel`.
+
+### The dedup arms — the three planes, all byte-gated
+
+| plane | measurement | number |
+|---|---|---|
+| **deploy-time incremental** (Arm R, gen-rebuild) | a localized single-host edit recomputes only that host and skips the rest, byte-identical to a full rebuild (`resultEqualsFullRebuild`) | edit at bitstream **skips 66.7%** of fleet composition (blade + cortex = 35,350,336 fcalls); pessimal shared-node edit saves 0 |
+| **in-eval declaration** (Arm C keystone, den s2) | is the shared option-declaration tree free to share within one eval? | blade+cortex from one `out` = **18,836,571** fcalls ≈ **1.066×** a single host — already free via native memoization; den@s2 adds **+4.6%** overhead here (byte-sound: terminal drvPath byte-identical, no win) |
+| **in-eval realization** (Task 7b, config-merge) | is host-specific realization free to share within one eval? | blade+cortex `systemd.units` from one `out` ≈ **1.489×** a single host; injecting the byte-identical shared core saves ~**1.6%**/member |
+
+**Arm R** is incremental reuse *across a change*, not a single-eval speedup (gen-rebuild does
+not beat `O(|cone|)`); the win exists because a prior store is reused after a localized edit.
+Floor: saving `>= 0.60` of fleet composition fcalls (measured 0.667).
+
+**Arm C** is byte-sound but shows no composition win *in this separate-per-host harness*: the
+~60% Plane-2a prior is a cross-host fleet-eval-sharing collapse that separate evals cannot
+capture, and the declaration layer is already natively shared (the 1.066× keystone).
+Reconciled, not refuted.
+
+**Task 7b** is a real, byte-identical win at the realization plane, and small: the **212-unit
+byte-identical shared `systemd.units` core** is 76.3% of cortex's 278 units, yet injecting it
+saves only ~1.6% fcalls / ~0.18% `//`-copies per added member (**732,796** / **195,421**
+counters; floor `>= 0.008`, measured ~0.0158). Small because `systemd.units` realization is
+only ~2% of a member's eval — the host-specific config-resolution spine (~98%) dominates and
+config-merge cannot share it. That spine is the concrete den-hoag target. Not 1:1 with the
+synthetic 96-host 1.89–4.38× priors: those measured a homogeneous `extendModules`-variant
+class with a class-invariant `system.path`; the real corpus is heterogeneous, its spine is
+unshared, and `system.path` is not class-invariant here (so its big win is unsound).
+
+### Gate policy
+
+Digests and byte gates are exact on *every* evaluator (drvPaths and structural sha256s are
+determined by the pinned inputs, not the Nix build). The four deterministic counters gate in
+two tiers: exact on the baseline CppNix 2.34.7, and a **±0.1% relative band** cross-build —
+because a version *string* does not identify an evaluator *build* (CI's Determinate Nix and the
+baselines' CppNix both print `nix (Nix) 2.34.7`, yet Determinate measured `nrPrimOpCalls` −8 on
+the deep evals, ~4e-7 relative). `gc.totalBytes` and `cpuTime` are never gated. Floors update
+in-PR, never delete. Re-run all gates: `nix run ~/Documents/repos/hola/ci#fleet-gates`.
 
 ## Live regression report
 
@@ -66,16 +139,16 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 |---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.010 | 0.007 | 0.754 | 0.240 | 0.329 | ok |
-| scalar | 2000 | 0.028 | 0.021 | 0.731 | 0.783 | 0.655 | ok |
-| scalar | 8000 | 0.091 | 0.062 | 0.682 | 0.787 | 0.656 | ok |
-| registry | 500 | 0.051 | 0.024 | 0.472 | 0.454 | 0.378 | ok |
-| registry | 2000 | 0.169 | 0.076 | 0.452 | 0.454 | 0.378 | ok |
-| lazyRegistry | 2000 | 0.159 | 0.076 | 0.475 | 0.455 | 0.379 | ok |
-| schemaHosts | 400 | 0.065 | 0.039 | 0.599 | 0.570 | 0.491 | ok |
-| schemaHosts | 1600 | 0.218 | 0.126 | 0.580 | 0.571 | 0.491 | ok |
-| aspects | 400 | 0.097 | 0.036 | 0.374 | 0.334 | 0.278 | ok |
-| aspects | 1600 | 0.351 | 0.123 | 0.349 | 0.334 | 0.278 | ok |
+| startup | 1 | 0.013 | 0.006 | 0.476 | 0.240 | 0.329 | ok |
+| scalar | 2000 | 0.030 | 0.020 | 0.687 | 0.783 | 0.655 | ok |
+| scalar | 8000 | 0.091 | 0.060 | 0.660 | 0.787 | 0.656 | ok |
+| registry | 500 | 0.048 | 0.026 | 0.541 | 0.454 | 0.378 | ok |
+| registry | 2000 | 0.170 | 0.077 | 0.453 | 0.454 | 0.378 | ok |
+| lazyRegistry | 2000 | 0.166 | 0.083 | 0.498 | 0.455 | 0.379 | ok |
+| schemaHosts | 400 | 0.066 | 0.037 | 0.564 | 0.570 | 0.491 | ok |
+| schemaHosts | 1600 | 0.221 | 0.131 | 0.592 | 0.571 | 0.491 | ok |
+| aspects | 400 | 0.097 | 0.038 | 0.388 | 0.334 | 0.278 | ok |
+| aspects | 1600 | 0.356 | 0.126 | 0.354 | 0.334 | 0.278 | ok |
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 

@@ -9,7 +9,8 @@ The two load-bearing proofs are the **byte-parity oracles**: they hold the pure-
 byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. They
 run as permanent regressions on `nix flake check ./ci` in this hub. Everything else — the
 per-library unit suites (counted in the §2 table), the purity scanners, the config-thunk deferral
-regression, and the performance gates — is enumerated in the same reproducible form.
+regression, the performance gates, and the fleet-scale regression gates (§6) — is enumerated in the
+same reproducible form.
 
 A few terms used throughout, for readers new to the ecosystem:
 
@@ -249,7 +250,85 @@ with engine changes, so kept in one place — and the full baseline numbers live
 [BENCHMARKS.md](BENCHMARKS.md); the harness rationale and the threshold-update policy are in
 [`ci/README.md`](ci/README.md).
 
-## 6. Re-run everything
+## 6. Fleet-scale regression gates
+
+The proofs above measure the engine on isolated den shapes inside this hub. The fleet-scale
+gates measure the **same engine on a real, heterogeneous fleet**, and they live in a separate
+public repo — the measurement lab. A few terms for readers new to this half:
+
+- **hola** ([github:sini/hola](https://github.com/sini/hola)) — the fleet-eval measurement lab.
+  It forces den's real fleet under deterministic evaluator counters and freezes the results as
+  gates. gen cites it; the audit path is **gen → hola → nix-config**.
+- **fleet** — the three real hosts pinned by
+  [nix-config](https://github.com/sini/nix-config) (`8f84aa6`): bitstream (nixpkgs-unstable),
+  blade and cortex (nixpkgs-master).
+- **A1 report** — the formal write-up of the protocol, results, prior reconciliation, and
+  threats to validity that these gates enforce.
+
+The campaign made two claims and turned both into a failing check (`ci/bench/fleet-gates.sh`,
+wired as the `fleet-gates` app and a GitHub job). All rows below were **green at hola `d643a8d`,
+CI run `28727988245`** (`check` + `fleet-gates`).
+
+### fleet parity — the headline claim
+
+- **Claim:** the den fleet builds **byte-identically** on the vendored engine — the vanilla
+  build's `system.build.toplevel.drvPath` equals the vendored-engine build's, on all three hosts
+  — and the vendored engine body byte-matches its nixpkgs source (`channel-modules-identity`).
+- **Artifact:** `ci/tests/den-fleet-parity.nix` + the `[parity]` partition of `fleet-gates.sh`.
+- **Command:** from the hola repo, `nix run ./ci#fleet-gates` (the `[parity]` line), or directly
+  `nix eval --impure ./ci#tests.den-fleet-parity.<host>.expr` per host (expects `true`).
+- **Failure looks like:** the `[parity]` gate prints a localizing block naming the host and
+  `expected=true actual=<drv>` (vanilla ≠ vendored-engine drvPath), and the run exits non-zero.
+
+### savings don't erode — the dedup byte gates and floors
+
+- **Claim:** the three dedup findings stay sound and un-eroded — (a) **Arm R** (gen-rebuild
+  incremental rebuild): a localized single-host edit is byte-identical to a full rebuild
+  (`resultEqualsFullRebuild`) and skips **≥ 60%** of the fleet composition (measured 66.7%);
+  (b) **Arm C** (den s2 class-share): the composition digest *and* terminal drvPath stay
+  byte-identical under s2 on all three hosts — a resolution-only optimization, recorded as a
+  +4.6% overhead, never floored as a win; (c) **Task 7b** (realization-plane class-share): the
+  injected `systemd.units` core reassembles the member byte-identically
+  (`injectedDigest == realDigest`) and saves **≥ 0.8%** of reconstruct fcalls (measured ~1.6%).
+- **Artifact:** the three committed baselines
+  (`ci/bench/baselines/{g6-split.json, dedup-savings.json, class-share-realization.json}`) plus
+  the `[consistency]` partition of `fleet-gates.sh` (pure JSON arithmetic over them + the pinned
+  floors); the full protocol is hola's `MEASUREMENT.md` and the A1 report.
+- **Command:** from the hola repo, `nix run ./ci#fleet-gates -- --quick` (the seconds-long
+  `[consistency]` sweep + floors); `nix run ./ci#fleet-gates -- --selftest` proves the gates have
+  teeth (it corrupts a copy of a baseline — a counter, then a floor — and asserts each fails).
+- **Failure looks like:** a `[consistency]` FAIL line names the broken invariant (a saving that no
+  longer equals the sum of skipped-host composition, a byte gate flipped to `false`, or a floor
+  breached); the run exits non-zero. A floor is never lowered and a workload never deleted to pass
+  — a legitimate baseline shift is re-pinned in the same PR citing the new run.
+
+### the counter gates — exact where sound, banded where honest
+
+- **Claim:** the four deterministic evaluator counters
+  (`nrFunctionCalls`/`nrPrimOpCalls`/`nrOpUpdateValuesCopied`/`nrThunks`) are re-measured and
+  compared in two tiers — **exact** on the baseline evaluator, and within a **±0.1% relative
+  band** on any other build. The band exists because a version *string* does not identify an
+  evaluator *build*: CI's Determinate Nix and the baselines' upstream CppNix both print
+  `nix (Nix) 2.34.7`, yet Determinate measured `nrPrimOpCalls` −8 on the deep evals (~4e-7
+  relative; every digest identical). Digests and byte gates are exact on *every* evaluator (they
+  are determined by the pinned inputs, not the Nix build); `gc.totalBytes` and `cpuTime` never
+  enter any gate.
+- **Artifact:** the `[ci-remeasure]` partition of `fleet-gates.sh` (re-runs the public-pinned
+  arms — `baseline-*`, `rebuild-dedup`, and the Task-7b driver — and diffs digests always,
+  counters per tier).
+- **Command:** from the hola repo, `nix run ./ci#fleet-gates` (default: `[consistency]` +
+  `[ci-remeasure]` + `[parity]`, ~12–18 min; `HOLA_STRICT_COUNTERS=1` forces the exact tier on the
+  baseline evaluator).
+- **Failure looks like:** the re-measure gate prints a verbose per-counter table
+  (`cell counter: expected / actual / delta / tol`) for any cell outside its tier's tolerance, or
+  names a mismatched digest; the run exits non-zero.
+- **Caveat — the local-only partition.** The Arm-C `class-share` s2 arm needs den's local worktree
+  branches (`git+file://`, campaign impure-local by design), which a CI runner cannot fetch. It is
+  a documented **pre-push local gate** (`nix run ./ci#fleet-gates -- --local`), deliberately
+  skipped in CI; the `[ci-remeasure]` and `[parity]` partitions run the public-pinned arms that CI
+  can reproduce.
+
+## 7. Re-run everything
 
 From this hub's root:
 
