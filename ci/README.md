@@ -31,7 +31,7 @@ catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule
 registries), `schemaHosts` (gen-schema kind + instances incl id_hash), `aspects` (gen-aspects
 tree with flatten), `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
-keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs-parity band),
+keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
 `startup` (fixed cost, report-only).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
@@ -52,9 +52,10 @@ Three gate families (thresholds at the top of `perf-bench.sh`):
   host speed cancels); pure thunks/allocation ≤ 0.90× ref (deterministic evaluator counters).
   Measured headroom is wide (see baseline): a regression that erodes the speedup below ~15–35%
   margin fires the gate long before pure gets *slower* than nixpkgs. `wideFreeform` is the one
-  exception — a nixpkgs-parity workload gated at a BAND ceiling (`WIDEFREEFORM_RATIO_MAX = 1.5`)
-  rather than the win-gate, because freeform absorption rides the same per-key type merges nixpkgs
-  performs; its teeth are the linearity net (see the baseline block below for the rationale).
+  partial exception — its cpu and alloc keep the default win-gates, but its THUNK ratio rides a band
+  (`WIDEFREEFORM_RATIO_MAX = 1.3`) rather than the 0.90 win-gate, because freeform absorption is
+  thunk-parity with nixpkgs (the same per-key type merges); its teeth are the linearity net (see the
+  baseline block below for the rationale).
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
   ≥ 12×). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
   (fixed in gen-merge `976a87a`): pre-fix, scalar allocation grew ~11.5× over a 4× step.
@@ -75,13 +76,13 @@ largest size per workload:
 
 | workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
 |---|---:|---:|---:|---:|---:|---:|
-| scalar | 8000 | 0.092s | 0.063s | 0.684 | 0.844 | 0.681 |
-| registry | 2000 | 0.163s | 0.084s | 0.515 | 0.493 | 0.400 |
-| lazyRegistry | 2000 | 0.167s | 0.079s | 0.475 | 0.493 | 0.401 |
-| schemaHosts | 1600 | 0.226s | 0.136s | 0.602 | 0.607 | 0.515 |
-| aspects | 1600 | 0.345s | 0.126s | 0.366 | 0.358 | 0.292 |
-| wideFreeform | 8000 | 0.089s | 0.069s | 0.768 | 1.099 | 0.821 |
-| deepSubmodule | 1600 | 1.375s | 0.216s | 0.157 | 0.287 | 0.236 |
+| scalar | 8000 | 0.092s | 0.063s | 0.689 | 0.844 | 0.681 |
+| registry | 2000 | 0.166s | 0.079s | 0.478 | 0.493 | 0.400 |
+| lazyRegistry | 2000 | 0.157s | 0.079s | 0.504 | 0.493 | 0.401 |
+| schemaHosts | 1600 | 0.221s | 0.135s | 0.611 | 0.607 | 0.515 |
+| aspects | 1600 | 0.351s | 0.125s | 0.357 | 0.358 | 0.292 |
+| wideFreeform | 8000 | 0.082s | 0.063s | 0.771 | 1.099 | 0.821 |
+| deepSubmodule | 1600 | 1.385s | 0.223s | 0.161 | 0.287 | 0.236 |
 
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
 wideFreeform 3.989×/3.985×, deepSubmodule 3.998×/3.996×.
@@ -93,14 +94,15 @@ stays linear in the instance count.
 
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the
-absorption path. Its pure/ref ratios sit in a **parity BAND** rather than below the 0.90 win-gate:
-freeform absorption rides the SAME per-key type merges nixpkgs.lib performs (the engine's thunk/alloc
-win is on DECLARED option paths), so parity is the honest contract. Gated at
-`WIDEFREEFORM_RATIO_MAX = 1.5` (measured worst thunks 1.099 + ~36% headroom) plus the standard
-linearity gate — the band's real teeth are LINEARITY, which catches the O(n²) freeform-absorption
-blowup this workload was built to expose (pre-fix, n=8000 pure thunks were 468× ref; gen-merge
-`018bafa` coalesces the per-key unmatched defs per originating module, restoring linear absorption).
-Full pre-fix quadratic data: `den-architecture/parked/wideFreeform-b4/NOTES.md`.
+absorption path. Its **thunk** ratio sits in a parity band rather than below the 0.90 win-gate:
+freeform absorption rides the SAME per-key type merges nixpkgs.lib performs (the engine's thunk win is
+on DECLARED option paths), so thunk-parity is the honest contract on that counter — cpu and alloc still
+win and keep their default gates (0.85 / 0.90). Only thunks are band-gated at
+`WIDEFREEFORM_RATIO_MAX = 1.3` (deterministic 1.099 + ~18% headroom); the band's real teeth are
+LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to expose
+(pre-fix, n=8000 pure thunks were 468× ref; gen-merge `018bafa` coalesces the per-key unmatched defs
+per originating module, restoring linear absorption). Full pre-fix quadratic data:
+`den-architecture/parked/wideFreeform-b4/NOTES.md`.
 
 Full methodology, the pre-fix quadratic data, and the interpretation against the hola/zen priors:
 `den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md` (papers archive).
@@ -111,8 +113,8 @@ Fixed-input (`pure-fixed`) vs full re-merge (`pure-full`), 6-member class, ratio
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1,263,991 | 216,835 | 0.172 | 0.188 | 0.275 | ok |
-| 1600 | 5,048,791 | 860,635 | 0.170 | 0.218 | 0.237 | ok |
+| 400 | 1,263,991 | 216,835 | 0.172 | 0.188 | 0.268 | ok |
+| 1600 | 5,048,791 | 860,635 | 0.170 | 0.218 | 0.255 | ok |
 
 Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
 
