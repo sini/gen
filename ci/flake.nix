@@ -180,6 +180,27 @@
             ''
             + builtins.readFile ./perf-bench.sh;
           };
+
+          # ── flake-compare bench — the 3-way real-flake comparison (roadmap B5) ──
+          # `nix run ./ci#flake-compare` — evaluates ci/flake-compare/{flake-parts,adios,gen-flake}/
+          # (the SAME outputs three ways) under adios-flake's BENCHMARKS.md methodology (5 nix eval
+          # runs, NIX_SHOW_STATS counters, eval-cache off), prints a 3-way counter table + drvPath
+          # equivalence. Report-only: pins the neighbour frameworks by rev but gates NOTHING (their
+          # code moves independently of the hub). The variant flakes carry their own committed locks;
+          # `${./flake-compare}` copies the tree (incl locks) to the store for a hermetic run.
+          flakeCompare = pkgs.writeShellApplication {
+            name = "gen-flake-compare";
+            runtimeInputs = [
+              pkgs.nix
+              pkgs.jq
+              pkgs.gawk
+              pkgs.coreutils
+            ];
+            text = ''
+              export FLAKE_COMPARE_DIR=${./flake-compare}
+            ''
+            + builtins.readFile ./flake-compare.sh;
+          };
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -203,6 +224,11 @@
           apps.perf-bench = {
             type = "app";
             program = "${perfBench}/bin/gen-perf-bench";
+          };
+
+          apps.flake-compare = {
+            type = "app";
+            program = "${flakeCompare}/bin/gen-flake-compare";
           };
 
           treefmt = {
@@ -252,6 +278,13 @@
                 help = "Run the module-system perf-regression bench (pure vs nixpkgs stack)";
                 command = ''
                   nix run "$FLAKE_ROOT/ci#perf-bench"
+                '';
+              }
+              {
+                name = "flake-compare";
+                help = "Run the 3-way real-flake comparison bench (gen-flake vs flake-parts vs adios-flake)";
+                command = ''
+                  nix run "$FLAKE_ROOT/ci#flake-compare"
                 '';
               }
             ];
