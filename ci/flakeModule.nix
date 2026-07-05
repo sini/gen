@@ -46,6 +46,19 @@ in
         system,
         ...
       }:
+      let
+        # Deep module-system evals (gen-schema's 398-suite, hola's fleet corpus) exceed the
+        # default 8 MB stack. The pre-commit framework execs `entry` directly (shlex split, no
+        # shell), so the raise can't be inlined — it needs a wrapper binary. Harmless elsewhere.
+        ciNixUnit = pkgs.writeShellApplication {
+          name = "${name}-ci-nix-unit";
+          runtimeInputs = [ (resolve "nix-unit").packages.${system}.default ];
+          text = ''
+            ulimit -s unlimited 2>/dev/null || true
+            exec nix-unit --flake ./ci#tests "$@"
+          '';
+        };
+      in
       {
         # Pre-commit hooks: format check + unit tests
         pre-commit = {
@@ -59,7 +72,7 @@ in
               enable = true;
               name = "ci";
               description = "Run nix-unit tests";
-              entry = "${(resolve "nix-unit").packages.${system}.default}/bin/nix-unit --flake ./ci#tests";
+              entry = "${ciNixUnit}/bin/${name}-ci-nix-unit";
               files = "\\.nix$";
               pass_filenames = false;
             };
