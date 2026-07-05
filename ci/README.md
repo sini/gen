@@ -89,7 +89,10 @@ Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
 
 **Threshold rationale (`CLASSSHARE_RATIO_MAX = 0.30`).** The gate is on `nrThunks` — the deterministic
 count of the thunk graph the fixed-input kernel skips building (alloc and cpu are reported for context,
-not gated: cpu is non-deterministic and the thunk count is the canonical spine indicator, cf. the
+not gated: cpu is non-deterministic; alloc runs >4× growth by design — once the spine is skipped, the
+fixed path's remaining allocation is dominated by the harness's own digest/serialization of the
+projection (paid by both stacks for the byte gate), not per-member spine work; the thunk count is the
+canonical spine indicator, cf. the
 linearity net). Measured fixed/full thunk ratio ≈ 0.17 (a ~5.8× spine reduction, stable across both
 sizes). The floor 0.30 = measured + ~75% relative headroom, and enforces ≥ 3.33× — comfortably past the
 A1 **fixed-input reference of 2.48×** (ratio 0.403), the upper end of the 1.89×→2.48× spine-tax band
