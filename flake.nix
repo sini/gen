@@ -26,6 +26,7 @@
     gen-dispatch.url = "github:sini/gen-dispatch";
     gen-resolve.url = "github:sini/gen-resolve";
     gen-flake.url = "github:sini/gen-flake";
+    gen-class.url = "github:sini/gen-class";
   };
 
   outputs = inputs: {

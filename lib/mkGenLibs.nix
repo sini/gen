@@ -21,4 +21,11 @@ _:
   dispatch = genInputs.gen-dispatch.lib;
   resolve = genInputs.gen-resolve.lib;
   flake = genInputs.gen-flake.lib;
+  # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
+  # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
+  # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
+  class = import "${genInputs.gen-class}/lib" {
+    prelude = genInputs.gen-prelude.lib;
+    merge = genInputs.gen-merge.lib;
+  };
 }
