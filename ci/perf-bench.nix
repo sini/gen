@@ -18,7 +18,7 @@
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, gen-class, nixpkgs-lib } — store paths as strings
   stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "deepSubmodule" | "classShare"
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare"
   n,
 }:
 let
@@ -278,13 +278,65 @@ let
       key = a.key or null;
     }) flat;
 
+  # wideFreeform — a WIDE freeform tree: one root module with a `freeformType` (lazyAttrsOf str) that
+  # absorbs n UNKNOWN sibling keys, coexisting with a handful of declared options. Layered defs
+  # (mkDefault all, mkForce on even, mkIf discharge on non-thirds) drive priority discharge THROUGH the
+  # freeform absorption path — the twin of `scalar`'s wide DECLARED option set, but exercising the
+  # unknown-key → root-freeform merge instead of typed option lookup. Declared wins over freeform at
+  # shared paths (`title`/`count`); the k* keys route to the freeform.
+  wideFreeform =
+    P:
+    let
+      eval = P.eval {
+        modules = [
+          {
+            freeformType = P.types.lazyAttrsOf P.types.str;
+            options.title = P.mkOption {
+              type = P.types.str;
+              default = "t";
+            };
+            options.count = P.mkOption {
+              type = P.types.int;
+              default = 0;
+            };
+          }
+          {
+            config =
+              (toAttrs (i: {
+                name = "k${toString i}";
+                value = P.mkDefault "d${toString i}";
+              }))
+              // {
+                title = "wide";
+                count = n;
+              };
+          }
+          {
+            config = toAttrsIf even (i: {
+              name = "k${toString i}";
+              value = P.mkForce "f${toString i}";
+            });
+          }
+          {
+            config = toAttrs (i: {
+              name = "k${toString i}";
+              value = P.mkIf (!third i) "b${toString i}";
+            });
+          }
+        ];
+      };
+    in
+    eval.config;
+
   # deepSubmodule — n replicated DEEP submodule chains, each a fixed `depth`-level nest of
   # `submodule`s ending in leaf options. Exercises per-level engine recursion (the module fixpoint
   # re-entered `depth` deep per instance) — the one axis no other workload touches: registry's
-  # instances are FLAT (4 leaf options), this one's are `depth` submodules deep. `depth` is a FIXED
-  # sane constant (recursion depth per instance ≈ depth, no eval-stack overflow on default `nix run`);
-  # `n` scales the chain COUNT horizontally (an attrsOf(submodule) of `n` instances), so counters stay
-  # linear in n — a per-level blowup would show as super-linear growth against the linearity gate.
+  # instances are FLAT (4 leaf options), this one's are `depth` submodules deep. `depth = 8` is the
+  # fixed sane constant — deep enough that per-level fixpoint re-entry dominates an instance's cost
+  # (a shallower nest would be swamped by fixed per-instance overhead), shallow enough to stay within
+  # the default eval stack (no overflow on a plain `nix run`); `n` scales the chain COUNT horizontally
+  # (an attrsOf(submodule) of `n` instances), so counters stay linear in n — a per-level blowup would
+  # show as super-linear growth against the linearity gate.
   deepSubmodule =
     P:
     let
@@ -336,6 +388,7 @@ let
       lazyRegistry
       schemaHosts
       aspects
+      wideFreeform
       deepSubmodule
       ;
   };

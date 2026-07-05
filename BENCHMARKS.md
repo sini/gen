@@ -141,32 +141,38 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 |---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.011 | 0.010 | 0.946 | 0.247 | 0.330 | ok |
-| scalar | 2000 | 0.034 | 0.023 | 0.671 | 0.821 | 0.670 | ok |
-| scalar | 8000 | 0.095 | 0.066 | 0.691 | 0.825 | 0.672 | ok |
-| registry | 500 | 0.049 | 0.024 | 0.489 | 0.480 | 0.390 | ok |
-| registry | 2000 | 0.168 | 0.079 | 0.467 | 0.481 | 0.390 | ok |
-| lazyRegistry | 2000 | 0.168 | 0.083 | 0.496 | 0.481 | 0.391 | ok |
-| schemaHosts | 400 | 0.067 | 0.043 | 0.641 | 0.589 | 0.500 | ok |
-| schemaHosts | 1600 | 0.231 | 0.135 | 0.584 | 0.590 | 0.500 | ok |
-| aspects | 400 | 0.101 | 0.040 | 0.391 | 0.348 | 0.284 | ok |
-| aspects | 1600 | 0.355 | 0.127 | 0.358 | 0.349 | 0.284 | ok |
+| startup | 1 | 0.009 | 0.008 | 0.871 | 0.252 | 0.332 | ok |
+| scalar | 2000 | 0.030 | 0.023 | 0.759 | 0.840 | 0.679 | ok |
+| scalar | 8000 | 0.092 | 0.063 | 0.684 | 0.844 | 0.681 | ok |
+| registry | 500 | 0.050 | 0.027 | 0.550 | 0.492 | 0.400 | ok |
+| registry | 2000 | 0.163 | 0.084 | 0.515 | 0.493 | 0.400 | ok |
+| lazyRegistry | 2000 | 0.167 | 0.079 | 0.475 | 0.493 | 0.401 | ok |
+| schemaHosts | 400 | 0.062 | 0.040 | 0.643 | 0.605 | 0.514 | ok |
+| schemaHosts | 1600 | 0.226 | 0.136 | 0.602 | 0.607 | 0.515 | ok |
+| aspects | 400 | 0.097 | 0.036 | 0.366 | 0.358 | 0.292 | ok |
+| aspects | 1600 | 0.345 | 0.126 | 0.366 | 0.358 | 0.292 | ok |
+| wideFreeform | 2000 | 0.028 | 0.024 | 0.867 | 1.092 | 0.818 | ok |
+| wideFreeform | 8000 | 0.089 | 0.069 | 0.768 | 1.099 | 0.821 | ok |
+| deepSubmodule | 400 | 0.199 | 0.066 | 0.329 | 0.287 | 0.236 | ok |
+| deepSubmodule | 1600 | 1.375 | 0.216 | 0.157 | 0.287 | 0.236 | ok |
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 
 | workload | sizes | thunk growth | alloc growth |
 |---|---|---:|---:|
-| scalar | 2000 → 8000 | 3.991 | 3.986 |
-| registry | 500 → 2000 | 3.993 | 3.987 |
-| schemaHosts | 400 → 1600 | 3.992 | 3.989 |
+| scalar | 2000 → 8000 | 3.991 | 3.984 |
+| registry | 500 → 2000 | 3.993 | 3.986 |
+| schemaHosts | 400 → 1600 | 3.991 | 3.990 |
 | aspects | 400 → 1600 | 3.993 | 3.989 |
+| wideFreeform | 2000 → 8000 | 3.989 | 3.985 |
+| deepSubmodule | 400 → 1600 | 3.998 | 3.996 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1232695 | 211559 | 0.172 | 0.188 | 0.241 | ok |
-| 1600 | 4923895 | 839759 | 0.171 | 0.220 | 0.238 | ok |
+| 400 | 1263991 | 216835 | 0.172 | 0.188 | 0.275 | ok |
+| 1600 | 5048791 | 860635 | 0.170 | 0.218 | 0.237 | ok |
 
 thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.969× (gate ≤ 5.5)
 

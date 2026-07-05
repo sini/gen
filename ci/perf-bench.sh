@@ -14,6 +14,7 @@
 # Gates (rationale + baselines: ci/README.md):
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
 #   ratio     — at the largest size per workload: pure cpu ≤ 0.85×ref; pure thunks/alloc ≤ 0.90×ref
+#               (exception: wideFreeform is a parity BAND, ≤ WIDEFREEFORM_RATIO_MAX — see its block below)
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×)
 #
 # cpu is the median of $REPS runs (same-process ratio, robust to host speed); thunk/alloc counters
@@ -34,7 +35,8 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# "workload n tags" — tags: r = ratio-gated size, small/big = linearity pair (big = 4×small)
+# "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = ratio-BAND-gated size
+# (wideFreeform parity band, see WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
 MATRIX=(
   "startup 1 none"
   "scalar 2000 small"
@@ -46,6 +48,8 @@ MATRIX=(
   "schemaHosts 1600 r,big"
   "aspects 400 small"
   "aspects 1600 r,big"
+  "wideFreeform 2000 small"
+  "wideFreeform 8000 rb,big"
   "deepSubmodule 400 small"
   "deepSubmodule 1600 r,big"
 )
@@ -65,6 +69,19 @@ GROWTH_MAX=5.5
 CLASSSHARE_SMALL=400
 CLASSSHARE_BIG=1600
 CLASSSHARE_RATIO_MAX=0.30
+
+# ── wideFreeform (freeform absorption parity band) — its OWN ratio ceiling, own rationale ──
+# Wide freeform is nixpkgs-PARITY, not a pure-engine win: unknown sibling keys route through the root
+# freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib performs — the pure engine's
+# thunk/alloc win is on DECLARED option paths (see scalar/registry/aspects, all well under 0.90). So the
+# pure/ref ratios sit in a parity BAND, not below the default 0.90 win-gate. Measured (2026-07-05, Nix
+# 2.34.7, gen-merge 018bafa) at n=8000: thunks 1.099, alloc 0.821, cpu ~0.77 (n=2000: 1.092 / 0.818 /
+# ~0.87; cpu is noise). The ceiling 1.5 = measured worst (thunks 1.099) + ~36% headroom, far below any quadratic
+# (pre-fix n=8000 thunks were 468×ref; see den-architecture/parked/wideFreeform-b4/NOTES.md). The gate's
+# real teeth are LINEARITY — the O(n^2) freeform-absorption regression this workload was built to catch,
+# gated at GROWTH_MAX over a 4x size step — plus this band ceiling as a gross-regression sanity cap.
+# Regenerate the measured numbers via `nix run ./ci#perf-bench`.
+WIDEFREEFORM_RATIO_MAX=1.5
 
 declare -A CPU THUNKS ALLOC DIG
 declare -A CR TR AR PAR
@@ -117,10 +134,15 @@ for row in "${MATRIX[@]}"; do
     lte "${CR[$w,$n]}" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu ${CR[$w,$n]} > $CPU_RATIO_MAX")
     lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
+  elif [[ ",$tags," == *",rb,"* ]]; then
+    # parity-band ceiling (wideFreeform): all three pure/ref ratios ≤ WIDEFREEFORM_RATIO_MAX, no win required
+    lte "${CR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref cpu ${CR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
+    lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
+    lte "${AR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref alloc ${AR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
   fi
 done
 
-for w in scalar registry schemaHosts aspects deepSubmodule; do
+for w in scalar registry schemaHosts aspects wideFreeform deepSubmodule; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -186,7 +208,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry schemaHosts aspects deepSubmodule; do
+  for w in scalar registry schemaHosts aspects wideFreeform deepSubmodule; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
