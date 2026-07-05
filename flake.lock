@@ -456,11 +456,11 @@
         "gen-types": "gen-types_5"
       },
       "locked": {
-        "lastModified": 1783188673,
-        "narHash": "sha256-e2yrsqnqahUBlkxK4FRkL8MZp0PAo+RzVyPfvGWpa0w=",
+        "lastModified": 1783273337,
+        "narHash": "sha256-oRqGZ0tTUsAPwwwU6u7Mw/1YwK/VUu7IcPR1b09l1Uk=",
         "owner": "sini",
         "repo": "gen-merge",
-        "rev": "976a87a6f07d12b919571967163b13bdcc6f2b05",
+        "rev": "018bafaba716c3e5ba25f99dda8936dd4ba4f27a",
         "type": "github"
       },
       "original": {
