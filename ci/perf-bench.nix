@@ -18,7 +18,7 @@
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, gen-class, nixpkgs-lib } — store paths as strings
   stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "classShare"
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "deepSubmodule" | "classShare"
   n,
 }:
 let
@@ -278,6 +278,56 @@ let
       key = a.key or null;
     }) flat;
 
+  # deepSubmodule — n replicated DEEP submodule chains, each a fixed `depth`-level nest of
+  # `submodule`s ending in leaf options. Exercises per-level engine recursion (the module fixpoint
+  # re-entered `depth` deep per instance) — the one axis no other workload touches: registry's
+  # instances are FLAT (4 leaf options), this one's are `depth` submodules deep. `depth` is a FIXED
+  # sane constant (recursion depth per instance ≈ depth, no eval-stack overflow on default `nix run`);
+  # `n` scales the chain COUNT horizontally (an attrsOf(submodule) of `n` instances), so counters stay
+  # linear in n — a per-level blowup would show as super-linear growth against the linearity gate.
+  deepSubmodule =
+    P:
+    let
+      depth = 8;
+      # a depth-level nested submodule chain type: `next.next.…(depth)….{ leaf; tag }`.
+      mkChain =
+        d:
+        if d == 0 then
+          {
+            options.leaf = P.mkOption { type = P.types.str; };
+            options.tag = P.mkOption {
+              type = P.types.str;
+              default = "end";
+            };
+          }
+        else
+          {
+            options.next = P.mkOption {
+              type = P.types.submodule (mkChain (d - 1));
+              default = { };
+            };
+          };
+      # a value that fills a chain to `depth` (only the leaf differs per instance).
+      mkVal = d: leaf: if d == 0 then { inherit leaf; } else { next = mkVal (d - 1) leaf; };
+      eval = P.eval {
+        modules = [
+          {
+            options.chains = P.mkOption {
+              type = P.types.attrsOf (P.types.submodule (mkChain depth));
+              default = { };
+            };
+          }
+          {
+            config.chains = toAttrs (i: {
+              name = "c${toString i}";
+              value = mkVal depth "leaf${toString i}";
+            });
+          }
+        ];
+      };
+    in
+    eval.config.chains;
+
   workloads = {
     inherit
       startup
@@ -286,6 +336,7 @@ let
       lazyRegistry
       schemaHosts
       aspects
+      deepSubmodule
       ;
   };
 

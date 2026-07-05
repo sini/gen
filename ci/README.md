@@ -29,7 +29,8 @@ fixtures); `perf-bench.sh` drives it through `nix-instantiate --eval` + `NIX_SHO
 × 3 reps per cell. Workloads are den shapes: `scalar` (wide flat option sets — the shape that
 catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule) instance
 registries), `schemaHosts` (gen-schema kind + instances incl id_hash), `aspects` (gen-aspects
-tree with flatten), `startup` (fixed cost, report-only).
+tree with flatten), `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
+per-level engine recursion no flat-instance workload exercises), `startup` (fixed cost, report-only).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
 pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
@@ -73,6 +74,17 @@ The `classShare` section adds its own two gates (own thresholds, not the pure/re
 
 Linearity at baseline: 3.98–3.99× on every workload (exactly linear).
 
+`deepSubmodule` (added 2026-07-05, Nix 2.34.7, gen-merge `fa5d5cc`, default-gated) at its `r` size —
+counters are deterministic per Nix version, cpu is ratio-context; regenerate with `nix run ./ci#perf-bench`:
+
+| workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
+|---|---:|---:|---:|---:|---:|---:|
+| deepSubmodule | 1600 | 1.357s | 0.220s | 0.16 | 0.28 | 0.23 |
+
+`depth = 8` (fixed) per instance; `n` scales the chain count. Linearity 3.998×/3.996× over the 400→1600
+step — the deep per-level recursion stays linear in the instance count, and the fixed depth keeps the
+eval-stack recursion bounded so the bench runs under a plain `nix run` (no raised stack limit needed).
+
 Full methodology, the pre-fix quadratic data, and the interpretation against the hola/zen priors:
 `den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md` (papers archive).
 
@@ -106,5 +118,6 @@ the workload is never deleted to make it pass.
 Counters are deterministic per Nix version; cpu gates are ratios, so CI host speed does not
 matter. If a legitimate engine change shifts a ratio past a gate, update the threshold in
 `perf-bench.sh` **in the same PR**, citing the new baseline table from the run output — never
-delete a workload to make a gate pass. New den shapes (wide freeform trees, deep submodule
-nesting) should be added to `perf-bench.nix` as they become hot in den-hoag.
+delete a workload to make a gate pass. New den shapes should be added to `perf-bench.nix` as they
+become hot in den-hoag (deep submodule nesting landed as `deepSubmodule`; wide freeform trees remain
+to add).

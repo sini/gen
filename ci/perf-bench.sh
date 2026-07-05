@@ -46,6 +46,8 @@ MATRIX=(
   "schemaHosts 1600 r,big"
   "aspects 400 small"
   "aspects 1600 r,big"
+  "deepSubmodule 400 small"
+  "deepSubmodule 1600 r,big"
 )
 
 REPS=3
@@ -118,7 +120,7 @@ for row in "${MATRIX[@]}"; do
   fi
 done
 
-for w in scalar registry schemaHosts aspects; do
+for w in scalar registry schemaHosts aspects deepSubmodule; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -184,7 +186,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry schemaHosts aspects; do
+  for w in scalar registry schemaHosts aspects deepSubmodule; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
