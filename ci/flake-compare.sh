@@ -78,6 +78,9 @@ for row in "${BENCHMARKS[@]}"; do
     LOOKUPS["$key"]=$(jq -r .nrLookups "$statf")
     UPDATES["$key"]=$(jq -r .nrOpUpdates "$statf")
     COPIES["$key"]=$(jq -r .nrOpUpdateValuesCopied "$statf")
+    # gc.totalBytes (bytes allocated during eval) — reported as adios's "GC heap"; chosen over
+    # gc.heapSize because it is deterministic (arena-independent, required for the counter claim). Same
+    # field perf-bench.sh labels "alloc".
     GCBYTES["$key"]=$(jq -r '.gc.totalBytes // 0' "$statf")
   done
 done

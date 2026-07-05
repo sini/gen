@@ -9,9 +9,10 @@
   #   1. `gen-flake.lib.compose { tree = ./gen; }` — the PURE half. gen-merge's byte-mode
   #      `evalModuleTree` resolves the typed spec tree (packages registry + devShell/formatter specs)
   #      with ZERO nixpkgs. This is the gen framework machinery this bench measures.
-  #   2. a hand-rolled per-system DATA TERMINAL — the README-sanctioned "any pure terminalArgs ->
-  #      artifact builder" pattern — maps each resolved spec to a derivation at the nixpkgs boundary
-  #      (`import nixpkgs { inherit system; }`, identical to the other two variants).
+  #   2. a hand-rolled per-system builder at the nixpkgs boundary, reading `composed.values` directly
+  #      — the compose+own-builder path for consumers off the realize/nixosConfigurations track. It
+  #      maps each resolved spec to a derivation (`import nixpkgs { inherit system; }`, identical to
+  #      the other two variants); it does not go through gen-flake's `realize`/`terminals`.
   #
   # This is value-injection, not type-driving: the resolved VALUES cross into nixpkgs, gen TYPES never
   # do. The derivation-constructing calls are byte-identical to the flake-parts/ and adios/ variants,
@@ -37,7 +38,7 @@
       composed = gen-flake.lib.compose { tree = ./gen; };
       specs = composed.values;
 
-      # (2) the per-system data terminal: resolved spec -> derivation at the nixpkgs boundary.
+      # (2) the per-system builder: resolved spec -> derivation at the nixpkgs boundary.
       build =
         pkgs: name: spec:
         if spec.builder == "text" then
