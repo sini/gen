@@ -76,13 +76,13 @@ largest size per workload:
 
 | workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
 |---|---:|---:|---:|---:|---:|---:|
-| scalar | 8000 | 0.092s | 0.063s | 0.689 | 0.844 | 0.681 |
-| registry | 2000 | 0.166s | 0.079s | 0.478 | 0.493 | 0.400 |
-| lazyRegistry | 2000 | 0.157s | 0.079s | 0.504 | 0.493 | 0.401 |
-| schemaHosts | 1600 | 0.221s | 0.135s | 0.611 | 0.607 | 0.515 |
-| aspects | 1600 | 0.351s | 0.125s | 0.357 | 0.358 | 0.292 |
-| wideFreeform | 8000 | 0.082s | 0.063s | 0.771 | 1.099 | 0.821 |
-| deepSubmodule | 1600 | 1.385s | 0.223s | 0.161 | 0.287 | 0.236 |
+| scalar | 8000 | 0.108s | 0.070s | 0.644 | 0.844 | 0.681 |
+| registry | 2000 | 0.176s | 0.082s | 0.466 | 0.493 | 0.400 |
+| lazyRegistry | 2000 | 0.165s | 0.082s | 0.496 | 0.493 | 0.401 |
+| schemaHosts | 1600 | 0.230s | 0.139s | 0.604 | 0.607 | 0.515 |
+| aspects | 1600 | 0.349s | 0.130s | 0.373 | 0.358 | 0.292 |
+| wideFreeform | 8000 | 0.090s | 0.068s | 0.755 | 1.099 | 0.821 |
+| deepSubmodule | 1600 | 1.366s | 0.226s | 0.165 | 0.287 | 0.236 |
 
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
 wideFreeform 3.989×/3.985×, deepSubmodule 3.998×/3.996×.
@@ -113,8 +113,8 @@ Fixed-input (`pure-fixed`) vs full re-merge (`pure-full`), 6-member class, ratio
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1,263,991 | 216,835 | 0.172 | 0.188 | 0.268 | ok |
-| 1600 | 5,048,791 | 860,635 | 0.170 | 0.218 | 0.255 | ok |
+| 400 | 1,263,991 | 216,835 | 0.172 | 0.188 | 0.275 | ok |
+| 1600 | 5,048,791 | 860,635 | 0.170 | 0.218 | 0.243 | ok |
 
 Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
 

@@ -141,20 +141,22 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 |---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.014 | 0.008 | 0.574 | 0.252 | 0.332 | ok |
-| scalar | 2000 | 0.041 | 0.023 | 0.570 | 0.840 | 0.679 | ok |
-| scalar | 8000 | 0.092 | 0.063 | 0.689 | 0.844 | 0.681 | ok |
-| registry | 500 | 0.052 | 0.025 | 0.481 | 0.492 | 0.400 | ok |
-| registry | 2000 | 0.166 | 0.079 | 0.478 | 0.493 | 0.400 | ok |
-| lazyRegistry | 2000 | 0.157 | 0.079 | 0.504 | 0.493 | 0.401 | ok |
-| schemaHosts | 400 | 0.062 | 0.039 | 0.621 | 0.605 | 0.514 | ok |
-| schemaHosts | 1600 | 0.221 | 0.135 | 0.611 | 0.607 | 0.515 | ok |
-| aspects | 400 | 0.094 | 0.041 | 0.432 | 0.358 | 0.292 | ok |
-| aspects | 1600 | 0.351 | 0.125 | 0.357 | 0.358 | 0.292 | ok |
-| wideFreeform | 2000 | 0.029 | 0.023 | 0.803 | 1.092 | 0.818 | ok |
-| wideFreeform | 8000 | 0.082 | 0.063 | 0.771 | 1.099 | 0.821 | ok |
-| deepSubmodule | 400 | 0.194 | 0.061 | 0.313 | 0.287 | 0.236 | ok |
-| deepSubmodule | 1600 | 1.385 | 0.223 | 0.161 | 0.287 | 0.236 | ok |
+| startup | 1 | 0.011 | 0.009 | 0.818 | 0.252 | 0.332 | ok |
+| scalar | 2000 | 0.034 | 0.023 | 0.685 | 0.840 | 0.679 | ok |
+| scalar | 8000 | 0.108 | 0.070 | 0.644 | 0.844 | 0.681 | ok |
+| registry | 500 | 0.054 | 0.029 | 0.544 | 0.492 | 0.400 | ok |
+| registry | 2000 | 0.176 | 0.082 | 0.466 | 0.493 | 0.400 | ok |
+| lazyRegistry | 2000 | 0.165 | 0.082 | 0.496 | 0.493 | 0.401 | ok |
+| schemaHosts | 400 | 0.063 | 0.044 | 0.688 | 0.605 | 0.514 | ok |
+| schemaHosts | 1600 | 0.230 | 0.139 | 0.604 | 0.607 | 0.515 | ok |
+| aspects | 400 | 0.099 | 0.036 | 0.365 | 0.358 | 0.292 | ok |
+| aspects | 1600 | 0.349 | 0.130 | 0.373 | 0.358 | 0.292 | ok |
+| wideFreeform | 2000 | 0.030 | 0.024 | 0.807 | 1.092 | 0.818 | ok |
+| wideFreeform | 8000 | 0.090 | 0.068 | 0.755 | 1.099 | 0.821 | ok |
+| deepSubmodule | 400 | 0.194 | 0.063 | 0.326 | 0.287 | 0.236 | ok |
+| deepSubmodule | 1600 | 1.366 | 0.226 | 0.165 | 0.287 | 0.236 | ok |
+
+> wideFreeform thunks ride a parity band (gate ≤ 1.3, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs; cpu+alloc keep the default gates). See ci/README.md.
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 
@@ -171,8 +173,8 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1263991 | 216835 | 0.172 | 0.188 | 0.268 | ok |
-| 1600 | 5048791 | 860635 | 0.170 | 0.218 | 0.255 | ok |
+| 400 | 1263991 | 216835 | 0.172 | 0.188 | 0.275 | ok |
+| 1600 | 5048791 | 860635 | 0.170 | 0.218 | 0.243 | ok |
 
 thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.969× (gate ≤ 5.5)
 

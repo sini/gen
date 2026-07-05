@@ -62,7 +62,7 @@ GROWTH_MAX=5.5
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
 # core loc, so its thunk graph must be a fraction of the full re-merge's. Measured fixed/full thunk
-# ratio ≈ 0.17 (2026-07-05, Nix 2.34.7, gen-merge 2ad1099) — a ~5.8× spine reduction. The gate floor
+# ratio ≈ 0.17 (2026-07-05, Nix 2.34.7, gen-merge 018bafa) — a ~5.8× spine reduction. The gate floor
 # 0.30 = measured + ~75% relative headroom, and enforces ≥3.33× — comfortably past the A1 fixed-input
 # reference (2.48×, ratio 0.403; the 1.89×→2.48× spine-tax band, spec §2.5) so an erosion BELOW the A1
 # band fires the gate ("any reduction" is not a pass). Sizes mirror schemaHosts/aspects (400→1600, ×4).
@@ -203,6 +203,8 @@ emit_report() {
       "$w" "$n" "${CPU[$w,$n,ref]}" "${CPU[$w,$n,pure]}" \
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
+  echo
+  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs; cpu+alloc keep the default gates). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX"
   echo
   echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
   echo

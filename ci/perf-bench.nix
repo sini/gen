@@ -280,10 +280,10 @@ let
 
   # wideFreeform — a WIDE freeform tree: one root module with a `freeformType` (lazyAttrsOf str) that
   # absorbs n UNKNOWN sibling keys, coexisting with a handful of declared options. Layered defs
-  # (mkDefault all, mkForce on even, mkIf discharge on non-thirds) drive priority discharge THROUGH the
-  # freeform absorption path — the twin of `scalar`'s wide DECLARED option set, but exercising the
-  # unknown-key → root-freeform merge instead of typed option lookup. Declared wins over freeform at
-  # shared paths (`title`/`count`); the k* keys route to the freeform.
+  # (mkDefault all, mkForce on even, mkIf every 3rd discharged away) drive priority resolution THROUGH
+  # the freeform absorption path — the twin of `scalar`'s wide DECLARED option set, but exercising the
+  # unknown-key → root-freeform merge instead of typed option lookup. Declared options (`title`/`count`)
+  # take the typed path; unknown k* keys route to the freeform.
   wideFreeform =
     P:
     let
