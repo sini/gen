@@ -63,7 +63,7 @@ measured (the BENCHMARKS engine-cost note).
 | [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch) — re-hosted on gen-merge + gen-schema |
 | [gen-scope](https://github.com/sini/gen-scope) | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes) |
 | [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
-| [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions) |
+| [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions; identity/kind selectors, scope/graph/registry/product adapters) |
 | [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject external args into NixOS modules) |
 | [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified phases, conflict resolution) |
 | [gen-resolve](https://github.com/sini/gen-resolve) | Demand-driven RAG evaluator over scope graphs (attribute schedule + convergence loop) |
@@ -73,6 +73,18 @@ measured (the BENCHMARKS engine-cost note).
 | [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
 
 The hub exposes `mkGenLibs` with fourteen keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected) — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
+
+### Ecosystem contract libraries
+
+Five further libraries build on the L1 substrate (gen-prelude / gen-graph / gen-algebra / gen-bind / gen-select / gen-scope) as standalone **contract libraries** — each pins one algebra a configuration framework assembles with but the substrate deliberately leaves to the consumer. They are published and CI-green but, like `gen-rebuild` and `gen-vars`, are **not** wired into `mkGenLibs`: a consumer imports them directly as flake inputs. All five are Class B (nixpkgs-lib-free) and depend only on L1 siblings.
+
+| Library | Role |
+|---------|------|
+| [gen-edge](https://github.com/sini/gen-edge) | Content-movement contract — the `(S,T,P,M)` edge algebra, toposorted materialization fold, frozen hashable edge-trace oracle |
+| [gen-product](https://github.com/sini/gen-product) | Graph products over accessor-graphs (Cartesian / tensor / strong / lexicographic) — cells, slices, fibers, quotients, sparse restriction, containment chains |
+| [gen-settings](https://github.com/sini/gen-settings) | Stratified settings resolution — a pure layered fold with per-field provenance, identity-bearing cross-aspect refs, and graduated injection |
+| [gen-demand](https://github.com/sini/gen-demand) | Typed demand cascade — kinds resolve demands into resources / wiring / sub-demands over a downward-only kind DAG; stratified terminating fold, dedup, provenance trace |
+| [gen-pipe](https://github.com/sini/gen-pipe) | Scoped-channel dataflow algebra — channels + `map`/`filter`/`fold`/`scan`/`route`/`join`/`tee`, selector routing, class-tagged provenance, static config-dependence |
 
 ## Architecture
 
@@ -97,6 +109,13 @@ gen-vars     (vars/secrets)                ← standalone
 
 # the ONE nixpkgs boundary (compose purely → inject VALUES → build systems)
 gen-flake    (value-injection terminal)    ← import-tree, gen-merge, gen-schema, gen-aspects, gen-bind, nixpkgs
+
+# ecosystem contract libraries (standalone, not in mkGenLibs; all Class B, nixpkgs-lib-free)
+gen-edge     (content-movement (S,T,P,M) edge algebra)   ← gen-prelude, gen-graph
+gen-product  (graph products over accessor-graphs)       ← gen-prelude
+gen-settings (stratified settings fold + injection)      ← gen-prelude, gen-algebra, gen-bind
+gen-demand   (typed demand cascade)                      ← gen-prelude, gen-graph (+ gen-select optional)
+gen-pipe     (scoped-channel dataflow algebra)           ← gen-prelude, gen-select, gen-scope
 ```
 
 The whole ecosystem is now **nixpkgs-lib-free**: gen-schema and gen-aspects were re-hosted onto gen-merge + gen-types (their `lib/` no longer touches `lib.evalModules` / `lib.types`, byte-identically to the old nixpkgs-driven versions). Full nixpkgs enters at exactly one place — `gen-flake`, the terminal that injects resolved values into a consumer's nixpkgs eval and builds NixOS systems. See [ARCHITECTURE.md](ARCHITECTURE.md) for the two-plane split, composition model, data flow, and performance architecture.

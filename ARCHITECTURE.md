@@ -29,6 +29,8 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
     gen-dispatch · gen-resolve · gen-flake
   standalone pure libs:
     gen-rebuild · gen-vars
+  ecosystem contract libs (standalone, not in mkGenLibs):
+    gen-edge · gen-product · gen-settings · gen-demand · gen-pipe
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
@@ -61,6 +63,13 @@ gen-rebuild  (gen-prelude)
 gen-resolve  (gen-scope + gen-graph + gen-rebuild + gen-algebra + gen-bind)
 gen-vars     (standalone pure)
 
+  # ecosystem contract libraries (standalone, not in mkGenLibs; all Class B, nixpkgs-lib-free)
+  gen-edge     (gen-prelude + gen-graph)
+  gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
+  gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
+  gen-demand   (gen-prelude + gen-graph; gen-select optional, for adapters.select)
+  gen-pipe     (gen-prelude + gen-select + gen-scope)
+
   # the ONE nixpkgs boundary — pure core (compose/inject) is nixpkgs-lib-free;
   # only its terminal (mkSystems / flakeModule) touches nixpkgs
 gen-flake    (import-tree + gen-merge + gen-schema + gen-aspects + gen-bind + nixpkgs)
@@ -69,6 +78,8 @@ gen-flake    (import-tree + gen-merge + gen-schema + gen-aspects + gen-bind + ni
 Each library exposes a single `.lib` value output — the obsolete functor-call form `gen-graph { inherit lib; }` is gone (`__functor` is banned ecosystem-wide). Dependency classes are declared honestly: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib, **D** nixpkgs-lib + gen-dep.
 
 The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions, incl the `id_hash` SHA); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with five gen siblings — it hosts the convergence loop that ties the dispatch step, scope evaluation, and rebuild together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminal (`mkSystems`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
+
+Above the L1 substrate sit five **ecosystem contract libraries** — gen-edge, gen-product, gen-settings, gen-demand, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, typed demand, and scoped-channel dataflow. They depend only on L1 siblings, import nothing upward, and (like gen-rebuild and gen-vars) are consumed directly as flake inputs rather than through `mkGenLibs`.
 
 ### The nixpkgs.lib policy
 
@@ -135,7 +146,7 @@ Accessor-based: takes `{ edges, parent, nodes, nodeData }` functions, answers st
 
 **gen-select** — Selector algebra.
 
-Pattern matching over attributed graph positions. Selectors are `{ __sel = tag; ... }` attrsets. Constructors (star, attrs, and, or, not, has, within, when) compose into predicates evaluated by `matches selector id ctx`. Adapters bridge to gen-scope and gen-graph without importing them.
+Pattern matching over attributed graph positions. Selectors are `{ __sel = tag; ... }` attrsets. Constructors (star, attrs, entity, kind, and, any, not, has, within, parentMatches, when) compose into predicates evaluated by `matches selector id ctx`. **Identity-bearing selectors** (`sel.entity`, `sel.kind`) match by gen-schema `id_hash` / kind rather than attribute values, taking registry entries or kind values (never `"kind:name"` strings). Adapters bridge to gen-scope, gen-graph, a flat registry, and gen-product cells without importing them.
 
 ### Binding Layer
 
@@ -166,6 +177,30 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Thr
 - **`mkSystems { hostContent, nixpkgs, extraModules ? {} } -> { <host> = nixosSystem }`** — the terminal: per host, gen-bind's `wrapAll` partial-applies the resolved `host` binding into the `nixos` class deferredModules, then `nixpkgs.lib.nixosSystem` builds them (with a colmena-style cross-terminal `nodes` accessor). This is the ONE file that touches nixpkgs.
 
 `flakeModules.default` is the flake-parts ergonomics — one `imports` gives both the injected query surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose. The **invariant** (gen TYPES never leave the pure eval; only VALUES cross) is proven end-to-end by a fixture consumer: a gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet `nixosConfigurations.<h>.options ? schema == false`, so nixpkgs never type-walks it. This is the same one-way `compose → value → nixpkgs` trade adios (adisbladis) takes; a pure engine cannot be driven by foreign nixpkgs-module libraries. For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings), the reader escape hatch is `compose`/`injectArgs` plus your own terminal reading `genValues`.
+
+### Ecosystem Contract Libraries
+
+These five libraries build on the L1 substrate as standalone, nixpkgs-lib-free (Class B) contract libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer; none is wired into `mkGenLibs`.
+
+**gen-edge** — Content-movement contract.
+
+Everything that moves content between graph positions is an edge `(S, T, P, M)` — source, target, attrpath, mode. gen-edge owns the edge record and its constructors, edge-set derivation for a root (`edgesFor`), toposorted materialization (Kahn's algorithm over the accumulator dependency relation) into a per-root/per-channel content map, and a frozen, hashable **edge trace** that renders edge identities without forcing resolved content — a cross-repo parity oracle. Positions, channels, and content are all opaque; it depends on gen-prelude and gen-graph.
+
+**gen-product** — Graph products over accessor-graphs.
+
+Builds the four standard graph products — Cartesian, tensor, strong, lexicographic — over the gen-graph accessor-record convention. A product *is* an accessor-graph (gen-graph queries apply unchanged) extended with product metadata. Provides cells (full coordinates), slices, fibers, projections, quotients, sparse `restrict` (the real, non-dense fleet), and specificity `containmentChain`s. Lazy in, lazy out; coordinates are registry entries, never `"kind:name"` strings. Depends only on gen-prelude.
+
+**gen-settings** — Stratified settings resolution.
+
+Resolves an aspect's static `{ default; merge }` settings schema against an ordered layer list (least → most specific) as a pure layered fold — byte-identical to gen-algebra's `foldLayers` over the same strategies. Adds identity-bearing cross-aspect **refs** as inert data (statically computable dependency graph, definition-time cycle detection), structured per-field provenance, and graduated injection (`injectAspectSettings` / `assembleHost`) via gen-bind. Lattice-blind by design: the layer order arrives precomputed. Depends on gen-prelude, gen-algebra, and gen-bind; consumes gen-schema interface-only (`id_hash`).
+
+**gen-demand** — Typed demand cascade.
+
+Graph nodes emit typed **demands**; registered **kinds** resolve each into resources, wiring, and sub-demands over a downward-only kind DAG. A stratified fold resolves the growing demand multiset in ≤ DAG-depth rounds (termination is a theorem, not a convergence loop), with pinned-order dedup and a full provenance trace. Emission is independent of consumption by signature. Produces pure data — it constructs no edges or modules. Depends on gen-prelude and gen-graph; gen-select is optional (subject-matching adapter).
+
+**gen-pipe** — Scoped-channel dataflow algebra.
+
+A channel is a typed, named accumulation lane whose value at a scope position is a deterministic fold (pinned traversal, associative-only combine) over the contributions visible there. Operators (`map`, `filter`, `fold`, `scan`, `route`, `join`, `tee`) connect channels into a dataflow DAG, validated at composition time and evaluated demand-driven. Contributions carry structured provenance and a class tag; a `classInvariant` flag records config-dependence statically. Depends on gen-prelude, gen-select, and gen-scope.
 
 ## Composition Patterns
 

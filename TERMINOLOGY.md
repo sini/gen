@@ -20,6 +20,11 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
   - [gen-dispatch](#gen-dispatch--relational-rule-dispatch-step)
   - [gen-resolve](#gen-resolve--rag-evaluator--convergence-loop)
   - [gen-flake](#gen-flake--value-injection-boundary)
+  - [gen-edge](#gen-edge--content-movement-contract)
+  - [gen-product](#gen-product--graph-products)
+  - [gen-settings](#gen-settings--stratified-settings-resolution)
+  - [gen-demand](#gen-demand--typed-demand-cascade)
+  - [gen-pipe](#gen-pipe--scoped-channel-dataflow)
 - [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
 - [Classes: The Output Dimension](#classes-the-output-dimension)
 - [Cross-Cutting Patterns](#cross-cutting-patterns)
@@ -242,8 +247,10 @@ Pattern matching over attributed graph positions. Uses gen-algebra's intensional
 | **Matches** | `selector → id → context → bool`. Core dispatch on `__sel` tag. | — |
 | **star** | Matches everything. | CSS `*` |
 | **attrs** | Matches when all k:v pairs equal in `data id`. | CSS attribute selectors |
+| **entity** | Matches when the node's projected identity (`__identity.id_hash`) equals the entry's `id_hash`. Takes a registry entry — never a `"kind:name"` string. | Neron 2015 (declaration identity); gen-schema `id_hash` |
+| **kind** | Matches when the node's projected kind (`__identity.kind`) equals the kind value's `kind`. Takes a gen-schema kind value. | CSS Selectors L4 §5.1 (type selector, lifted to schema kinds) |
 | **and** | All selectors match. `and [] = true`. | CSS compound selectors |
-| **or** | Any selector matches. `or [] = false`. | CSS `:is()` |
+| **any** | Any selector matches. `any [] = false`. | CSS `:is()` |
 | **not** | Does not match. | CSS `:not()` |
 | **has** | Any child matches. | CSS `:has()` |
 | **within** | Any ancestor matches. | CSS descendant combinator (inverted) |
@@ -253,7 +260,8 @@ Pattern matching over attributed graph positions. Uses gen-algebra's intensional
 | **when** | Programmatic escape hatch. `fn id ctx → bool`. Supports intensional identity. | — |
 | **isIdentified** | True when a `when` selector wraps an intensional function. | Palmer 2024 |
 | **selectorEq** | Structural equality for selectors. Delegates to `intensionalEq` for identified `when` selectors. | Palmer 2024 |
-| **Adapters** | Bridges to gen-scope (`adapters.scope.mkContext`) and gen-graph (`adapters.graph.mkPredicate`, `mkSelectPredicate`). Pure structural contracts — no imports of gen-scope/gen-graph. | — |
+| **Adapters** | Bridges to gen-scope (`adapters.scope.mkContext`), gen-graph (`adapters.graph.mkPredicate`, `mkSelectPredicate`), a flat registry (`adapters.registry.mkContext`), and gen-product cells (`adapters.product.coord`/`inSlice`/`mkContext`). Pure structural contracts — no imports of the bridged libraries. | — |
+| **\_\_identity** | The reserved record the enriched adapters project alongside node data (`{ id_hash; kind; entry; }` or `null`), off which `entity`/`kind` selectors match. A missing key is a loud identity-blind-context throw. | — |
 
 ### gen-bind — Module Binding
 
@@ -326,6 +334,85 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Its
 | **flakeModules.default** | Flake-parts ergonomics: one `imports` gives the injected query surface (top-level + `perSystem` args) and `flake.nixosConfigurations` from one compose. `options.gen = { tree; modules; specialArgs; inject; nixpkgs; extraModules; composed; }`. | — |
 | **The invariant** | gen TYPES never leave the pure eval; only VALUES cross. A gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet never enters a consumer's options tree (`nixosConfigurations.<h>.options ? schema == false`), so nixpkgs never type-walks it. | value-injection; adios prior art |
 | **Reader escape hatch** | For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values, keep your own terminal reading `genValues`. | — |
+
+*The five libraries below are standalone, nixpkgs-lib-free (Class B) contract libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and none is wired into `mkGenLibs`.*
+
+### gen-edge — Content-Movement Contract
+
+The `(S,T,P,M)` edge algebra: everything that moves content between graph positions is an edge. Depends on gen-prelude + gen-graph.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Edge `(S,T,P,M)`** | A content-movement record: source, target, attr**p**ath, **m**ode. The only thing that moves content between positions. | edge algebra |
+| **Source (S)** | Where content comes from: `collected` (a channel bucket of a subtree), `synthesize` (adapter-built), `value`/`keyedValue` (direct), `rewalk` (legacy). | — |
+| **Target (T)** | Where content goes: `root { root, class }` (an instantiation root) or `output` (a terminal flake-output sink). | — |
+| **Mode (M)** | Closed enum `merge` / `nest` / `nest-verbatim`. Apparent hybrids decompose into edge composition (`nest ∘ merge`). | — |
+| **edgesFor** | The complete edge set of a root: one default-fold merge edge per channel in the resolved isolation-bounded subtree, plus every declared edge targeting the root. | default-fold-by-construction |
+| **toposort** | Kahn's algorithm over the accumulator dependency relation (edge B depends on A iff B reads a cell A writes). Incomparable edges emit in frozen sort-key order; cycles abort loudly. | Kahn 1962 (A. B. Kahn, topological sort) |
+| **materialize** | THE fold: one left fold over the ordered edge list, seeded from the projection Π, dispatching on the single mode switch. Produces the per-root/per-channel content map. | — |
+| **trace `E`** | The normalized, stably-sorted, hashable edge trace. Renders edge identities and never forces resolved content — a cross-repo structural parity oracle. | — |
+| **Content inertness** | Construction (`edgesFor`/`toposort`/`trace`/`project`) forces no bucket content — only structural accessors and channel presence; resolved values enter solely through `materialize`. | HOAG r2 §B2 |
+
+### gen-product — Graph Products
+
+The four standard graph products over gen-graph accessor-graphs. Depends on gen-prelude (consumes the gen-graph accessor convention and gen-schema `id_hash` shape structurally).
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Product** | An accessor-graph over ordered factor specs, extended with product metadata. `productN kind factors`; a product is itself a factor of other products. | Hammack, Imrich & Klavžar 2011 |
+| **Product kinds** | `cartesian` (□), `tensor` (×), `strong` (⊠), `lexicographic` (∘) — standard definitions applied coordinatewise to directed adjacency. | Hammack et al. 2011 (Part I) |
+| **Factor spec** | `{ dim; graph; key ? }` — a named dimension whose coordinates are registry entries (default key `e: e.id_hash`). | — |
+| **Cell** | A full coordinate `{ <dim> = entry; … }`; the id gen-graph queries take. `cell` / `coordsOf` / `cells` (lazy row-major enumeration). | — |
+| **slice / fiber / projectTo** | Induced sub-product over remaining dims; preimage of a projection; factor graph + projection metadata. | Hammack et al. 2011 (layers/projections) |
+| **restrict** | Sparse sub-product over a membership relation — the real, non-dense fleet (not every coordinate exists). | — |
+| **quotient** | Class-share as a quotient of a graph by a class map; generalizes gen-graph's condensation quotient. | Mokhov 2017 |
+| **containmentChain** | The specificity lattice for a cell under a linearization — an ordered layer list (consumed downstream as settings layers). | — |
+| **Lazy in, lazy out** | Adjacency, addressing, slices, and chains are pointwise — they never scan a factor's `nodes` (documented `en-masse` exceptions aside). | Kahn 1974 (via gen-graph) |
+
+### gen-settings — Stratified Settings Resolution
+
+Settings resolution as a pure layered fold with provenance, refs, and injection. Depends on gen-prelude + gen-algebra + gen-bind; gen-schema interface-only.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Settings schema** | `mkSchema { aspect; fields; }` — bare-key `{ default; merge ? }` leaves, always introspectable. `merge ∈ { replace, append, recursive }`. | — |
+| **Layer** | `{ scope; rendered; via; value; }` — a partial contribution keyed by registry-entry scope; the ordered list is least → most specific. | — |
+| **Layered fold** | Positional last-wins (`replace`) / accumulation (`append`/`recursive`); byte-identical to gen-algebra's `foldLayers` (the Spike 5 gate). Authority is positional — no strength lattice. | gen-algebra `foldLayersTraced`; Leijen 2005 |
+| **Lattice-blind** | The layer order arrives precomputed; gen-settings never reorders, dedups, or filters it. | — |
+| **Ref as data** | `ref aspectEntry [path]` — an identity-bearing cross-aspect reference, inert data (no thunks), so the dependency graph is statically computable (`refGraph`). | Mokhov et al. 2018 (applicative task deps) |
+| **Static ref graph** | Conservative over pre-fold values, structurally strict; definition-time cycle detection (E3) names every address in a cycle. | Mokhov et al. 2018 §3 |
+| **Structured provenance** | Per-field ordered chain `{ scope; rendered; via; value; refs; }`; per-entry lazy ref substitution (forcing one entry never resolves another's refs). | Cheney et al. 2009 |
+| **Injection** | `injectAspectSettings` routes class content through gen-bind `wrap` (namespaced `settings.<key>.<field>`); `assembleHost` keys modules by `id_hash` pairs. | Cardelli 1997; Chitil 2012 (via gen-bind) |
+
+### gen-demand — Typed Demand Cascade
+
+A terminating, stratified demand cascade over a downward-only kind DAG. Depends on gen-prelude + gen-graph; gen-select optional.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Demand** | A typed unit of work emitted by a graph node; the subject is a registry entry. The multiset **grows during resolution**. | — |
+| **Kind** | A registered resolver: `resolve d ctx → { resources; wiring; demands }`. `below` declares the sub-demands it desugars into (a downward-only DAG). | — |
+| **depth / stratum** | Per-kind `depth` = `0` for a leaf else `1 + max` over `below`; `resolveAll` runs `maxDepth + 1` strata top-down. | Apt, Blair & Walker 1988 (stratified evaluation) |
+| **Termination theorem** | Every `below` edge strictly decreases depth, so the cascade quiesces in ≤ DAG-depth rounds — no cap, no convergence loop. | well-founded (Noetherian) recursion on ℕ |
+| **Emission ⊥ consumption** | A resolver sees only the demand's own fields plus static `ctx` — no accumulator, no already-resolved view. The eval-cycle failure mode is unexpressible. | HOAG r2 §B5 |
+| **Resources / wiring / sub-demands** | Provider-side artifacts; consumer-side splice data; lower-level demands a composite desugars into. All opaque to the engine. | — |
+| **Pinned-order dedup** | Grouped fragments fold in schedule order; undeclared duplication is a loud resource-key collision, never silent last-wins. | — |
+| **Trace** | Witness + derivation provenance (each artifact ↦ producing demand instances, with parent chains to roots). | Cheney, Chiticariu & Tan 2009 |
+
+### gen-pipe — Scoped-Channel Dataflow
+
+Content-agnostic dataflow algebra for scoped channels. Depends on gen-prelude + gen-select + gen-scope.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Channel** | A typed, named accumulation lane; its value at a position is a deterministic fold over the contributions visible there. | — |
+| **Determinism as law** | Pinned traversal (self → imports → parent) + associative-only combine; no silent reorder or dedup. Determinism is **not** KPN (channels have multiple writers). | Kahn 1974 (informed-by, caveated); HOAG r2 §B5 |
+| **Operators** | `map`, `filter`, `fold`, `scan`, `route`, `join`, `tee` — connect channels into a dataflow DAG, validated at composition time, evaluated demand-driven. | — |
+| **route / tee / join** | Selector-matched delivery edges (`route`), fan-out (`tee`), and fan-in (`join`); routing predicates are gen-select selectors. | — |
+| **Provenance as data** | Every contribution carries its producer as structured registry-entry identities (entity, scope, aspect); operators extend the chain. | Cheney et al. 2009 |
+| **Class as type** | Contributions are class-tagged at emission; a deferred value's `config` means the producing class's config at the producing scope; cross-class consumption needs a declared adapter. | — |
+| **classInvariant** | A static config-dependence flag derived from arg-shape and composed through operators at composition time — never runtime discovery. | — |
+| **Two-stratum discipline** | gen-pipe reads the graph and produces plain data; no output can feed graph structure (sound reading of an under-construction scope graph). | van Antwerpen et al. 2016 (Statix, via HOAG r2 §B2) |
 
 ______________________________________________________________________
 
@@ -476,3 +563,8 @@ ______________________________________________________________________
 | Kiczales et al. | 1997 | Aspect-oriented programming | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ) |
 | Apel et al. | 2009 | An overview of feature-oriented software development | Feature-oriented decomposition |
 | Thum et al. | 2014 | Analysis strategies for software product lines | Feature interaction detection |
+| Kahn, A. B. | 1962 | Topological sorting of large networks | Accumulator-DAG toposort (gen-edge) — distinct from Gilles Kahn 1974 |
+| Apt, Blair & Walker | 1988 | Towards a theory of declarative knowledge | Stratified bottom-up evaluation, stratum-local aggregation (gen-demand) |
+| Cheney, Chiticariu & Tan | 2009 | Provenance in databases: why, how, and where | Witness/derivation provenance traces (gen-demand, gen-pipe, gen-settings) |
+| Hammack, Imrich & Klavžar | 2011 | Handbook of Product Graphs (2nd ed.) | Four standard graph products, projections/layers (gen-product; gen-select `coord`) |
+| Mokhov, Mitchell & Peyton Jones | 2018 | Build Systems à la Carte | Applicative (static) task dependencies (gen-settings `refGraph`) |
