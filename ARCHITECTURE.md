@@ -56,7 +56,7 @@ gen-algebra (pure primitives — zero deps)
   │
 gen-scope    (gen-prelude)
 gen-graph    (gen-prelude)
-gen-select   (gen-prelude; zero gen-sibling deps)
+gen-select   (zero deps — Class A, builtins only)
 gen-bind     (gen-prelude)
 gen-dispatch (gen-prelude only)
 gen-rebuild  (gen-prelude)

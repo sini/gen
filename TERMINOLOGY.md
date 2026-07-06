@@ -238,7 +238,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 
 ### gen-select — Selector Algebra
 
-Pattern matching over attributed graph positions. Uses gen-algebra's intensional identity; otherwise nixpkgs-lib-free (built on gen-prelude).
+Pattern matching over attributed graph positions. Zero-dependency (Class A, builtins only) — intensional equality is inlined name-equality; no gen-algebra or gen-prelude dependency.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|

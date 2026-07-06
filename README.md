@@ -100,7 +100,7 @@ gen-merge    (byte-mode evalModuleTree)    ← gen-prelude, gen-types
 │
 gen-scope    (HOAG evaluator)              ← gen-prelude
 gen-graph    (graph queries + ordering)    ← gen-prelude
-gen-select   (selector algebra)            ← gen-prelude
+gen-select   (selector algebra)            ← (zero deps, Class A)
 gen-bind     (module binding)              ← gen-prelude
 gen-dispatch (rule dispatch step)          ← gen-prelude
 gen-rebuild  (incremental rebuilder)       ← gen-prelude
