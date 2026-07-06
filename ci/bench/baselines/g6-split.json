@@ -1,0 +1,153 @@
+{
+  "schema": "hola.g6-split.v1",
+  "generated": {
+    "by": "nix run ./ci#fleet-stats  (defaults: hosts=bitstream,blade,cortex  arms=baseline-composition,baseline-toplevel  reps=3)",
+    "from": "results.csv, last-rep values",
+    "nixVersion": "2.34.7",
+    "reps": 3
+  },
+  "pinNote": "EXACT-pinned (deterministic per nix version, verified reproduced across two full runs): the 4 evaluator counters (nrFunctionCalls, nrPrimOpCalls, nrOpUpdateValuesCopied, nrThunks) + both digests. INFORMATIONAL (recorded, NOT exact-gated): gcTotalBytes — Boehm total-allocation, drifts ~1e-6..1e-5 run-to-run; and cpuTime (machine-dependent, not carried in this file). Ratios are computed over the exact counters; the gc ratio is informational/approximate.",
+  "framing": "composition and terminal are two NON-NESTED projections of the same cfg: the baseline-composition witness deepSeqs ALL declared options; the baseline-toplevel force reaches only the build.toplevel cone plus the derivation-construction storm. ratios below compare the two projections — they are NOT a part/whole share of the terminal's own composition work.",
+  "digestNote": "baseline-composition digest = sha256 of the merged option tree's top-level attr-name list (coarse, structural — changes iff the declared top-level option set changes). baseline-toplevel digest = the exact system.build.toplevel drvPath.",
+  "pins": {
+    "hola": "5b88004ec6bff22c3d585558297015da0d48fb1a",
+    "nix-config": "8f84aa62168994714d5dc18459d4c5fe96650239",
+    "nixpkgs-vendored-body": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+    "nixpkgs-ci": "64c08a7ca051951c8eae34e3e3cb1e202fe36786",
+    "nixpkgs-unstable-channel": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+    "nixpkgs-master-channel": "5e8ca42db8804dbe70af4d4d3fcd1c71e8409e60",
+    "den": "5df0987658d6e44268abba953406480e9f066928",
+    "_hola_note": "harness rev (fleet-stats driver + compositionWalk witness) that generated these counters. MEASUREMENT.md's pin table lists de5b21d as the doc-time hola rev; the driver landed in the 5 commits after de5b21d, so the baseline is generated at HEAD 5b88004.",
+    "_dedup_arm_pins": "gen-rebuild 7a87691 (Arm R) and den s1 b3449c8 / s2 487cc671 (Arm C) are Task 7 pins, unused by the G6 baseline arms — see MEASUREMENT.md pin table.",
+    "_meta": "underscore-prefixed keys in .pins are prose annotations, not revs; consumers skip them."
+  },
+  "hosts": {
+    "bitstream": {
+      "channel": "nixpkgs-unstable",
+      "baseline-composition": {
+        "counters": {
+          "nrFunctionCalls": 17634072,
+          "nrPrimOpCalls": 4897429,
+          "nrOpUpdateValuesCopied": 4169336,
+          "nrThunks": 19864490
+        },
+        "gcTotalBytesInformational": 1327464832,
+        "digest": "4b74f4c26d9030ed818c37eba215c9b363d0da7d67a8dc408be15e1b9575b02e"
+      },
+      "baseline-toplevel": {
+        "counters": {
+          "nrFunctionCalls": 31945508,
+          "nrPrimOpCalls": 12237805,
+          "nrOpUpdateValuesCopied": 30515566,
+          "nrThunks": 42937450
+        },
+        "gcTotalBytesInformational": 3431066896,
+        "digest": "/nix/store/70xb6lxavlwvn98zhd9badjmvzq7yznn-nixos-system-bitstream-26.11.20260616.567a49d.drv"
+      }
+    },
+    "blade": {
+      "channel": "nixpkgs-master",
+      "baseline-composition": {
+        "counters": {
+          "nrFunctionCalls": 17673112,
+          "nrPrimOpCalls": 4907083,
+          "nrOpUpdateValuesCopied": 4177219,
+          "nrThunks": 19922872
+        },
+        "gcTotalBytesInformational": 1331099520,
+        "digest": "2508ad9aa9752b49030c02dbb9c5adde21c00ce8abc7cc15b11bfe620a69d6f3"
+      },
+      "baseline-toplevel": {
+        "counters": {
+          "nrFunctionCalls": 43904413,
+          "nrPrimOpCalls": 17648888,
+          "nrOpUpdateValuesCopied": 101221186,
+          "nrThunks": 66891079
+        },
+        "gcTotalBytesInformational": 7317612304,
+        "digest": "/nix/store/z1j54phnlbgn4sn0nzk7c3fnjwfgs322-nixos-system-blade-26.11.20260622.5e8ca42.drv"
+      }
+    },
+    "cortex": {
+      "channel": "nixpkgs-master",
+      "baseline-composition": {
+        "counters": {
+          "nrFunctionCalls": 17677224,
+          "nrPrimOpCalls": 4908756,
+          "nrOpUpdateValuesCopied": 4315464,
+          "nrThunks": 19928929
+        },
+        "gcTotalBytesInformational": 1334862624,
+        "digest": "dbdf2c1cdb81fdb8f7a79189787588136a3ba2e20f4e9587de786c003e09fbe5"
+      },
+      "baseline-toplevel": {
+        "counters": {
+          "nrFunctionCalls": 48905573,
+          "nrPrimOpCalls": 20024381,
+          "nrOpUpdateValuesCopied": 110210756,
+          "nrThunks": 74582314
+        },
+        "gcTotalBytesInformational": 8029495200,
+        "digest": "/nix/store/93da5ba9ahyan0cs0dmp73cpyrlfdvgi-nixos-system-cortex-26.11.20260622.5e8ca42.drv"
+      }
+    }
+  },
+  "fleet": {
+    "baseline-composition": {
+      "counters": {
+        "nrFunctionCalls": 52984408,
+        "nrPrimOpCalls": 14713268,
+        "nrOpUpdateValuesCopied": 12662019,
+        "nrThunks": 59716291
+      },
+      "gcTotalBytesInformational": 3993426976
+    },
+    "baseline-toplevel": {
+      "counters": {
+        "nrFunctionCalls": 124755494,
+        "nrPrimOpCalls": 49911074,
+        "nrOpUpdateValuesCopied": 241947508,
+        "nrThunks": 184410843
+      },
+      "gcTotalBytesInformational": 18778174400
+    }
+  },
+  "ratios": {
+    "note": "composition / terminal, per EXACT counter; derived from hosts[*] and fleet counters by the generation command — not hand-typed.",
+    "perHost": {
+      "bitstream": {
+        "nrFunctionCalls": 0.5520047450802785,
+        "nrPrimOpCalls": 0.4001885141984204,
+        "nrOpUpdateValuesCopied": 0.13662981050392445,
+        "nrThunks": 0.4626378604225449
+      },
+      "blade": {
+        "nrFunctionCalls": 0.402536118635728,
+        "nrPrimOpCalls": 0.2780392169750298,
+        "nrOpUpdateValuesCopied": 0.041268228175077894,
+        "nrThunks": 0.29784049379738664
+      },
+      "cortex": {
+        "nrFunctionCalls": 0.36145622912955133,
+        "nrPrimOpCalls": 0.24513896334673216,
+        "nrOpUpdateValuesCopied": 0.039156468539241304,
+        "nrThunks": 0.26720716924926735
+      }
+    },
+    "fleet": {
+      "nrFunctionCalls": 0.4247060093401578,
+      "nrPrimOpCalls": 0.29478964928705,
+      "nrOpUpdateValuesCopied": 0.05233374422686759,
+      "nrThunks": 0.32382201625747137
+    },
+    "gcTotalBytesInformational": {
+      "note": "gc bytes is NOT exact-pinned (Boehm noise ~1e-6..1e-5 run-to-run); this ratio is approximate, from the recorded run.",
+      "perHost": {
+        "bitstream": 0.3868956427365443,
+        "blade": 0.18190353146645744,
+        "cortex": 0.16624489967937212
+      },
+      "fleet": 0.2126632169312476
+    }
+  }
+}

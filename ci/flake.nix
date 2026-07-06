@@ -206,6 +206,29 @@
             ''
             + builtins.readFile ./flake-compare.sh;
           };
+
+          # ── fleet-consistency — the TRUST-SURFACE arithmetic roster for the cited A1 fleet numbers ──
+          # `nix run ./ci#fleet-consistency` — the [consistency] partition (nine pure-jq gates + a
+          # `--selftest` teeth check) over the three committed baselines (ci/bench/baselines/, copied
+          # verbatim from the hola lab @4bab613). It re-asserts pin agreement, the arithmetic
+          # re-derivations, the byte-digest ties, and the two floors that BENCHMARKS.md / VALIDATION.md
+          # cite — so the cited numbers cannot silently drift from their own arithmetic. It DOES gate
+          # (unlike flake-compare): pure jq, seconds, NO fleet eval / NIX_SHOW_STATS / re-measurement —
+          # re-measurement of the fleet is the hola lab's job. Owner principle: libraries stay unburdened
+          # by fleet metrics; this hub is the trust surface, so the drift tooth lives here. SC2329: the
+          # consistency-gate roster invokes its gate fns indirectly by name.
+          fleetConsistency = pkgs.writeShellApplication {
+            name = "gen-fleet-consistency";
+            excludeShellChecks = [ "SC2329" ];
+            runtimeInputs = [
+              pkgs.jq
+              pkgs.coreutils
+            ];
+            text = ''
+              export FLEET_BASELINES=${./bench/baselines}
+            ''
+            + builtins.readFile ./fleet-consistency.sh;
+          };
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -234,6 +257,11 @@
           apps.flake-compare = {
             type = "app";
             program = "${flakeCompare}/bin/gen-flake-compare";
+          };
+
+          apps.fleet-consistency = {
+            type = "app";
+            program = "${fleetConsistency}/bin/gen-fleet-consistency";
           };
 
           treefmt = {
@@ -290,6 +318,13 @@
                 help = "Run the 3-way real-flake comparison bench (gen-flake vs flake-parts vs adios-flake)";
                 command = ''
                   nix run "$FLAKE_ROOT/ci#flake-compare"
+                '';
+              }
+              {
+                name = "fleet-consistency";
+                help = "Re-assert the [consistency] roster over the cited A1 fleet baselines (pure jq, seconds)";
+                command = ''
+                  nix run "$FLAKE_ROOT/ci#fleet-consistency"
                 '';
               }
             ];

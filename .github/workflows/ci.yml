@@ -34,3 +34,13 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix run ./ci#perf-bench
+
+  # Trust surface: the cited fleet numbers still agree with their own arithmetic (pure jq over the
+  # committed baselines — pin agreement + re-derivations + digest ties + floors; no fleet eval).
+  fleet-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix run ./ci#fleet-consistency

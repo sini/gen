@@ -197,3 +197,28 @@ matter. If a legitimate engine change shifts a ratio past a gate, update the thr
 delete a workload to make a gate pass. New den shapes should be added to `perf-bench.nix` as they
 become hot in den-hoag (deep submodule nesting landed as `deepSubmodule`, wide freeform trees as
 `wideFreeform`).
+
+## Fleet consistency — the trust-surface roster
+
+`nix run ./ci#fleet-consistency` guards the **real-fleet numbers this repo cites** (`BENCHMARKS.md`
+§"Fleet-scale results", `VALIDATION.md` §7). Those numbers are measured in the
+[hola](https://github.com/sini/hola) lab against a real three-host fleet; their baselines are
+committed here verbatim under [`bench/baselines/`](bench/baselines/) (provenance + refresh in that
+dir's README). The roster is the nine-gate `[consistency]` partition ported from hola's
+`fleet-gates.sh` — pin agreement across the three files, the arithmetic re-derivations (each saving
+= the sum/difference it comes from), the byte-digest ties, and the two floors (Arm-R `>= 0.60`,
+Task-7b `>= 0.008`) — so a cited number cannot silently drift from its own arithmetic.
+`-- --selftest` corrupts a copy of a baseline (a counter, then a floor) and asserts the roster
+fails, proving it has teeth. Gate names/labels match the lab's roster so a reader can cross-reference
+the A1 report gate-for-gate.
+
+What it deliberately does **not** do: it never re-measures the fleet (no `nix` eval, no
+`NIX_SHOW_STATS`, no fleet build) — that is pure JSON arithmetic over the committed files, seconds,
+corpus-independent. **Re-measurement is the hola lab's documented procedure.** This is the owner
+principle: libraries (gen-class, gen-rebuild, …) stay unburdened by fleet metrics; metrics live in
+metrics homes — hola is the lab, and this hub is the trust surface (its CI is already all metrics,
+and it cites these numbers), so the drift tooth lives here. The two-tier counter policy (exact
+same-build, ±0.1% relative cross-build; `gc`/`cpu` never gated) is a re-measurement concern and so
+is the lab's; this roster compares within one committed baseline and stays exact. Same
+update-in-PR policy as above: a legitimate lab re-measure that shifts a baseline is re-pinned here
+with its cited numbers updated in the same PR — never lower a floor or delete a workload to pass.

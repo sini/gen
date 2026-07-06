@@ -1,0 +1,385 @@
+{
+  "schema": "hola.dedup-savings.v1",
+  "generated": {
+    "by": "jq generator over g6-split.json (pinned baseline-composition) + the class-share fleet CSV (s2 composition) + measured facts (byte gates / soundness record / secondary witness). See baselines/README.md. class-share.terminalPessimal is derived by the terminalPessimal jq (baselines/README.md) over class-share-toplevel-pessimal.sh facts.json.",
+    "from": "ci/bench/baselines/g6-split.json + class-share results.csv + dedup-facts (recorded byte-gate + soundness evals) + class-share-toplevel-pessimal.sh facts.json (Arm-C terminal-plane s2 cost)",
+    "nixVersion": "2.34.7",
+    "reps": 1
+  },
+  "framing": "Two dedup arms, BOTH byte-gated. Arm R (rebuild-dedup, gen-rebuild) = incremental reuse-ACROSS-CHANGE: a localized single-host edit recomputes only that host and skips the untouched hosts, byte-identical to a full rebuild (resultEqualsFullRebuild). Its saving = the SKIPPED hosts baseline-composition counters — NOT a single-eval speedup (gen-rebuild does not beat O(|cone|) in one pure eval). Arm C (class-share, den s1/s2) = a config-RESOLUTION optimization: byte-identical terminal (SOUND) but NO composition win in this SEPARATE-per-host-eval harness — a consistent ~+4% s2 machinery overhead. The Plane-2a ~60% prior is a CROSS-HOST fleet-eval-sharing collapse that separate per-host evals cannot capture (reconciled, not reproduced). See MEASUREMENT.md. Arm C's TERMINAL-plane (pessimal) cost — den@s2's machinery overhead when forcing toplevel.drvPath, on a byte-identical terminal — is pinned in class-share.terminalPessimal (an overhead/soundness record, NOT a win; no floor).",
+  "pinNote": "Deterministic evaluator counters (verified reproduced across two runs) + digests are EXACT. gcTotalBytes/cpuTime omitted (informational). The class-share secondary cfg.config witness is INFORMATIONAL: builtins.tryEval CANNOT catch its terminating stack overflow, so it measures work-up-to-a-deterministic-crash — the DELTA is stable and reported, absolutes are a crash-prefix, never gated. PREAMBLE SENSITIVITY: the composition counters here come from the fleet-stats driver baked-store-path preamble; nrFunctionCalls/nrPrimOpCalls + the digest are preamble-invariant, but nrOpUpdateValuesCopied/nrThunks shift ±1-2 under a different preamble — a reader reproducing OUT-OF-BAND via the README github-getFlake command WILL see ±2 on those two counters (same as g6-split.json stub provenance). The reported class-share DELTAS (s2 − pinned) and Arm R saving are computed WITHIN one preamble (the driver), so they are exact and preamble-invariant. class-share.terminalPessimal: both terminal forces (pinned + s2) are measured in ONE out-of-band preamble (class-share-toplevel-pessimal.sh, x2 STOP-on-diff) so its s2-pinned delta is BIT-EXACT within-preamble; its `pinned` terminal counters therefore differ from g6-split baseline-toplevel by the +-1-3 out-of-band preamble wobble (fcalls +1 / copies +2 / thunks +3), while its terminalDrvPath is byte-identical (the byte gate).",
+  "pins": {
+    "hola": "65179bd (base; the Task-7 dedup wiring — adapter.fleetRebuildSoundness + arms.json class-share/rebuild-dedup + ci/flake.nix gen-rebuild input — lands in the follow-up commits ON TOP of this base, at whose working tree these were measured; same convention as g6-split.json _hola_note)",
+    "nix-config": "8f84aa62168994714d5dc18459d4c5fe96650239",
+    "den-baseline": "5df0987658d6e44268abba953406480e9f066928",
+    "den-s1": "b3449c8ba0325d51a00cd973b8eb104575691dc1",
+    "den-s2": "487cc671e87982ad04bca69fb9a5723c85ed22ca",
+    "gen-rebuild": "7a87691f004679668852d53fc130a57bc305e20a",
+    "nixpkgs-unstable-channel": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+    "nixpkgs-master-channel": "5e8ca42db8804dbe70af4d4d3fcd1c71e8409e60",
+    "_meta": "underscore-prefixed keys are prose annotations, not revs; consumers skip them. den-s1/s2 are LOCAL-ONLY worktree branches (git+file://, campaign impure-local by design); gen-rebuild is public (github:sini/gen-rebuild)."
+  },
+  "rebuild-dedup": {
+    "arm": "gen-rebuild incremental rebuild (Arm R)",
+    "mechanism": "Model the fleet as a gen-rebuild graph: nodes = a shared class-composition producer + the fleet hosts; edge host->shared (gen-graph edges id = deps of id). recompute(host) forces the host REAL compositionNames folded with its node data + the shared value. build = full store; propagateEager {host=edit} = incremental. Helper: hola.adapter.fleetRebuildSoundness.",
+    "byteGate": {
+      "oracle": "resultEqualsFullRebuild",
+      "resultEqualsFullRebuild": true,
+      "coneOnlyRecompute": true,
+      "untouchedReused": true,
+      "digest": "d2dc0fee470d38e1d96b12d22130f7534fafc0d5d7af1091c80fc88822b1bd7d",
+      "note": "resultEqualsFullRebuild = propagateEager store byte-identical to a from-scratch build with the same edit (re-asserted on the REAL corpus). coneOnlyRecompute proven by a POISONED recompute that throws on the untouched hosts and is never called. digest = sha256 of the full soundness record (reproduced across two runs)."
+    },
+    "graph": {
+      "nodes": [
+        "shared",
+        "bitstream",
+        "blade",
+        "cortex"
+      ],
+      "edges": "each host -> shared"
+    },
+    "singleHostEdit": {
+      "editHost": "bitstream",
+      "recomputedCone": [
+        "bitstream"
+      ],
+      "untouchedNodes": [
+        "blade",
+        "cortex",
+        "shared"
+      ],
+      "savedRecompute": {
+        "source": "sum of baseline-composition counters over the skipped hosts [\"blade\",\"cortex\"] (from g6-split.json)",
+        "counters": {
+          "nrFunctionCalls": 35350336,
+          "nrPrimOpCalls": 9815839,
+          "nrOpUpdateValuesCopied": 8492683,
+          "nrThunks": 39851801
+        }
+      },
+      "savedFractionOfFleetComposition": {
+        "nrFunctionCalls": 0.6671837496042232,
+        "nrPrimOpCalls": 0.6671419972775593,
+        "nrOpUpdateValuesCopied": 0.6707210753672065,
+        "nrThunks": 0.6673522473122117
+      }
+    },
+    "pessimalSharedEdit": {
+      "note": "Editing the SHARED node moves every host hash -> cone = the whole graph -> dedup saves nothing. The honest boundary.",
+      "cone": [
+        "shared",
+        "bitstream",
+        "blade",
+        "cortex"
+      ],
+      "savedRecompute": {
+        "counters": {
+          "nrFunctionCalls": 0,
+          "nrPrimOpCalls": 0,
+          "nrOpUpdateValuesCopied": 0,
+          "nrThunks": 0
+        }
+      }
+    },
+    "crossPlaneNote": "The savedRecompute counters (35,350,336 fcalls = blade+cortex) are the SEPARATE-per-host (deploy-time / cross-eval) recompute. The class-share keystone shows the SAME declaration layer is nearly free to share WITHIN one eval (blade+cortex = 18.8M ≈ 1.066× a single host, not the 35.35M naive sum) — different execution planes, NOT in tension: Arm R saves the cross-eval recompute a change repeats host-by-host; class-share measures the in-eval plane where native Nix memoization already shares it. See MEASUREMENT.md §Arm-C reconciliation pt2."
+  },
+  "class-share": {
+    "arm": "den s1/s2 class-share (Arm C)",
+    "mechanism": "Re-run the fleet with nc.inputs.den overridden pinned(5df0987) -> s2(487cc671). s1/s2 share per-sid/class composition work across hosts of a class. Measured per-host: compositionNames under s2 vs pinned; the terminal drvPath must stay byte-identical.",
+    "verdict": "BYTE-SOUND, NO measurable composition win in the per-host harness (+~4.6% s2 machinery overhead, host-invariant). The class-share win is a CROSS-HOST fleet-eval-sharing collapse (Plane-2a ~60% prior) that separate per-host evals cannot capture; the derivation-free composition witness sits at the declaration layer, which native Nix thunk-memoization already shares. Reconciled in MEASUREMENT.md.",
+    "byteGate": {
+      "compositionDigest": {
+        "identical": true,
+        "note": "s2 composition digest (top-level option-name list) == pinned per host: the class-share declaration surface is unchanged (resolution-only optimization).",
+        "perHost": {
+          "bitstream": {
+            "baseline": "4b74f4c26d9030ed818c37eba215c9b363d0da7d67a8dc408be15e1b9575b02e",
+            "s2": "4b74f4c26d9030ed818c37eba215c9b363d0da7d67a8dc408be15e1b9575b02e",
+            "identical": true
+          },
+          "blade": {
+            "baseline": "2508ad9aa9752b49030c02dbb9c5adde21c00ce8abc7cc15b11bfe620a69d6f3",
+            "s2": "2508ad9aa9752b49030c02dbb9c5adde21c00ce8abc7cc15b11bfe620a69d6f3",
+            "identical": true
+          },
+          "cortex": {
+            "baseline": "dbdf2c1cdb81fdb8f7a79189787588136a3ba2e20f4e9587de786c003e09fbe5",
+            "s2": "dbdf2c1cdb81fdb8f7a79189787588136a3ba2e20f4e9587de786c003e09fbe5",
+            "identical": true
+          }
+        }
+      },
+      "toplevelDrvPath": {
+        "identical": true,
+        "note": "s2 system.build.toplevel.drvPath == pinned per host: the TERMINAL is byte-identical. A class-share arm that moved the drvPath would be a BUG, not a win.",
+        "perHost": {
+          "bitstream": {
+            "baseline": "/nix/store/70xb6lxavlwvn98zhd9badjmvzq7yznn-nixos-system-bitstream-26.11.20260616.567a49d.drv",
+            "s2": "/nix/store/70xb6lxavlwvn98zhd9badjmvzq7yznn-nixos-system-bitstream-26.11.20260616.567a49d.drv",
+            "identical": true
+          },
+          "blade": {
+            "baseline": "/nix/store/z1j54phnlbgn4sn0nzk7c3fnjwfgs322-nixos-system-blade-26.11.20260622.5e8ca42.drv",
+            "s2": "/nix/store/z1j54phnlbgn4sn0nzk7c3fnjwfgs322-nixos-system-blade-26.11.20260622.5e8ca42.drv",
+            "identical": true
+          },
+          "cortex": {
+            "baseline": "/nix/store/93da5ba9ahyan0cs0dmp73cpyrlfdvgi-nixos-system-cortex-26.11.20260622.5e8ca42.drv",
+            "s2": "/nix/store/93da5ba9ahyan0cs0dmp73cpyrlfdvgi-nixos-system-cortex-26.11.20260622.5e8ca42.drv",
+            "identical": true
+          }
+        }
+      }
+    },
+    "compositionWitness": {
+      "note": "options-declaration walk (baseline-composition). delta = s2 - pinned; POSITIVE = s2 OVERHEAD, not a win. Deterministic (reproduced across two runs).",
+      "perHost": {
+        "bitstream": {
+          "pinned": {
+            "nrFunctionCalls": 17634072,
+            "nrPrimOpCalls": 4897429,
+            "nrOpUpdateValuesCopied": 4169336,
+            "nrThunks": 19864490
+          },
+          "s2": {
+            "nrFunctionCalls": 18444671,
+            "nrPrimOpCalls": 5020978,
+            "nrOpUpdateValuesCopied": 4218341,
+            "nrThunks": 20676501
+          },
+          "delta": {
+            "nrFunctionCalls": 810599,
+            "nrPrimOpCalls": 123549,
+            "nrOpUpdateValuesCopied": 49005,
+            "nrThunks": 812011
+          },
+          "deltaFractionFcalls": 0.045967771936056515
+        },
+        "blade": {
+          "pinned": {
+            "nrFunctionCalls": 17673112,
+            "nrPrimOpCalls": 4907083,
+            "nrOpUpdateValuesCopied": 4177219,
+            "nrThunks": 19922872
+          },
+          "s2": {
+            "nrFunctionCalls": 18483707,
+            "nrPrimOpCalls": 5030738,
+            "nrOpUpdateValuesCopied": 4226246,
+            "nrThunks": 20734801
+          },
+          "delta": {
+            "nrFunctionCalls": 810595,
+            "nrPrimOpCalls": 123655,
+            "nrOpUpdateValuesCopied": 49027,
+            "nrThunks": 811929
+          },
+          "deltaFractionFcalls": 0.045866002546693534
+        },
+        "cortex": {
+          "pinned": {
+            "nrFunctionCalls": 17677224,
+            "nrPrimOpCalls": 4908756,
+            "nrOpUpdateValuesCopied": 4315464,
+            "nrThunks": 19928929
+          },
+          "s2": {
+            "nrFunctionCalls": 18487811,
+            "nrPrimOpCalls": 5032401,
+            "nrOpUpdateValuesCopied": 4364498,
+            "nrThunks": 20740890
+          },
+          "delta": {
+            "nrFunctionCalls": 810587,
+            "nrPrimOpCalls": 123645,
+            "nrOpUpdateValuesCopied": 49034,
+            "nrThunks": 811961
+          },
+          "deltaFractionFcalls": 0.04585488083423053
+        }
+      },
+      "fleet": {
+        "pinned": {
+          "nrFunctionCalls": 52984408,
+          "nrPrimOpCalls": 14713268,
+          "nrOpUpdateValuesCopied": 12662019,
+          "nrThunks": 59716291
+        },
+        "s2": {
+          "nrFunctionCalls": 55416189,
+          "nrPrimOpCalls": 15084117,
+          "nrOpUpdateValuesCopied": 12809085,
+          "nrThunks": 62152192
+        },
+        "delta": {
+          "nrFunctionCalls": 2431781,
+          "nrPrimOpCalls": 370849,
+          "nrOpUpdateValuesCopied": 147066,
+          "nrThunks": 2435901
+        },
+        "deltaFractionFcalls": 0.045896162508789376
+      }
+    },
+    "secondaryWitness": {
+      "note": "tryEval-guarded cfg.config deepSeq (INFORMATIONAL — see pinNote; terminates via an uncatchable stack overflow, work-up-to-crash). Same conclusion as the primary: consistent ~+0.81M-fcall s2 overhead, no win.",
+      "perHost": {
+        "bitstream": {
+          "pinned": {
+            "nrFunctionCalls": 19840113,
+            "nrPrimOpCalls": 6032270,
+            "nrOpUpdateValuesCopied": 12586179,
+            "nrThunks": 23940301
+          },
+          "s2": {
+            "nrFunctionCalls": 20651047,
+            "nrPrimOpCalls": 6156056,
+            "nrOpUpdateValuesCopied": 12635184,
+            "nrThunks": 24752869
+          },
+          "delta": {
+            "nrFunctionCalls": 810934,
+            "nrPrimOpCalls": 123786,
+            "nrOpUpdateValuesCopied": 49005,
+            "nrThunks": 812568
+          },
+          "deltaFractionFcalls": 0.040873456718719295
+        },
+        "blade": {
+          "pinned": {
+            "nrFunctionCalls": 23979069,
+            "nrPrimOpCalls": 8058894,
+            "nrOpUpdateValuesCopied": 46453104,
+            "nrThunks": 33426022
+          },
+          "s2": {
+            "nrFunctionCalls": 24790553,
+            "nrPrimOpCalls": 8183348,
+            "nrOpUpdateValuesCopied": 46502131,
+            "nrThunks": 34239457
+          },
+          "delta": {
+            "nrFunctionCalls": 811484,
+            "nrPrimOpCalls": 124454,
+            "nrOpUpdateValuesCopied": 49027,
+            "nrThunks": 813435
+          },
+          "deltaFractionFcalls": 0.03384134721827607
+        },
+        "cortex": {
+          "pinned": {
+            "nrFunctionCalls": 23738771,
+            "nrPrimOpCalls": 7885919,
+            "nrOpUpdateValuesCopied": 44842162,
+            "nrThunks": 32807311
+          },
+          "s2": {
+            "nrFunctionCalls": 24550282,
+            "nrPrimOpCalls": 8010378,
+            "nrOpUpdateValuesCopied": 44891196,
+            "nrThunks": 33620825
+          },
+          "delta": {
+            "nrFunctionCalls": 811511,
+            "nrPrimOpCalls": 124459,
+            "nrOpUpdateValuesCopied": 49034,
+            "nrThunks": 813514
+          },
+          "deltaFractionFcalls": 0.03418504690070097
+        }
+      }
+    },
+    "terminalPessimal": {
+      "note": "PESSIMAL-plane (terminal / system.build.toplevel.drvPath) cost record for den@s2. The terminal is derivation-storm-dominated (g6-split: composition is only ~5% of the terminal //-storm), so den@s2 per-host machinery (pipe.reads cone-expander + per-sid hostConfigFor) is paid in FULL while the cross-host sharing s2 targets cannot manifest in this separate-per-host harness. delta = s2 - pinned; POSITIVE = OVERHEAD on a BYTE-IDENTICAL terminal (terminalDrvPath unchanged — see byteGate.toplevelDrvPath; a class-share arm that MOVED the drvPath would be a BUG, not a win) → this is an overhead/soundness record, NOT a win, so there is NO floor. Both forces measured in ONE out-of-band preamble (ci/bench/class-share-toplevel-pessimal.sh, x2 STOP-on-diff) so delta is BIT-EXACT within-preamble (secondaryWitness discipline). The `pinned` terminal is re-measured HERE for that exactness, NOT read from g6-split; its drvPath == g6-split baseline-toplevel (the byte gate) and its counters match g6-split baseline-toplevel within the +-1-3 out-of-band preamble wobble (pinNote).",
+      "perHost": {
+        "bitstream": {
+          "pinned": {
+            "nrFunctionCalls": 31945509,
+            "nrPrimOpCalls": 12237805,
+            "nrOpUpdateValuesCopied": 30515568,
+            "nrThunks": 42937453
+          },
+          "s2": {
+            "nrFunctionCalls": 32703012,
+            "nrPrimOpCalls": 12354629,
+            "nrOpUpdateValuesCopied": 30562046,
+            "nrThunks": 43698191
+          },
+          "delta": {
+            "nrFunctionCalls": 757503,
+            "nrPrimOpCalls": 116824,
+            "nrOpUpdateValuesCopied": 46478,
+            "nrThunks": 760738
+          },
+          "deltaFractionFcalls": 0.023712347172179977,
+          "terminalDrvPath": "/nix/store/70xb6lxavlwvn98zhd9badjmvzq7yznn-nixos-system-bitstream-26.11.20260616.567a49d.drv"
+        },
+        "blade": {
+          "pinned": {
+            "nrFunctionCalls": 43904414,
+            "nrPrimOpCalls": 17648888,
+            "nrOpUpdateValuesCopied": 101221188,
+            "nrThunks": 66891082
+          },
+          "s2": {
+            "nrFunctionCalls": 44560746,
+            "nrPrimOpCalls": 17752668,
+            "nrOpUpdateValuesCopied": 101260710,
+            "nrThunks": 67553361
+          },
+          "delta": {
+            "nrFunctionCalls": 656332,
+            "nrPrimOpCalls": 103780,
+            "nrOpUpdateValuesCopied": 39522,
+            "nrThunks": 662279
+          },
+          "deltaFractionFcalls": 0.014949111950338297,
+          "terminalDrvPath": "/nix/store/z1j54phnlbgn4sn0nzk7c3fnjwfgs322-nixos-system-blade-26.11.20260622.5e8ca42.drv"
+        },
+        "cortex": {
+          "pinned": {
+            "nrFunctionCalls": 48905574,
+            "nrPrimOpCalls": 20024381,
+            "nrOpUpdateValuesCopied": 110210758,
+            "nrThunks": 74582317
+          },
+          "s2": {
+            "nrFunctionCalls": 49555252,
+            "nrPrimOpCalls": 20127247,
+            "nrOpUpdateValuesCopied": 110249512,
+            "nrThunks": 75238249
+          },
+          "delta": {
+            "nrFunctionCalls": 649678,
+            "nrPrimOpCalls": 102866,
+            "nrOpUpdateValuesCopied": 38754,
+            "nrThunks": 655932
+          },
+          "deltaFractionFcalls": 0.013284334419630776,
+          "terminalDrvPath": "/nix/store/93da5ba9ahyan0cs0dmp73cpyrlfdvgi-nixos-system-cortex-26.11.20260622.5e8ca42.drv"
+        }
+      },
+      "fleet": {
+        "pinned": {
+          "nrFunctionCalls": 124755497,
+          "nrPrimOpCalls": 49911074,
+          "nrOpUpdateValuesCopied": 241947514,
+          "nrThunks": 184410852
+        },
+        "s2": {
+          "nrFunctionCalls": 126819010,
+          "nrPrimOpCalls": 50234544,
+          "nrOpUpdateValuesCopied": 242072268,
+          "nrThunks": 186489801
+        },
+        "delta": {
+          "nrFunctionCalls": 2063513,
+          "nrPrimOpCalls": 323470,
+          "nrOpUpdateValuesCopied": 124754,
+          "nrThunks": 2078949
+        },
+        "deltaFractionFcalls": 0.016540457531903384
+      }
+    }
+  }
+}
