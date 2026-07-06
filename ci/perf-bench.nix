@@ -17,8 +17,8 @@
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare"
+  stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed"; overrideWarm only: "cold" | "warm")
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm"
   n,
 }:
 let
@@ -518,7 +518,159 @@ let
       }
     ) memberIdx;
 
-  projection = if workload == "classShare" then classShare else workloads.${workload} P;
+  # ── overrideWarm — gen-merge's warm re-eval (memoized override) gate (README §"Warm re-eval") ──
+  # A shared registry-heavy base (den-hoag emit shape: a marked-pure data module + a clean force layer +
+  # one dirty config-reading module) that a class of `overrides` cheap 1-module edits is applied over —
+  # the adios `mkOverride` reverse-cone scenario the warm path implements, sound under gen-merge's config
+  # fixpoint. Each edit appends a single sibling-axis def (`nodeId`), disjoint from the registry loc.
+  #
+  #   cold : evaluate every override's FULL module tree from scratch — each independently re-merges the
+  #          shared registry (the honest no-reuse baseline: `overrides × merge(n)`).
+  #   warm : evaluate the base ONCE (`prev`, forced once and shared), then reconstruct each override via
+  #          `evalModuleTree { warmFrom = prev; editedModules = [edit]; }`. The dirty footprint of a
+  #          1-module `nodeId` edit excludes the registry loc, so `hosts` splices from prev byte-for-byte
+  #          (a typed registry is an isOptLeaf ⇒ whole-leaf splice) while only the edited `nodeId` and the
+  #          dirty `summary` re-merge (`1 × merge(n) + overrides × edit`).
+  #
+  # Both stacks return the SAME list of projections byte-identically (the in-bench byte gate asserts
+  # digest equality — the perf-scale twin of gen-merge's own warm-vs-cold byte oracle, and the standing
+  # tooth against a lying `pureModule` marker: the data module is marked-pure, so a marker that read
+  # `config` would stale-splice and diverge here). The warm/cold thunk ratio is the measured reuse; the
+  # projection forces the whole registry in both stacks (cold `overrides` times, warm once via the splice).
+  overrideWarm =
+    let
+      overrides = 6; # a fixed class of edits over one base (mirrors the corpus 6-agent class); n scales the registry
+      ovIdx = builtins.genList (i: i) overrides;
+
+      sub = {
+        options = {
+          addr = genMerge.mkOption { type = genMerge.types.str; };
+          role = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "app";
+          };
+          port = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 80;
+          };
+          tags = genMerge.mkOption {
+            type = genMerge.types.listOf genMerge.types.str;
+            default = [ ];
+          };
+        };
+      };
+
+      # decl (clean attrset) + the cheap per-override sibling axis (nodeId) + a dirty aggregate (summary).
+      decl = {
+        _file = "decl";
+        options.hosts = genMerge.mkOption { type = genMerge.types.attrsOf (genMerge.types.submodule sub); };
+        options.nodeId = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "";
+        };
+        options.summary = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "";
+        };
+      };
+      # THE data-heavy registry def, as a MARKED-PURE module taking a lib formal — the den-hoag emit-layer
+      # shape ("den-hoag's emit layer can mark its data modules mechanically"). The formal resolves from
+      # specialArgs and the body reads NO config, so the marker is honest ⇒ `hosts` classifies CLEAN and
+      # is reusable across the class. (A lying marker would surface as a byte divergence at the gate.)
+      dataModule = genMerge.pureModule (
+        { genLib, ... }:
+        {
+          _file = "data";
+          config.hosts = toAttrs (i: {
+            name = "h${toString i}";
+            value = {
+              addr = "10.0.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
+              tags = [
+                "t${toString i}"
+                (genLib.zone i)
+              ];
+            };
+          });
+        }
+      );
+      # a clean force/override layer (attrset) — half the instances, mkForce role + a distinct port.
+      dataForce = {
+        _file = "data-force";
+        config.hosts = toAttrsIf even (i: {
+          name = "h${toString i}";
+          value = {
+            role = genMerge.mkForce "db";
+            port = 8000 + i;
+          };
+        });
+      };
+      # one DIRTY config-reading module (bare function ⇒ dirty-by-default): it reads the registry and
+      # re-merges in every re-eval, but reads the SPLICED (prev) registry under warm ⇒ forced once.
+      dirtyReader =
+        { config, ... }:
+        {
+          _file = "dirty";
+          config.summary = "n=${toString (builtins.length (builtins.attrNames config.hosts))}";
+        };
+
+      # the lib the marked-pure data module consumes — a specialArg, NOT a fixpoint-derived _module.args.
+      specialArgs = {
+        genLib = {
+          zone = i: "zone-${toString (i / 100)}";
+        };
+      };
+      base = [
+        decl
+        dataModule
+        dataForce
+        dirtyReader
+      ];
+      editOf = k: {
+        _file = "edit${toString k}";
+        config.nodeId = "node-${toString k}";
+      };
+
+      # the base eval, computed ONCE — the memo the warm class reuses (`warmFrom`). Only the warm stack
+      # references it; cold never does (laziness ⇒ no double-pay), exactly as classShare's `coreValues`.
+      prev = genMerge.evalModuleTree {
+        modules = base;
+        inherit specialArgs;
+      };
+
+      coldMember =
+        k:
+        (genMerge.evalModuleTree {
+          modules = base ++ [ (editOf k) ];
+          inherit specialArgs;
+        }).config;
+      warmMember =
+        k:
+        (genMerge.evalModuleTree {
+          modules = base ++ [ (editOf k) ];
+          inherit specialArgs;
+          warmFrom = prev;
+          editedModules = [ (editOf k) ];
+        }).config;
+
+      projOf = if stack == "warm" then warmMember else coldMember;
+    in
+    map (
+      k:
+      let
+        c = projOf k;
+      in
+      {
+        inherit (c) hosts nodeId summary;
+      }
+    ) ovIdx;
+
+  projection =
+    if workload == "classShare" then
+      classShare
+    else if workload == "overrideWarm" then
+      overrideWarm
+    else
+      workloads.${workload} P;
   json = builtins.toJSON projection;
 in
 {

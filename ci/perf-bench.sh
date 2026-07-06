@@ -62,7 +62,7 @@ GROWTH_MAX=5.5
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
 # core loc, so its thunk graph must be a fraction of the full re-merge's. Measured fixed/full thunk
-# ratio ≈ 0.17 (2026-07-05, Nix 2.34.7, gen-merge 018bafa) — a ~5.8× spine reduction. The gate floor
+# ratio ≈ 0.17 (2026-07-05, Nix 2.34.7, gen-merge fdbf140) — a ~5.8× spine reduction. The gate floor
 # 0.30 = measured + ~75% relative headroom, and enforces ≥3.33× — comfortably past the A1 fixed-input
 # reference (2.48×, ratio 0.403; the 1.89×→2.48× spine-tax band, spec §2.5) so an erosion BELOW the A1
 # band fires the gate ("any reduction" is not a pass). Sizes mirror schemaHosts/aspects (400→1600, ×4).
@@ -75,7 +75,7 @@ CLASSSHARE_RATIO_MAX=0.30
 # route through the root freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib
 # performs (the pure engine's thunk win is on DECLARED option paths — see scalar/registry/aspects). So
 # only the THUNK ratio rides a band; cpu and alloc still win and stay on the default gates. Measured
-# (2026-07-05, Nix 2.34.7, gen-merge 018bafa) at n=8000: thunks 1.099 (deterministic), alloc 0.821
+# (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at n=8000: thunks 1.099 (deterministic), alloc 0.821
 # (deterministic, ≤ 0.90 default), cpu ~0.77-0.81 (≤ 0.85 default, same regime as every other workload).
 # The thunk ceiling 1.3 = measured 1.099 + ~18% headroom; a genuine regression shows first as LINEARITY
 # (the O(n^2) freeform blowup this workload was built to catch — pre-fix n=8000 thunks were 468×ref,
@@ -83,12 +83,30 @@ CLASSSHARE_RATIO_MAX=0.30
 # den-architecture/parked/wideFreeform-b4/NOTES.md; regenerate via `nix run ./ci#perf-bench`.
 WIDEFREEFORM_RATIO_MAX=1.3
 
+# ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
+# The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
+# the edit's dirty footprint, so a class of overrides over one base pays the registry merge ONCE (in the
+# shared `prev`) instead of once per override. Measured warm/cold thunk ratio ≈ 0.17 and alloc ≈ 0.17
+# (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at both sizes — a ~5.9× reduction (6 overrides amortising a
+# single base merge: 1/6 ≈ 0.167 + the per-edit re-merge). The gate ceiling 0.30 = measured + ~75%
+# relative headroom, and enforces ≥ 3.33× — an erosion of the reuse (a footprint that wrongly pulls the
+# registry into the re-merge, or a lost splice) fires the gate well before warm stops beating cold. BOTH
+# thunks AND alloc are gated (both are deterministic per Nix version and both genuinely reduce here — the
+# whole warm stack allocates less, unlike classShare where the digest serialization dominates alloc).
+# Sizes mirror classShare/schemaHosts/aspects (400 → 1600, ×4).
+OVERRIDEWARM_SMALL=400
+OVERRIDEWARM_BIG=1600
+OVERRIDEWARM_RATIO_MAX=0.30
+
 declare -A CPU THUNKS ALLOC DIG
 declare -A CR TR AR PAR
 declare -A LIN_SMALL LIN_BIG LIN_TG LIN_AG
 declare -A CS_TR CS_AR CS_CR CS_BG
 CS_LIN_FULL=""
 CS_LIN_FIXED=""
+declare -A OW_TR OW_AR OW_CR OW_BG
+OW_LIN_COLD=""
+OW_LIN_WARM=""
 FAILURES=()
 
 run_cell() {
@@ -190,6 +208,39 @@ lte "$CS_LIN_FULL" "$GROWTH_MAX" \
 lte "$CS_LIN_FIXED" "$GROWTH_MAX" \
   || FAILURES+=("classShare linearity: pure-fixed thunks expected≤$GROWTH_MAX actual=${CS_LIN_FIXED}× delta=$(delta "$CS_LIN_FIXED" "$GROWTH_MAX") over a 4× size step")
 
+# ── overrideWarm — the gen-merge warm re-eval (memoized override) gate (README §"Warm re-eval") ──
+# DEDICATED section (classShare precedent): the two "stacks" are cold / warm (both the pure engine), so
+# its ratios are warm-vs-cold — a class of `overrides` edits over one base, cold re-merging the shared
+# registry per override, warm merging it ONCE (`prev`) and splicing it into each. It asserts the in-bench
+# BYTE gate (warm == cold byte-for-byte, the perf-scale twin of gen-merge's warm-vs-cold byte oracle),
+# gates the warm reuse (thunks AND alloc) against OVERRIDEWARM_RATIO_MAX, and owns its linearity check.
+for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
+  run_cell overrideWarm "$n" cold
+  run_cell overrideWarm "$n" warm
+  # BYTE GATE (in-bench): the warm re-eval must be byte-identical to the cold from-scratch eval.
+  if [[ -n "${DIG[overrideWarm,$n,cold]}" && "${DIG[overrideWarm,$n,cold]}" == "${DIG[overrideWarm,$n,warm]}" ]]; then
+    OW_BG[$n]="ok"
+  else
+    OW_BG[$n]="MISMATCH"
+    FAILURES+=("overrideWarm byte gate: n=$n expected(cold)=${DIG[overrideWarm,$n,cold]:-<none>} actual(warm)=${DIG[overrideWarm,$n,warm]:-<none>}")
+  fi
+  OW_TR[$n]=$(ratio "${THUNKS[overrideWarm,$n,warm]}" "${THUNKS[overrideWarm,$n,cold]}")
+  OW_AR[$n]=$(ratio "${ALLOC[overrideWarm,$n,warm]}" "${ALLOC[overrideWarm,$n,cold]}")
+  OW_CR[$n]=$(ratio "${CPU[overrideWarm,$n,warm]}" "${CPU[overrideWarm,$n,cold]}")
+  # REUSE gate: warm thunks AND alloc ≤ cold × threshold (both deterministic, both reduce under reuse).
+  lte "${OW_TR[$n]}" "$OVERRIDEWARM_RATIO_MAX" \
+    || FAILURES+=("overrideWarm reuse gate: n=$n warm/cold thunks expected≤$OVERRIDEWARM_RATIO_MAX actual=${OW_TR[$n]} delta=$(delta "${OW_TR[$n]}" "$OVERRIDEWARM_RATIO_MAX") — warm reuse eroded")
+  lte "${OW_AR[$n]}" "$OVERRIDEWARM_RATIO_MAX" \
+    || FAILURES+=("overrideWarm reuse gate: n=$n warm/cold alloc expected≤$OVERRIDEWARM_RATIO_MAX actual=${OW_AR[$n]} delta=$(delta "${OW_AR[$n]}" "$OVERRIDEWARM_RATIO_MAX") — warm reuse eroded")
+done
+# LINEARITY: both stacks stay linear in the registry size (a quadratic base merge would fail here).
+OW_LIN_COLD=$(ratio "${THUNKS[overrideWarm,$OVERRIDEWARM_BIG,cold]}" "${THUNKS[overrideWarm,$OVERRIDEWARM_SMALL,cold]}")
+OW_LIN_WARM=$(ratio "${THUNKS[overrideWarm,$OVERRIDEWARM_BIG,warm]}" "${THUNKS[overrideWarm,$OVERRIDEWARM_SMALL,warm]}")
+lte "$OW_LIN_COLD" "$GROWTH_MAX" \
+  || FAILURES+=("overrideWarm linearity: cold thunks expected≤$GROWTH_MAX actual=${OW_LIN_COLD}× delta=$(delta "$OW_LIN_COLD" "$GROWTH_MAX") over a 4× size step")
+lte "$OW_LIN_WARM" "$GROWTH_MAX" \
+  || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
+
 # ── report (pure printing from the computed values above) ──────────────────────
 emit_report() {
   echo
@@ -227,6 +278,19 @@ emit_report() {
   echo
   printf 'thunk linearity (%s → %s, ×4 step): pure-full %s×, pure-fixed %s× (gate ≤ %s)\n' \
     "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" "$CS_LIN_FULL" "$CS_LIN_FIXED" "$GROWTH_MAX"
+  echo
+  echo "### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ $OVERRIDEWARM_RATIO_MAX on thunks + alloc)"
+  echo
+  echo "| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |"
+  echo "|---|---:|---:|---:|---:|---:|---|"
+  for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
+    printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
+      "$n" "${THUNKS[overrideWarm,$n,cold]}" "${THUNKS[overrideWarm,$n,warm]}" \
+      "${OW_TR[$n]}" "${OW_AR[$n]}" "${OW_CR[$n]}" "${OW_BG[$n]}"
+  done
+  echo
+  printf 'thunk linearity (%s → %s, ×4 step): cold %s×, warm %s× (gate ≤ %s)\n' \
+    "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" "$OW_LIN_COLD" "$OW_LIN_WARM" "$GROWTH_MAX"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"

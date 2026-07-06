@@ -42,6 +42,15 @@ member (the no-sharing baseline); `pure-fixed` builds that core once and reconst
 the sole-def core marker, so gen-merge SKIPS the discharge/fold/verify spine for the shared loc. Both
 return the same projections byte-identically. See the design spec §2.5.
 
+`overrideWarm` is likewise a separate workload with its own dedicated section: its two "stacks" are
+`cold` / `warm` — both the pure engine — measuring gen-merge's warm re-eval (memoized override, README
+§"Warm re-eval"). A class of 6 cheap 1-module overrides is applied over one registry-heavy base (a
+marked-pure data module + a clean force layer + a dirty config-reading module — the den-hoag emit
+shape). `cold` re-merges the shared registry from scratch per override (the no-reuse baseline); `warm`
+evaluates the base once and reuses it via `warmFrom`/`editedModules`, so the registry loc — outside the
+1-module edit's dirty footprint — splices byte-for-byte and only the edited `nodeId` and the dirty
+`summary` re-merge. Both return the same projections byte-identically.
+
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section and emits the tables already in mdformat's canonical compact form (`|---|---:|`), so treefmt leaves the block untouched — the script never invokes a formatter.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
@@ -68,7 +77,17 @@ The `classShare` section adds its own two gates (own thresholds, not the pure/re
   at each size, i.e. the fixed-input path must build ≤ 30% of the full re-merge's thunk graph. Plus its
   own thunk linearity check (both stacks ≤ `GROWTH_MAX` over the 4× step).
 
-### Baseline (2026-07-05, Nix 2.34.7, gen-merge `018bafa`, gen-class `218c54f`)
+The `overrideWarm` section adds its own gates (own threshold, not the pure/ref ones):
+
+- **byte gate** — `cold` and `warm` must produce byte-identical projections at every size (the
+  perf-scale twin of gen-merge's warm-vs-cold byte oracle, and the standing tooth against a lying
+  `pureModule` marker): a warm splice that changed the bytes cannot pass.
+- **warm reuse** (`OVERRIDEWARM_RATIO_MAX = 0.30`) — `warm` thunks AND alloc ≤ `cold` × 0.30 at each
+  size, i.e. the warm re-eval must build ≤ 30% of the cold from-scratch class's thunk graph / allocation
+  (6 overrides amortising one base merge ≈ 1/6). Plus its own thunk linearity check (both stacks ≤
+  `GROWTH_MAX` over the 4× step).
+
+### Baseline (2026-07-05, Nix 2.34.7, gen-merge `fdbf140`, gen-class `218c54f`)
 
 Whole matrix regenerated at a single gen-merge pin (every number from `nix run ./ci#perf-bench`;
 counters are deterministic per Nix version, cpu is same-process ratio context). Ratio row = the
@@ -76,16 +95,21 @@ largest size per workload:
 
 | workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
 |---|---:|---:|---:|---:|---:|---:|
-| scalar | 8000 | 0.108s | 0.070s | 0.644 | 0.844 | 0.681 |
-| registry | 2000 | 0.176s | 0.082s | 0.466 | 0.493 | 0.400 |
-| lazyRegistry | 2000 | 0.165s | 0.082s | 0.496 | 0.493 | 0.401 |
-| schemaHosts | 1600 | 0.230s | 0.139s | 0.604 | 0.607 | 0.515 |
-| aspects | 1600 | 0.349s | 0.130s | 0.373 | 0.358 | 0.292 |
-| wideFreeform | 8000 | 0.090s | 0.068s | 0.755 | 1.099 | 0.821 |
-| deepSubmodule | 1600 | 1.366s | 0.226s | 0.165 | 0.287 | 0.236 |
+| scalar | 8000 | 0.105s | 0.073s | 0.695 | 0.882 | 0.708 |
+| registry | 2000 | 0.166s | 0.084s | 0.507 | 0.524 | 0.423 |
+| lazyRegistry | 2000 | 0.163s | 0.079s | 0.486 | 0.524 | 0.423 |
+| schemaHosts | 1600 | 0.221s | 0.139s | 0.628 | 0.650 | 0.545 |
+| aspects | 1600 | 0.350s | 0.133s | 0.380 | 0.386 | 0.310 |
+| wideFreeform | 8000 | 0.086s | 0.070s | 0.812 | 1.099 | 0.821 |
+| deepSubmodule | 1600 | 1.474s | 0.231s | 0.157 | 0.314 | 0.255 |
 
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
-wideFreeform 3.989×/3.985×, deepSubmodule 3.998×/3.996×.
+wideFreeform 3.988×/3.985×, deepSubmodule 3.998×/3.996×.
+
+The `fdbf140` pin adds the warm-path source classification (`classifyModule` runs on every eval), so
+the pure-side counter ratios sit slightly above the pre-warm `018bafa` baseline (e.g. scalar thunks
+0.844 → 0.882, registry 0.493 → 0.524) — still comfortably inside every win-gate. `018bafa`'s numbers
+are the immediately-prior baseline in git history.
 
 **`deepSubmodule`** — `depth = 8` (fixed) per instance; `n` scales the chain count. Deep enough that
 per-level fixpoint re-entry dominates an instance's cost, shallow enough to keep the eval-stack
@@ -100,21 +124,21 @@ on DECLARED option paths), so thunk-parity is the honest contract on that counte
 win and keep their default gates (0.85 / 0.90). Only thunks are band-gated at
 `WIDEFREEFORM_RATIO_MAX = 1.3` (deterministic 1.099 + ~18% headroom); the band's real teeth are
 LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to expose
-(pre-fix, n=8000 pure thunks were 468× ref; gen-merge `018bafa` coalesces the per-key unmatched defs
-per originating module, restoring linear absorption). Full pre-fix quadratic data:
+(pre-fix, n=8000 pure thunks were 468× ref; gen-merge `976a87a`→`018bafa` coalesces the per-key
+unmatched defs per originating module, restoring linear absorption). Full pre-fix quadratic data:
 `den-architecture/parked/wideFreeform-b4/NOTES.md`.
 
 Full methodology, the pre-fix quadratic data, and the interpretation against the hola/zen priors:
 `den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md` (papers archive).
 
-### classShare baseline (2026-07-05, Nix 2.34.7, gen-merge `018bafa`, gen-class `218c54f`)
+### classShare baseline (2026-07-05, Nix 2.34.7, gen-merge `fdbf140`, gen-class `218c54f`)
 
 Fixed-input (`pure-fixed`) vs full re-merge (`pure-full`), 6-member class, ratios = fixed ÷ full:
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1,263,991 | 216,835 | 0.172 | 0.188 | 0.275 | ok |
-| 1600 | 5,048,791 | 860,635 | 0.170 | 0.218 | 0.243 | ok |
+| 400 | 1,345,768 | 230,621 | 0.171 | 0.187 | 0.260 | ok |
+| 1600 | 5,375,368 | 915,221 | 0.170 | 0.215 | 0.240 | ok |
 
 Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
 
@@ -131,6 +155,30 @@ A1 **fixed-input reference of 2.48×** (ratio 0.403), the upper end of the 1.89�
 approaches "no reduction" — "any reduction" is explicitly not a pass. Per the update-in-PR policy below,
 a legitimate engine change that shifts this ratio updates the constant in the same PR citing a fresh run;
 the workload is never deleted to make it pass.
+
+### overrideWarm baseline (2026-07-05, Nix 2.34.7, gen-merge `fdbf140`)
+
+Warm re-eval (`warm`) vs cold from-scratch (`cold`), 6-override class, ratios = warm ÷ cold:
+
+| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
+|---|---:|---:|---:|---:|---:|---|
+| 400 | 1,368,412 | 232,030 | 0.170 | 0.174 | 0.298 | ok |
+| 1600 | 5,464,012 | 916,630 | 0.168 | 0.172 | 0.213 | ok |
+
+Thunk linearity (400 → 1600, ×4 step): cold 3.99×, warm 3.95×.
+
+**Threshold rationale (`OVERRIDEWARM_RATIO_MAX = 0.30`).** The warm path pays the registry merge ONCE
+(in the shared `prev`) instead of once per override, so a class of 6 overrides collapses to ≈ 1/6 of the
+cold cost on the reused registry mass — measured warm/cold ≈ 0.17 on BOTH thunks and alloc (a ~5.9×
+reduction, stable across sizes). Unlike classShare — where the digest serialization dominates alloc and
+only thunks are gated — the whole warm stack allocates less, so both counters are gated (both are
+deterministic per Nix version). The ceiling 0.30 = measured + ~75% relative headroom, enforcing ≥ 3.33×:
+an erosion of the reuse (a footprint that wrongly pulls the registry into the re-merge, or a lost splice)
+fires the gate well before warm stops beating cold. The two adversarial teeth are shared with gen-merge's
+own warm suite — a lying `pureModule` marker on the data module would stale-splice and diverge at the
+byte gate; a dirty module reading `config` is re-merged, never stale-reused. Per the update-in-PR policy
+below, a legitimate engine change that shifts this ratio updates the constant in the same PR citing a
+fresh run; the workload is never deleted to make it pass.
 
 ### Updating thresholds / workloads
 
