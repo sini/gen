@@ -20,6 +20,11 @@
     # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host byte-parity oracles ──
     # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`) + gen-aspects (`{ lib, schema }`),
     # pinned to their pre-re-host revs (the last commit before the pure re-host changed the signature).
+    # These are PERMANENT golden-reference pins (same class as the nixpkgs-lib / flake-parts pins below),
+    # NEVER release-set pins — do NOT sweep them forward to main. main carries the pure re-host signature
+    # (`{ prelude, merge, algebra }`) the oracle's reference side cannot call: rotating them to main makes
+    # rehost-byte-parity throw (`called without required argument 'merge'`) and dissolves the frozen
+    # witness the parity check exists to compare re-host(main) against.
     gen-schema-orig.url = "github:sini/gen-schema/2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6";
     gen-aspects-orig.url = "github:sini/gen-aspects/87bf758169bc1d7f3336132f22e7fe38c5adf954";
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
