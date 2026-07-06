@@ -14,8 +14,9 @@
 # seconds, corpus-INDEPENDENT, NO eval, NO NIX_SHOW_STATS, NO fleet re-measurement. The re-measurement
 # partitions ([ci-remeasure]/[parity]/[local-remeasure]) stay in the hola lab (hola ci/bench/fleet-gates.sh).
 #
-# GATE NAMES/LABELS are kept identical to the hola lab's roster (fleet-gates.sh:306-316) so a reader can
-# cross-reference the A1 report (2026-07-05-a1-fleet-measurement-report.md) gate-for-gate.
+# GATE NAMES are kept identical to the hola lab's roster (fleet-gates.sh:306-316) so a reader can
+# cross-reference the A1 report (2026-07-05-a1-fleet-measurement-report.md) gate-for-gate (labels too,
+# except the adapted g_dualsite — the hub has no live arm exprs to cross-check; see its comment).
 #
 # COUNTER POLICY (framing; not exercised here — nothing is re-measured). The A1 report §3 two-tier policy:
 # the four deterministic evaluator counters (nrFunctionCalls, nrPrimOpCalls, nrOpUpdateValuesCopied,
@@ -64,6 +65,11 @@ done
   echo "fleet-consistency: FLEET_BASELINES not set (the app wrapper bakes it)" >&2
   exit 2
 }
+
+# One scratch dir for the whole run, reaped on EXIT (perf-bench.sh idiom). --selftest's corrupt_copy
+# nests its per-teeth dirs under it, so the temp baseline copies never leak.
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
 
 DET=(nrFunctionCalls nrPrimOpCalls nrOpUpdateValuesCopied nrThunks)
 DET_JSON="$(printf '%s\n' "${DET[@]}" | jq -R . | jq -s .)" # the deterministic key list as a JSON array
@@ -268,7 +274,7 @@ count_consistency_failures() {
 # set-e landmine.
 corrupt_copy() {
   local file="$1" jqexpr="$2" d
-  d="$(mktemp -d)"
+  d="$(mktemp -d -p "$SCRATCH")"
   cp "$BL_SRC"/*.json "$d/"
   chmod -R u+w "$d"
   jq "$jqexpr" "$d/$file" >"$d/.corrupt" && mv "$d/.corrupt" "$d/$file"
@@ -310,7 +316,8 @@ run_consistency "$BL_SRC"
 
 echo >&2
 if [[ "$FAILURES" -eq 0 ]]; then
-  echo "ALL GATES PASSED — the cited fleet numbers still agree with their own arithmetic (9/9 [consistency])."
+  n=${#CONSISTENCY_GATES[@]}
+  echo "ALL GATES PASSED — the cited fleet numbers still agree with their own arithmetic ($n/$n [consistency])."
   echo "(re-measurement of the fleet is the hola lab's documented procedure — ci/bench/baselines/README.md.)"
   exit 0
 else

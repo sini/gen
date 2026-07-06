@@ -427,8 +427,8 @@ without re-measuring in the lab.
   [`ci/bench/baselines/`](ci/bench/baselines/) (provenance + refresh in that dir's README), plus
   the nine-gate `[consistency]` roster in `ci/fleet-consistency.sh` — pure JSON arithmetic over the
   committed files, corpus-independent, seconds, **no fleet eval / re-measurement** (re-measurement
-  is the lab's, above). The gate names/labels match the lab's roster so a reader can cross-reference
-  the A1 report gate-for-gate.
+  is the lab's, above). The gate names match the lab's roster (labels too, except the adapted
+  `g_dualsite`) so a reader can cross-reference the A1 report gate-for-gate.
 - **Command:** `nix run ./ci#fleet-consistency` (all 9 gates PASS; also a GitHub `fleet-consistency`
   job); `nix run ./ci#fleet-consistency -- --selftest` proves the roster has teeth (it corrupts a
   copy of a baseline — a counter, then a floor — and asserts each fails, never touching the

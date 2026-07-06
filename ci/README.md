@@ -209,8 +209,8 @@ dir's README). The roster is the nine-gate `[consistency]` partition ported from
 = the sum/difference it comes from), the byte-digest ties, and the two floors (Arm-R `>= 0.60`,
 Task-7b `>= 0.008`) — so a cited number cannot silently drift from its own arithmetic.
 `-- --selftest` corrupts a copy of a baseline (a counter, then a floor) and asserts the roster
-fails, proving it has teeth. Gate names/labels match the lab's roster so a reader can cross-reference
-the A1 report gate-for-gate.
+fails, proving it has teeth. Gate names match the lab's roster (labels too, except the adapted
+`g_dualsite`) so a reader can cross-reference the A1 report gate-for-gate.
 
 What it deliberately does **not** do: it never re-measures the fleet (no `nix` eval, no
 `NIX_SHOW_STATS`, no fleet build) — that is pure JSON arithmetic over the committed files, seconds,
