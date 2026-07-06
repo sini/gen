@@ -60,6 +60,7 @@ Every proof, its one command, and how it fails. The rest of this document expand
 | Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear |
 | 3-way comparison (drvPath equivalence) | `nix run ./ci#flake-compare` | any output builds differently across flake-parts / adios / gen-flake |
 | Fleet-scale dedup gates | `nix run ./ci#fleet-gates` (hola) | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached |
+| Fleet-number consistency (in-repo) | `nix run ./ci#fleet-consistency` | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor) |
 
 ## 1. The byte-parity oracles
 
@@ -408,7 +409,35 @@ public repo — the measurement lab. A few terms for readers new to this half:
 
 The campaign made two claims and turned both into a failing check (`ci/bench/fleet-gates.sh`,
 wired as the `fleet-gates` app and a GitHub job). All rows below were **green at hola `d643a8d`,
-CI run `28727988245`** (`check` + `fleet-gates`).
+CI run `28727988245`** (`check` + `fleet-gates`). The three baselines those gates freeze are also
+committed **in this repo** (`ci/bench/baselines/`), and this hub carries an in-repo arithmetic tooth
+over them — the next subsection — so the numbers it cites cannot drift from their own arithmetic
+without re-measuring in the lab.
+
+### fleet-number consistency — the in-repo trust-surface roster
+
+- **Claim:** every real-fleet number this repo cites (§"Fleet-scale results" in `BENCHMARKS.md`)
+  still agrees with its own arithmetic — the three baselines name the same corpus/den/nixpkgs revs
+  (pin agreement), each saving equals the sum/difference it is derived from, each byte gate is
+  `true`, each recorded digest ties across files, and both floors hold (Arm-R `>= 0.60`, Task-7b
+  `>= 0.008`). This is the **trust-surface** half of the owner principle: libraries stay unburdened
+  by fleet metrics, and the hub — which already carries all the other gates and cites these
+  numbers — carries the drift tooth.
+- **Artifact:** the three baselines committed verbatim from the hola lab (`@4bab613`) under
+  [`ci/bench/baselines/`](ci/bench/baselines/) (provenance + refresh in that dir's README), plus
+  the nine-gate `[consistency]` roster in `ci/fleet-consistency.sh` — pure JSON arithmetic over the
+  committed files, corpus-independent, seconds, **no fleet eval / re-measurement** (re-measurement
+  is the lab's, above). The gate names/labels match the lab's roster so a reader can cross-reference
+  the A1 report gate-for-gate.
+- **Command:** `nix run ./ci#fleet-consistency` (all 9 gates PASS; also a GitHub `fleet-consistency`
+  job); `nix run ./ci#fleet-consistency -- --selftest` proves the roster has teeth (it corrupts a
+  copy of a baseline — a counter, then a floor — and asserts each fails, never touching the
+  committed files).
+- **Failure looks like:** a `[consistency]` FAIL line names the broken invariant (a pin
+  disagreement, a saving that no longer equals its arithmetic, a byte gate flipped to `false`, or a
+  floor breached) and the run exits non-zero. A legitimate lab re-measure that shifts a baseline is
+  re-pinned here and its cited numbers updated in the same PR — a floor is never lowered nor a
+  workload deleted to pass.
 
 ### fleet parity — the headline claim
 
@@ -484,6 +513,9 @@ nix eval ./ci#lib.parity.den  --json | jq
 # performance gates (parity + ratio + linearity) + the 3-way drvPath-equivalence check
 nix run ./ci#perf-bench
 nix run ./ci#flake-compare
+
+# the cited fleet numbers still agree with their own arithmetic (9 gates + teeth, seconds)
+nix run ./ci#fleet-consistency
 ```
 
 Per library — clone the repo (e.g. `github:sini/gen-schema`) and from its root:

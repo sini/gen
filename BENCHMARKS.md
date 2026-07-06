@@ -193,6 +193,13 @@ baselines' CppNix both print `nix (Nix) 2.34.7`, yet Determinate measured `nrPri
 the deep evals, ~4e-7 relative). `gc.totalBytes` and `cpuTime` are never gated. Floors update
 in-PR, never delete. Re-run all gates: `nix run ~/Documents/repos/hola/ci#fleet-gates`.
 
+The numbers cited in this section are also arithmetic-gated **in this repo**: the three baselines
+are committed under [`ci/bench/baselines/`](ci/bench/baselines/) and `nix run ./ci#fleet-consistency`
+re-asserts the pin agreement, the arithmetic re-derivations, the byte-digest ties, and both floors
+over them — seconds-fast, no fleet eval — so the cited numbers cannot silently drift from their own
+arithmetic (`--selftest` proves the teeth). Re-measurement of the fleet stays the hola lab's
+documented procedure.
+
 ## Live regression report
 
 Regenerate this section with:
