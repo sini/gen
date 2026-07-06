@@ -6,7 +6,7 @@ The gen ecosystem is a set of decoupled Nix libraries for building demand-driven
 
 Each library owns one concern — types, evaluation, queries, binding, dispatch — and communicates through accessor functions and plain attrsets. The libraries compose at the consumer level, not through deep coupling. You can use gen-graph for graph queries without touching gen-scope, or gen-schema for typed registries without knowing about aspects.
 
-The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/home-manager configuration framework. But the gen libraries are generic — they have no knowledge of NixOS, system configuration, or den-specific concepts.
+The primary consumer is [den](https://github.com/denful/den), a NixOS/nix-darwin/home-manager configuration framework. But the gen libraries are generic — they have no knowledge of NixOS, system configuration, or den-specific concepts.
 
 ## Table of Contents
 
