@@ -14,7 +14,8 @@
 # Gates (rationale + baselines: ci/README.md):
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
 #   ratio     — at the largest size per workload: pure cpu ≤ 0.85×ref; pure thunks/alloc ≤ 0.90×ref
-#               (wideFreeform exception: cpu+alloc keep the default gates, only THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX)
+#               (wideFreeform exception: only ALLOC keeps the default gate; THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX
+#               and CPU rides a band ≤ WIDEFREEFORM_CPU_MAX — the cell is tiny + load-sensitive on cpu)
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×)
 #
 # cpu is the median of $REPS runs (same-process ratio, robust to host speed); thunk/alloc counters
@@ -70,18 +71,22 @@ CLASSSHARE_SMALL=400
 CLASSSHARE_BIG=1600
 CLASSSHARE_RATIO_MAX=0.30
 
-# ── wideFreeform — THUNK band only (cpu + alloc keep the default win-gates) ──
+# ── wideFreeform — THUNK band + CPU band (only alloc keeps the default win-gate) ──
 # Freeform absorption is THUNK-parity with nixpkgs, not a pure win on that counter: unknown sibling keys
 # route through the root freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib
 # performs (the pure engine's thunk win is on DECLARED option paths — see scalar/registry/aspects). So
-# only the THUNK ratio rides a band; cpu and alloc still win and stay on the default gates. Measured
-# (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at n=8000: thunks 1.099 (deterministic), alloc 0.821
-# (deterministic, ≤ 0.90 default), cpu ~0.77-0.81 (≤ 0.85 default, same regime as every other workload).
-# The thunk ceiling 1.3 = measured 1.099 + ~18% headroom; a genuine regression shows first as LINEARITY
-# (the O(n^2) freeform blowup this workload was built to catch — pre-fix n=8000 thunks were 468×ref,
-# gated at GROWTH_MAX over a 4x step), with this thunk band as a gross-regression cap. See
+# the THUNK ratio rides a band. CPU rides its OWN band too (same philosophy): absorption cpu IS genuinely
+# sub-parity, but this cell is tiny (~0.07s) and the ratio is load-sensitive — measured spread 0.776-0.888
+# at n=8000 across load conditions (quiet median ~0.80; an authoritative run under load hit 0.867), so the
+# default 0.85 win-gate flakes on cpu noise, not a regression. Only ALLOC stays on the default win-gate.
+# Deterministic anchors (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at n=8000: thunks 1.099, alloc 0.821.
+# The thunk ceiling 1.3 = measured 1.099 + ~18% headroom; the cpu ceiling 0.95 = above the load tail
+# (0.888) as a gross-regression cap. The real teeth are LINEARITY (the O(n^2) freeform blowup this workload
+# was built to catch — pre-fix n=8000 thunks were 468×ref, gated at GROWTH_MAX over a 4x step) + the thunk
+# band + the deterministic counters; the cpu band is only a gross-regression cap. See
 # den-architecture/parked/wideFreeform-b4/NOTES.md; regenerate via `nix run ./ci#perf-bench`.
 WIDEFREEFORM_RATIO_MAX=1.3
+WIDEFREEFORM_CPU_MAX=0.95
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -153,10 +158,10 @@ for row in "${MATRIX[@]}"; do
     lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
   elif [[ ",$tags," == *",rb,"* ]]; then
-    # wideFreeform: cpu + alloc still win and keep the DEFAULT gates; only THUNKS ride the parity band.
-    lte "${CR[$w,$n]}" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu ${CR[$w,$n]} > $CPU_RATIO_MAX")
+    # wideFreeform: only ALLOC keeps the DEFAULT win-gate; THUNKS and CPU each ride their own parity band.
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
+    lte "${CR[$w,$n]}" "$WIDEFREEFORM_CPU_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref cpu ${CR[$w,$n]} > $WIDEFREEFORM_CPU_MAX")
   fi
 done
 
@@ -255,7 +260,7 @@ emit_report() {
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
-  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs; cpu+alloc keep the default gates). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX"
+  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs) and cpu rides a band (gate ≤ %s — tiny load-sensitive cell); only alloc keeps the default win-gate. See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$WIDEFREEFORM_CPU_MAX"
   echo
   echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
   echo

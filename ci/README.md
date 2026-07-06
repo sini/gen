@@ -61,10 +61,12 @@ Three gate families (thresholds at the top of `perf-bench.sh`):
   host speed cancels); pure thunks/allocation ≤ 0.90× ref (deterministic evaluator counters).
   Measured headroom is wide (see baseline): a regression that erodes the speedup below ~15–35%
   margin fires the gate long before pure gets *slower* than nixpkgs. `wideFreeform` is the one
-  partial exception — its cpu and alloc keep the default win-gates, but its THUNK ratio rides a band
+  partial exception — only its ALLOC keeps the default win-gate; its THUNK ratio rides a band
   (`WIDEFREEFORM_RATIO_MAX = 1.3`) rather than the 0.90 win-gate, because freeform absorption is
-  thunk-parity with nixpkgs (the same per-key type merges); its teeth are the linearity net (see the
-  baseline block below for the rationale).
+  thunk-parity with nixpkgs (the same per-key type merges), and its CPU rides a band
+  (`WIDEFREEFORM_CPU_MAX = 0.95`) rather than the 0.85 win-gate, because that cell is tiny (~0.07s) and
+  load-sensitive so the default gate flakes on cpu noise. Its real teeth are the linearity net + the
+  thunk band + the deterministic counters (see the baseline block below for the rationale).
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
   ≥ 12×). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
   (fixed in gen-merge `976a87a`): pre-fix, scalar allocation grew ~11.5× over a 4× step.
@@ -106,10 +108,13 @@ largest size per workload:
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
 wideFreeform 3.988×/3.985×, deepSubmodule 3.998×/3.996×.
 
-The `fdbf140` pin adds the warm-path source classification (`classifyModule` runs on every eval), so
-the pure-side counter ratios sit slightly above the pre-warm `018bafa` baseline (e.g. scalar thunks
-0.844 → 0.882, registry 0.493 → 0.524) — still comfortably inside every win-gate. `018bafa`'s numbers
-are the immediately-prior baseline in git history.
+The `fdbf140` pin's pure-side counter ratios sit slightly above the pre-warm `018bafa` baseline (e.g.
+scalar thunks 0.844 → 0.882, registry 0.493 → 0.524) — still comfortably inside every win-gate. The
+shift isolates ~99.9% to the always-on lazy **provenance channel** landed in gen-merge `11b39d7` (which
+forces declared-record defs to WHNF, an extra pure-side cost the nixpkgs ref does not pay); it is NOT
+the warm-path `classifyModule`, which is allocated lazily and never forced on the cold path (a flat,
+n-independent +40 thunks across the whole pin). `018bafa`'s numbers are the immediately-prior baseline
+in git history.
 
 **`deepSubmodule`** — `depth = 8` (fixed) per instance; `n` scales the chain count. Deep enough that
 per-level fixpoint re-entry dominates an instance's cost, shallow enough to keep the eval-stack
@@ -120,11 +125,15 @@ stays linear in the instance count.
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the
 absorption path. Its **thunk** ratio sits in a parity band rather than below the 0.90 win-gate:
 freeform absorption rides the SAME per-key type merges nixpkgs.lib performs (the engine's thunk win is
-on DECLARED option paths), so thunk-parity is the honest contract on that counter — cpu and alloc still
-win and keep their default gates (0.85 / 0.90). Only thunks are band-gated at
-`WIDEFREEFORM_RATIO_MAX = 1.3` (deterministic 1.099 + ~18% headroom); the band's real teeth are
-LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to expose
-(pre-fix, n=8000 pure thunks were 468× ref; gen-merge `976a87a`→`018bafa` coalesces the per-key
+on DECLARED option paths), so thunk-parity is the honest contract on that counter (band-gated at
+`WIDEFREEFORM_RATIO_MAX = 1.3`, deterministic 1.099 + ~18% headroom). Its **cpu** also rides a band
+(`WIDEFREEFORM_CPU_MAX = 0.95`) rather than the 0.85 win-gate: absorption cpu IS genuinely sub-parity,
+but this cell is tiny (~0.07s at n=8000) so the ratio is load-sensitive — measured spread **0.776–0.888**
+across load conditions (quiet median ~0.80; an authoritative run under load hit 0.867), which flakes the
+default 0.85 win-gate on cpu noise, not a regression. The `0.95` ceiling sits above the load tail as a
+gross-regression cap. Only **alloc** keeps a default win-gate (deterministic 0.821). The band's real
+teeth are LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to
+expose (pre-fix, n=8000 pure thunks were 468× ref; gen-merge `976a87a`→`018bafa` coalesces the per-key
 unmatched defs per originating module, restoring linear absorption). Full pre-fix quadratic data:
 `den-architecture/parked/wideFreeform-b4/NOTES.md`.
 
