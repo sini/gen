@@ -7,10 +7,11 @@ no claim appears here without a way to reproduce it.
 The two load-bearing proofs are the **byte-parity oracles**: they hold the pure-gen module system
 (gen-prelude → gen-types → gen-merge → re-hosted gen-schema/gen-aspects, all nixpkgs-lib-free)
 byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. They
-run as permanent regressions on `nix flake check ./ci` in this hub. Everything else — the
-per-library unit suites (counted in the §2 table), the purity scanners, the config-thunk deferral
-regression, the performance gates, and the fleet-scale regression gates (§6) — is enumerated in the
-same reproducible form.
+run as permanent regressions on `nix flake check ./ci` in this hub (`cbf3a5f`). Everything else —
+the per-library unit suites (§2), the engine and terminal suites (§2's gen-merge / gen-flake
+detail), the purity scanners (§3), the config-thunk deferral regression (§4), the migrated demos
+(§5), the performance and 3-way-comparison gates (§6), and the fleet-scale regression gates (§7) —
+is enumerated in the same reproducible form.
 
 A few terms used throughout, for readers new to the ecosystem:
 
@@ -25,16 +26,40 @@ A few terms used throughout, for readers new to the ecosystem:
   ([gen-merge README](https://github.com/sini/gen-merge)).
 - **quirk** — a den pipe/effect that can carry a value depending on the final rendered config; §4
   proves such values ride the engine unforced.
+- **gen-flake** — the single terminal that crosses into nixpkgs: it composes purely, then injects
+  the resolved config VALUES into a consumer's nixpkgs eval and builds NixOS systems.
 
 Run the whole hub-side proof set:
 
 ```bash
-nix flake check ./ci        # rehost-byte-parity + rehost-den-parity oracles
+nix flake check ./ci        # rehost-byte-parity + rehost-den-parity oracles + treefmt
 nix run ./ci#perf-bench     # parity + ratio + linearity performance gates
+nix run ./ci#flake-compare  # the 3-way real-flake drvPath-equivalence check (15/15)
 ```
 
-All test counts and revisions in this document were **measured on 2026-07-04** by running the
-suites (nix-unit 2.34.0, Nix 2.34.7), not quoted from other docs.
+Test counts and revisions in this document were **measured by running the suites** (nix-unit 2.34.0,
+Nix 2.34.7), not quoted from other docs: gen-merge (`fdbf140`), gen-flake (`88f639c`), gen-class
+(`218c54f`), and the hub oracles/gates (`cbf3a5f`) were re-measured **2026-07-05** for this release;
+the remaining per-library counts were measured **2026-07-04** at the revisions recorded in §2 (the
+rev is the anchor — a reader checks out that exact rev and reproduces the count).
+
+## The inventory at a glance
+
+Every proof, its one command, and how it fails. The rest of this document expands each row.
+
+| Proof | Command | Fails if |
+|---|---|---|
+| Whole-stack byte-parity (`rehost-byte-parity`) | `nix flake check ./ci` | any projection ≠ the nixpkgs reference (incl `id_hash`) |
+| Real-den byte-parity (`rehost-den-parity`) | `nix flake check ./ci` | den's real registry shape diverges across stacks |
+| gen-merge engine suite (167) | `nix flake check ./ci` (in the gen-merge repo) | any merge / lint / classify / warm / provenance test regresses |
+| gen-flake terminal suite (89) | `nix flake check ./ci` (in the gen-flake repo) | compose / override / diff / realize / terminal regresses |
+| Per-library suites (§2 table) | `nix flake check ./ci` (per lib repo) | any lib's nix-unit suite fails |
+| Purity — nixpkgs-lib-free cores | `nix-unit --flake ./ci#tests.purity` (per pure lib) | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/` |
+| Config-thunk deferral | `nix-unit --flake ./ci#tests.deferral` (gen-merge) | a marker forces early, or diverges from nixpkgs at the terminal |
+| Migrated demos (canaries) | each demo's `nix flake check` / eval | a re-hosted demo stops producing byte-identical output |
+| Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear |
+| 3-way comparison (drvPath equivalence) | `nix run ./ci#flake-compare` | any output builds differently across flake-parts / adios / gen-flake |
+| Fleet-scale dedup gates | `nix run ./ci#fleet-gates` (hola) | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached |
 
 ## 1. The byte-parity oracles
 
@@ -144,15 +169,14 @@ Both oracles are pure functions of flake inputs, wired in `ci/flake.nix`:
 ## 2. Per-library unit suites
 
 Every gen library ships a nix-unit suite. The counts below are the `N/N successful` figure
-nix-unit prints — i.e. every listed test **executed and passed** — measured 2026-07-04 at the
-recorded revision.
+nix-unit prints — i.e. every listed test **executed and passed** — at the recorded revision.
 
 | Library | rev | tests | suite artifact |
 |---|---|---:|---|
 | gen-prelude | `968579c` | 41 | `ci/tests/` |
 | gen-algebra | `40147f4` | 128 | `ci/tests/` |
 | gen-types | `3513399` | 105 | `ci/tests/` |
-| gen-merge | `469dcf3` | 75 | `ci/tests/` |
+| gen-merge | `fdbf140` | 167 | `ci/tests/` (detail below) |
 | gen-schema | `05a18be` | 398 | `ci/tests/` |
 | gen-aspects | `dda5ab2` | 110 | `ci/tests/` |
 | gen-scope | `8599e5f` | 167 | `ci/tests/` |
@@ -161,10 +185,11 @@ recorded revision.
 | gen-bind | `f08a103` | 65 | `ci/tests/` |
 | gen-dispatch | `f2956fb` | 55 | `ci/tests/` |
 | gen-resolve | `d429eb3` | 58 | `ci/tests/` |
-| gen-flake | `df3192c` | 28 | `ci/tests/` |
+| gen-flake | `88f639c` | 89 | `ci/tests/` (detail below) |
+| gen-class | `218c54f` | 90 | `ci/tests/` |
 | gen-rebuild | `7a87691` | 211 | `ci/tests/` |
 | gen-vars | `56d1911` | 47 | `ci/tests/` |
-| **total** | | **1745** | |
+| **total** | | **1988** | |
 
 - **Command (gate):** clone the repo, then from its root `nix flake check ./ci`.
 - **Command (count):** `nix develop ./ci -c nix-unit --flake ./ci#tests` prints the `N/N successful`
@@ -172,9 +197,87 @@ recorded revision.
 - **Failure looks like:** nix-unit prints the failing `suite.test-name` with `got` vs `expected`
   and exits non-zero; `nix flake check ./ci` fails the same way through the shared CI module.
 
-> gen-schema's 398-test suite exhausts the default evaluator stack when run through standalone
-> nix-unit in a single strict pass; run it with `ulimit -s unlimited` (as the count above was), or
-> use `nix flake check ./ci`, which is unaffected.
+> gen-schema's 398-test suite (and gen-merge's 167 through the standalone CLI) can exhaust the
+> default evaluator stack when run through standalone nix-unit in a single strict pass; run those
+> with `ulimit -s unlimited`, or use `nix flake check ./ci`, which is unaffected.
+
+### gen-merge — the engine (167 tests, `fdbf140`)
+
+gen-merge is the `lib.evalModules` / `lib.types` replacement — the byte-mode merge half of the
+module system — so its suite is the densest correctness surface in the ecosystem. Measured per suite:
+
+| suite | tests | proves |
+|---|---:|---|
+| oracle | 22 | byte-identity vs the nixpkgs merge over the shared parity corpus, its mutation teeth, and the freeform-absorption trio |
+| merge | 15 | the core `(loc, defs)` merge, priority discharge, `mkIf`/`mkMerge`/`mkDefault`/`mkForce` |
+| combinators | 7 | `listOf` / `nullOr` / `oneOf` / `either` type combinators |
+| checking | 2 | leaf-type verification through gen-types |
+| introspection | 3 | the options-introspection surface (sub-options, defaults) |
+| freeform | 2 | `freeformType` absorption of unknown keys |
+| deferred | 1 | `deferredModule` |
+| moduleArgs | 1 | `_module.args` threading |
+| deferral | 12 | config-thunk carry through compose → route → terminal (see §4) |
+| compat | 12 | compat mode — nixpkgs `lib.types` drive the engine byte-identically at leaf types; the structural boundary is proven, not asserted |
+| core-kernel | 12 | the fixed-input kernel (`evalModuleTree { coreShortCircuit }` + `mkCoreValue`) — default-off, byte-identical where it fires, deterministic firing |
+| lint | 34 | the portable-subset lint — accepts every parity-corpus module, rejects one fixture per unsupported construct, and inherits the engine's forcing profile (totality) |
+| classify | 12 | source-class threading + the `pureModule` marker + the `configOf` strip |
+| warm | 22 | warm re-eval byte oracles, incl. the adversarial **lying-marker** and the **group-splice hazard** teeth |
+| provenance | 9 | provenance records (winners / priority / defaulted) + the **values-untouched** tooth |
+| purity | 1 | the nixpkgs-lib-free source scan (see §3) |
+| **total** | **167** | |
+
+- **The teeth that matter:** `warm.test-adversarial-lying-marker-diverges-visibly` (a data module
+  that lies about being pure stale-splices and is caught at the byte oracle),
+  `warm.test-group-splice-hazard` (an edited group does not wrongly reuse a stale sibling splice),
+  `provenance.test-provenance-does-not-disturb-values` (the always-on provenance channel forces only
+  its own records, never the config values), and the lint reject fixtures for the four out-of-subset
+  constructs (`order` pass, options-introspection, `typeMerge`, `functionTo`).
+- **Boundary notes (honest limits):** the lint checks the *byte-mode surface* — the exact set of
+  constructs proven byte-identical — and flags what falls outside it; it is not a general nixpkgs-module
+  linter. Compat mode is byte-identical at **leaf** types only; a structural shim (`submodule`) drags
+  `lib.evalModules` back into every subtree and gives the win back (proven by
+  `compat.test-structural-*`). Warm re-eval fires only when the edit's static dirty footprint leaves a
+  loc untouched and no edited module carries a lying `pureModule` marker — any dirty contributor or a
+  `config`-reading module re-merges (the standing byte oracle is the tooth). The full byte-mode
+  boundary list lives in the gen-merge README.
+- **Command:** from the gen-merge repo, `nix flake check ./ci`, or
+  `ulimit -s unlimited; nix develop ./ci -c nix-unit --flake ./ci#tests` for the count (the CLI may
+  need the raised stack; `nix flake check` does not). A single suite: e.g.
+  `nix develop ./ci -c nix-unit --flake ./ci#tests.warm`.
+
+### gen-flake — the terminal (89 tests, `88f639c`)
+
+gen-flake is the one nixpkgs boundary (compose purely → inject resolved VALUES → build NixOS
+systems) and the home of the observability surfaces (provenance / diff / decision trace). Measured
+per suite:
+
+| suite | tests | proves |
+|---|---:|---|
+| compose | 6 | the v1 pure compose over a gen tree (gen-merge engine, no nixpkgs) |
+| compose-empty | 3 | empty / edge-case composes |
+| compose-engine-args | 4 | the `engineArgs` guard |
+| compose-select-hosts | 5 | the `selectHosts` guard |
+| compose-override | 19 | the **standing override tooth** — warm ≡ cold on values + provenance digests — plus chained `.override` variants |
+| diff-added-removed | 4 | the diff surface (options added / removed between two composes) |
+| diff-changed | 4 | diff of changed options (winner / priority) |
+| diff-provenance-shape | 2 | the diff provenance record shape |
+| diff-lazy | 4 | diff laziness pins (unforced thunks stay unforced) |
+| realize-shape | 4 | the realize output shape |
+| realize-nodes | 2 | per-node realization |
+| realize-bindings | 3 | binding injection through gen-bind |
+| realize-osconfig | 2 | `osConfig` threading |
+| realize-multi-class | 2 | multi-class realize |
+| terminal-inject | 3 | value-injection into a consumer's nixpkgs eval via `_module.args` |
+| terminal-nixos | 5 | the `nixosSystem` terminal (realizes only NixOS hosts) |
+| flake-module | 16 | the `flakeModule` v1 surface |
+| purity | 1 | the pure half is nixpkgs-lib-free |
+| **total** | **89** | |
+
+- **The tooth that matters:** `compose-override`'s warm-vs-cold check — a warm (memoized) override
+  must produce values AND provenance digests byte-identical to a cold re-eval. This is the A4
+  correctness contract; the perf side of the same claim is the `overrideWarm` gate in §6.
+- **Command:** from the gen-flake repo, `nix flake check ./ci`, or
+  `nix develop ./ci -c nix-unit --flake ./ci#tests` for the count.
 
 ## 3. Purity invariants
 
@@ -195,6 +298,13 @@ asserted in prose.
     makes `violations` a non-empty list of `file: 'token'` entries and the test fails. gen-types
     additionally ships a teeth test (`test-detector-catches-injected-violation`) proving the
     scanner actually fires on an injected violation.
+- **The `pureModule` contract (gen-merge).** The warm-override path reads an author-supplied
+  `pureModule` marker to decide a data module can be spliced without re-merging. That marker is a
+  *contract*, and it has teeth: `classify.test-pure-module-is-marked-pure` /
+  `test-marked-wrapper-with-imports-is-marked-pure` pin what counts as pure,
+  `classify.test-configof-strips-marker-key` proves the marker never leaks into the merged value, and
+  `warm.test-adversarial-lying-marker-diverges-visibly` proves a *lying* marker is caught at the byte
+  oracle rather than silently corrupting output — so the contract is verified, not trusted.
 - **Pure by construction (gen-prelude).** gen-prelude has **no flake inputs**, so nothing
   transitive — no nixpkgs — can enter its lock. There is nothing to scan for; the flake structure
   itself is the proof.
@@ -231,7 +341,26 @@ pull it.
 - **Failure looks like:** a premature force surfaces as a `forced too early` throw; a divergence
   from the nixpkgs reference fails `test-terminal-resolves-byte-identical` with `got` vs `expected`.
 
-## 5. Performance gates
+## 5. Demos as regression canaries
+
+Three libraries ship demos that were **migrated onto the pure engine and byte-checked against their
+pre-migration output** — small consumers that break loudly if a re-host or engine change silently
+shifts a byte. They are the ecosystem's canaries: not synthetic fixtures but real usage.
+
+- **gen-schema / gen-aspects demos.** The migrated demos assert their resolved projection is
+  byte-identical to the nixpkgs-driven original. The gen-aspects cascade demo's digest has now
+  survived **two engine bumps** unchanged (the classify + warm landings and the provenance channel),
+  which is exactly the property a canary should have — an unrelated engine change must not perturb a
+  settled consumer's bytes.
+- **gen-vars demo.** The `examples/multi-target` demo evaluates standalone (no den, no overrides) and
+  is the pinned reference for gen-vars' pure `pure/` tier.
+- **Claim → command → failure:** each demo is a check in its own repo; `nix flake check` (or the
+  demo's eval) reproduces it, and a byte shift fails the demo's own equality assertion with `got` vs
+  `expected`. These sit alongside the §1 oracles: the oracles prove the *engine* byte-identical on
+  den-shaped fixtures; the demos prove *whole small consumers* keep producing identical output across
+  engine changes.
+
+## 6. Performance gates
 
 The performance twin of the parity oracles. `nix run ./ci#perf-bench` drives `ci/perf-bench.nix`
 (the pure stack vs the pinned-nixpkgs stack, scaled ~200× over the oracle fixtures) through
@@ -245,12 +374,24 @@ The performance twin of the parity oracles. `nix run ./ci#perf-bench` drives `ci
 - **linearity** — the pure stack's counters must grow no worse than linearly across a ×4 size
   step; this is the net that caught the 2026-07-04 O(k²) `unique` key-union bug.
 
+Two dedicated workloads run their own byte + reuse gates (both "stacks" are the pure engine):
+**`classShare`** (gen-class tier-2 `applyCoreFixed` vs the full re-merge — the fixed-input path
+must build ≤ 0.30× the full thunk graph, byte-identical) and **`overrideWarm`** (gen-merge warm
+re-eval vs cold — the warm path must build ≤ 0.30× the cold thunks *and* allocation, byte-identical;
+the perf twin of gen-flake's standing override tooth in §2).
+
+The **3-way comparison** (`nix run ./ci#flake-compare`) is a separate hub gate: one representative
+flake expressed in gen-flake vs flake-parts vs adios-flake, run under adios's `NIX_SHOW_STATS`
+methodology, with a first-class **drvPath-equivalence** check — all **5 outputs × 3 systems = 15**
+must build byte-identically across the three frameworks (they do; gen-flake carries the lowest
+evaluator counters). This is the correctness oracle behind the 3-way counter tables in BENCHMARKS.
+
 A gate breach exits non-zero with the offending table. The exact thresholds — retuned in lockstep
 with engine changes, so kept in one place — and the full baseline numbers live in
 [BENCHMARKS.md](BENCHMARKS.md); the harness rationale and the threshold-update policy are in
 [`ci/README.md`](ci/README.md).
 
-## 6. Fleet-scale regression gates
+## 7. Fleet-scale regression gates
 
 The proofs above measure the engine on isolated den shapes inside this hub. The fleet-scale
 gates measure the **same engine on a real, heterogeneous fleet**, and they live in a separate
@@ -328,7 +469,7 @@ CI run `28727988245`** (`check` + `fleet-gates`).
   skipped in CI; the `[ci-remeasure]` and `[parity]` partitions run the public-pinned arms that CI
   can reproduce.
 
-## 7. Re-run everything
+## 8. Re-run everything
 
 From this hub's root:
 
@@ -340,8 +481,9 @@ nix flake check ./ci
 nix eval ./ci#lib.parity.byte --json | jq
 nix eval ./ci#lib.parity.den  --json | jq
 
-# performance gates (parity + ratio + linearity)
+# performance gates (parity + ratio + linearity) + the 3-way drvPath-equivalence check
 nix run ./ci#perf-bench
+nix run ./ci#flake-compare
 ```
 
 Per library — clone the repo (e.g. `github:sini/gen-schema`) and from its root:
@@ -358,6 +500,8 @@ Or run a single sub-proof directly:
 nix develop ./ci -c nix-unit --flake ./ci#tests.purity
 # the config-thunk deferral regression (in the gen-merge repo)
 nix develop ./ci -c nix-unit --flake ./ci#tests.deferral
+# the warm re-eval byte oracles (in the gen-merge repo)
+nix develop ./ci -c nix-unit --flake ./ci#tests.warm
 ```
 
 The full library set — each with its revision and test count — is the table in
