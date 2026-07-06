@@ -10,12 +10,46 @@ The primary consumer is [den](https://github.com/sini/den), a NixOS/nix-darwin/h
 
 ## Table of Contents
 
+- [Trust — three proof axes](#trust--three-proof-axes)
 - [Libraries](#libraries)
 - [Architecture](#architecture)
 - [Core Ideas](#core-ideas)
 - [Theoretical Foundations](#theoretical-foundations)
-- [Trust artifacts](#trust-artifacts)
 - [Documentation](#documentation)
+
+## Trust — three proof axes
+
+If users are asked to write modules evaluated by a separate eval system, they need proof, not
+promises. Everything below re-runs from a command — nothing here is taken on faith. The ecosystem
+stands on three proof axes, each with public, CI-enforced artifacts.
+
+**Correctness.** [VALIDATION.md](VALIDATION.md) is the full inventory: every claim paired with the
+command that re-runs it and the way it fails. The two load-bearing proofs are the **byte-parity
+oracles** (`nix flake check ./ci`) — the pure stack is byte-identical to the frozen nixpkgs stack it
+replaced, down to the `id_hash` SHA, with mutation teeth proving the oracle discriminates content
+(design in [`ci/README.md`](ci/README.md)). Underneath sit the per-library nix-unit suites — the
+[gen-merge](https://github.com/sini/gen-merge) byte-mode engine's 167 tests, the
+[gen-flake](https://github.com/sini/gen-flake) terminal's 89, and the rest — the purity scanners
+that keep the cores nixpkgs-lib-free, the config-thunk deferral regression, and three migrated demos
+(gen-schema / gen-aspects / gen-vars) that byte-check whole small consumers across engine bumps.
+
+**Performance.** [BENCHMARKS.md](BENCHMARKS.md) reports evaluation-time cost against that same frozen
+nixpkgs stack, **byte-parity-gated first** so a fast-but-wrong change cannot pass. The live table
+regenerates from `nix run ./ci#perf-bench` (parity + ratio + linearity gates, plus the `classShare`
+and `overrideWarm` reuse gates); the
+[3-way comparison](BENCHMARKS.md#3-way-real-flake-comparison--gen-flake-vs-flake-parts-vs-adios-flake)
+puts [gen-flake](https://github.com/sini/gen-flake) head-to-head with flake-parts and adios-flake
+under a drvPath-equivalence oracle (`nix run ./ci#flake-compare`, 15/15 byte-identical). The
+fleet-scale dedup numbers are measured in a separate lab and frozen as gates
+([hola](https://github.com/sini/hola)).
+
+**Observability.** The surface nixpkgs `evalModules` cannot offer:
+[gen-flake](https://github.com/sini/gen-flake) v1 exposes provenance (which module set each option,
+at what priority), a diff between two composes, and a memoization decision trace — powered by
+[gen-merge](https://github.com/sini/gen-merge)'s always-on provenance channel and its warm re-eval,
+with [gen-class](https://github.com/sini/gen-class) carrying the class-share mechanism den-hoag
+consumes. Every one of these surfaces is asserted in tests (VALIDATION §2) and its engine cost is
+measured (the BENCHMARKS engine-cost note).
 
 ## Libraries
 
@@ -93,13 +127,6 @@ The ecosystem is grounded in attribute grammar theory, scope graph formalism, an
 - **Rule systems** — Forgy (1982, RETE), Ehrig (2006), Arntzenius (2016, Datafun)
 
 See [TERMINOLOGY.md](TERMINOLOGY.md) for the complete vocabulary with provenance.
-
-## Trust artifacts
-
-Two regenerable, CI-enforced artifacts back the performance and correctness claims in this repo:
-
-- [BENCHMARKS.md](BENCHMARKS.md) — evaluation-time performance of the pure-gen module system vs the frozen nixpkgs reference stack, byte-parity-gated; the live section regenerates from the CI perf harness (`nix run ./ci#perf-bench`).
-- [VALIDATION.md](VALIDATION.md) — the byte-parity oracles proving the pure stack is byte-identical to the nixpkgs stack, down to the `id_hash` SHA (`nix flake check ./ci`).
 
 ## Documentation
 
