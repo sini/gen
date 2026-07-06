@@ -37,7 +37,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
-# (cpu+alloc default-gated, thunks band-gated, see WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
+# (only alloc default-gated; thunks band ≤ WIDEFREEFORM_RATIO_MAX, cpu band ≤ WIDEFREEFORM_CPU_MAX), small/big = linearity pair (big = 4×small)
 MATRIX=(
   "startup 1 none"
   "scalar 2000 small"
