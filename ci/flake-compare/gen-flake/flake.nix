@@ -20,7 +20,7 @@
   # gen-schema / gen-aspects / ...) as transitive inputs; its own nixpkgs (terminal-only) follows ours.
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
-    gen-flake.url = "github:sini/gen-flake/16aafe641aa7f9bb20b84a979ae90d97bda65ef8";
+    gen-flake.url = "github:sini/gen-flake";
     gen-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
