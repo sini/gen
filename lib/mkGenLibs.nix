@@ -21,6 +21,14 @@ _:
   dispatch = genInputs.gen-dispatch.lib;
   resolve = genInputs.gen-resolve.lib;
   flake = genInputs.gen-flake.lib;
+  # L2 concern libraries — each flake `.lib` self-resolves its own deps (edge: prelude+graph;
+  # product: prelude; settings: prelude+algebra+bind; demand: prelude+graph; pipe:
+  # prelude+select+scope), so the hub re-exports them plainly like the self-wiring libs above.
+  edge = genInputs.gen-edge.lib;
+  product = genInputs.gen-product.lib;
+  settings = genInputs.gen-settings.lib;
+  demand = genInputs.gen-demand.lib;
+  pipe = genInputs.gen-pipe.lib;
   # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
   # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
   # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
