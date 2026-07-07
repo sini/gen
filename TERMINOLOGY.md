@@ -232,7 +232,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 | **Transitive Closure** | Full edge map preserving all reachability. Fixpoint over `compose`. | — |
 | **Transitive Reduction** | Minimal edge map preserving reachability. O(1) inner membership via attrset. | — |
 | **Fixpoint (graph)** | Iterates `step` on `seed` until stable. Throws on non-monotonic steps. | Arntzenius 2016 |
-| **phaseOrder** | Ordering front-door (`order.nix`): a forward producers-first order over the condensation. A cycle or self-loop throws. This is where gen-dispatch's phase ordering moved; `dispatch` consumes the result as `phaseOrder :: [phaseName]`. | Sloane 2010 (dependency-driven scheduling) |
+| **phaseOrder** | Ordering front-door (`order.nix`): a forward producers-first order over the condensation. A cycle or self-loop throws. This is where gen-dispatch's group ordering moved; `dispatch` consumes the result as its `groupOrder :: [groupName]`. (The gen-graph function keeps the name `phaseOrder`; it is a general topological order gen-dispatch reads as a group order.) | Sloane 2010 (dependency-driven scheduling) |
 | **entry\*** | Ordering constraints feeding `phaseOrder`: `entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`. Formerly on gen-derive; now gen-graph's. | — |
 | **Mock** | Test helpers: `mkGraph`, `fromNodeMap`, `fixtures` (diamond, chain, cyclic, tree, serviceGraph, disconnected). | — |
 
@@ -284,17 +284,17 @@ Inject external bindings into NixOS module functions with collision detection an
 
 ### gen-dispatch — Relational Rule Dispatch STEP
 
-Pure relational rule dispatch. It is deliberately just the **step**: it does *not* own the convergence loop (that is gen-resolve, via `gen-scope.circular`) and does *not* sort phases (that is gen-graph's `phaseOrder`). Depends only on gen-prelude. (Renamed from gen-derive; a GitHub redirect keeps old refs resolving.)
+Pure relational rule dispatch — **rule evaluation only**, a function of `(rules, context)`. It is deliberately just the **step**: it does *not* own the convergence loop (that is gen-resolve, via `gen-scope.circular`) and does *not* sort groups (that is gen-graph's `phaseOrder`). Depends only on gen-prelude. (Renamed from gen-derive; a GitHub redirect keeps old refs resolving.)
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
 | **Rule** | Guarded transformation unit: condition + action producer + identity. | Forgy 1982 (RETE); Ehrig 2006 |
 | **Condition** | Predicate determining when a rule fires. Opaque in core — caller provides `match`. | Forgy 1982 (RETE LHS) |
-| **Action** | Opaque tagged value produced when a rule fires. Caller provides `classify` to route to phases. | Forgy 1982 (RETE RHS) |
-| **Phase** | Named dispatch group. Ordering is supplied externally: `dispatch` takes a pre-ordered `phaseOrder :: [phaseName]` (from gen-graph's `phaseOrder`/`entry*`) and does not sort internally. | Classical Datalog stratification; monotonicity from Arntzenius 2016 |
+| **Action** | Opaque tagged value produced when a rule fires. Caller provides `classify` to route to groups. | Forgy 1982 (RETE RHS) |
+| **Group** | Named dispatch stratum (the leaked den-ism "phase", renamed). Ordering is supplied externally: `dispatch` takes a pre-ordered `groupOrder :: [groupName]` (from gen-graph's `phaseOrder`/`entry*`) and does not sort internally. | Classical Datalog stratification; monotonicity from Arntzenius 2016 |
 | **Match** | Testing a condition against a position: `condition → id → ctx → bool`. | Ehrig 2006 (match morphism) |
-| **Dispatch** | One-shot step: fire matching rules over the caller-supplied `phaseOrder`, group actions by phase. Result `orderedPhases` = present-only subsequence of `phaseOrder`. NAC → match → override → priority → exclusive → fire → classify → group. | — |
-| **dispatchStep / dispatchInit** | The step paired with an external loop. `gen-scope.circular { init = dispatchInit ctx; eq; } (dispatchStep { inherit dispatch; } cfg)` (driven by gen-resolve) reproduces the old gen-derive fixpoint byte-identically. | Kleene ascent (Sloane 2010 §2.2); Arntzenius 2016; Radul 2009 |
+| **Dispatch** | One-shot pure step: fire matching rules over the caller-supplied `groupOrder`, group actions by group. Result `orderedGroups` = present-only subsequence of `groupOrder`. NAC → match → override → priority → exclusive → fire → classify → group. | — |
+| **Convergence (blessed pattern)** | `dispatch` is a pure function of `(rules, context)`, so a caller iterates by threading the plain domain state: the step is one one-shot `dispatch` whose output context is the next iterate, `gen-scope.circular` drives it to a fixpoint (Kleene ascent), and the actions are read off the converged context by one post-convergence dispatch. Recompute-at-fixpoint = confluence, so no cross-pass accumulator or `fired` set is threaded. (Retired: the `dispatchStep`/`dispatchInit` migration seam that carried the old fixpoint accumulator.) | Kleene ascent (Sloane 2010 §2.2); Arntzenius 2016; Radul 2009 |
 | **NAC** | Negative Application Condition — pattern that must NOT match. First-class `nac` field, checked before condition. | Ehrig 2006 |
 | **Override** | Rule names identities it replaces via `overrides` field. Applied before priority (unconditional suppression). | Inspired by Batory 2005 (AHEAD feature composition); override semantics are gen-dispatch's design |
 | **Priority** | Numeric precedence (higher fires first). `exclusive` mode: only highest-priority group fires. | — |
@@ -302,7 +302,7 @@ Pure relational rule dispatch. It is deliberately just the **step**: it does *no
 | **Conflict Resolution** | Three-tier: override suppression → priority sort → specificity → additive ties. | — |
 | **fromFunction** | Converts a Nix function into a rule. `builtins.functionArgs` as condition. Detects `mkIntensional`. | Palmer 2024 |
 | **fromFunctionMatch** | Default match implementation for `fromFunction` rules. Checks required args present in context. | — |
-| **mkActions** | Generates tagged action constructors + `classify` from phase declarations. | — |
+| **mkActions** | Generates tagged action constructors + `classify` from group declarations. | — |
 | **Rule Composition** | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B). | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-dispatch's design |
 | **Adapter** | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution. | — |
 
@@ -315,7 +315,7 @@ Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** tha
 | **Attribute Schedule** | Static schedule for demand-driven RAG evaluation over the scope graph. | Knuth 1968 (attribute schedule) |
 | **HOAG Gate** | Higher-order gate on schedule expansion. | Vogt 1989 (HOAG) |
 | **Two-Stratum Partition** | Cold/warm fold into `gen-scope.eval`: a static schedule stratum and a convergence stratum. | Knuth 1968; Vogt 1989 |
-| **Convergence Loop** | The Kleene-ascent loop (`gen-scope.circular`) that drives gen-dispatch's `dispatchStep` to a fixpoint. Reproduces the old gen-derive fixpoint byte-identically. | Sloane 2010 §2.2 (Kleene ascent) |
+| **Convergence Loop** | The Kleene-ascent loop (`gen-scope.circular`) that drives repeated one-shot `gen-dispatch.dispatch` over the domain state to a fixpoint; actions are read off the converged context. | Sloane 2010 §2.2 (Kleene ascent) |
 
 ### gen-flake — Value-Injection Boundary
 
@@ -335,7 +335,7 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Its
 | **The invariant** | gen TYPES never leave the pure eval; only VALUES cross. A gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet never enters a consumer's options tree (`nixosConfigurations.<h>.options ? schema == false`), so nixpkgs never type-walks it. | value-injection; adios prior art |
 | **Reader escape hatch** | For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values, keep your own terminal reading `genValues`. | — |
 
-*The five libraries below are standalone, nixpkgs-lib-free (Class B) contract libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and none is wired into `mkGenLibs`.*
+*The five libraries below are nixpkgs-lib-free (Class B) L2 concern libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and all five are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `demand`, `pipe`).*
 
 ### gen-edge — Content-Movement Contract
 
@@ -517,7 +517,7 @@ Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 | gen-algebra (search) | `converge` | Index keys grow monotonically | Intensional continuation dedup |
 | gen-graph | `fixpoint { seed, step }` | Edge count must not shrink (throws) | Edge map equality |
 | gen-scope | `circular { init, f, eq }` | Attribute values converge under `eq` | `_eval` memoization |
-| gen-resolve | `gen-scope.circular` over `dispatchStep` | Context widens monotonically | Identified rules fire once globally |
+| gen-resolve | `gen-scope.circular` over one-shot `dispatch` | Context widens monotonically | Actions are a function of the converged context (confluence) |
 
 ### Lazy Evaluation Contracts
 
@@ -554,7 +554,7 @@ ______________________________________________________________________
 | Chitil | 2012 | Practical typed lazy contracts | Lazy contracts (gen-bind, gen-schema) |
 | Neron et al. | 2015 | A theory of name resolution | Scope graphs, P/I edges, resolution (gen-scope, gen-select) |
 | van Antwerpen et al. | 2016 | A constraint language for static semantic analysis based on scope graphs | Constraint-based scope graph resolution, well-formedness generalization |
-| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-dispatch, gen-graph); phase stratification inspired by classical Datalog |
+| Arntzenius & Krishnaswami | 2016 | Datafun | Monotonic fixpoint with typed guarantees (gen-dispatch, gen-graph); group stratification inspired by classical Datalog |
 | Mokhov | 2017 | Algebraic graphs with class | Graph construction primitives (gen-scope); algebraic foundation for gen-graph |
 | van Antwerpen et al. | 2018 | Scopes as types (introduces Statix) | Custom edge labels, structural subtyping, Statix DSL (gen-scope) |
 | Palmer et al. | 2024 | Intensional functions | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-dispatch, gen-select) |

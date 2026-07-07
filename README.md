@@ -65,18 +65,18 @@ measured (the BENCHMARKS engine-cost note).
 | [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
 | [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions; identity/kind selectors, scope/graph/registry/product adapters) |
 | [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject external args into NixOS modules) |
-| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified phases, conflict resolution) |
+| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified groups, conflict resolution) |
 | [gen-resolve](https://github.com/sini/gen-resolve) | Demand-driven RAG evaluator over scope graphs (attribute schedule + convergence loop) |
 | [gen-class](https://github.com/sini/gen-class) | Class-share mechanism (partition / contract / apply / gate), byte-gated; tier-2 fixed-input via the injected gen-merge kernel |
 | [gen-flake](https://github.com/sini/gen-flake) | The single nixpkgs boundary (compose purely → inject resolved VALUES → build NixOS systems) |
 | [gen-rebuild](https://github.com/sini/gen-rebuild) | Pure-Nix incremental rebuilder (change propagation, AFFECTED set) |
 | [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
 
-The hub exposes `mkGenLibs` with fourteen keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected) — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
+The hub exposes `mkGenLibs` with nineteen keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected), and the five L2 concern libraries `edge`, `product`, `settings`, `demand`, `pipe` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
 
-### Ecosystem contract libraries
+### L2 concern libraries
 
-Five further libraries build on the L1 substrate (gen-prelude / gen-graph / gen-algebra / gen-bind / gen-select / gen-scope) as standalone **contract libraries** — each pins one algebra a configuration framework assembles with but the substrate deliberately leaves to the consumer. They are published and CI-green but, like `gen-rebuild` and `gen-vars`, are **not** wired into `mkGenLibs`: a consumer imports them directly as flake inputs. All five are Class B (nixpkgs-lib-free) and depend only on L1 siblings.
+Five libraries build on the L1 substrate (gen-prelude / gen-graph / gen-algebra / gen-bind / gen-select / gen-scope) — each pins one algebra a configuration framework assembles with but the substrate deliberately leaves to the consumer. All five are Class B (nixpkgs-lib-free), depend only on L1 siblings, and are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `demand`, `pipe`); each flake `.lib` self-resolves its own deps, so the hub re-exports it plainly.
 
 | Library | Role |
 |---------|------|
@@ -110,7 +110,7 @@ gen-vars     (vars/secrets)                ← standalone
 # the ONE nixpkgs boundary (compose purely → inject VALUES → build systems)
 gen-flake    (value-injection terminal)    ← import-tree, gen-merge, gen-schema, gen-aspects, gen-bind, nixpkgs
 
-# ecosystem contract libraries (standalone, not in mkGenLibs; all Class B, nixpkgs-lib-free)
+# L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
 gen-edge     (content-movement (S,T,P,M) edge algebra)   ← gen-prelude, gen-graph
 gen-product  (graph products over accessor-graphs)       ← gen-prelude
 gen-settings (stratified settings fold + injection)      ← gen-prelude, gen-algebra, gen-bind
@@ -128,9 +128,9 @@ The whole ecosystem is now **nixpkgs-lib-free**: gen-schema and gen-aspects were
 
 **Identity everywhere.** Palmer's intensional functions (program-point identity + conservative equality) power dedup across the ecosystem: search continuation dedup (gen-algebra), aspect diamond dedup (gen-aspects), rule identity dedup (gen-dispatch), selector equality (gen-select).
 
-**Step, loop, and ordering are separate concerns.** gen-dispatch is the pure relational dispatch *step* (guard→effect rules); it never sorts phases and never loops. Phase ordering is a forward producers-first order computed by gen-graph (`phaseOrder` over condensation), and the convergence *loop* lives in gen-resolve via `gen-scope.circular` (Kleene ascent). `dispatchStep`/`dispatchInit` pair the step with any loop.
+**Step, loop, and ordering are separate concerns.** gen-dispatch owns rule evaluation only: it is the pure relational dispatch *step* (guard→effect rules), a function of `(rules, context)` that never sorts groups and never loops. Group ordering is a forward producers-first order computed by gen-graph (`phaseOrder` over condensation), and the convergence *loop* lives in gen-resolve via `gen-scope.circular` (Kleene ascent) — a caller iterates by threading plain domain state through repeated one-shot dispatch and reads the actions off the fixpoint. Recompute-at-fixpoint makes the action set a function of the converged state (confluence), so no cross-pass bookkeeping is needed.
 
-**Actions are opaque.** gen-dispatch dispatches rules over a caller-supplied `phaseOrder` and groups actions by phase, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
+**Actions are opaque.** gen-dispatch dispatches rules over a caller-supplied `groupOrder` and groups actions by group, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
 
 **Compose purely, inject VALUES.** The module system is a pure plane: gen module trees are composed by gen-merge's byte-mode `evalModuleTree` (a nixpkgs-lib-free `lib.evalModules`), checked by gen-types, over the gen-schema/gen-aspects grammar — all without nixpkgs. gen-flake is the single terminal that crosses into nixpkgs: it injects the resolved config VALUES into a consumer's nixpkgs eval via `_module.args` (the query surface), then builds NixOS systems. **The invariant: gen TYPES never leave the pure eval; only VALUES cross.** A gen type rides as inert data inside `_module.args` (a consumer can read `genValues.schema.<kind>.options.<f>.type.name`) yet never enters the consumer's options tree, so nixpkgs never type-walks it. This is value-injection, not type-driving — the same one-way trade [adios](https://github.com/adisbladis/adios) takes. A pure engine cannot be driven by foreign nixpkgs-module libraries.
 

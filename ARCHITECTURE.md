@@ -23,14 +23,13 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
-  mkGenLibs keys:
+  mkGenLibs keys (nineteen):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-graph · gen-select · gen-bind
-    gen-dispatch · gen-resolve · gen-flake
+    gen-dispatch · gen-resolve · gen-flake · gen-class
+    gen-edge · gen-product · gen-settings · gen-demand · gen-pipe   (L2 concern libs)
   standalone pure libs:
     gen-rebuild · gen-vars
-  ecosystem contract libs (standalone, not in mkGenLibs):
-    gen-edge · gen-product · gen-settings · gen-demand · gen-pipe
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
@@ -63,7 +62,7 @@ gen-rebuild  (gen-prelude)
 gen-resolve  (gen-scope + gen-graph + gen-rebuild + gen-algebra + gen-bind)
 gen-vars     (standalone pure)
 
-  # ecosystem contract libraries (standalone, not in mkGenLibs; all Class B, nixpkgs-lib-free)
+  # L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
   gen-edge     (gen-prelude + gen-graph)
   gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
   gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
@@ -79,7 +78,7 @@ Each library exposes a single `.lib` value output — the obsolete functor-call 
 
 The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions, incl the `id_hash` SHA); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with five gen siblings — it hosts the convergence loop that ties the dispatch step, scope evaluation, and rebuild together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminal (`mkSystems`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
 
-Above the L1 substrate sit five **ecosystem contract libraries** — gen-edge, gen-product, gen-settings, gen-demand, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, typed demand, and scoped-channel dataflow. They depend only on L1 siblings, import nothing upward, and (like gen-rebuild and gen-vars) are consumed directly as flake inputs rather than through `mkGenLibs`.
+Above the L1 substrate sit five **L2 concern libraries** — gen-edge, gen-product, gen-settings, gen-demand, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, typed demand, and scoped-channel dataflow. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `demand`, `pipe`) like the self-wiring libraries above.
 
 ### The nixpkgs.lib policy
 
@@ -142,7 +141,7 @@ This is the evaluation substrate — it computes values over the graph that othe
 
 **gen-graph** — Graph query combinators.
 
-Accessor-based: takes `{ edges, parent, nodes, nodeData }` functions, answers structural questions. Lazy traversal (reachableFrom, canReach, pathsBetween) and global analysis (cycles, dependents, transpose). C-level BFS via `builtins.genericClosure`. It also owns the ordering front-door (`order.nix`): `phaseOrder` — a forward producers-first order over the condensation (a cycle or self-loop throws) — plus `entryAnywhere`/`entryAfter`/`entryBefore`/`entryBetween`. This is where gen-derive's phase ordering moved; gen-dispatch consumes the result.
+Accessor-based: takes `{ edges, parent, nodes, nodeData }` functions, answers structural questions. Lazy traversal (reachableFrom, canReach, pathsBetween) and global analysis (cycles, dependents, transpose). C-level BFS via `builtins.genericClosure`. It also owns the ordering front-door (`order.nix`): `phaseOrder` — a forward producers-first order over the condensation (a cycle or self-loop throws) — plus `entryAnywhere`/`entryAfter`/`entryBefore`/`entryBetween`. This is where gen-derive's group ordering moved; gen-dispatch consumes the result as its `groupOrder`.
 
 **gen-select** — Selector algebra.
 
@@ -158,13 +157,13 @@ Injects external values into NixOS module functions. Handles three module shapes
 
 **gen-dispatch** — Relational rule dispatch STEP.
 
-Production rule system: rules (condition + action producer + identity) dispatched across stratified phases. It is deliberately just the *step* — it does **not** own the convergence loop and does **not** sort phases. `dispatch` takes a pre-ordered `phaseOrder :: [phaseName]` (computed elsewhere) and returns `orderedPhases`, the present-only subsequence. Conflict resolution: override → priority → specificity → additive. `dispatchStep`/`dispatchInit` pair the step with an external loop; a gen-select bridge (`adapters.select`) supplies selectors as conditions. Removed vs the old gen-derive: `fixpoint` (the loop, now gen-resolve) and `topoSort`/`entry*` (the ordering, now gen-graph).
+Production rule system: rules (condition + action producer + identity) dispatched across stratified groups. It owns **rule evaluation only** — a pure function of `(rules, context)`. It does **not** own the convergence loop and does **not** sort groups. `dispatch` takes a pre-ordered `groupOrder :: [groupName]` (computed elsewhere) and returns `orderedGroups`, the present-only subsequence. Conflict resolution: override → priority → specificity → additive. A caller iterates by threading plain domain state through repeated one-shot dispatch and reading actions off the fixpoint (recompute-at-fixpoint = confluence, so no cross-pass `fired` bookkeeping); a gen-select bridge (`adapters.select`) supplies selectors as conditions. Removed vs the old gen-derive: `fixpoint` (the loop, now gen-resolve), `topoSort`/`entry*` (the ordering, now gen-graph), and the `dispatchStep`/`dispatchInit` migration seam (retired once the recompute-at-fixpoint pattern was blessed).
 
 ### Evaluation / Convergence Layer
 
 **gen-resolve** — Demand-driven RAG evaluator over scope graphs.
 
-A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOAG gate + two-stratum partition, cold/warm fold into `gen-scope.eval`). It **owns the convergence loop**: `gen-scope.circular { init = dispatchInit ctx; eq; } (dispatchStep { inherit dispatch; } cfg)` (Kleene ascent, Sloane 2010 §2.2) reproduces the old gen-derive fixpoint byte-identically. Class B — five gen siblings (gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind).
+A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOAG gate + two-stratum partition, cold/warm fold into `gen-scope.eval`). It **owns the convergence loop**: `gen-scope.circular` iterates a step over the domain state to a fixpoint (Kleene ascent, Sloane 2010 §2.2); a relational-dispatch fixpoint is expressed by making that step a one-shot `gen-dispatch.dispatch` whose output context is the next iterate, then reading the actions off the converged context. Class B — five gen siblings (gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind).
 
 ### Terminal Layer
 
@@ -178,9 +177,9 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Thr
 
 `flakeModules.default` is the flake-parts ergonomics — one `imports` gives both the injected query surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose. The **invariant** (gen TYPES never leave the pure eval; only VALUES cross) is proven end-to-end by a fixture consumer: a gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet `nixosConfigurations.<h>.options ? schema == false`, so nixpkgs never type-walks it. This is the same one-way `compose → value → nixpkgs` trade adios (adisbladis) takes; a pure engine cannot be driven by foreign nixpkgs-module libraries. For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings), the reader escape hatch is `compose`/`injectArgs` plus your own terminal reading `genValues`.
 
-### Ecosystem Contract Libraries
+### L2 Concern Libraries
 
-These five libraries build on the L1 substrate as standalone, nixpkgs-lib-free (Class B) contract libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer; none is wired into `mkGenLibs`.
+These five libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Each flake `.lib` self-resolves its own deps, so all five are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `demand`, `pipe`).
 
 **gen-edge** — Content-movement contract.
 
@@ -217,8 +216,8 @@ A channel is a typed, named accumulation lane whose value at a scope position is
    gen-scope: eval builds nodes, computes attributes demand-driven
 
 4. Rules dispatch policies
-   gen-dispatch: rules fire on context, produce effects (one step);
-   gen-graph phaseOrder orders the phases; gen-resolve loops to convergence
+   gen-dispatch: rules fire on context, produce effects (one pure step);
+   gen-graph phaseOrder orders the groups; gen-resolve loops to convergence
 
 5. Selectors match positions
    gen-select: neededBy, pipe.gather, policy guards use selectors as predicates
@@ -265,10 +264,10 @@ ctx = genSelect.adapters.scope.mkContext {
 genSelect.matches (sel.attrs { type = "host"; }) "host:igloo" ctx
 
 # gen-dispatch uses gen-select adapter for rule conditions;
-# phaseOrder comes from gen-graph, the loop from gen-resolve
+# groupOrder comes from gen-graph, the loop from gen-resolve
 genDispatch.dispatch {
   match = genDispatch.adapters.select.mkMatch genSelect;
-  phaseOrder = genGraph.phaseOrder { /* phases + entry* constraints */ };
+  groupOrder = genGraph.phaseOrder { /* groups + entry* constraints */ };
   # ...
 };
 ```
@@ -283,9 +282,9 @@ Three fixpoint loops, each at a different level:
 |-------|---------|---------------|-------------|
 | Value | gen-algebra (search.converge) | Index state + continuations | Search monad operations |
 | Structure | gen-scope (circular attr) | Attribute values on nodes | Circular dependencies between attributes |
-| Dispatch | gen-resolve (via gen-scope.circular) | Rule context + fired set | Enrichment actions that widen context |
+| Dispatch | gen-resolve (via gen-scope.circular) | Rule context (domain state) | Enrichment actions that widen context |
 
-The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies only the step (`dispatchStep`/`dispatchInit`), and gen-resolve drives it to convergence with `gen-scope.circular` (Kleene ascent). The consumer (den) coordinates these: gen-resolve's loop runs the dispatch step, which may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
+The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies only the pure step (`dispatch`, a function of `(rules, context)`), and gen-resolve drives it to convergence with `gen-scope.circular` (Kleene ascent) by threading the plain domain state and reading actions off the fixpoint. The consumer (den) coordinates these: gen-resolve's loop runs the dispatch step, which may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
 
 ## Performance Architecture
 
