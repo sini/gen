@@ -17,6 +17,13 @@
     # against gen-merge's fixed-input kernel (the `classShare` workload — spec §2.5).
     gen-class.url = "github:sini/gen-class";
 
+    # The hub itself — for the mkGenLibs wiring smoke check (checks.mkgenlibs-eval). The ci subflake
+    # can't `import ../lib` (that escapes its flake root), so it reaches the root lib through this
+    # input, exactly like den-hoag's ci reaches den-hoag. Its gen-* pins stay the ROOT flake.lock's
+    # (the published `gen.lib.mkGenLibs` surface consumers get); only the heavy nixpkgs is deduped.
+    gen.url = "path:..";
+    gen.inputs.nixpkgs.follows = "nixpkgs";
+
     # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host byte-parity oracles ──
     # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`) + gen-aspects (`{ lib, schema }`),
     # pinned to their pre-re-host revs (the last commit before the pure re-host changed the signature).
@@ -97,6 +104,12 @@
         "teeth-parity"
         "parity-nested"
       ];
+
+      # ── mkGenLibs wiring smoke check ──
+      # Forces every key of the hub's published `gen.lib.mkGenLibs` so a broken lib wiring (bad pin
+      # bump, drifted `.lib` signature) or a roster drift fails `nix flake check ./ci`. `.gate` is the
+      # per-key wiring-ok record + roster tripwire; `.gateKeys` the keys that MUST be `true`.
+      mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = lib.systems.flakeExposed;
@@ -109,12 +122,14 @@
       ];
 
       # Raw oracle results (system-independent, pure eval) for eyeballing:
-      #   nix eval ./ci#lib.parity.byte --json | jq
-      #   nix eval ./ci#lib.parity.den  --json | jq
+      #   nix eval ./ci#lib.parity.byte     --json | jq
+      #   nix eval ./ci#lib.parity.den      --json | jq
+      #   nix eval ./ci#lib.mkGenLibsEval   --json | jq   (keyCount / missing / extra / per-key gate)
       flake.lib.parity = {
         byte = byteParity;
         den = denParity;
       };
+      flake.lib.mkGenLibsEval = mkGenLibsEval;
 
       perSystem =
         {
@@ -149,6 +164,38 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "PARITY REGRESSION — re-host is no longer byte-identical to the nixpkgs stack" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the mkGenLibs wiring check: prints the per-key gate (+ roster diff) and FAILS the
+          # build if any key failed to evaluate or the 19-key roster drifted (mkgenlibs-eval.nix).
+          mkGenLibsCheck =
+            name: g:
+            let
+              allOk = builtins.all (k: g.gate.${k} == true) g.gateKeys;
+              failed = builtins.filter (k: g.gate.${k} != true) g.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                inherit (g)
+                  keyCount
+                  keys
+                  missing
+                  extra
+                  ;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "mkGenLibs WIRING REGRESSION — a lib key failed to evaluate or the roster drifted" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -247,6 +294,7 @@
           checks = {
             rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
+            mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
           };
 
           apps.perf-bench = {
