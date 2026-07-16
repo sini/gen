@@ -47,9 +47,14 @@ in
         ...
       }:
       let
-        # Deep module-system evals (gen-schema's 398-suite, hola's fleet corpus) exceed the
-        # default 8 MB stack. The pre-commit framework execs `entry` directly (shlex split, no
-        # shell), so the raise can't be inlined — it needs a wrapper binary. Harmless elsewhere.
+        # Genuinely deep evals (hola's fleet corpus: whole NixOS/den configs, thousands of
+        # module merges) exceed the default 8 MB stack. This is intrinsic eval depth, not a bug
+        # — raising the stack is the standard remedy. (The gen-schema overflow that once shared
+        # this justification was NOT depth: it was purity scans calling nixpkgs lib.hasInfix,
+        # whose `.*needle.*` regex recurses to depth ∝ string length on whole-file source reads;
+        # fixed by genPrelude.hasInfix, so the pure gen libs now pass at the default 8 MB.)
+        # The pre-commit framework execs `entry` directly (shlex split, no shell), so the raise
+        # can't be inlined — it needs a wrapper binary. Harmless where the stack isn't needed.
         ciNixUnit = pkgs.writeShellApplication {
           name = "${name}-ci-nix-unit";
           runtimeInputs = [ (resolve "nix-unit").packages.${system}.default ];
