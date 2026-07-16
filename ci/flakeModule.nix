@@ -47,19 +47,17 @@ in
         ...
       }:
       let
-        # Genuinely deep evals (hola's fleet corpus: whole NixOS/den configs, thousands of
-        # module merges) exceed the default 8 MB stack. This is intrinsic eval depth, not a bug
-        # — raising the stack is the standard remedy. (The gen-schema overflow that once shared
-        # this justification was NOT depth: it was purity scans calling nixpkgs lib.hasInfix,
-        # whose `.*needle.*` regex recurses to depth ∝ string length on whole-file source reads;
-        # fixed by genPrelude.hasInfix, so the pure gen libs now pass at the default 8 MB.)
-        # The pre-commit framework execs `entry` directly (shlex split, no shell), so the raise
-        # can't be inlined — it needs a wrapper binary. Harmless where the stack isn't needed.
+        # nix-unit as a binary: the pre-commit framework execs `entry` directly (shlex split, no
+        # shell), so it needs an executable that bundles the `--flake ./ci#tests` ref, not a bare
+        # command string. No stack raise — the pure gen module system (gen-merge's evalModuleTree)
+        # recurses per nesting level, not per module count, so every gen library's suite evaluates
+        # within the default 8 MB stack. (A prior `ulimit -s unlimited` here masked a regex bug,
+        # not eval depth: purity scans called nixpkgs lib.hasInfix, whose `.*needle.*` recurses to
+        # depth ∝ string length on whole-file source reads. Fixed by genPrelude.hasInfix.)
         ciNixUnit = pkgs.writeShellApplication {
           name = "${name}-ci-nix-unit";
           runtimeInputs = [ (resolve "nix-unit").packages.${system}.default ];
           text = ''
-            ulimit -s unlimited 2>/dev/null || true
             exec nix-unit --flake ./ci#tests "$@"
           '';
         };
