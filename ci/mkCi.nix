@@ -32,6 +32,10 @@ in
     inherit inputs;
     specialArgs = {
       inherit name genInputs;
+      # Every test suite gets the pure prelude — notably `genPrelude.hasInfix`, the
+      # backtracking-free substring test the purity scans use (nixpkgs `lib.hasInfix`
+      # overflows the C stack on whole-file source scans). Consumers may override.
+      genPrelude = (resolve "gen-prelude").lib;
     }
     // specialArgs;
   }
