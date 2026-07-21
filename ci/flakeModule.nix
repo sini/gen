@@ -38,6 +38,15 @@ in
   config = {
     systems = lib.systems.flakeExposed;
 
+    # tests1.<suite>.<test> = { <test> = leaf; } — wraps each leaf as a named test-prefixed child of a
+    # group, so `--flake .#tests1.<suite>.<test>` makes that singleton the group root → nix-unit runs
+    # exactly one test. nix-unit always treats the target attrpath ENDPOINT as a GROUP; pointing it at a
+    # bare `{expr;expected;}` leaf (`#tests.<suite>.<test>`) recurses into expr/expected, finds no
+    # test-prefixed child, and silently reports `0/0 successful` — a false pass. This view is the fix.
+    flake.tests1 = lib.mapAttrs (
+      _suite: subtests: lib.mapAttrs (tn: t: { ${tn} = t; }) subtests
+    ) config.flake.tests;
+
     perSystem =
       {
         self',
@@ -153,10 +162,19 @@ in
           commands = [
             {
               name = "ci";
-              help = "Run all checks, or a specific test [ci] [ci suite.test]";
+              help = "Run all checks, or a specific test [ci] [ci suite] [ci suite.test]";
               command = ''
+                # A `suite.test` arg must target the `tests1` singleton-group view: nix-unit treats the
+                # attrpath endpoint as a GROUP, so `#tests.<suite>.<test>` (a bare leaf) reports a silent
+                # `0/0 successful`. `tests1.<suite>.<test>` wraps that leaf as a test-prefixed child, so
+                # the singleton is the group root and runs 1/1. Bare suite / no arg stay on `tests`.
+                if [ -n "''${1:-}" ] && [ "''${1#*.}" != "''$1" ]; then
+                  target="tests1.$1"
+                else
+                  target="tests''${1:+.$1}"
+                fi
                 nix-unit \
-                  --flake "$FLAKE_ROOT/ci#tests''${1:+.$1}" \
+                  --flake "$FLAKE_ROOT/ci#$target" \
                   --gc-roots-dir "$FLAKE_ROOT/ci/.gcroots" "''${@:2}"
               '';
             }
