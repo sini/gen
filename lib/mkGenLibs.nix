@@ -29,6 +29,9 @@ _:
   settings = genInputs.gen-settings.lib;
   demand = genInputs.gen-demand.lib;
   pipe = genInputs.gen-pipe.lib;
+  # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
+  # plainly like the other self-wiring libs.
+  link = genInputs.gen-link.lib;
   # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
   # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
   # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.

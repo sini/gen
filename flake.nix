@@ -32,6 +32,7 @@
     gen-settings.url = "github:sini/gen-settings";
     gen-demand.url = "github:sini/gen-demand";
     gen-pipe.url = "github:sini/gen-pipe";
+    gen-link.url = "github:sini/gen-link";
   };
 
   outputs = inputs: {
