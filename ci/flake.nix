@@ -317,20 +317,26 @@
             # A `.git/config` marker walk is worktree-blind — a linked worktree's `.git` is a
             # gitdir-pointer file, so the walk escapes the worktree and formats the main checkout.
             # Explicit `null` rather than omission: flake-parts' `mkDefault "flake.nix"` would pin
-            # the tree root to `ci/`. Mirrors flakeModule.nix, the module mkCi hands to consumers.
+            # the tree root to `ci/`. Mirrors flakeModule.nix, the module mkCi hands to consumers —
+            # root detection and the program set alike: the repo that ships the gate is gated by it,
+            # so this list may not be trimmed below the one consumers receive.
             projectRootFile = null;
             flakeCheck = false;
             enableDefaultExcludes = true;
             settings.on-unmatched = "info";
-            programs.mdformat = {
-              enable = true;
-              package = pkgs.mdformat.withPlugins (p: [
-                p.mdformat-beautysh
-                p.mdformat-footnote
-                p.mdformat-frontmatter
-                p.mdformat-gfm
-                p.mdformat-simple-breaks
-              ]);
+            programs = {
+              actionlint.enable = true;
+              nixfmt.enable = true;
+              mdformat = {
+                enable = true;
+                package = pkgs.mdformat.withPlugins (p: [
+                  p.mdformat-beautysh
+                  p.mdformat-footnote
+                  p.mdformat-frontmatter
+                  p.mdformat-gfm
+                  p.mdformat-simple-breaks
+                ]);
+              };
             };
           };
 
