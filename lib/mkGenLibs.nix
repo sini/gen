@@ -6,8 +6,7 @@
 # so the hub just re-exports `genInputs.gen-X.lib`. The `lib` arg is now vestigial
 # (real consumers read `inputs.gen-X.lib` directly); kept as `_` for call-compat.
 { genInputs }:
-_:
-{
+_: {
   prelude = genInputs.gen-prelude.lib;
   algebra = genInputs.gen-algebra.lib;
   types = genInputs.gen-types.lib;
