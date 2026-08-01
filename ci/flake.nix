@@ -313,7 +313,12 @@
           };
 
           treefmt = {
-            projectRootFile = ".git/config";
+            # Native tree-root detection (`git rev-parse --show-toplevel`, the current worktree).
+            # A `.git/config` marker walk is worktree-blind — a linked worktree's `.git` is a
+            # gitdir-pointer file, so the walk escapes the worktree and formats the main checkout.
+            # Explicit `null` rather than omission: flake-parts' `mkDefault "flake.nix"` would pin
+            # the tree root to `ci/`. Mirrors flakeModule.nix, the module mkCi hands to consumers.
+            projectRootFile = null;
             flakeCheck = false;
             enableDefaultExcludes = true;
             settings.on-unmatched = "info";

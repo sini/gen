@@ -83,7 +83,23 @@ in
         };
 
         treefmt = {
-          projectRootFile = ".git/config";
+          # `null` selects treefmt's own native tree-root detection — `git rev-parse
+          # --show-toplevel`, the root of the CURRENT worktree. A marker-file walk cannot serve
+          # here: a linked worktree's `.git` is a gitdir-POINTER FILE rather than a directory, so
+          # a `.git/config` search climbs straight through the worktree boundary and resolves the
+          # main checkout. treefmt then formats that tree instead of the one it was invoked in,
+          # and because the pre-commit hook above shares this wrapper (`package = self'.formatter`)
+          # the hook formats one tree while the commit carries another.
+          #
+          # Explicit `null`, not omission: flake-parts' treefmt module supplies
+          # `mkDefault "flake.nix"`, which walking up from `ci/` resolves to `ci/` itself — the
+          # right worktree, the wrong scope.
+          #
+          # Residual: the native-detection branch of the generated wrapper omits the
+          # `unset PRJ_ROOT` that the marker-file branch emits. Measured against treefmt 2.5.0,
+          # PRJ_ROOT takes no part in tree-root resolution, so that unset is vestigial; the live
+          # environment override is TREEFMT_TREE_ROOT, which neither branch unsets.
+          projectRootFile = null;
           flakeCheck = false;
           enableDefaultExcludes = true;
           settings.on-unmatched = "info";
