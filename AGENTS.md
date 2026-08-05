@@ -62,7 +62,7 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 
 | Export | Signature |
 |---|---|
-| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix:7,9` binds it as `_`) |
+| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix:9` binds it as `_`) |
 | `lib.mkCi` | `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs` |
 
 `builtins.functionArgs lib.mkCi` ⇒ `{"extraModules":true,"inputs":false,"name":false,"specialArgs":true,"testModules":false}`
@@ -70,13 +70,13 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 Live: `gen-select`, `gen-schema`, `gen-class`, `gen-pipe`, `gen-link` all call `gen.lib.mkCi` from
 their `ci/flake.nix`.
 
-**`lib.mkGenLibs` roster** — `lib/mkGenLibs.nix:11-41`. Twenty keys, all unprefixed. Each value is
+**`lib.mkGenLibs` roster** — `lib/mkGenLibs.nix:10-40`. Twenty keys, all unprefixed. Each value is
 `genInputs.gen-<key>.lib` verbatim except `class` (see below).
 
 `algebra` `aspects` `bind` `class` `demand` `dispatch` `edge` `flake` `graph` `link` `merge` `pipe`
 `prelude` `product` `resolve` `schema` `scope` `select` `settings` `types`
 
-`class` is the one exception: `lib/mkGenLibs.nix:38-41` re-imports `"${genInputs.gen-class}/lib"` with
+`class` is the one exception: `lib/mkGenLibs.nix:37-40` re-imports `"${genInputs.gen-class}/lib"` with
 `{ prelude; merge; }` rather than re-exporting `gen-class.lib`, because gen-class's own flake leaves
 `merge = null`. Every other key is a plain re-export.
 
