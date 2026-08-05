@@ -72,7 +72,7 @@ measured (the BENCHMARKS engine-cost note).
 | [gen-rebuild](https://github.com/sini/gen-rebuild) | Pure-Nix incremental rebuilder (change propagation, AFFECTED set) |
 | [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
 
-The hub exposes `mkGenLibs` with nineteen keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected), and the five L2 concern libraries `edge`, `product`, `settings`, `demand`, `pipe` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
+The hub exposes `mkGenLibs` with twenty keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `link`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected), and the five L2 concern libraries `edge`, `product`, `settings`, `demand`, `pipe` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
 
 ### L2 concern libraries
 

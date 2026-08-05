@@ -13,7 +13,7 @@ let
   genLibs = gen.lib.mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)
   actualKeys = builtins.attrNames genLibs;
 
-  # The 19-key roster (lib/mkGenLibs.nix). A roster change is intentional: bump this list in the SAME
+  # The 20-key roster (lib/mkGenLibs.nix). A roster change is intentional: bump this list in the SAME
   # commit that adds/removes a lib, so this stays a tripwire rather than silent drift.
   expectedKeys = [
     "algebra"
@@ -25,6 +25,7 @@ let
     "edge"
     "flake"
     "graph"
+    "link"
     "merge"
     "pipe"
     "prelude"

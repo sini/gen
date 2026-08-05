@@ -23,7 +23,7 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
-  mkGenLibs keys (nineteen):
+  mkGenLibs keys (twenty):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-graph · gen-select · gen-bind
     gen-dispatch · gen-resolve · gen-flake · gen-class
