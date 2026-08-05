@@ -2,153 +2,298 @@
 
 [![CI](https://github.com/sini/gen/actions/workflows/ci.yml/badge.svg)](https://github.com/sini/gen/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/sini)
 
-The gen ecosystem is a set of decoupled Nix libraries for building demand-driven, graph-structured configuration frameworks.
-
-Each library owns one concern — types, evaluation, queries, binding, dispatch — and communicates through accessor functions and plain attrsets. The libraries compose at the consumer level, not through deep coupling. You can use gen-graph for graph queries without touching gen-scope, or gen-schema for typed registries without knowing about aspects.
-
-The primary consumer is [den](https://github.com/denful/den), a NixOS/nix-darwin/home-manager configuration framework. But the gen libraries are generic — they have no knowledge of NixOS, system configuration, or den-specific concepts.
+An ecosystem of small, independently versioned Nix libraries for building demand-driven,
+graph-structured configuration frameworks.
 
 ## Table of Contents
 
-- [Trust — three proof axes](#trust--three-proof-axes)
-- [Libraries](#libraries)
-- [Architecture](#architecture)
-- [Core Ideas](#core-ideas)
-- [Theoretical Foundations](#theoretical-foundations)
+- [What gen is](#what-gen-is)
+- [What it provides](#what-it-provides)
+- [Using it](#using-it)
+- [What it promises](#what-it-promises)
+- [How it's architected](#how-its-architected)
+- [Core ideas](#core-ideas)
+- [Theoretical foundations](#theoretical-foundations)
 - [Documentation](#documentation)
 
-## Trust — three proof axes
+## What gen is
 
-If users are asked to write modules evaluated by a separate eval system, they need proof, not
-promises. Everything below re-runs from a command — nothing here is taken on faith. The ecosystem
-stands on three proof axes, each with public, CI-enforced artifacts.
+Each gen library owns exactly one concern — type checking, module merging, scope-graph evaluation,
+graph queries, selection, binding, dispatch, dataflow — names it after the literature it comes from,
+and ships its own test suite and CI gate. They talk to each other through accessor functions and plain
+attrsets rather than deep coupling, so you can take gen-graph for graph queries without gen-scope, or
+gen-schema for typed registries without knowing what an aspect is. This repository is the hub: it owns
+no concern of its own, and publishes the roster (`mkGenLibs`), the shared CI wrapper (`mkCi`), and one
+flake-parts module.
 
-**Correctness.** [VALIDATION.md](VALIDATION.md) is the full inventory: every claim paired with the
-command that re-runs it and the way it fails. The two load-bearing proofs are the **byte-parity
-oracles** (`nix flake check ./ci`) — the pure stack is byte-identical to the frozen nixpkgs stack it
-replaced, down to the `id_hash` SHA, with mutation teeth proving the oracle discriminates content
-(design in [`ci/README.md`](ci/README.md)). Underneath sit the per-library nix-unit suites — the
-[gen-merge](https://github.com/sini/gen-merge) byte-mode engine's 167 tests, the
-[gen-flake](https://github.com/sini/gen-flake) terminal's 89, and the rest — the purity scanners
-that keep the cores nixpkgs-lib-free, the config-thunk deferral regression, and three migrated demos
-(gen-schema / gen-aspects / gen-vars) that byte-check whole small consumers across engine bumps.
+The primary consumer is [den](https://github.com/denful/den), a NixOS / nix-darwin / home-manager
+configuration framework. The libraries themselves are generic — none of them knows what NixOS is.
 
-**Performance.** [BENCHMARKS.md](BENCHMARKS.md) reports evaluation-time cost against that same frozen
-nixpkgs stack, **byte-parity-gated first** so a fast-but-wrong change cannot pass. The live table
-regenerates from `nix run ./ci#perf-bench` (parity + ratio + linearity gates, plus the `classShare`
-and `overrideWarm` reuse gates); the
-[3-way comparison](BENCHMARKS.md#3-way-real-flake-comparison--gen-flake-vs-flake-parts-vs-adios-flake)
-puts [gen-flake](https://github.com/sini/gen-flake) head-to-head with flake-parts and adios-flake
-under a drvPath-equivalence oracle (`nix run ./ci#flake-compare`, 15/15 byte-identical). The
-fleet-scale dedup numbers are measured in a separate lab and frozen as gates
-([hola](https://github.com/sini/hola)).
+## What it provides
 
-**Observability.** The surface nixpkgs `evalModules` cannot offer:
-[gen-flake](https://github.com/sini/gen-flake) v1 exposes provenance (which module set each option,
-at what priority), a diff between two composes, and a memoization decision trace — powered by
-[gen-merge](https://github.com/sini/gen-merge)'s always-on provenance channel and its warm re-eval,
-with [gen-class](https://github.com/sini/gen-class) carrying the class-share mechanism den-hoag
-consumes. Every one of these surfaces is asserted in tests (VALIDATION §2) and its engine cost is
-measured (the BENCHMARKS engine-cost note).
+Twenty libraries are wired into the hub roster and reachable as `mkGenLibs` keys; two more are
+standalone and consumed directly. Each library's `flake.nix` `description` and its `AGENTS.md`
+capability sheet are the authority on its scope — the sheet also records what the library explicitly
+does *not* own, and which sibling does.
 
-## Libraries
+### Foundation
 
-| Library | Role |
-|---------|------|
-| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base (builtins re-exports + vendored lib utils) |
-| [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives (record, search monad, either, intensional identity) |
-| [gen-types](https://github.com/sini/gen-types) | Pure structural type checker (`verify`-only leaf checkers — the checking half of the module system) |
-| [gen-merge](https://github.com/sini/gen-merge) | Byte-mode module merge engine (`evalModuleTree` — a nixpkgs-lib-free `lib.evalModules`; the merge half) |
-| [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) — re-hosted on gen-merge + gen-types |
-| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch) — re-hosted on gen-merge + gen-schema |
-| [gen-scope](https://github.com/sini/gen-scope) | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes) |
-| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
-| [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions; identity/kind selectors, scope/graph/registry/product adapters) |
-| [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject external args into NixOS modules) |
-| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified groups, conflict resolution) |
-| [gen-resolve](https://github.com/sini/gen-resolve) | Demand-driven RAG evaluator over scope graphs (attribute schedule + convergence loop) |
-| [gen-class](https://github.com/sini/gen-class) | Class-share mechanism (partition / contract / apply / gate), byte-gated; tier-2 fixed-input via the injected gen-merge kernel |
-| [gen-flake](https://github.com/sini/gen-flake) | The single nixpkgs boundary (compose purely → inject resolved VALUES → build NixOS systems) |
-| [gen-rebuild](https://github.com/sini/gen-rebuild) | Pure-Nix incremental rebuilder (change propagation, AFFECTED set) |
-| [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
+| Library | What it owns |
+|---|---|
+| [gen-prelude](https://github.com/sini/gen-prelude) | The zero-dependency utility base: `builtins` re-exports plus the pure list / attrset / string helpers the substrate needs, vendored behaviour-identically from `nixpkgs.lib` so every other library can drop nixpkgs from its closure |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives: a Palmer §3 search monad, Leijen/Bracha record algebra with scoped labels and layer folding, Either combinators, intensional-function constructors, standalone identity hashing — `builtins` only |
 
-The hub exposes `mkGenLibs` with twenty keys — `prelude`, `algebra`, `types`, `merge`, `schema`, `aspects`, `scope`, `graph`, `link`, `select`, `bind`, `dispatch`, `resolve`, `flake`, `class` (gen-class with the tier-2 gen-merge kernel injected), and the five L2 concern libraries `edge`, `product`, `settings`, `demand`, `pipe` — plus two standalone pure libraries, `gen-rebuild` and `gen-vars`. Each library exposes a single `.lib` value output.
+### Module system
 
-### L2 concern libraries
+| Library | What it owns |
+|---|---|
+| [gen-types](https://github.com/sini/gen-types) | The checking half: every constructor returns a record whose `verify` maps a value to `null` (it inhabits the type) or an error string. No merging, no priorities, no fixpoint |
+| [gen-merge](https://github.com/sini/gen-merge) | The merge half: `evalModuleTree` collects a module tree, ties one `config` fixpoint, resolves definitions by priority, dispatches structural types, routes undeclared keys through a `freeformType`, and verifies leaves through injected gen-types checkers — reproducing `lib.evalModules` + `lib.types` merge output with zero nixpkgs |
+| [gen-schema](https://github.com/sini/gen-schema) | Typed record registries: **kinds** (deferred modules carrying collections, ref fields, a parent topology), **instances** (submodules with a content-addressed `id_hash`), and the registry option that binds them |
+| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect-oriented composition types: one flat `aspectType` that dispatches by value shape in merge, giving every aspect a path-derived identity, one declared-key classification surface, a defunctionalized guard vocabulary, and a flat registry for downstream queries |
 
-Five libraries build on the L1 substrate (gen-prelude / gen-graph / gen-algebra / gen-bind / gen-select / gen-scope) — each pins one algebra a configuration framework assembles with but the substrate deliberately leaves to the consumer. All five are Class B (nixpkgs-lib-free), depend only on L1 siblings, and are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `demand`, `pipe`); each flake `.lib` self-resolves its own deps, so the hub re-exports it plainly.
+### Graph and evaluation
 
-| Library | Role |
-|---------|------|
-| [gen-edge](https://github.com/sini/gen-edge) | Content-movement contract — the `(S,T,P,M)` edge algebra, toposorted materialization fold, frozen hashable edge-trace oracle |
-| [gen-product](https://github.com/sini/gen-product) | Graph products over accessor-graphs (Cartesian / tensor / strong / lexicographic) — cells, slices, fibers, quotients, sparse restriction, containment chains |
-| [gen-settings](https://github.com/sini/gen-settings) | Stratified settings resolution — a pure layered fold with per-field provenance, identity-bearing cross-aspect refs, and graduated injection |
-| [gen-demand](https://github.com/sini/gen-demand) | Typed demand cascade — kinds resolve demands into resources / wiring / sub-demands over a downward-only kind DAG; stratified terminating fold, dedup, provenance trace |
-| [gen-pipe](https://github.com/sini/gen-pipe) | Scoped-channel dataflow algebra — channels + `map`/`filter`/`fold`/`scan`/`route`/`join`/`tee`, selector routing, class-tagged provenance, static config-dependence |
+| Library | What it owns |
+|---|---|
+| [gen-scope](https://github.com/sini/gen-scope) | The higher-order attribute grammar (HOAG) evaluator: you supply root descriptors and attribute definitions, and `eval` returns an accessor record whose attributes compute lazily and memoize on an `_eval` cache co-located on each node |
+| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph queries: the caller supplies `edges` / `nodes` / `parent` / `nodeData` as plain functions, and gen-graph answers reachability, SCC condensation, phase order, edge-map algebra, pre-order folds and label-regex queries over them — it never stores the graph |
+| [gen-select](https://github.com/sini/gen-select) | Selector algebra over attributed graph positions: `{ __sel = tag; … }` predicate values evaluated against a caller-supplied five-accessor context. Identity-bearing selectors match by `id_hash` or kind, never by `"kind:name"` strings |
+| [gen-resolve](https://github.com/sini/gen-resolve) | The reference attribute grammar (RAG) evaluator and the convergence loop: folds semantic equations into a sealed `ResolveCtx` through `gen-scope.eval`, owning only the static attribute-dependency schedule and the cold/warm fold |
+| [gen-product](https://github.com/sini/gen-product) | Graph products as first-class operations over accessor-graphs — Cartesian, tensor, strong, lexicographic — plus cells, slices, fibers, projections, quotients, sparse restriction and containment chains. Lazy in, lazy out |
 
-## Architecture
+### Composition and wiring
 
-```
-gen-prelude  (pure nixpkgs-lib-free utility base)
-gen-algebra  (pure primitives)
+| Library | What it owns |
+|---|---|
+| [gen-bind](https://github.com/sini/gen-bind) | Partial application of external bindings into module functions: inspects a module's formals, injects the matching bindings, and re-advertises the residual interface in the `__functionArgs` / `_file` convention |
+| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch as one guard→effect **step**: walks a caller-supplied `groupOrder`, matches conditions against a threaded context, resolves conflicts, and buckets the opaque actions by group. It never sorts groups and never loops |
+| [gen-edge](https://github.com/sini/gen-edge) | The content-movement contract: every move of content between positions is one edge `(S,T,P,M)` — source, target, attrpath, mode — with edge-set derivation, Kahn-ordered materialization, and a frozen hashable edge trace as a cross-repo parity oracle |
+| [gen-pipe](https://github.com/sini/gen-pipe) | Scoped channels and a dataflow algebra over them: a channel's value at a position is a left fold over the contributions visible there under a pinned traversal, with `map` / `filter` / `fold` / `scan` / `route` / `join` / `tee` wiring channels into a DAG that `compose` validates and `run` evaluates demand-driven |
+| [gen-demand](https://github.com/sini/gen-demand) | The typed demand cascade: registered **kinds** resolve demand values into resources, wiring and sub-demands, and a stratified fold over a registration-time kind DAG resolves the whole multiset with a provenance trace — termination is a theorem, not a convergence loop |
+| [gen-settings](https://github.com/sini/gen-settings) | *Experimental — subject to replacement.* Stratified settings resolution: folds a static `{ default; merge }` schema against an ordered layer list into `{ value; provenance; }`, adding refs-as-data and the graduated injection construct |
+| [gen-class](https://github.com/sini/gen-class) | The class-share mechanism: groups nodes into classes by a caller-supplied key, computes each class's byte-identical shared **core** over a named projection, applies it back onto a member, and authorises every reuse claim by sha256 over canonical `toJSON` |
+| [gen-link](https://github.com/sini/gen-link) | Cross-flake aspect federation: normalizes each source aspect registry into an origin-free includes-graph, stamps every node with a federation origin, disjoint-unions the subgraphs, binds facet holes into instantiation identity, and returns a diffable resolution manifest |
 
-# module-system substrate (all nixpkgs-lib-free)
-gen-types    (structural checker)          ← gen-prelude
-gen-merge    (byte-mode evalModuleTree)    ← gen-prelude, gen-types
-├── gen-schema   (typed registries)        ← gen-prelude, gen-merge, gen-algebra
-│   └── gen-aspects (aspect types)         ← gen-prelude, gen-merge, gen-schema
-│
-gen-scope    (HOAG evaluator)              ← gen-prelude
-gen-graph    (graph queries + ordering)    ← gen-prelude
-gen-select   (selector algebra)            ← (zero deps, Class A)
-gen-bind     (module binding)              ← gen-prelude
-gen-dispatch (rule dispatch step)          ← gen-prelude
-gen-rebuild  (incremental rebuilder)       ← gen-prelude
-gen-resolve  (RAG evaluator + loop)        ← gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind
-gen-vars     (vars/secrets)                ← standalone
+### Terminal
 
-# the ONE nixpkgs boundary (compose purely → inject VALUES → build systems)
-gen-flake    (value-injection terminal)    ← import-tree, gen-merge, gen-schema, gen-aspects, gen-bind, nixpkgs
+| Library | What it owns |
+|---|---|
+| [gen-flake](https://github.com/sini/gen-flake) | The single nixpkgs / flake-parts boundary. Its pure core is `compose` (resolves a gen module tree through gen-merge into values, a flat aspect registry, a per-host class projection and the provenance channel), plus `injectArgs`, `realize` and `diff`; `terminals.mkSystemTerminal` / `mkFlakeTerminal` are where a nixpkgs evaluator actually builds systems |
 
-# L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
-gen-edge     (content-movement (S,T,P,M) edge algebra)   ← gen-prelude, gen-graph
-gen-product  (graph products over accessor-graphs)       ← gen-prelude
-gen-settings (stratified settings fold + injection)      ← gen-prelude, gen-algebra, gen-bind
-gen-demand   (typed demand cascade)                      ← gen-prelude, gen-graph (+ gen-select optional)
-gen-pipe     (scoped-channel dataflow algebra)           ← gen-prelude, gen-select, gen-scope
+### Standalone (off-roster)
+
+| Library | What it owns |
+|---|---|
+| [gen-rebuild](https://github.com/sini/gen-rebuild) | The rebuilder dimension (Mokhov 2018) as a pure-Nix library: a flat relocatable result store, a per-key verifying trace, node-reuse decisions, and change propagation over a caller-supplied `recompute`. No `mkGenLibs` key — consumed as `inputs.gen-rebuild.lib` (today, by gen-resolve) |
+| [gen-vars](https://github.com/sini/gen-vars) | *Experimental — subject to replacement.* Target-agnostic vars/secrets: normalizes generator declarations, toposorts them into a backend-agnostic plan, and fans one resolution-free file handle out to many consumer targets in one evaluation, emitting a generate script it never runs. Off-roster and deliberately `nixpkgs.lib`-tethered outside its bottom `pure/` tier |
+
+## Using it
+
+Take only the libraries you need. Every library exports exactly one `.lib`, and each resolves its own
+dependencies, so there is nothing to wire:
+
+```nix
+{
+  inputs.gen-graph.url = "github:sini/gen-graph";
+  inputs.gen-flake.url = "github:sini/gen-flake";
+
+  outputs =
+    { gen-graph, gen-flake, ... }:
+    let
+      genGraph = gen-graph.lib;
+      composed = gen-flake.lib.compose { tree = ./gen-modules; };
+    in
+    {
+      # `injectArgs` packages the resolved VALUES as a plain query module
+      nixosModules.gen = gen-flake.lib.injectArgs composed;
+    };
+}
 ```
 
-The whole ecosystem is now **nixpkgs-lib-free**: gen-schema and gen-aspects were re-hosted onto gen-merge + gen-types (their `lib/` no longer touches `lib.evalModules` / `lib.types`, byte-identically to the old nixpkgs-driven versions). Full nixpkgs enters at exactly one place — `gen-flake`, the terminal that injects resolved values into a consumer's nixpkgs eval and builds NixOS systems. See [ARCHITECTURE.md](ARCHITECTURE.md) for the two-plane split, composition model, data flow, and performance architecture.
+A consumer's ordinary nixpkgs modules then read those values as one module argument:
 
-## Core Ideas
+```nix
+{ genValues, ... }:
+{
+  networking.hostName = genValues.hosts.igloo.name;
+  # A gen type rides along as inert data — readable here, never in the options tree:
+  #   genValues.schema.host.options.addr.type.name
+}
+```
 
-**Nix is the evaluator.** gen-scope doesn't build an attribute grammar evaluator — it leverages Nix's native lazy evaluation for demand-driven computation, `lib.fix` for memoization, and attrset lookup for O(1) attribute access. The `_eval` cache co-located on each scope graph node is just a lazy attrset.
+The hub is optional. `mkGenLibs` gives you the whole roster under short keys (`genLibs.graph`,
+`genLibs.merge`, …) when you want it, but a consumer reading `inputs.gen-X.lib` directly never needs
+this repository at all.
 
-**Accessors, not data.** gen-graph takes `{ edges = id: [...]; }` — functions, not materialized maps. gen-select takes `{ data = id: {...}; parent = id: ...; }`. When wired to gen-scope's memoized `result.get`, accessor calls are O(1) after first evaluation. Zero redundant computation between libraries.
+## What it promises
 
-**Identity everywhere.** Palmer's intensional functions (program-point identity + conservative equality) power dedup across the ecosystem: search continuation dedup (gen-algebra), aspect diamond dedup (gen-aspects), rule identity dedup (gen-dispatch), selector equality (gen-select).
+Each promise below names the mechanism that enforces it. Where the enforcer is a person rather than a
+command, that is said outright. The full inventory — every proof, the command that re-runs it, and how
+it fails — is [TRUST.md](TRUST.md).
 
-**Step, loop, and ordering are separate concerns.** gen-dispatch owns rule evaluation only: it is the pure relational dispatch *step* (guard→effect rules), a function of `(rules, context)` that never sorts groups and never loops. Group ordering is a forward producers-first order computed by gen-graph (`phaseOrder` over condensation), and the convergence *loop* lives in gen-resolve via `gen-scope.circular` (Kleene ascent) — a caller iterates by threading plain domain state through repeated one-shot dispatch and reads the actions off the fixpoint. Recompute-at-fixpoint makes the action set a function of the converged state (confluence), so no cross-pass bookkeeping is needed.
+**Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
+`ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Eighteen of the twenty roster libraries carry
+it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter its
+lock, and the flake structure is the proof. gen-demand's scanner is outstanding; its purity today rests
+on its input list rather than on a check. gen-vars is the documented exception, and is off-roster for
+this reason.
 
-**Actions are opaque.** gen-dispatch dispatches rules over a caller-supplied `groupOrder` and groups actions by group, but never interprets what actions mean. The consumer defines the vocabulary. gen-select matches patterns, but adapters bridge to gen-scope and gen-graph without importing them. Libraries provide machinery; consumers provide meaning.
+**Full nixpkgs enters at exactly one file.** In gen-flake — the only library that consumes it —
+`lib/terminals.nix` is the single file the purity scanner excludes as the sanctioned boundary. Every
+other file in that `lib/` is scanned, and a *new* file is treated as strict pure core by default, so
+the boundary cannot widen by accident. Everywhere the ecosystem needs `lib.*` alone it pulls the pinned
+`github:nix-community/nixpkgs.lib` rather than full nixpkgs — policy stated in `ci/flake.nix` and
+visible in every `ci/` lock file.
 
-**Compose purely, inject VALUES.** The module system is a pure plane: gen module trees are composed by gen-merge's byte-mode `evalModuleTree` (a nixpkgs-lib-free `lib.evalModules`), checked by gen-types, over the gen-schema/gen-aspects grammar — all without nixpkgs. gen-flake is the single terminal that crosses into nixpkgs: it injects the resolved config VALUES into a consumer's nixpkgs eval via `_module.args` (the query surface), then builds NixOS systems. **The invariant: gen TYPES never leave the pure eval; only VALUES cross.** A gen type rides as inert data inside `_module.args` (a consumer can read `genValues.schema.<kind>.options.<f>.type.name`) yet never enters the consumer's options tree, so nixpkgs never type-walks it. This is value-injection, not type-driving — the same one-way trade [adios](https://github.com/adisbladis/adios) takes. A pure engine cannot be driven by foreign nixpkgs-module libraries.
+**One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
+for nineteen of the twenty roster keys — gen-class is the exception described below, and its flake
+exports `.lib` too — so a library that renames, wraps or drops that output fails hub evaluation at its
+first consumer. All twenty-two library flakes declare it today.
 
-## Theoretical Foundations
+**Every library gates on its own CI.** All twenty-two library repos build their `ci/flake.nix` on this
+hub's `gen.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes a
+gate the moment it lands, with no registration step. `nix flake check ./ci` from any repo root runs the
+suite, and every roster library carries a GitHub Actions workflow that runs it on push and pull request.
 
-The ecosystem is grounded in attribute grammar theory, scope graph formalism, and algebraic graph construction:
+**The pure module system is byte-identical to the nixpkgs one it replaced.** Two parity oracles in this
+hub's `ci/` — `rehost-byte-parity` over den-shaped fixtures and `rehost-den-parity` over den's actual
+registry shape — compare resolved projections down to the `id_hash` SHA, and carry mutation teeth.
+`nix flake check ./ci`, wired as the `checks` job. The reference side is pinned at frozen pre-re-host
+revisions, so the bar cannot drift.
+
+**Performance claims are parity-gated.** `nix run ./ci#perf-bench` measures every cell and gates on
+parity, ratio and linearity together: a parity mismatch fails the run whatever the timings say, so a
+fast-but-wrong change cannot pass. Wired as its own CI job, alongside `fleet-consistency`, which
+re-derives every cited fleet number from committed baselines.
+
+**Every library states what it does not own.** All twenty-three repositories (the hub included) carry
+an `AGENTS.md` capability sheet whose "Not this library's job" table names the owning sibling for each
+adjacent concern and quotes that sibling's own `flake.nix` description verbatim, most rows backed by a
+grep that localizes the seam. This is a convention with a uniform artifact, not a CI gate.
+
+**Names answer to the literature.** [TERMINOLOGY.md](TERMINOLOGY.md) carries a per-term provenance
+column and a reference table of thirty-odd papers, and library sources cite their papers inline at the
+point of use — `gen-scope/lib/resolve.nix` alone cites Neron, van Antwerpen and Sloane by section. This
+promise is enforced by review against TERMINOLOGY.md, not by a check; no CI job verifies a citation.
+
+## How it's architected
+
+### Two planes, one crossing
+
+The *composition plane* is pure and nixpkgs-lib-free: the module-system substrate
+(`gen-types → gen-merge → { gen-schema, gen-aspects }`) resolves gen module trees to values without
+ever touching `lib.evalModules`. The *terminal plane* is nixpkgs: `gen-flake.realize` folds the
+composed per-host projection through per-class terminals — `realize` is itself pure, and the nixpkgs
+contact lives in the terminals it is handed (`terminals.mkSystemTerminal`, `mkFlakeTerminal`). The
+invariant across the crossing is that **gen types never leave the pure eval; only values cross** — a
+gen type may ride along as inert data a consumer can read, but it never enters the consumer's options
+tree, so nixpkgs never type-walks it. This is value-injection rather than type-driving, the same
+one-way trade [adios](https://github.com/adisbladis/adios) takes: a pure engine cannot be driven by
+foreign nixpkgs-module libraries.
+
+### Two-stage instantiation, self-wired members
+
+`mkGenLibs` (`lib/mkGenLibs.nix`) is a two-stage function. Stage one captures `genInputs` — the gen
+flake inputs — at definition time. Stage two returns the roster. Every member flake is **self-wiring**:
+its `.lib` output resolves its own dependencies internally (gen-schema owns its gen-algebra input,
+gen-pipe its gen-select and gen-scope), so the hub does nothing but re-export `genInputs.gen-X.lib`.
+The second argument is vestigial and kept only for call compatibility.
+
+**gen-class is the one exception.** Its flake `.lib` leaves the merge engine as `null` — every tier-1
+export works without it — so the hub re-imports gen-class's `./lib` with the gen-merge kernel injected
+as a value. That is what makes `mkGenLibs.class` carry the tier-2 `applyCoreFixed` path. gen-merge is
+injected rather than declared as a flake input precisely so gen-class stays a single-input Class B
+library.
+
+### Dependency tiers
+
+Libraries declare their class honestly: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib,
+**D** nixpkgs-lib plus a gen dependency. Classes C and D are empty among the roster libraries. The
+graph is strictly acyclic and shallow — most libraries have one or two inputs:
+
+```
+gen-prelude   zero inputs (Class A)
+gen-algebra   zero inputs (Class A)
+gen-select    zero inputs (Class A)
+
+gen-types     ← prelude
+gen-merge     ← prelude, types
+gen-schema    ← prelude, types, merge, algebra
+gen-aspects   ← prelude, merge, schema
+gen-scope     ← prelude
+gen-graph     ← prelude
+gen-bind      ← prelude
+gen-dispatch  ← prelude
+gen-product   ← prelude
+gen-class     ← prelude (+ gen-merge injected by the hub for tier 2)
+gen-edge      ← prelude, graph
+gen-demand    ← prelude, graph (gen-select optional, for adapters.select)
+gen-pipe      ← prelude, select, scope
+gen-settings  ← prelude, algebra, bind
+gen-resolve   ← prelude, scope, graph, rebuild, algebra, bind
+gen-link      ← prelude, scope, resolve, edge, schema, algebra, aspects
+
+gen-flake     ← prelude, types, merge, schema, aspects, bind,
+                import-tree, flake-parts, nixpkgs        (the one boundary)
+```
+
+Libraries never import each other's flake inputs to reach a sibling's data — gen-select does not
+import gen-scope, it provides an adapter that accepts gen-scope's result shape. That is what keeps the
+roster composable at the consumer rather than at the library.
+
+[ARCHITECTURE.md](ARCHITECTURE.md) is the deep reference: composition patterns, the data-flow chain,
+the three fixpoint levels and who owns each, the memoization and cost model, and the full design
+constraints.
+
+## Core ideas
+
+**Nix is the evaluator.** gen-scope does not build an attribute-grammar evaluator — it leverages Nix's
+native lazy evaluation for demand-driven computation, `lib.fix` for memoization, and attrset lookup for
+O(1) attribute access. The `_eval` cache co-located on each scope-graph node is just a lazy attrset.
+
+**Accessors, not data.** gen-graph takes `{ edges = id: [...]; }` — functions, not materialized maps.
+gen-select takes `{ data = id: {...}; parent = id: ...; }`. Wired to gen-scope's memoized `result.get`,
+accessor calls are O(1) after first evaluation, and no computation is repeated between libraries.
+
+**Identity everywhere.** Palmer's intensional functions — program-point identity with conservative
+equality — power dedup across the ecosystem: search continuation dedup in gen-algebra, aspect diamond
+dedup in gen-aspects, rule identity in gen-dispatch, selector equality in gen-select, and the
+content-addressed `id_hash` in gen-schema.
+
+**Step, loop and ordering are separate concerns.** gen-dispatch is the pure relational dispatch *step*,
+a function of `(rules, context)` that never sorts and never iterates. Group ordering is a forward
+producers-first order computed by gen-graph's `phaseOrder` over the condensation. The convergence *loop*
+lives in gen-resolve via `gen-scope.circular` (Kleene ascent). Recomputing at the fixpoint makes the
+action set a function of the converged state, so no cross-pass bookkeeping is needed.
+
+**Actions are opaque.** gen-dispatch groups actions but never interprets them; gen-edge moves content
+without knowing what content is; gen-demand produces pure data and constructs no modules. Libraries
+provide machinery, consumers provide meaning.
+
+## Theoretical foundations
+
+The ecosystem is grounded in attribute-grammar theory, scope-graph formalism, and algebraic graph
+construction:
 
 - **Attribute grammars** — Knuth (1968), Vogt (1989, HOAG), Hedin (2000, RAG), Sloane (2010, Kiama)
 - **Scope graphs** — Neron (2015), van Antwerpen (2016, Statix; 2018, Scopes as Types)
-- **Algebraic graphs** — Mokhov (2017)
+- **Algebraic graphs** — Mokhov (2017); graph products — Hammack, Imrich & Klavžar (2011)
 - **Intensional functions** — Palmer (2024)
 - **Record algebra** — Leijen (2005), Bracha & Cook (1990)
-- **Contracts** — Findler (2002), Chitil (2012)
+- **Contracts** — Findler (2002), Chitil (2012); refinement types — Rondon (2008)
 - **Rule systems** — Forgy (1982, RETE), Ehrig (2006), Arntzenius (2016, Datafun)
+- **Dataflow and stratification** — Kahn (1974, channels), Kahn (1962, toposort), Apt, Blair & Walker
+  (1988, stratified evaluation)
+- **Build systems** — Mokhov, Mitchell & Peyton Jones (2018, rebuilder dimension)
 
-See [TERMINOLOGY.md](TERMINOLOGY.md) for the complete vocabulary with provenance.
+See [TERMINOLOGY.md](TERMINOLOGY.md) for the complete vocabulary with per-term provenance.
 
 ## Documentation
 
-- [TERMINOLOGY.md](TERMINOLOGY.md) — Unified vocabulary across the gen libraries with academic provenance
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Composition model, data flow, performance architecture, design constraints
+- [TERMINOLOGY.md](TERMINOLOGY.md) — Unified vocabulary across the gen libraries, with academic provenance
+- [TRUST.md](TRUST.md) — The map: what is proven, on which axis, and where each check lives
+- [VALIDATION.md](VALIDATION.md) — The per-proof inventory: every claim, its command, and its failure mode
+- [BENCHMARKS.md](BENCHMARKS.md) — Evaluation-time measurements and the gates that hold them
