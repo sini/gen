@@ -231,7 +231,7 @@ gen-class     ← prelude (+ gen-merge injected by the hub for tier 2)
 gen-edge      ← prelude, graph
 gen-demand    ← prelude, graph (gen-select optional, for adapters.select)
 gen-pipe      ← prelude, select, scope
-gen-settings  ← prelude, algebra, bind
+gen-settings  ← prelude, algebra, bind, graph
 gen-resolve   ← prelude, scope, graph, rebuild, algebra, bind
 gen-link      ← prelude, scope, resolve, edge, schema, algebra, aspects
 

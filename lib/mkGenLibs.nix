@@ -21,7 +21,7 @@ _: {
   resolve = genInputs.gen-resolve.lib;
   flake = genInputs.gen-flake.lib;
   # L2 concern libraries — each flake `.lib` self-resolves its own deps (edge: prelude+graph;
-  # product: prelude; settings: prelude+algebra+bind; demand: prelude+graph; pipe:
+  # product: prelude; settings: prelude+algebra+bind+graph; demand: prelude+graph; pipe:
   # prelude+select+scope), so the hub re-exports them plainly like the self-wiring libs above.
   edge = genInputs.gen-edge.lib;
   product = genInputs.gen-product.lib;
