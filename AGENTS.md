@@ -3,9 +3,10 @@
 ## Scope
 
 The ecosystem hub: it owns no concern of its own. It publishes `mkGenLibs` — two-stage instantiation
-of the gen library roster (stage 1 captures `genInputs` at definition time; stage 2 re-exports each
-member flake's self-wired `.lib`) — plus `mkCi`, the shared CI-flake wrapper every sibling's `ci/`
-calls, and one flake-parts module.
+of the gen library roster (stage 1 captures `genInputs` at definition time and binds the roster; stage
+2 hands back that same value, each member flake's self-wired `.lib`) — the three **stratum buckets**
+cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), plus `mkCi`, the shared CI-flake
+wrapper every sibling's `ci/` calls, and one flake-parts module.
 
 ## Not this library's job
 
@@ -58,27 +59,71 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flakeModules`. There are no
 `packages`, `devShells`, `checks`, or `formatter` at the root.
 
-**`lib`** — `flake.nix:39-40`
+**`lib`**
 
 | Export | Signature |
 |---|---|
-| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix:9` binds it as `_`) |
+| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix` binds it as `_`) |
 | `lib.mkCi` | `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs` |
+| `lib.substrate` | the S1 stratum bucket — 9 members, selected from the flat roster |
+| `lib.modules` | the S2 (module-system) stratum bucket — 2 members |
+| `lib.aspects` | the S3 (aspect-layer) stratum bucket — 3 members |
 
 `builtins.functionArgs lib.mkCi` ⇒ `{"extraModules":true,"inputs":false,"name":false,"specialArgs":true,"testModules":false}`
 (`false` = required). `mkCi` is already stage-1-applied by the flake, so a consumer makes one call.
 Live: `gen-select`, `gen-schema`, `gen-class`, `gen-pipe`, `gen-link` all call `gen.lib.mkCi` from
 their `ci/flake.nix`.
 
-**`lib.mkGenLibs` roster** — `lib/mkGenLibs.nix:10-40`. Twenty keys, all unprefixed. Each value is
-`genInputs.gen-<key>.lib` verbatim except `class` (see below).
+**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty-one keys: **twenty
+members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
+`genInputs.gen-<key>.lib` verbatim except `class`.
 
 `algebra` `aspects` `bind` `class` `demand` `dispatch` `edge` `flake` `graph` `link` `merge` `pipe`
-`prelude` `product` `resolve` `schema` `scope` `select` `settings` `types`
+`prelude` `product` `resolve` `schema` `scope` `select` `settings` `types` — plus `strata`
 
-`class` is the one exception: `lib/mkGenLibs.nix:37-40` re-imports `"${genInputs.gen-class}/lib"` with
+`class` is the one exception: the `class` binding re-imports `"${genInputs.gen-class}/lib"` with
 `{ prelude; merge; }` rather than re-exporting `gen-class.lib`, because gen-class's own flake leaves
-`merge = null`. Every other key is a plain re-export.
+`merge = null`. Every other member is a plain re-export.
+
+**The stratum declaration.** `strata` maps every member name to the layer it belongs to. It is
+**total and explicit** — a member with no entry is a build error, never a member of an implicit
+residue bucket, because a defaulted stratum would let a new library land silently in whatever bucket
+the default names. Adding a roster member is therefore two lines in the same commit: the binding and
+its stratum. Five values:
+
+| value | meaning | publishes a path? |
+|---|---|---|
+| `substrate` | the base layer: values, graphs, selection, evaluation | `lib.substrate` |
+| `modules` | the module system: the checking half and the merging half | `lib.modules` |
+| `aspects` | the aspect layer, built on the module system | `lib.aspects` |
+| `framework` | above the stack rather than a layer of it — a configuration framework assembles with it, and no substrate vocabulary may be defined in its terms | **no** |
+| `retiring` | on the roster and leaving it: content is moving to another member, so it stays reachable but no consumer should newly adopt it | **no** |
+
+`framework` and `retiring` are facts about the roster, not consumer surfaces: publishing a path for
+them would invite exactly the adoption `retiring` exists to prevent. Their members stay reachable on
+the flat roster, unchanged.
+
+Current assignment (9 / 2 / 3 / 1 / 5):
+
+```
+substrate  algebra bind dispatch graph prelude product schema scope select
+modules    merge types
+aspects    aspects class link
+framework  settings
+retiring   demand edge flake pipe resolve
+```
+
+**`lib.substrate` / `lib.modules` / `lib.aspects`** — the three stratum buckets, each a **selection
+from the flat roster**, never a re-import: `lib.substrate.prelude` and the flat `prelude` are one
+value rather than two evaluations of the same source. The distinction is invisible to a
+names-and-types comparison — a library re-imported at a different pin has identical names and
+identical types while being a different build — so `ci/mkgenlibs-eval.nix` holds it by value equality
+(`buckets-agree`), not by shape.
+
+★ The token `aspects` carries two senses on two nearby surfaces: `lib.aspects` is the **S3 bucket**
+(`aspects`, `link`, `class`), while `lib.aspects.aspects` and `(lib.mkGenLibs { }).aspects` are the
+**gen-aspects library**. Both resolve; neither shadows the other. `substrate` and `modules` carry no
+such overload.
 
 **`flakeModules`** — `flake.nix:42`
 
@@ -94,8 +139,10 @@ genAlgebra genAspects genBind genDispatch genGraph genSchema genScope genSelect
 ```
 
 The other twelve (`class` `demand` `edge` `flake` `link` `merge` `pipe` `prelude` `product` `resolve`
-`settings` `types`) are reachable only via `inputs.gen.lib.mkGenLibs { }` or the sibling flake input
-directly.
+`settings` `types`) are reachable via `inputs.gen.lib.mkGenLibs { }`, the sibling flake input
+directly, or — for the six that declare a published stratum (`class` `link` `merge` `prelude`
+`product` `types`) — the matching bucket. The other six publish no bucket path: `demand`, `edge`,
+`flake`, `pipe`, `resolve` (`retiring`) and `settings` (`framework`).
 
 **Three names per library.** Flake input `gen-schema` · roster key `schema` · `_module.args` name
 `genSchema`.
@@ -105,6 +152,8 @@ directly.
 | Task | Reach for |
 |---|---|
 | Get the whole roster in a consumer | `inputs.gen.lib.mkGenLibs { }` |
+| Get one stratum | `inputs.gen.lib.substrate` / `.modules` / `.aspects` — the members of that layer, selected from the flat roster |
+| Find out which layer a library is in | `(inputs.gen.lib.mkGenLibs { }).strata.<key>` — total, and forceable with no `genInputs` at all |
 | Get one library | `inputs.gen-<name>.lib` directly — the roster adds nothing over the flake input, except for `class` |
 | Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib` |
 | Inject libs as flake-parts module args | `imports = [ inputs.gen.flakeModules.genLibs ];` (eight keys only) |
@@ -116,8 +165,9 @@ directly.
 
 ## Measured traps
 
-Verified in this run at rev `8eb5f29` (Nix 2.34.8), tree clean. Commands run from the hub repo root.
-`f` = `builtins.getFlake (toString ./.)`.
+Verified at rev `8eb5f29` (Nix 2.34.8), tree clean. Commands run from the hub repo root.
+`f` = `builtins.getFlake (toString ./.)`. Rows marked *re-measured at the stratum commit*, and the two
+stratum rows, were re-run when `strata` landed; the rest carry their original run.
 
 | Trap | Evidence |
 |---|---|
@@ -125,10 +175,12 @@ Verified in this run at rev `8eb5f29` (Nix 2.34.8), tree clean. Commands run fro
 | `nix eval .` at the root fails — there are no `packages`/`devShells` | `error: flake 'git+file:///…/gen' does not provide attribute 'packages.x86_64-linux.default' or 'defaultPackage.x86_64-linux'`. Root outputs are `["flakeModules","lib"]` |
 | `nix flake check .` at the **root** is a false green: it prints `all checks passed!` and exits 0 having checked only output shape | observed `checking flake output 'lib'` / `checking flake output 'flakeModules'` / `all checks passed!`, exit 0. The real gate is `nix flake check ./ci` |
 | The ci subflake reaches the hub through `gen.url = "path:.."` (`ci/flake.nix:24`) — SOURCE is live but *inputs* come from `ci/flake.lock`, so a roster addition needs a ci relock in the same commit or the gate goes red on a missing input | measured 2026-08-05: a stale ci lock (19 `gen-*` edges, no `gen-link`) failed the gate with `attribute 'gen-link' missing` while the root lock carried 20; fixed by a targeted `nix flake lock --update-input gen` in ci/ |
-| The `mkgenlibs-eval` roster tripwire (`expectedKeys`) must be bumped in the SAME commit as any roster change — it is a hand-maintained list, not derived | `ci/mkgenlibs-eval.nix:17-39`; `nix eval --json './ci#lib.mkGenLibsEval' --apply 'r: { inherit (r) keyCount missing extra; }'` ⇒ `{"extra":[],"keyCount":20,"missing":[]}` (measured 2026-08-05: `gen-link` had entered the roster without a bump — `extra:["link"]` — fixed same day) |
+| The `mkgenlibs-eval` roster tripwire (`expectedKeys`) must be bumped in the SAME commit as any roster change — it is a hand-maintained list, not derived. `extra` is every actual key absent from that list, so it cannot tell a member from a declaration: the `strata` key is listed there too | the `expectedKeys` binding in `ci/mkgenlibs-eval.nix`; `nix eval --json './ci#lib.mkGenLibsEval' --apply 'r: { inherit (r) keyCount memberCount missing extra; }'` ⇒ `{"extra":[],"keyCount":21,"memberCount":20,"missing":[]}` (re-measured at the stratum commit). Measured 2026-08-05: `gen-link` had entered the roster without a bump — `extra:["link"]` — fixed same day. Measured again when `strata` landed: an unbumped list returns `extra:["strata"]`, `rosterOk` false |
 | `mkgenlibs-eval` wraps each key in `tryEval` to name *which* key broke, but a **missing flake input is not catchable by `tryEval`** in Nix 2.34.8, so the whole check aborts unnamed instead | `ci/mkgenlibs-eval.nix:51`; `(tryEval (deepSeq (throw "boom") true)).success` ⇒ `false`, exit 0, but `(tryEval (deepSeq ({ }.nope) true)).success` ⇒ throws, exit 1. Observed live during the 2026-08-05 stale-lock incident: forcing the missing key aborted unnamed, exit 1 |
-| The roster is **fully lazy**: `attrNames` returns all 20 keys even when `genInputs` is `{ }` | `import ./lib/mkGenLibs.nix { genInputs = { }; }` then `attrNames (mk { })` ⇒ the full 20-key list, exit 0. Forcing one key from that same value (`(mk { }).prelude`) ⇒ exit 1. Positive control with real `genInputs` ⇒ `true`, exit 0. This is why the ci check needs `deepSeq` |
-| `mkGenLibs`'s argument is **inert** — `{ }`, `null`, and `{ lib = throw "forced"; }` all yield the identical 20-key roster | `lib/mkGenLibs.nix:9` binds it as `_`; all three `attrNames` runs returned the same list, and the `throw` was never forced |
+| The roster is **fully lazy**: `attrNames` returns all 21 keys even when `genInputs` is `{ }` | `import ./lib/mkGenLibs.nix { genInputs = { }; }` then `attrNames (mk { })` ⇒ the full 21-key list, exit 0. Forcing one member from that same value (`(mk { }).prelude`) ⇒ exit 1. Positive control with real `genInputs` ⇒ `true`, exit 0. This is why the ci check needs `deepSeq` (re-measured at the stratum commit) |
+| The `strata` declaration is **pure data** — forceable with no inputs at all, unlike every member | same empty-`genInputs` value: `(mk { }).strata.class` ⇒ `"aspects"`, exit 0, while `(mk { }).prelude` ⇒ exit 1 in the same run. A tool can read the layering without resolving a single flake input |
+| `mkGenLibs`'s argument is **inert** — `{ }`, `null`, and `{ lib = throw "forced"; }` all yield the identical roster | `lib/mkGenLibs.nix` binds it as `_`; all three `attrNames` runs returned the same list, and the `throw` was never forced |
+| Every application of `mkGenLibs` returns the **same value**, so `lib.substrate.class == (lib.mkGenLibs { }).class` | the `roster` binding sits in stage 1, above the `_:`. Measured across two applications: `tryEval (r1.${k} == r2.${k})` ⇒ 21/21 `true`, 0 throws. Before the roster was hoisted into stage 1 the same instrument returned 19/20 with **`class` false** — it is an `import` the hub applies itself, so a per-application binding re-allocated it. Live negative control both runs (each member against a different member) ⇒ 0 `true` |
 | `(mkGenLibs { }).class` and `inputs.gen-class.lib` expose the **same ten attribute names** but are not interchangeable: only the hub's supports tier-2 | both `attrNames` ⇒ `["applyCoreExtend","applyCoreFixed","applyCoreMerge","compareCounters","gateCore","invariantUnder","mkClass","mkClasses","mkCore","mkCoreRecord"]`, and `? applyCoreFixed` ⇒ `true` on both. Calling it on a valid core: hub ⇒ `success = true`, raw input ⇒ `success = false` (`gen-class/lib/apply.nix:166-167` throws when `merge == null`). Positive control on the same two libs: `mkCore` and tier-1 `applyCoreMerge` both ⇒ `success = true` |
 | `mkCore` rejects a hand-built `{ members; archetype; }` attrset — the `class` argument must come from `mkClass` | `gen-class/lib/apply.nix` → `contract.mkCoreRecord`: `error: gen-class: mkCoreRecord: class must be a gen-class/class record`. `mkClass { key = "k"; members = [ "a" "b" ]; }` then works |
 | `mkCi`'s input resolution silently **falls back to the hub's pins** for any input the consumer does not declare | `ci/mkCi.nix:27`: `resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name}` — affects `flake-parts`, `import-tree`, `treefmt-nix`, `devshell`, `flake-root`, `git-hooks-nix`, `gen-prelude`. Read, not exercised in this run |
@@ -162,7 +214,7 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 Current output (verbatim):
 
 ```json
-{"flakeModules":["genLibs"],"lib":["mkCi","mkGenLibs"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","demand","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","types"]}
+{"flakeModules":["genLibs"],"lib":["aspects","mkCi","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","demand","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
 ```
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`

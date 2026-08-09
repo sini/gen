@@ -35,10 +35,38 @@
     gen-link.url = "github:sini/gen-link";
   };
 
-  outputs = inputs: {
-    lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
-    lib.mkGenLibs = import ./lib/mkGenLibs.nix { genInputs = inputs; };
+  outputs =
+    inputs:
+    let
+      mkGenLibs = import ./lib/mkGenLibs.nix { genInputs = inputs; };
+      roster = mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)
 
-    flakeModules.genLibs = ./flakeModules/genLibs.nix;
-  };
+      # A stratum bucket is a SELECTION from the flat roster, never a re-import: `substrate.prelude`
+      # and the flat `prelude` are one value rather than two evaluations of the same source. That
+      # distinction is invisible to a names-and-types comparison — a library re-imported at a
+      # different pin has identical names and identical types while being a different build — so it
+      # is the roster, not a reconstruction of it, that the buckets are cut from.
+      bucket =
+        s:
+        builtins.listToAttrs (
+          map (n: {
+            name = n;
+            value = roster.${n};
+          }) (builtins.filter (n: roster.strata.${n} == s) (builtins.attrNames roster.strata))
+        );
+    in
+    {
+      lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
+      lib.mkGenLibs = mkGenLibs;
+
+      # The three stack layers, each selected by the roster's own stratum declaration. The
+      # `framework` and `retiring` declarations publish no path here by design: they are facts
+      # about the roster, and inviting a consumer to select a leaving library is the adoption the
+      # `retiring` value exists to prevent. Both remain reachable on the flat roster.
+      lib.substrate = bucket "substrate";
+      lib.modules = bucket "modules";
+      lib.aspects = bucket "aspects";
+
+      flakeModules.genLibs = ./flakeModules/genLibs.nix;
+    };
 }

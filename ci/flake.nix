@@ -107,8 +107,10 @@
 
       # ── mkGenLibs wiring smoke check ──
       # Forces every key of the hub's published `gen.lib.mkGenLibs` so a broken lib wiring (bad pin
-      # bump, drifted `.lib` signature) or a roster drift fails `nix flake check ./ci`. `.gate` is the
-      # per-key wiring-ok record + roster tripwire; `.gateKeys` the keys that MUST be `true`.
+      # bump, drifted `.lib` signature) or a roster drift fails `nix flake check ./ci`. It also holds
+      # the stratum partition: total declaration, published buckets matching it, and each bucket
+      # entry the same value as its flat member. `.gate` is the per-key wiring-ok record + the roster
+      # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -124,7 +126,7 @@
       # Raw oracle results (system-independent, pure eval) for eyeballing:
       #   nix eval ./ci#lib.parity.byte     --json | jq
       #   nix eval ./ci#lib.parity.den      --json | jq
-      #   nix eval ./ci#lib.mkGenLibsEval   --json | jq   (keyCount / missing / extra / per-key gate)
+      #   nix eval ./ci#lib.mkGenLibsEval   --json | jq   (keyCount / missing / extra / strata / per-key gate)
       flake.lib.parity = {
         byte = byteParity;
         den = denParity;
@@ -168,8 +170,10 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
-          # Build the mkGenLibs wiring check: prints the per-key gate (+ roster diff) and FAILS the
-          # build if any key failed to evaluate or the 19-key roster drifted (mkgenlibs-eval.nix).
+          # Build the mkGenLibs wiring check: prints the per-key gate (+ the roster and stratum
+          # diffs) and FAILS the build if any key failed to evaluate, the roster drifted, or the
+          # stratum partition is not total and in agreement with the flat roster
+          # (mkgenlibs-eval.nix). The roster of record is that file, never a count.
           mkGenLibsCheck =
             name: g:
             let
@@ -179,9 +183,19 @@
                 inherit allOk failed;
                 inherit (g)
                   keyCount
+                  memberCount
                   keys
                   missing
                   extra
+                  strata
+                  strataMissing
+                  strataExtra
+                  strataUnknown
+                  bucketCounts
+                  bucketMismatch
+                  bucketOverlap
+                  resolveFailed
+                  agreeFailed
                   ;
               };
             in
@@ -195,7 +209,7 @@
                 cat "$reportPath"
                 echo
                 ${lib.optionalString (!allOk) ''
-                  echo "mkGenLibs WIRING REGRESSION — a lib key failed to evaluate or the roster drifted" >&2
+                  echo "mkGenLibs WIRING REGRESSION — a lib key failed to evaluate, the roster drifted, or the stratum partition broke" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"

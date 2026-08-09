@@ -123,7 +123,8 @@ A consumer's ordinary nixpkgs modules then read those values as one module argum
 ```
 
 The hub is optional. `mkGenLibs` gives you the whole roster under short keys (`genLibs.graph`,
-`genLibs.merge`, …) when you want it, but a consumer reading `inputs.gen-X.lib` directly never needs
+`genLibs.merge`, …) when you want it, and `gen.lib.substrate` / `gen.lib.modules` / `gen.lib.aspects`
+give you one layer of it at a time — but a consumer reading `inputs.gen-X.lib` directly never needs
 this repository at all.
 
 ## What it promises
@@ -196,16 +197,46 @@ foreign nixpkgs-module libraries.
 ### Two-stage instantiation, self-wired members
 
 `mkGenLibs` (`lib/mkGenLibs.nix`) is a two-stage function. Stage one captures `genInputs` — the gen
-flake inputs — at definition time. Stage two returns the roster. Every member flake is **self-wiring**:
-its `.lib` output resolves its own dependencies internally (gen-schema owns its gen-algebra input,
-gen-pipe its gen-select and gen-scope), so the hub does nothing but re-export `genInputs.gen-X.lib`.
-The second argument is vestigial and kept only for call compatibility.
+flake inputs — and binds the roster. Stage two hands back that same value. Every member flake is
+**self-wiring**: its `.lib` output resolves its own dependencies internally (gen-schema owns its
+gen-algebra input, gen-pipe its gen-select and gen-scope), so the hub does nothing but re-export
+`genInputs.gen-X.lib`. The second argument is vestigial and kept only for call compatibility.
+
+The roster is bound once rather than per application, so every route to it — a bucket, the
+flakeModule, a direct call — holds one value rather than several evaluations of the same source.
+Nineteen members are shared that way anyway by input memoization; `class` is not, because it is an
+`import` the hub applies itself, and a per-application binding re-allocated it.
 
 **gen-class is the one exception.** Its flake `.lib` leaves the merge engine as `null` — every tier-1
 export works without it — so the hub re-imports gen-class's `./lib` with the gen-merge kernel injected
 as a value. That is what makes `mkGenLibs.class` carry the tier-2 `applyCoreFixed` path. gen-merge is
 injected rather than declared as a flake input precisely so gen-class stays a single-input Class B
 library.
+
+### Three strata, one declaration
+
+The roster carries a `strata` key declaring, for every member, which layer of the stack it belongs
+to. The declaration is **total and explicit**: a member with no entry is a build error rather than a
+member of an implicit residue bucket, because a defaulted stratum would let a new library join the
+roster and land silently in whatever bucket the default happened to name. Adding a member is two
+lines in one commit — the binding and its stratum — and `ci/mkgenlibs-eval.nix` fails the gate
+otherwise.
+
+Three of the five values publish a consumer path, each a **selection from the flat roster** rather
+than a re-import, so `gen.lib.substrate.prelude` and the flat `prelude` are one value and not two
+evaluations of the same source:
+
+```
+gen.lib.substrate   algebra bind dispatch graph prelude product schema scope select
+gen.lib.modules     merge types
+gen.lib.aspects     aspects class link
+```
+
+The other two publish nothing. `framework` (gen-settings) sits above the stack rather than in it — a
+configuration framework assembles with it, and no substrate vocabulary is defined in its terms.
+`retiring` (gen-demand, gen-edge, gen-flake, gen-pipe, gen-resolve) marks a member whose content is
+moving elsewhere: still reachable on the flat roster, deliberately not offered as something to adopt.
+Both keep the declaration total without inviting a consumer onto a path that is about to close.
 
 ### Dependency tiers
 
