@@ -25,6 +25,8 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
   - [gen-settings](#gen-settings--stratified-settings-resolution)
   - [gen-demand](#gen-demand--typed-demand-cascade)
   - [gen-pipe](#gen-pipe--scoped-channel-dataflow)
+  - [gen-class](#gen-class--class-share-mechanism)
+  - [gen-link](#gen-link--cross-flake-aspect-federation)
 - [Den v2 Vocabulary (Consumer)](#den-v2-vocabulary-consumer)
 - [Classes: The Output Dimension](#classes-the-output-dimension)
 - [Cross-Cutting Patterns](#cross-cutting-patterns)
@@ -415,6 +417,42 @@ Content-agnostic dataflow algebra for scoped channels. Depends on gen-prelude + 
 | **Class as type** | Contributions are class-tagged at emission; a deferred value's `config` means the producing class's config at the producing scope; cross-class consumption needs a declared adapter. | — |
 | **classInvariant** | A static config-dependence flag derived from arg-shape and composed through operators at composition time — never runtime discovery. | — |
 | **Two-stratum discipline** | gen-pipe reads the graph and produces plain data; no output can feed graph structure (sound reading of an under-construction scope graph). | van Antwerpen et al. 2016 (Statix, via HOAG r2 §B2) |
+
+### gen-class — Class-Share Mechanism
+
+Groups nodes into classes by a caller-supplied key, computes each class's byte-identical shared **core** over a named projection, applies that core back onto a member, and authorises every reuse claim by sha256 over canonical `toJSON`. gen-prelude is the sole flake input (Class B); the gen-merge kernel arrives as an *injected value*, never as an input. Intra-process only — cross-evaluation reuse belongs to gen-rebuild.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Class** | `{ _type = "gen-class/class"; key; members; archetype; }` — nodes grouped by a caller-supplied `keyOf`. The caller declares the boundary; `mkClasses` never discovers one. | — |
+| **Core** | `{ _type = "gen-class/core"; class; projection; sharedKeys; values; digest; }` — what a class actually shares under one projection. An empty intersection is a valid core. | — |
+| **Archetype** | The member whose keys the oracle scans. Defaults to the byte-order-first member, which is not necessarily `head members`. | — |
+| **Projection** | The named attrpath a core is computed over. Inert in `mkCore` / `applyCoreMerge`, but a dotted path in `applyCoreExtend` / `applyCoreFixed`. | — |
+| **Oracle** | `mkCore` — presence-guarded byte-identical intersection over the archetype's keys. A key the archetype lacks is invisible; a key a member lacks is dropped, never merged. | — |
+| **Digest** | `hashString "sha256" (toJSON values)` — key-order-insensitive, and the same function the gate applies. | Merkle-style content address |
+| **Gate** | `gateCore` authorises a reuse claim by byte equality between the core-applied candidate and the real member. No gate-free path exists in the API; the residual it cannot remove is the WHNF config-resolution spine (Gate-B). | — |
+| **Tier 1 / tier 2** | Both wirings export the same ten names. Tier 1 is the flake `.lib` (`merge = null`); tier 2 is the hub's `mkGenLibs.class`, with gen-merge injected. `applyCoreFixed` is present on both surfaces and throws on *call* under tier 1 — presence is not availability. | — |
+| **invariantUnder** | Asks whether a leaf is shareable before committing to it, returning `divergingKeys`. | — |
+| **compareCounters** | Eval-counter regression gate: `"exact"` same-build, a relative band cross-build. A counter-set mismatch throws rather than reporting `pass = false`. | — |
+| **Defunctionalization** | Parametric class behaviour is reduced to plain-data `Class` / `Core` records *before* anything is keyed, so partition, apply and gate all operate on first-order values. | Reynolds 1972 |
+
+### gen-link — Cross-Flake Aspect Federation
+
+Federates several source aspect registries into one graph: normalizes each into an origin-free includes-graph, stamps every node with a federation origin, disjoint-unions the subgraphs, binds facet holes into instantiation identity, and returns a diffable resolution manifest. It owns only the origin coordinate, the union-with-relabel and the manifest, delegating every computation to a sibling — gen-prelude, gen-scope, gen-resolve, gen-schema, gen-algebra and gen-aspects, each overridable at the root `default.nix`. nixpkgs-lib-free. gen-edge is a declared input that `lib/**` never imports, exercised only by the conductor-oracle test.
+
+| Term | Definition | Provenance |
+|------|-----------|------------|
+| **Origin** | The federation coordinate: a label list stamped onto every node of a source. `originLabel` (the `"/"`-joined hash preimage) and `renderOrigin` (`[]` ⇒ `"self"`) disagree by design. | — |
+| **Source** | `{ registry; origin ? []; alias ? {}; keySemantics ? {}; }` — one registry entering the federation. Omitting `keySemantics` silently disables the hole guard for that source's own nodes. | — |
+| **normalize** | Ingests one registry into an origin-free includes-graph `{ nodesByKey; edges; refByToken }`. A registry is a labeled graph, not a tree of values. | Néron et al. 2015 |
+| **originStamp / disjointUnion** | Rescopes a normalized subgraph under an origin (with optional `alias` renaming), then merges stamped subgraphs. `overlay` is the union monoid; the origin stamp is a coproduct injection. | Mokhov 2017 |
+| **Facet / hole** | A declared key whose value carries `requires` — an unfilled port. `holesOf` / `providesOf` / `requiresOf` / `contractOf` read a node's ports. | Kilpatrick et al. 2014 (Backpack); Yang 2016 |
+| **wire** | `{ "<requirerRef>" = { <facet> = "<fillerRef>"; }; }` — fills a facet-require across the seam. Coverage of declared holes is enforced; an *undeclared* filling key is not rejected and forks identity silently. | Kilpatrick et al. 2014 |
+| **Contract** | A facet is either `capability` (tag subset, `checkCapability`) or `refined` (a gen-schema refined type, `checkRefined`). | Bracha & Cook 1990; Findler & Felleisen 2002; Rondon et al. 2008 |
+| **Instantiation identity** | `nodeId origin node` is the holeless id; `instantiatedId origin node holeFillings` folds the fillings in (empty fillings ≡ `nodeId`). Instantiation creates identity, **applicative** by default — the generative alternative was rejected. | MacQueen 1984; Leroy 1995; Dreyer 2005 |
+| **keyRef** | `parseRef` maps string sugar or `{ origin; path }` to `{ __keyRef; origin; path; key }`. `self` ⇒ origin `[]`, and is special only in first position. | — |
+| **Manifest** | The diffable resolution record: deterministically ordered `{ kind; from; to; via }` rows, `kind` ∈ `includes` / `hole`. gen-link writes nothing to disk — serializing a lock is the consuming flake's job. | Merkle 1987; Dolstra 2006 |
+| **resolved** | Keyed by the **holeless** `nodeId`, never by the bound instantiation id. A node with no `includes` gets no entry at all — absent, not `null`. | Hedin 2000 |
 
 ______________________________________________________________________
 
