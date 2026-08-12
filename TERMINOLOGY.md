@@ -157,7 +157,7 @@ Typed record registries with extension, validation, introspection, and scope-gra
 | **Methods** | Declarative functions on entity instances. Named args auto-resolved from instance config. `schemaFn`. | — |
 | **Topology** | Parent-child relationships between kinds. `_topology`, `_roots`, `_leaves`. | — |
 | **Introspection** | Flat `_`-prefixed read-only options for programmatic access: `_kindNames`, `_edges`, `_kindMeta`, `_refEdges`. | — |
-| **Refinement** | Predicate co-located with a type declaration. Validated during apply pipeline. `schema.types.refined`. | Rondon 2008 (Liquid Types); Findler 2002 |
+| **Refinement** | Predicate co-located with a type declaration, carried as `__schema.refinements` metadata on the base type. Validated during apply pipeline. `schema.refined <base> <refinements>` — a bare refinement or a list, both normalized; `schema.refinements` holds the built-ins (`tcpPort`, `nonEmpty`, `positive`). **Was `schema.types.refined`**, which is deleted: `refined` is exported flat and `types` left gen-schema's surface at `2d81387`. | Rondon 2008 (Liquid Types); Findler 2002 |
 | **Blame** | Field-level error attribution for contract violations. `schema.blame`. | Findler 2002 |
 | **Mixin (schema)** | Reusable schema fragment with `requires`/`provides` fields and structural compatibility. `schema.mkMixin`. | Bracha & Cook 1990 |
 | **Derive** | Post-evaluation enrichment hook on registries. Runs after validation. | — |
@@ -525,7 +525,7 @@ Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 
 | Library | Pattern | Provenance |
 |---------|---------|------------|
-| gen-schema | `schema.types.refined` — predicates co-located with types, `lazy = true` defers to access | Chitil 2012; Rondon 2008 |
+| gen-schema | `schema.refined` (**was `schema.types.refined`**, deleted) — predicates co-located with types; a refinement marked `lazy = true` is deferred to access, the rest throw in the apply pipeline. The deferral wraps the field value in `addErrorContext` and re-checks on force, so the violation surfaces at the read that demanded it | Chitil 2012; Rondon 2008 |
 | gen-bind | `contract.mk` — assertions fire only when bound value demanded | Chitil 2012 |
 | gen-aspects | `deferredModule` — class content as lazy constructor, inspectable before forcing | Lorenzen 2025 §1-2.3 |
 
