@@ -309,6 +309,12 @@
             rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
+            # The hub carries the tree-root oracle it ships to consumers (flakeModule.nix).
+            treefmt-tree-root = import ./treefmt-tree-root.nix {
+              inherit pkgs;
+              name = "gen";
+              formatter = self'.formatter;
+            };
           };
 
           apps.perf-bench = {
@@ -327,17 +333,19 @@
           };
 
           treefmt = {
-            # Native tree-root detection (`git rev-parse --show-toplevel`, the current worktree).
-            # A `.git/config` marker walk is worktree-blind — a linked worktree's `.git` is a
-            # gitdir-pointer file, so the walk escapes the worktree and formats the main checkout.
-            # Explicit `null` rather than omission: flake-parts' `mkDefault "flake.nix"` would pin
-            # the tree root to `ci/`. Mirrors flakeModule.nix, the module mkCi hands to consumers —
-            # root detection and the program set alike: the repo that ships the gate is gated by it,
-            # so this list may not be trimmed below the one consumers receive.
+            # TREE ROOT — see flakeModule.nix for the mechanism in full. A `.git/config` marker
+            # walk is worktree-blind: a linked worktree's `.git` is a gitdir-pointer file, so the
+            # walk escapes the worktree and formats the main checkout. `null` rather than
+            # omission, because flake-parts' `mkDefault "flake.nix"` would pin the tree root to
+            # `ci/`; `tree-root-cmd` then STATES the root instead of inheriting treefmt's default.
+            # Mirrors flakeModule.nix, the module mkCi hands to consumers — root detection, the
+            # program set, and the tree-root check alike: the repo that ships the gate is gated by
+            # it, so this list may not be trimmed below the one consumers receive.
             projectRootFile = null;
             flakeCheck = false;
             enableDefaultExcludes = true;
             settings.on-unmatched = "info";
+            settings.tree-root-cmd = "git rev-parse --show-toplevel";
             programs = {
               actionlint.enable = true;
               nixfmt.enable = true;
