@@ -294,8 +294,15 @@ asserted in prose.
   by hand** — re-run it rather than trusting the number above:
 
   ```sh
-  for d in gen-*; do git -C "$d" ls-files | grep -E 'ci/tests/.*purity.*\.nix$' | sed "s|^|$d/|"; done
+  for d in gen-*; do
+    git -C "$d" ls-files | grep -E '^ci/tests/(purity|types-purity)\.nix$' | sed "s|^|$d/|"
+  done
   ```
+
+  The pattern is **anchored and alternated deliberately**. The looser `ci/tests/.*purity.*\.nix$` returns
+  the same 21 today — the two forms were compared and agree exactly — but it would also match a
+  hypothetical `impurity.nix`, and would then over-count silently. A substring predicate that happens to
+  be right today is still the wrong instrument for a figure meant to be re-run.
 
   It reported 21 files across 21 repositories when this section was last measured. The thirteen
   originally listed here are all still present and correct; eight libraries (gen-class, gen-edge,
