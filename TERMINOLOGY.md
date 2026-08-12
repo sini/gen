@@ -62,7 +62,7 @@ These terms are shared across multiple libraries.
 | **Fixpoint** | Convergent iteration until a stability condition holds. The dispatch convergence loop lives in gen-resolve (via `gen-scope.circular`), not in gen-dispatch. | gen-resolve, gen-graph, gen-scope | Arntzenius 2016; Radul 2009; Sloane 2010 §2.2 |
 | **Byte-mode** | Reproducing nixpkgs' order-sensitive `lib.evalModules` merge OUTPUT byte-for-byte on the gen surface, gated by an equivalence oracle. The cut-over conformance contract; distinct from the deferred confluent/structural merge mode. | gen-merge | nixpkgs module system; identity-dedup spike §3 |
 | **Value-injection** | Composing purely, then injecting resolved config VALUES (never gen TYPES) into a consumer's nixpkgs eval via `_module.args`. The invariant: a pure engine cannot be driven by foreign nixpkgs-module libraries, so only values cross. | gen-flake | adios (adisbladis) — `compose → value → nixpkgs` prior art |
-| **Two-plane split** | The composition plane (pure, nixpkgs-lib-free: `gen-types → gen-merge → { gen-schema, gen-aspects }`) vs the terminal plane (nixpkgs: `gen-flake.mkSystems`). One sanctioned crossing. | gen-merge, gen-flake | — |
+| **Two-plane split** | The composition plane (pure, nixpkgs-lib-free: `gen-types → gen-merge → { gen-schema, gen-aspects }`) vs the terminal plane (nixpkgs: `gen-flake.terminals.nixosSystem`, driven by `realize`). One sanctioned crossing. | gen-merge, gen-flake | — |
 
 ______________________________________________________________________
 
@@ -319,7 +319,7 @@ Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** tha
 
 ### gen-flake — Value-Injection Boundary
 
-The single sanctioned crossing from the pure composition plane into nixpkgs. Its pure core (`compose`/`injectArgs`) is nixpkgs-lib-free; only the terminal (`mkSystems`) and flake-parts module touch nixpkgs.
+The single sanctioned crossing from the pure composition plane into nixpkgs. Its pure core (`compose`/`injectArgs`) is nixpkgs-lib-free; only the instantiated terminal (`terminals.nixosSystem`) and flake-parts module touch nixpkgs.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -329,11 +329,13 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Its
 | **hostContent** | The per-host `(class, host)` projection: `{ <host> = { bindings = { host = <instance>; }; classes = { <class> = [ deferredModule ]; }; }; }`, driven by each host's `aspects` membership. The build surface. | — |
 | **injectArgs** | `composed → { _module.args.genValues = composed.values; }`. Packages resolved VALUES as a plain query module — pure, no gen type crosses. | — |
 | **genValues** | The injected arg name — the resolved config values a consumer's nixpkgs modules query (`{ genValues, ... }: … genValues.hosts.<h>.addr …`). | — |
-| **mkSystems** | `{ hostContent; nixpkgs; extraModules ? {}; } → { <host> = nixosSystem; }`. The terminal: `gen-bind.wrapAll` partial-applies the `host` binding into the `nixos` class deferredModules, then `nixpkgs.lib.nixosSystem` builds them. The ONE file that touches nixpkgs. | Reynolds 1972 (partial application) |
-| **nodes** | The colmena-style cross-terminal accessor in `mkSystems` specialArgs — the whole set of built systems, lazy (`nodes.<peer>.config.…`). | — |
+| **realize** | `{ composed; terminals; bindings ? {}; extraModules ? {}; } → { <class> = { <host> = <built>; }; }`. The terminal driver: `gen-bind.wrapAll` partial-applies the `host` binding into that class's deferredModules, then the supplied terminal builds them. Output keys are exactly the `terminals` keys. | Reynolds 1972 (partial application) |
+| **mkSystemTerminal / nixosSystem** | `mkSystemTerminal { evaluator }` is the GENERIC system terminal — no system class named, no nixpkgs touched. `terminals.nixosSystem { nixpkgs; }` is it instantiated with `nixpkgs.lib.nixosSystem`, and is the ONE place that touches nixpkgs; `mkFlakeTerminal` is the flake-parts crossing beside it. | — |
+| **mkSystems** | **RETIRED (v0).** The former terminal, `{ hostContent; nixpkgs; extraModules ? {}; } → { <host> = nixosSystem; }`. It is absent from `gen-flake/lib/`, not renamed; the v1 replacement is `realize { composed; terminals.nixos = terminals.nixosSystem { nixpkgs; }; extraModules; }`, and `composed.hostContent` became `composed.hosts`. Retained here only so the v0 name resolves to its successor. | — |
+| **nodes** | The colmena-style cross-terminal accessor in the system terminal's specialArgs — the whole set of built systems, lazy (`nodes.<peer>.config.…`). | — |
 | **flakeModules.default** | Flake-parts ergonomics: one `imports` gives the injected query surface (top-level + `perSystem` args) and `flake.nixosConfigurations` from one compose. `options.gen = { tree; modules; specialArgs; inject; nixpkgs; extraModules; composed; }`. | — |
 | **The invariant** | gen TYPES never leave the pure eval; only VALUES cross. A gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet never enters a consumer's options tree (`nixosConfigurations.<h>.options ? schema == false`), so nixpkgs never type-walks it. | value-injection; adios prior art |
-| **Reader escape hatch** | For shapes `mkSystems` does not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values, keep your own terminal reading `genValues`. | — |
+| **Reader escape hatch** | For shapes the shipped terminals do not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values and keep your own terminal reading `genValues`, or hand your own evaluator to `mkSystemTerminal`. | — |
 
 *The five libraries below are nixpkgs-lib-free (Class B) L2 concern libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and all five are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `demand`, `pipe`).*
 
@@ -534,7 +536,7 @@ ______________________________________________________________________
 | Author(s) | Year | Paper | Gen ecosystem usage |
 |-----------|------|-------|-------------------|
 | Knuth | 1968 | Semantics of context-free languages | Attributes (inherited, synthesized) |
-| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization-by-analogy (gen-aspects guard wrapping — functor, arrow retained), closure environments §5 (gen-bind partial application, gen-flake `mkSystems` binding via `wrapAll`) |
+| Reynolds | 1972 | Definitional interpreters for higher-order programming languages | Defunctionalization-by-analogy (gen-aspects guard wrapping — functor, arrow retained), closure environments §5 (gen-bind partial application, gen-flake `realize` binding via `wrapAll`) |
 | Kahn | 1974 | Semantics of a simple language for parallel programming | Deterministic dataflow, named channels |
 | Bracha & Cook | 1990 | Mixin-based inheritance | Record mixin composition (gen-algebra), schema mixins (gen-schema) |
 | Forgy | 1982 | RETE: A fast algorithm for the many pattern/many object pattern match problem | Rule dispatch (gen-dispatch) |
