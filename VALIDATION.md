@@ -286,10 +286,24 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 `lib.evalModules`/`lib.types` **replacement**, so it must not call them. This is enforced, not
 asserted in prose.
 
-- **The token-scanner (13 libraries).** Each of gen-merge, gen-schema, gen-aspects, gen-algebra,
-  gen-graph, gen-scope, gen-select, gen-bind, gen-dispatch, gen-resolve, gen-rebuild, and gen-flake
-  carries `ci/tests/purity.nix`, and gen-types carries the same scanner as
-  `ci/tests/types-purity.nix` — 13 in all. The test reads
+- **The token-scanner (21 libraries).** Each of gen-algebra, gen-aspects, gen-bind, gen-class,
+  gen-dispatch, gen-edge, gen-flake, gen-graph, gen-link, gen-lsp, gen-memo, gen-merge, gen-pipe,
+  gen-product, gen-rebuild, gen-resolve, gen-schema, gen-scope, gen-select and gen-settings carries
+  `ci/tests/purity.nix`, and gen-types carries the same scanner as
+  `ci/tests/types-purity.nix` — 21 in all. **The count is the output of a command, not a tally kept
+  by hand** — re-run it rather than trusting the number above:
+
+  ```sh
+  for d in gen-*; do git -C "$d" ls-files | grep -E 'ci/tests/.*purity.*\.nix$' | sed "s|^|$d/|"; done
+  ```
+
+  It reported 21 files across 21 repositories when this section was last measured. The thirteen
+  originally listed here are all still present and correct; eight libraries (gen-class, gen-edge,
+  gen-link, gen-lsp, gen-memo, gen-pipe, gen-product, gen-settings) gained scanners afterwards and
+  the figure was never restated, which is the failure mode a hand-kept count has and a command does
+  not. ★ The instrument's scope, stated because it bounds the claim: it reads the sibling **working
+  clones**, not this hub's locked inputs, so it measures the ecosystem as checked out rather than as
+  pinned. The test reads
   every `lib/**.nix` (plus the root `flake.nix` / `default.nix`), strips comments, and asserts zero
   occurrences of the nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`,
   `lib.evalModules`, `evalModules`, `{ lib }`, `{ lib,`. The library's own API names
