@@ -189,18 +189,18 @@ stratum rows, were re-run when `strata` landed; the rest carry their original ru
 
 ## Theory
 
-The hub claims no result of its own. `README.md:137-149` (§Theoretical Foundations) lists the
+The hub claims no result of its own. `README.md` (§Theoretical foundations) lists the
 ecosystem's grounding as a flat set of areas with representative citations — attribute grammars
 (Knuth 1968; Vogt 1989, HOAG; Hedin 2000, RAG; Sloane 2010, Kiama), scope graphs (Neron 2015; van
 Antwerpen 2016, Statix; 2018, Scopes as Types), algebraic graphs (Mokhov 2017), intensional functions
 (Palmer 2024), record algebra (Leijen 2005; Bracha & Cook 1990), contracts (Findler 2002; Chitil
 2012), rule systems (Forgy 1982, RETE; Ehrig 2006; Arntzenius 2016, Datafun).
 
-The per-result mapping lives in `TERMINOLOGY.md:532+` (§Academic References) — a 39-row table pairing
+The per-result mapping lives in `TERMINOLOGY.md` (§Academic References) — a 39-row table pairing
 each citation with the specific library and construct that uses it. That table, not this sheet, is
 the provenance authority.
 
-`ARCHITECTURE.md:321+` (§Design Constraints) states the ecosystem invariants the hub's wiring
+`ARCHITECTURE.md` (§Design Constraints) states the ecosystem invariants the hub's wiring
 presupposes: an acyclic library DAG, no library importing another's flake inputs, opaque
 actions/conditions, a nixpkgs-lib-free library level with nixpkgs entering only at `gen-flake`, and
 compose-purely/inject-VALUES-never-TYPES.
