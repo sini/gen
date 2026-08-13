@@ -870,11 +870,11 @@
         "gen-types": "gen-types_10"
       },
       "locked": {
-        "lastModified": 1783991188,
-        "narHash": "sha256-KSIlllbwidFgoGcRI4KD3wCk9x8aOiUeclpHUBPcy70=",
+        "lastModified": 1786662304,
+        "narHash": "sha256-vZa58ErlOInSKoazPI1OTZWIrpgwJixDZd5itsAhVUs=",
         "owner": "sini",
         "repo": "gen-merge",
-        "rev": "2701d8bbf5d81ed137ecda3eddfae1241509b728",
+        "rev": "eb0cd1c249b5806fb08803dbf8b453c92c0ec8fc",
         "type": "github"
       },
       "original": {
