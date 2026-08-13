@@ -1,26 +1,19 @@
 {
   inputs = {
-    # ── PURE side (the guarded thing): published re-host mains ──
-    gen-prelude.url = "github:sini/gen-prelude";
-    gen-types.url = "github:sini/gen-types";
-    gen-merge.url = "github:sini/gen-merge";
-    gen-algebra.url = "github:sini/gen-algebra";
-    gen-schema.url = "github:sini/gen-schema";
-    gen-aspects.url = "github:sini/gen-aspects";
-    gen-scope.url = "github:sini/gen-scope";
-    gen-graph.url = "github:sini/gen-graph";
-    gen-select.url = "github:sini/gen-select";
-    gen-bind.url = "github:sini/gen-bind";
-    gen-dispatch.url = "github:sini/gen-dispatch";
-    gen-resolve.url = "github:sini/gen-resolve";
-    # gen-class: the class-share mechanism lib; perf-bench drives its tier-2 `applyCoreFixed`
-    # against gen-merge's fixed-input kernel (the `classShare` workload — spec §2.5).
-    gen-class.url = "github:sini/gen-class";
-
-    # The hub itself — for the mkGenLibs wiring smoke check (checks.mkgenlibs-eval). The ci subflake
-    # can't `import ../lib` (that escapes its flake root), so it reaches the root lib through this
-    # input, exactly like den-hoag's ci reaches den-hoag. Its gen-* pins stay the ROOT flake.lock's
-    # (the published `gen.lib.mkGenLibs` surface consumers get); only the heavy nixpkgs is deduped.
+    # ── THE HUB ITSELF — and the ONLY route to a sibling library ──
+    # A subflake declares no sibling pin and reaches everything through its own root. The input
+    # carries the ENCLOSING REPOSITORY's name — `gen`, inside `gen` — because a `path:`
+    # self-reference points at a repository like any other input, and an input's name matches the
+    # repository it points at.
+    #
+    # The ci subflake can't `import ../lib` (that escapes its flake root), so it reaches the root
+    # lib through this input, exactly like den-hoag's ci reaches den-hoag — and through
+    # `gen.inputs.gen-X` it reaches every sibling AT THE ROOT flake.lock's pin. So the PURE side of
+    # the byte-parity oracle (the published re-host mains), the perf bench's src set, and the
+    # published `gen.lib.mkGenLibs` surface consumers get are one build of each library per
+    # evaluation — by construction, rather than by two pin sets kept in agreement. Declaring the
+    # siblings a second time here is exactly what let 12 of 13 of them diverge from the root.
+    # Only the heavy nixpkgs is deduped.
     gen.url = "path:..";
     gen.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -64,19 +57,25 @@
     let
       inherit (nixpkgs) lib;
 
+      # The root flake's own inputs — the sibling route. `gen.inputs.gen-X` is the root's pin BY
+      # REFERENCE, so no sibling revision is written in this file and none can be written stale:
+      # `nix flake update gen-X` here reports that no such input exists. `mkCi.nix` gives the same
+      # value the same name, for the same reason.
+      genInputs = inputs.gen.inputs;
+
       # ── re-host byte-parity oracle (permanent regression) ──
       # PURE side tracks the published re-host mains; REFERENCE side is the frozen original
       # nixpkgs-signature gen-schema driven through the pinned nixpkgs.lib. A future gen-merge /
       # re-host change that breaks byte-parity (incl the id_hash SHA) makes this check fail.
       denParity = import ./rehost-den-parity.nix {
-        inherit (inputs)
+        inherit (genInputs)
           gen-prelude
           gen-types
           gen-merge
           gen-algebra
           gen-schema
-          gen-schema-orig
           ;
+        inherit (inputs) gen-schema-orig;
         lib = inputs.nixpkgs-lib.lib;
       };
 
@@ -202,16 +201,20 @@
           # through nix-instantiate + NIX_SHOW_STATS and gates on parity / cpu+counter ratios /
           # counter linearity. An app, not a check derivation: timing needs an un-sandboxed
           # evaluator run. CI runs it as a dedicated workflow step.
+          #
+          # `gen-class` is the class-share mechanism lib: perf-bench drives its tier-2
+          # `applyCoreFixed` against gen-merge's fixed-input kernel (the `classShare` workload —
+          # spec §2.5). Like every sibling here it comes from the root's pin, never a local one.
           perfSrcs = pkgs.writeText "perf-srcs.nix" ''
             {
-              "gen-prelude" = "${inputs.gen-prelude}";
-              "gen-types" = "${inputs.gen-types}";
-              "gen-merge" = "${inputs.gen-merge}";
-              "gen-algebra" = "${inputs.gen-algebra}";
-              "gen-schema" = "${inputs.gen-schema}";
-              "gen-aspects" = "${inputs.gen-aspects}";
+              "gen-prelude" = "${genInputs.gen-prelude}";
+              "gen-types" = "${genInputs.gen-types}";
+              "gen-merge" = "${genInputs.gen-merge}";
+              "gen-algebra" = "${genInputs.gen-algebra}";
+              "gen-schema" = "${genInputs.gen-schema}";
+              "gen-aspects" = "${genInputs.gen-aspects}";
+              "gen-class" = "${genInputs.gen-class}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
-              "gen-class" = "${inputs.gen-class}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';
