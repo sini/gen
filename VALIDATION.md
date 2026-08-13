@@ -4,14 +4,15 @@ This is the public inventory of every correctness proof behind the gen ecosystem
 below has an artifact you can read, a command a stranger can run, and a described failure mode —
 no claim appears here without a way to reproduce it.
 
-The two load-bearing proofs are the **byte-parity oracles**: they hold the pure-gen module system
-(gen-prelude → gen-types → gen-merge → re-hosted gen-schema/gen-aspects, all nixpkgs-lib-free)
-byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. They
-run as permanent regressions on `nix flake check ./ci` in this hub (`cbf3a5f`). Everything else —
-the per-library unit suites (§2), the engine and terminal suites (§2's gen-merge / gen-flake
-detail), the purity scanners (§3), the config-thunk deferral regression (§4), the migrated demos
-(§5), the performance and 3-way-comparison gates (§6), and the fleet-scale regression gates (§7) —
-is enumerated in the same reproducible form.
+The load-bearing proof is the **byte-parity oracle** `rehost-den-parity`: it holds the pure-gen
+module system (gen-prelude → gen-types → gen-merge → re-hosted gen-schema, all nixpkgs-lib-free)
+byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. It
+runs as a permanent regression on `nix flake check ./ci` in this hub (`cbf3a5f`). Its retired
+sibling over the **aspect** grammar, and the claim now left unasserted, are recorded in §1.
+Everything else — the per-library unit suites (§2), the engine and terminal suites (§2's gen-merge /
+gen-flake detail), the purity scanners (§3), the config-thunk deferral regression (§4), the migrated
+demos (§5), the performance and 3-way-comparison gates (§6), and the fleet-scale regression gates
+(§7) — is enumerated in the same reproducible form.
 
 A few terms used throughout, for readers new to the ecosystem:
 
@@ -32,7 +33,7 @@ A few terms used throughout, for readers new to the ecosystem:
 Run the whole hub-side proof set:
 
 ```bash
-nix flake check ./ci        # rehost-byte-parity + rehost-den-parity oracles + treefmt
+nix flake check ./ci        # rehost-den-parity oracle + mkGenLibs wiring + treefmt
 nix run ./ci#perf-bench     # parity + ratio + linearity performance gates
 nix run ./ci#flake-compare  # the 3-way real-flake drvPath-equivalence check (15/15)
 ```
@@ -49,7 +50,7 @@ Every proof, its one command, and how it fails. The rest of this document expand
 
 | Proof | Command | Fails if |
 |---|---|---|
-| Whole-stack byte-parity (`rehost-byte-parity`) | `nix flake check ./ci` | any projection ≠ the nixpkgs reference (incl `id_hash`) |
+| Whole-stack byte-parity (`rehost-byte-parity`) | — | NOT CURRENTLY ASSERTED — carrier den-hoag-gkkh |
 | Real-den byte-parity (`rehost-den-parity`) | `nix flake check ./ci` | den's real registry shape diverges across stacks |
 | gen-merge engine suite (167) | `nix flake check ./ci` (in the gen-merge repo) | any merge / lint / classify / warm / provenance test regresses |
 | gen-flake terminal suite (89) | `nix flake check ./ci` (in the gen-flake repo) | compose / override / diff / realize / terminal regresses |
@@ -57,63 +58,66 @@ Every proof, its one command, and how it fails. The rest of this document expand
 | Purity — nixpkgs-lib-free cores | `nix-unit --flake ./ci#tests.purity` (per pure lib) | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/` |
 | Config-thunk deferral | `nix-unit --flake ./ci#tests.deferral` (gen-merge) | a marker forces early, or diverges from nixpkgs at the terminal |
 | Migrated demos (canaries) | each demo's `nix flake check` / eval | a re-hosted demo stops producing byte-identical output |
-| Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear |
+| Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note) |
 | 3-way comparison (drvPath equivalence) | `nix run ./ci#flake-compare` | any output builds differently across flake-parts / adios / gen-flake |
 | Fleet-scale dedup gates | `nix run ./ci#fleet-gates` (hola) | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached |
 | Fleet-number consistency (in-repo) | `nix run ./ci#fleet-consistency` | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor) |
 
-## 1. The byte-parity oracles
+## 1. The byte-parity oracle, and the claim its retired sibling held
 
-Two check derivations in `ci/` assert the pure stack's output equals the nixpkgs stack's output,
-byte for byte. Both take the form of `mkParityCheck` (`ci/flake.nix`): they evaluate a set of
-result keys and fail the build if **any** required key is not `true`. The pure side tracks the
-published re-host mains; the reference side is frozen (see Pinning policy below), so the bar never
-drifts. A future gen-merge or re-host change that breaks parity — including the `id_hash` SHA —
-fails `nix flake check ./ci`.
+One check derivation in `ci/` asserts the pure stack's output equals the nixpkgs stack's output,
+byte for byte. It takes the form of `mkParityCheck` (`ci/flake.nix`): it evaluates a set of result
+keys and fails the build if **any** required key is not `true`. The pure side tracks the published
+re-host mains; the reference side is frozen (see Pinning policy below). A future gen-merge or
+re-host change that breaks parity — including the `id_hash` SHA — fails `nix flake check ./ci`.
 
-### rehost-byte-parity — the whole-stack integration proof
+A frozen reference holds the **bar** still; it does not hold the **subject** still. Where the
+subject's grammar moves by design ruling, the reference cannot follow it and the gate reds on
+improvements rather than on defects. That is why a second oracle over the **aspect** grammar was
+retired rather than repaired, and its claim now sits unasserted — first subsection below. The
+surviving oracle guards the registry/schema surface, whose grammar is stable.
 
-- **Claim:** the pure stack (gen-prelude + gen-types + gen-merge `evalModuleTree` + re-hosted
-  gen-schema + re-hosted gen-aspects) is byte-identical to the nixpkgs stack (`lib.evalModules` +
-  original gen-schema + original gen-aspects) over realistic den-shaped fixtures: a schema `host`
-  kind with instances **including the `id_hash` SHA**, aspect trees with class content / includes /
-  raw guard functions / nesting, and schema-declared options threaded into aspect instances — plus
-  a read-only sample of a real den aspect tree run through both grammars.
+The perf bench (§5) applies the same distinction: 12 of its 14 matrix rows keep a pure/ref digest
+and win-gate; the 2 `aspects` rows are **pure-only** and keep their linearity gates and absolute
+counters, but assert no pure/ref digest parity and no pure/ref CPU or counter win-gate.
 
-- **Artifact:** `ci/rehost-byte-parity.nix` (fixtures parameterized by a shared provider `P` so
-  both stacks run the identical source; the resolved projections are deep-compared).
+### rehost-byte-parity — RETIRED, and the claim it held is NOT CURRENTLY ASSERTED
 
-- **Gate keys** (from `byteParityKeys` in `ci/flake.nix`, all must be `true`):
+- **The claim, unchanged:** *gen's module system agrees with nixpkgs' on the shared grammar.* This
+  is a compatibility claim about an external interface — what anyone **migrating from nixpkgs
+  modules** relies on — not a claim about gen's internals. **No command re-runs it today.**
 
-  ```nix
-  byteParityKeys = [
-    "all-identical"
-    "both-evaluated"
-    "teeth-mutation-diverges"
-    "den-realism"
-  ];
-  ```
+- **Command:** none — the Command cell in the inventory table above is empty, and that empty cell is
+  the record. This document is an inventory of claims paired with the commands that re-run them, so a
+  claim that has lost its command is kept here without one rather than deleted: a reader scanning the
+  table sees the gap, where a reader scanning a shortened table would not.
 
-  `all-identical` — every fixture's pure projection equals its reference projection.
-  `both-evaluated` — both stacks genuinely evaluated (not vacuously equal through a shared throw).
-  `teeth-mutation-diverges` — the mutation teeth (below) fired.
-  `den-realism` — a real den-shaped aspect tree flattens byte-identically through both grammars.
+- **Why it was retired:** the check compared the pure stack against a *frozen* pre-re-host
+  gen-aspects/gen-schema pair. That made it silently assert a conjunction — (P1) the pure re-host
+  computes what nixpkgs computes, **and** (P2) the published aspect grammar is semantically
+  unchanged since the freeze. P2 is contradicted by design: the aspect grammar moves by ruling
+  (`cnf.classes` → `cnf.keySemantics`, and container-relative aspect identity), and a frozen
+  reference cannot follow it. The gate therefore reddened on ruled improvements while being unable
+  to say which conjunct a red belonged to — the divergence grows monotonically, by construction.
 
-- **The `id_hash` claim:** the `schemaFleet` fixture projects each instance's `id_hash` and
-  deep-compares it across stacks; the mutation teeth then perturb a host `addr` and assert the
-  resulting `id_hash` **diverges** from the reference — so the SHA is inside the compared surface,
-  not merely alongside it.
+- **Carrier of the successor: `den-hoag-gkkh`.** ADR-0025 item 2 rules that P1's enforcer is hola's
+  harness extracted and generalized into a gen library whose reference side is a **parameter**, not
+  a frozen input, and in which every assertion names the proposition it belongs to, so a deliberate
+  grammar change is expressible as a named divergence rather than a red. The retired oracle's gate
+  keys — `all-identical`, `both-evaluated`, `teeth-mutation-diverges`, `den-realism` — are the
+  coverage the successor inherits; `both-evaluated` and the mutation teeth are **required** contract
+  features, since their absence is the standard way a parity harness reads green while asserting
+  nothing. The retired implementation stays readable in git history at `ci/rehost-byte-parity.nix`;
+  no copy was made.
 
-- **Mutation teeth:** `teeth-mutation-diverges` changes one `addr` and requires the `id_hash` to
-  change. Without teeth, "identical" could hold vacuously (e.g. both stacks throwing the same
-  error); the teeth prove the oracle discriminates content.
+- **What still holds, so this is not read as a wider hole than it is:** `rehost-den-parity` (below)
+  covers gen-prelude / gen-types / gen-merge / gen-algebra / gen-schema at the same byte bar —
+  including the `id_hash` SHA and the mutation teeth — and is green. What is unasserted is the
+  **aspect-grammar** layer specifically: that was the retired oracle's unique contribution over
+  `rehost-den-parity`, and it is exactly the layer whose reference could not follow.
 
-- **Command:** `nix flake check ./ci` (builds the `rehost-byte-parity` check). Raw result for
-  eyeballing: `nix eval ./ci#lib.parity.byte --json | jq`.
-
-- **Failure looks like:** the check derivation prints
-  `PARITY REGRESSION — re-host is no longer byte-identical to the nixpkgs stack` on stderr and
-  exits 1; the JSON `results` block shows which key went `false`.
+- **Retired:** 2026-08-13, ruling record `den-hoag-oyib`, spec
+  `den-architecture/specs/2026-08-13-rehost-byte-parity-retirement-spec.md`.
 
 ### rehost-den-parity — the real-den acceptance gate
 
@@ -152,20 +156,26 @@ fails `nix flake check ./ci`.
 - **Failure looks like:** same `mkParityCheck` failure as above — the regression message on stderr,
   exit 1, and the `false` key visible in the JSON `results`.
 
-### Pinning policy — why the bar can't drift
+### Pinning policy — what a frozen bar can and cannot hold
 
-Both oracles are pure functions of flake inputs, wired in `ci/flake.nix`:
+The oracle is a pure function of flake inputs, wired in `ci/flake.nix`:
 
 - **Pure side** (the guarded thing) tracks the **published re-host mains** — `github:sini/gen-prelude`,
-  `gen-types`, `gen-merge`, `gen-algebra`, `gen-schema`, `gen-aspects`. A change that breaks
-  byte-parity fails the check.
-- **Reference side** is **frozen**: the original nixpkgs-signature gen-schema
-  (`gen-schema-orig`, pinned at `2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6`) and gen-aspects
-  (`gen-aspects-orig`, pinned at `87bf758169bc1d7f3336132f22e7fe38c5adf954`) — their last commits
-  before the re-host changed the signature — driven through a **pinned**
-  `github:nix-community/nixpkgs.lib` (at `db3f255737b94216eb71cce308e2912cf6bc2d7c`), never an
-  impure `getFlake "nixpkgs"`. Because the reference is a fixed golden output, the parity target is
-  immovable.
+  `gen-types`, `gen-merge`, `gen-algebra`, `gen-schema`. A change that breaks byte-parity fails the
+  check.
+- **Reference side** is **frozen**: the original nixpkgs-signature gen-schema (`gen-schema-orig`,
+  pinned at `2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6`) — its last commit before the re-host changed
+  the signature — driven through a **pinned** `github:nix-community/nixpkgs.lib` (at
+  `db3f255737b94216eb71cce308e2912cf6bc2d7c`), never an impure `getFlake "nixpkgs"`. Because the
+  reference is a fixed golden output, the parity target is immovable.
+
+**And that is exactly the policy's limit.** An immovable target is sound only where the guarded
+grammar is itself stable. The registry/schema surface above is; the **aspect** grammar is not, so the
+matching `gen-aspects-orig` input (which was pinned at `87bf758169bc1d7f3336132f22e7fe38c5adf954`) has
+been removed rather than rotated forward: rotating it makes the reference uncallable, and freezing it
+makes the gate red on every ruled grammar change. The rev remains an immutable revision on
+`github:sini/gen-aspects` and the successor may re-pin it as a *parameter*; what was removed is the
+unforced flake input, not the witness.
 
 ## 2. Per-library unit suites
 
@@ -315,11 +325,13 @@ asserted in prose.
   occurrences of the nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`,
   `lib.evalModules`, `evalModules`, `{ lib }`, `{ lib,`. The library's own API names
   (`mkOption`, `mkMerge`, …) are deliberately **not** forbidden — only the nixpkgs tether is.
+
   - **Claim → artifact → command → failure:** `lib/` is nixpkgs-lib-free →
     `ci/tests/purity.nix` (test `test-library-source-is-nixpkgs-free`, `expr = violations; expected = [ ]`) → `nix develop ./ci -c nix-unit --flake ./ci#tests.purity` → a stray token
     makes `violations` a non-empty list of `file: 'token'` entries and the test fails. gen-types
     additionally ships a teeth test (`test-detector-catches-injected-violation`) proving the
     scanner actually fires on an injected violation.
+
 - **The `pureModule` contract (gen-merge).** The warm-override path reads an author-supplied
   `pureModule` marker to decide a data module can be spliced without re-merging. That marker is a
   *contract*, and it has teeth: `classify.test-pure-module-is-marked-pure` /
@@ -327,9 +339,11 @@ asserted in prose.
   `classify.test-configof-strips-marker-key` proves the marker never leaks into the merged value, and
   `warm.test-adversarial-lying-marker-diverges-visibly` proves a *lying* marker is caught at the byte
   oracle rather than silently corrupting output — so the contract is verified, not trusted.
+
 - **Pure by construction (gen-prelude).** gen-prelude has **no flake inputs**, so nothing
   transitive — no nixpkgs — can enter its lock. There is nothing to scan for; the flake structure
   itself is the proof.
+
 - **The documented exception (gen-vars).** gen-vars is deliberately **nixpkgs-lib-tethered**: it
   builds on `lib.toposort` and the NixOS module system. Only its bottom `pure/` tier is `lib`-free
   by construction. It is not part of the pure plane and carries no purity scanner by design.
@@ -524,12 +538,11 @@ without re-measuring in the lab.
 From this hub's root:
 
 ```bash
-# the two byte-parity oracles (permanent regressions) + treefmt
+# the byte-parity oracle (permanent regression) + mkGenLibs wiring + treefmt
 nix flake check ./ci
 
 # raw oracle results for eyeballing
-nix eval ./ci#lib.parity.byte --json | jq
-nix eval ./ci#lib.parity.den  --json | jq
+nix eval ./ci#lib.parity.den --json | jq
 
 # performance gates (parity + ratio + linearity) + the 3-way drvPath-equivalence check
 nix run ./ci#perf-bench

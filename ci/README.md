@@ -6,21 +6,34 @@ gen-merge → re-hosted gen-schema/gen-aspects) against the frozen nixpkgs refer
 
 | Net | What it proves | Runs as |
 |---|---|---|
-| **Byte-parity oracles** | pure stack output == nixpkgs stack output, byte-for-byte (incl the `id_hash` SHA), over whole-stack fixtures + a real-den registry sample; mutation-teeth prove the oracle discriminates | `nix flake check ./ci` — `rehost-byte-parity`, `rehost-den-parity` |
+| **Byte-parity oracle** | pure stack output == nixpkgs stack output, byte-for-byte (incl the `id_hash` SHA), over a real-den registry sample; mutation-teeth prove the oracle discriminates | `nix flake check ./ci` — `rehost-den-parity` |
 | **Perf-regression bench** | pure stack stays FASTER and LIGHTER than the nixpkgs stack, and stays LINEAR in workload size | `nix run ./ci#perf-bench` |
 
 Both sides are pinned reproducibly: the PURE side tracks the published re-host mains (a change
-that breaks parity or performance fails CI); the REFERENCE side is frozen at the pre-re-host revs
+that breaks parity or performance fails CI); the REFERENCE side is frozen at the pre-re-host rev
 plus a pinned `nixpkgs.lib`, so the bar never drifts.
 
-## Validation — the parity oracles
+**Where a frozen reference is NOT sound, and what that costs.** Freezing the bar only works while
+the SUBJECT's grammar is stable. The registry/schema surface above is; the **aspect** grammar is
+not — it moves by design ruling, so a frozen aspect reference diverges from the subject
+monotonically and a gate built on one reds on ruled improvements rather than on defects. Two
+consequences are live here, and both are unassertions rather than fixes:
 
-`rehost-byte-parity.nix` — whole-stack fixtures (schema kinds + instances + id_hash; aspect trees
-with class content/includes/guards; schema-declared options threaded into aspect instances)
-evaluated through BOTH stacks via a shared provider `P`; the resolved projections are deep-compared.
+- The whole-stack aspect-grammar oracle `rehost-byte-parity` was **retired** (2026-08-13, ruling
+  record `den-hoag-oyib`). Its claim is recorded unasserted in [VALIDATION.md](../VALIDATION.md) §1
+  with an empty command cell; carrier `den-hoag-gkkh`.
+- The perf bench's two `aspects` matrix rows are **pure-only**. They keep their linearity gates and
+  absolute counters and are reported in their own table, but assert **no** pure/ref digest parity
+  and **no** pure/ref CPU (0.85) or counter (0.90) win-gate. Whether that workload gets a ref-free
+  performance gate, and of what shape, is an open question carried by `den-hoag-gkkh`; a re-frozen
+  baseline is explicitly not the answer, since it reproduces the same defect at smaller scale.
+
+## Validation — the parity oracle
+
 `rehost-den-parity.nix` — den's actual registry config shape (collections, computed isEntity,
-parent topology) through both gen-schema generations. Gate keys are listed in `flake.nix`; any
-`false` fails the check derivation.
+parent topology, instances with `id_hash`, den's two-level nested option shape) evaluated through
+BOTH gen-schema generations via a shared provider `P`; the resolved projections are deep-compared.
+Gate keys are listed in `flake.nix`; any `false` fails the check derivation.
 
 ## Performance — the perf bench
 

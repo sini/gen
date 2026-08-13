@@ -1,10 +1,16 @@
-# Perf-regression workload corpus — the PERFORMANCE twin of the byte-parity oracles.
+# Perf-regression workload corpus — the PERFORMANCE twin of the byte-parity oracle.
 #
-# Same provider-P trick as rehost-byte-parity.nix, scaled: one workload source, two stacks —
+# Same provider-P trick as rehost-den-parity.nix, scaled: one workload source, two stacks —
 # PURE (gen-prelude → gen-types → gen-merge.evalModuleTree → re-hosted gen-schema/gen-aspects,
-# published mains) vs REFERENCE (frozen original gen-schema/gen-aspects on pinned nixpkgs.lib
-# evalModules). Each cell returns a sha256 digest of the JSON projection plus its length, so the
-# perf matrix doubles as a byte-parity check at benchmark scale (~200× the oracle fixtures).
+# published mains) vs REFERENCE (frozen original gen-schema on pinned nixpkgs.lib evalModules).
+# Each cell returns a sha256 digest of the JSON projection plus its length, so the perf matrix
+# doubles as a byte-parity check at benchmark scale (~200× the oracle fixtures).
+#
+# The `aspects` workload is PURE-ONLY and the exclusion is structural, not incidental: `refP` has no
+# `aspects` member, so running it on the reference stack throws rather than silently comparing. The
+# aspect grammar moves by design ruling, so no frozen reference can track it — a pure/ref digest gate
+# over that surface asserts "the grammar has not been improved", which is not a performance property.
+# Its pure cells, absolute counters and linearity gates are unaffected; see ci/README.md.
 #
 # This file only DEFINES workloads; timing/counters/gates live in the `perf-bench` app
 # (ci/flake.nix), which drives it through `nix-instantiate --eval` + NIX_SHOW_STATS per cell.
@@ -16,8 +22,8 @@
 # (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-aspects-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (classShare only: "pure-full" | "pure-fixed"; overrideWarm only: "cold" | "warm")
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm")
   workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm"
   n,
 }:
@@ -51,10 +57,6 @@ let
     inherit lib;
     algebra = genAlgebra;
   };
-  genAspectsOld = import "${srcs.gen-aspects-orig}/lib" {
-    inherit lib;
-    schema = genSchemaOld;
-  };
 
   pureP = {
     inherit (genMerge)
@@ -69,6 +71,8 @@ let
     schema = genSchemaNew;
     aspects = genAspectsNew;
   };
+  # No `aspects` member: the aspect grammar has no frozen reference to compare against (header note),
+  # so `aspects` is a pure-only workload and the reference stack cannot evaluate it by construction.
   refP = {
     inherit (lib)
       mkOption
@@ -80,7 +84,6 @@ let
       ;
     eval = lib.evalModules;
     schema = genSchemaOld;
-    aspects = genAspectsOld;
   };
 
   P = if stack == "pure" then pureP else refP;
@@ -242,6 +245,8 @@ let
     }) eval.config.hosts;
 
   # aspects — n aspects with class content, every 4th with a nested child; flatten.
+  # PURE-ONLY (header note): `refP` carries no `aspects`, so this workload runs on the pure stack
+  # alone — its linearity gates and absolute counters, never a pure/ref digest or ratio.
   aspects =
     P:
     let

@@ -18,7 +18,7 @@
 # kind) driven through the RE-HOSTED (pure) gen-schema vs the ORIGINAL nixpkgs gen-schema, asserted
 # byte-identical. This is den's real registry shape, not synthetic. Read-only; den unmodified.
 #
-# ── REPRODUCIBLE PINNING (permanent gen-ci regression) — see ci/flake.nix + rehost-byte-parity.nix ──
+# ── REPRODUCIBLE PINNING (permanent gen-ci regression) — see ci/flake.nix ──
 # PURE side (guarded) = published re-host main gen-schema (`{ prelude, merge, algebra }`); REFERENCE
 # side (frozen golden) = ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`, pre-re-host pin)
 # driven through a PINNED `github:nix-community/nixpkgs.lib` (NOT impure `getFlake "nixpkgs"`).

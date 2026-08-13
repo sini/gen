@@ -16,15 +16,23 @@ The ecosystem stands on three proof axes, each with public, CI-enforced artifact
 [VALIDATION.md](VALIDATION.md) is the full inventory: every claim paired with the command that
 re-runs it and the way it fails.
 
-The two load-bearing proofs are the **byte-parity oracles** (`nix flake check ./ci`). They hold the
-pure stack — gen-prelude → gen-types → gen-merge → the re-hosted gen-schema / gen-aspects — byte-identical
-to the frozen nixpkgs stack it replaced, down to the `id_hash` SHA. `rehost-byte-parity` compares
-resolved projections over den-shaped fixtures; `rehost-den-parity` runs den's actual registry shape
-through both stacks. Both carry **mutation teeth**: a perturbed host `addr` must change the `id_hash`,
-so "identical" cannot hold vacuously through a shared throw — without teeth, two stacks failing the
-same way would read as agreement. The reference side is pinned at the last pre-re-host revisions and
-driven through a pinned `github:nix-community/nixpkgs.lib`, so the bar cannot drift. Design detail:
+The load-bearing proof is the **byte-parity oracle** `rehost-den-parity` (`nix flake check ./ci`). It
+holds the pure stack — gen-prelude → gen-types → gen-merge → the re-hosted gen-schema — byte-identical
+to the frozen nixpkgs stack it replaced, down to the `id_hash` SHA, by running den's actual registry
+shape through both stacks. It carries **mutation teeth**: a perturbed host `addr` must change the
+`id_hash`, so "identical" cannot hold vacuously through a shared throw — without teeth, two stacks
+failing the same way would read as agreement. The reference side is pinned at the last pre-re-host
+revision and driven through a pinned `github:nix-community/nixpkgs.lib`. Design detail:
 [`ci/README.md`](ci/README.md).
+
+A frozen reference keeps the **bar** from drifting, but it cannot follow a **subject** that moves by
+design ruling — and the aspect grammar does. So the sibling oracle over that grammar
+(`rehost-byte-parity`, retired 2026-08-13) is **not** replaced by a re-pinned equivalent, and one
+claim is presently unasserted: *whole-stack agreement with nixpkgs across the aspect grammar* — the
+compatibility property anyone migrating from nixpkgs modules relies on. It is recorded, with an empty
+command cell, in [VALIDATION.md](VALIDATION.md) §1; its named carrier is `den-hoag-gkkh`, under
+ADR-0025 item 2, whose contract makes the reference a parameter rather than a frozen input so a ruled
+grammar change registers as a named divergence instead of a red.
 
 Underneath sit the per-library nix-unit suites — the [gen-merge](https://github.com/sini/gen-merge)
 byte-mode engine's 206 tests (at `9f20fb1`) and the [gen-flake](https://github.com/sini/gen-flake)

@@ -262,11 +262,11 @@
     },
     "gen-algebra_13": {
       "locked": {
-        "lastModified": 1782521734,
-        "narHash": "sha256-BU6HndNta7WDB51AKjBFYNOxFhp5rJPOumjMkQVKzSM=",
+        "lastModified": 1784603743,
+        "narHash": "sha256-jpKI8XgBTA9dJ/4nb3SBHfElR48i/RWTo9iQ9SBYiLw=",
         "owner": "sini",
         "repo": "gen-algebra",
-        "rev": "aaffd3f073715bd4ac47d3f78123a9882a328bfa",
+        "rev": "378a5651128025c0e8ee97cb2cd6ccd04777cb78",
         "type": "github"
       },
       "original": {
@@ -277,11 +277,11 @@
     },
     "gen-algebra_14": {
       "locked": {
-        "lastModified": 1784603743,
-        "narHash": "sha256-jpKI8XgBTA9dJ/4nb3SBHfElR48i/RWTo9iQ9SBYiLw=",
+        "lastModified": 1782521734,
+        "narHash": "sha256-BU6HndNta7WDB51AKjBFYNOxFhp5rJPOumjMkQVKzSM=",
         "owner": "sini",
         "repo": "gen-algebra",
-        "rev": "378a5651128025c0e8ee97cb2cd6ccd04777cb78",
+        "rev": "aaffd3f073715bd4ac47d3f78123a9882a328bfa",
         "type": "github"
       },
       "original": {
@@ -306,21 +306,6 @@
       }
     },
     "gen-algebra_16": {
-      "locked": {
-        "lastModified": 1782521734,
-        "narHash": "sha256-BU6HndNta7WDB51AKjBFYNOxFhp5rJPOumjMkQVKzSM=",
-        "owner": "sini",
-        "repo": "gen-algebra",
-        "rev": "aaffd3f073715bd4ac47d3f78123a9882a328bfa",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen-algebra",
-        "type": "github"
-      }
-    },
-    "gen-algebra_17": {
       "locked": {
         "lastModified": 1779816786,
         "narHash": "sha256-FzyAReCRt009sv2+Rl3LmtN7av1UZgQQR2n2BiefgJ4=",
@@ -472,26 +457,6 @@
       "original": {
         "owner": "sini",
         "repo": "gen-aspects",
-        "type": "github"
-      }
-    },
-    "gen-aspects-orig": {
-      "inputs": {
-        "gen-schema": "gen-schema_7",
-        "nixpkgs": "nixpkgs_3"
-      },
-      "locked": {
-        "lastModified": 1783023365,
-        "narHash": "sha256-uXHcg8AffAj1dsJ4/vrwH7gcrjsM2AyCxogdC7NHBPg=",
-        "owner": "sini",
-        "repo": "gen-aspects",
-        "rev": "87bf758169bc1d7f3336132f22e7fe38c5adf954",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen-aspects",
-        "rev": "87bf758169bc1d7f3336132f22e7fe38c5adf954",
         "type": "github"
       }
     },
@@ -663,7 +628,7 @@
     },
     "gen-bind_6": {
       "inputs": {
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1780184475,
@@ -1074,7 +1039,7 @@
     },
     "gen-graph_9": {
       "inputs": {
-        "nixpkgs": "nixpkgs_5"
+        "nixpkgs": "nixpkgs_3"
       },
       "locked": {
         "lastModified": 1782280237,
@@ -2755,7 +2720,7 @@
     },
     "gen-resolve_3": {
       "inputs": {
-        "gen-algebra": "gen-algebra_14",
+        "gen-algebra": "gen-algebra_13",
         "gen-bind": "gen-bind_7",
         "gen-graph": "gen-graph_10",
         "gen-memo": "gen-memo",
@@ -2799,8 +2764,8 @@
     },
     "gen-schema-orig": {
       "inputs": {
-        "gen-algebra": "gen-algebra_16",
-        "nixpkgs": "nixpkgs_6"
+        "gen-algebra": "gen-algebra_15",
+        "nixpkgs": "nixpkgs_4"
       },
       "locked": {
         "lastModified": 1783016626,
@@ -2936,26 +2901,7 @@
     },
     "gen-schema_7": {
       "inputs": {
-        "gen-algebra": "gen-algebra_13",
-        "nixpkgs": "nixpkgs_2"
-      },
-      "locked": {
-        "lastModified": 1782524366,
-        "narHash": "sha256-5ioahPWuYBLKb4MQtixVqIrzdKy9fMYkUXKCHFwTj8Q=",
-        "owner": "sini",
-        "repo": "gen-schema",
-        "rev": "e789c334fed02bd39d79a6ba31d8bebcbf3ee31f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen-schema",
-        "type": "github"
-      }
-    },
-    "gen-schema_8": {
-      "inputs": {
-        "gen-algebra": "gen-algebra_15",
+        "gen-algebra": "gen-algebra_14",
         "gen-merge": "gen-merge_12",
         "gen-prelude": "gen-prelude_80",
         "gen-types": "gen-types_19"
@@ -3174,8 +3120,8 @@
     },
     "gen-select_3": {
       "inputs": {
-        "gen-algebra": "gen-algebra_17",
-        "nixpkgs": "nixpkgs_7"
+        "gen-algebra": "gen-algebra_16",
+        "nixpkgs": "nixpkgs_5"
       },
       "locked": {
         "lastModified": 1780184477,
@@ -3766,38 +3712,6 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1778869304,
-        "narHash": "sha256-30sZNZoA1cqF5JNO9fVX+wgiQYjB7HJqqJ4ztCDeBZE=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_3": {
-      "locked": {
-        "lastModified": 1782467914,
-        "narHash": "sha256-pGvFkM8N0xEkIIXDe5YYfbEAvHrk4IxBrjB/x8OomhE=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "e73de5be04e0eff4190a1432b946d469c794e7b4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_4": {
-      "locked": {
         "lastModified": 1779560665,
         "narHash": "sha256-tpyBcxPpcQb8ukyNF7DoCwfSY3VPsxHoYwj00Cayv5o=",
         "owner": "NixOS",
@@ -3812,7 +3726,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1781577229,
         "narHash": "sha256-lrp67w8AulE9Ks53n27I45ADSzbOCn4H+CNW1Ck8B+8=",
@@ -3828,7 +3742,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_6": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1778869304,
         "narHash": "sha256-30sZNZoA1cqF5JNO9fVX+wgiQYjB7HJqqJ4ztCDeBZE=",
@@ -3844,7 +3758,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_7": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1779560665,
         "narHash": "sha256-tpyBcxPpcQb8ukyNF7DoCwfSY3VPsxHoYwj00Cayv5o=",
@@ -3860,7 +3774,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_8": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1781577229,
         "narHash": "sha256-rcUHdUtJEvMdNEl2Wq+YpHraHKfcer3KsBscpZEF2Yg=",
@@ -3881,7 +3795,6 @@
         "gen": "gen",
         "gen-algebra": "gen-algebra_11",
         "gen-aspects": "gen-aspects_4",
-        "gen-aspects-orig": "gen-aspects-orig",
         "gen-bind": "gen-bind_6",
         "gen-class": "gen-class_2",
         "gen-dispatch": "gen-dispatch_2",
@@ -3889,13 +3802,13 @@
         "gen-merge": "gen-merge_11",
         "gen-prelude": "gen-prelude_70",
         "gen-resolve": "gen-resolve_3",
-        "gen-schema": "gen-schema_8",
+        "gen-schema": "gen-schema_7",
         "gen-schema-orig": "gen-schema-orig",
         "gen-scope": "gen-scope_9",
         "gen-select": "gen-select_3",
         "gen-types": "gen-types_20",
         "git-hooks-nix": "git-hooks-nix_2",
-        "nixpkgs": "nixpkgs_8",
+        "nixpkgs": "nixpkgs_6",
         "nixpkgs-lib": "nixpkgs-lib_4",
         "treefmt-nix": "treefmt-nix_3"
       }

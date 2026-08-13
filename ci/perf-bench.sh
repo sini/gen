@@ -38,6 +38,10 @@ trap 'rm -rf "$tmp"' EXIT
 
 # "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
 # (only alloc default-gated; thunks band ≤ WIDEFREEFORM_RATIO_MAX, cpu band ≤ WIDEFREEFORM_CPU_MAX), small/big = linearity pair (big = 4×small)
+# noref = PURE-ONLY row: no reference cell is measured, so it carries no parity/ratio verdict and is
+# reported apart from the pure/ref table. A pure/ref gate is only meaningful where a frozen reference
+# can track its subject; the aspect grammar moves by design ruling, so no frozen aspect stack can (see
+# perf-bench.nix header). Linearity and the absolute pure counters are unaffected — they never read ref.
 MATRIX=(
   "startup 1 none"
   "scalar 2000 small"
@@ -47,8 +51,8 @@ MATRIX=(
   "lazyRegistry 2000 r"
   "schemaHosts 400 small"
   "schemaHosts 1600 r,big"
-  "aspects 400 small"
-  "aspects 1600 r,big"
+  "aspects 400 small,noref"
+  "aspects 1600 big,noref"
   "wideFreeform 2000 small"
   "wideFreeform 8000 rb,big"
   "deepSubmodule 400 small"
@@ -132,18 +136,25 @@ run_cell() {
 
 ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
 lte() { awk "BEGIN{exit !(($1) <= ($2))}"; }
+has_tag() { [[ ",$1," == *",$2,"* ]]; }
 
 # ── measure ──────────────────────────────────────────────────────────────────
-echo "collecting: ${#MATRIX[@]} cells × 2 stacks × $REPS reps ..." >&2
+echo "collecting: ${#MATRIX[@]} cells (pure) + the ref arm of every non-noref row × $REPS reps ..." >&2
 for row in "${MATRIX[@]}"; do
-  read -r w n _tags <<<"$row"
+  read -r w n tags <<<"$row"
   run_cell "$w" "$n" pure
-  run_cell "$w" "$n" ref
+  if ! has_tag "$tags" noref; then
+    run_cell "$w" "$n" ref
+  fi
 done
 
 # ── compute ratios + gate outcomes (no printing; emit_report reads these) ──────
 for row in "${MATRIX[@]}"; do
   read -r w n tags <<<"$row"
+  # noref rows have no reference cell: no ratio is computable and no parity verdict is asserted.
+  if has_tag "$tags" noref; then
+    continue
+  fi
   CR["$w,$n"]=$(ratio "${CPU[$w,$n,pure]}" "${CPU[$w,$n,ref]}")
   TR["$w,$n"]=$(ratio "${THUNKS[$w,$n,pure]}" "${THUNKS[$w,$n,ref]}")
   AR["$w,$n"]=$(ratio "${ALLOC[$w,$n,pure]}" "${ALLOC[$w,$n,ref]}")
@@ -153,11 +164,11 @@ for row in "${MATRIX[@]}"; do
     PAR["$w,$n"]="MISMATCH"
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
-  if [[ ",$tags," == *",r,"* ]]; then
+  if has_tag "$tags" r; then
     lte "${CR[$w,$n]}" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu ${CR[$w,$n]} > $CPU_RATIO_MAX")
     lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
-  elif [[ ",$tags," == *",rb,"* ]]; then
+  elif has_tag "$tags" rb; then
     # wideFreeform: only ALLOC keeps the DEFAULT win-gate; THUNKS and CPU each ride their own parity band.
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
@@ -170,8 +181,8 @@ for w in scalar registry schemaHosts aspects wideFreeform deepSubmodule; do
   big_n=""
   for row in "${MATRIX[@]}"; do
     read -r rw rn tags <<<"$row"
-    [[ "$rw" == "$w" && ",$tags," == *",small,"* ]] && small_n=$rn
-    [[ "$rw" == "$w" && ",$tags," == *",big,"* ]] && big_n=$rn
+    [[ "$rw" == "$w" ]] && has_tag "$tags" small && small_n=$rn
+    [[ "$rw" == "$w" ]] && has_tag "$tags" big && big_n=$rn
   done
   LIN_SMALL["$w"]=$small_n
   LIN_BIG["$w"]=$big_n
@@ -254,13 +265,29 @@ emit_report() {
   echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
   echo "|---|---:|---:|---:|---:|---:|---:|---|"
   for row in "${MATRIX[@]}"; do
-    read -r w n _tags <<<"$row"
+    read -r w n tags <<<"$row"
+    has_tag "$tags" noref && continue
     printf '| %s | %s | %.3f | %.3f | %s | %s | %s | %s |\n' \
       "$w" "$n" "${CPU[$w,$n,ref]}" "${CPU[$w,$n,pure]}" \
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
   printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs) and cpu rides a band (gate ≤ %s — tiny load-sensitive cell); only alloc keeps the default win-gate. See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$WIDEFREEFORM_CPU_MAX"
+  echo
+  echo "### pure-only workloads (no reference arm; report-only counters, gated on linearity below)"
+  echo
+  echo "| workload | n | pure cpu (s) | pure thunks | pure alloc |"
+  echo "|---|---:|---:|---:|---:|"
+  for row in "${MATRIX[@]}"; do
+    read -r w n tags <<<"$row"
+    has_tag "$tags" noref || continue
+    printf '| %s | %s | %.3f | %s | %s |\n' \
+      "$w" "$n" "${CPU[$w,$n,pure]}" "${THUNKS[$w,$n,pure]}" "${ALLOC[$w,$n,pure]}"
+  done
+  echo
+  echo "> These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot"
+  echo "> track a grammar that moves by design ruling, so such a gate would red on ruled improvements"
+  echo "> rather than on regressions. Their linearity gates and absolute counters are unaffected."
   echo
   echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
   echo

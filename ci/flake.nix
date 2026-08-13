@@ -24,16 +24,20 @@
     gen.url = "path:..";
     gen.inputs.nixpkgs.follows = "nixpkgs";
 
-    # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host byte-parity oracles ──
-    # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`) + gen-aspects (`{ lib, schema }`),
-    # pinned to their pre-re-host revs (the last commit before the pure re-host changed the signature).
-    # These are PERMANENT golden-reference pins (same class as the nixpkgs-lib / flake-parts pins below),
-    # NEVER release-set pins — do NOT sweep them forward to main. main carries the pure re-host signature
-    # (`{ prelude, merge, algebra }`) the oracle's reference side cannot call: rotating them to main makes
-    # rehost-byte-parity throw (`called without required argument 'merge'`) and dissolves the frozen
-    # witness the parity check exists to compare re-host(main) against.
+    # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host parity oracle ──
+    # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`), pinned to its pre-re-host rev (the
+    # last commit before the pure re-host changed the signature). A PERMANENT golden-reference pin
+    # (same class as the nixpkgs-lib / flake-parts pins below), NEVER a release-set pin — do NOT sweep
+    # it forward to main. main carries the pure re-host signature (`{ prelude, merge, algebra }`) the
+    # oracle's reference side cannot call: rotating it to main makes rehost-den-parity throw (`called
+    # without required argument 'merge'`) and dissolves the frozen witness the check exists to compare
+    # re-host(main) against.
+    #
+    # A frozen reference is only sound where the SUBJECT's grammar is stable. The registry/schema
+    # surface this pin guards is; the aspect grammar is not — it moves by design ruling, so no frozen
+    # aspect reference can track it and a parity gate built on one reds on every ruled improvement
+    # rather than on a defect. That is why only the schema half of the golden pair survives here.
     gen-schema-orig.url = "github:sini/gen-schema/2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6";
-    gen-aspects-orig.url = "github:sini/gen-aspects/87bf758169bc1d7f3336132f22e7fe38c5adf954";
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
     # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
     nixpkgs-lib.url = "github:nix-community/nixpkgs.lib/db3f255737b94216eb71cce308e2912cf6bc2d7c";
@@ -60,23 +64,10 @@
     let
       inherit (nixpkgs) lib;
 
-      # ── re-host byte-parity oracles (permanent regression) ──
+      # ── re-host byte-parity oracle (permanent regression) ──
       # PURE side tracks the published re-host mains; REFERENCE side is the frozen original
-      # nixpkgs-signature libs driven through the pinned nixpkgs.lib. A future gen-merge / re-host
-      # change that breaks byte-parity (incl the id_hash SHA) makes these checks fail.
-      byteParity = import ./rehost-byte-parity.nix {
-        inherit (inputs)
-          gen-prelude
-          gen-types
-          gen-merge
-          gen-algebra
-          gen-schema
-          gen-aspects
-          gen-schema-orig
-          gen-aspects-orig
-          ;
-        lib = inputs.nixpkgs-lib.lib;
-      };
+      # nixpkgs-signature gen-schema driven through the pinned nixpkgs.lib. A future gen-merge /
+      # re-host change that breaks byte-parity (incl the id_hash SHA) makes this check fail.
       denParity = import ./rehost-den-parity.nix {
         inherit (inputs)
           gen-prelude
@@ -90,12 +81,6 @@
       };
 
       # Keys that MUST be `true` for parity to hold (the regression gate).
-      byteParityKeys = [
-        "all-identical"
-        "both-evaluated"
-        "teeth-mutation-diverges"
-        "den-realism"
-      ];
       denParityKeys = [
         "parity-schema"
         "parity-instances"
@@ -124,11 +109,9 @@
       ];
 
       # Raw oracle results (system-independent, pure eval) for eyeballing:
-      #   nix eval ./ci#lib.parity.byte     --json | jq
       #   nix eval ./ci#lib.parity.den      --json | jq
       #   nix eval ./ci#lib.mkGenLibsEval   --json | jq   (keyCount / missing / extra / strata / per-key gate)
       flake.lib.parity = {
-        byte = byteParity;
         den = denParity;
       };
       flake.lib.mkGenLibsEval = mkGenLibsEval;
@@ -228,7 +211,6 @@
               "gen-schema" = "${inputs.gen-schema}";
               "gen-aspects" = "${inputs.gen-aspects}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
-              "gen-aspects-orig" = "${inputs.gen-aspects-orig}";
               "gen-class" = "${inputs.gen-class}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
@@ -306,7 +288,6 @@
           };
 
           checks = {
-            rehost-byte-parity = mkParityCheck "rehost-byte-parity" byteParity byteParityKeys;
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
             # The hub carries the tree-root oracle it ships to consumers (flakeModule.nix).

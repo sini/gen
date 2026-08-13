@@ -158,16 +158,19 @@ hub's `gen.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a
 gate the moment it lands, with no registration step. `nix flake check ./ci` from any repo root runs the
 suite, and every roster library carries a GitHub Actions workflow that runs it on push and pull request.
 
-**The pure module system is byte-identical to the nixpkgs one it replaced.** Two parity oracles in this
-hub's `ci/` — `rehost-byte-parity` over den-shaped fixtures and `rehost-den-parity` over den's actual
-registry shape — compare resolved projections down to the `id_hash` SHA, and carry mutation teeth.
-`nix flake check ./ci`, wired as the `checks` job. The reference side is pinned at frozen pre-re-host
-revisions, so the bar cannot drift.
+**The pure module system is byte-identical to the nixpkgs one it replaced.** The parity oracle in this
+hub's `ci/` — `rehost-den-parity` over den's actual registry shape — compares resolved projections
+down to the `id_hash` SHA, and carries mutation teeth. `nix flake check ./ci`, wired as the `checks`
+job. The reference side is pinned at a frozen pre-re-host revision, so the bar cannot drift. The
+sibling oracle over the **aspect** grammar was retired, because a frozen reference cannot follow a
+grammar that moves by design ruling; that claim is recorded unasserted in
+[VALIDATION.md](VALIDATION.md) §1 rather than dropped.
 
 **Performance claims are parity-gated.** `nix run ./ci#perf-bench` measures every cell and gates on
 parity, ratio and linearity together: a parity mismatch fails the run whatever the timings say, so a
-fast-but-wrong change cannot pass. Wired as its own CI job, alongside `fleet-consistency`, which
-re-derives every cited fleet number from committed baselines.
+fast-but-wrong change cannot pass — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only
+for the reason above and keep linearity and absolute counters only. Wired as its own CI job, alongside
+`fleet-consistency`, which re-derives every cited fleet number from committed baselines.
 
 **Every library states what it does not own.** All twenty-three repositories (the hub included) carry
 an `AGENTS.md` capability sheet whose "Not this library's job" table names the owning sibling for each
