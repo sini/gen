@@ -28,11 +28,15 @@ revision and driven through a pinned `github:nix-community/nixpkgs.lib`. Design 
 A frozen reference keeps the **bar** from drifting, but it cannot follow a **subject** that moves by
 design ruling — and the aspect grammar does. So the sibling oracle over that grammar
 (`rehost-byte-parity`, retired 2026-08-13) is **not** replaced by a re-pinned equivalent, and one
-claim is presently unasserted: *whole-stack agreement with nixpkgs across the aspect grammar* — the
-compatibility property anyone migrating from nixpkgs modules relies on. It is recorded, with an empty
-command cell, in [VALIDATION.md](VALIDATION.md) §1; its named carrier is `den-hoag-gkkh`, under
-ADR-0025 item 2, whose contract makes the reference a parameter rather than a frozen input so a ruled
-grammar change registers as a named divergence instead of a red.
+promise is presently **enforced by no gate**: **module system compatibility** — *whole-stack agreement
+with nixpkgs across the aspect grammar*, the property anyone migrating from nixpkgs modules relies on.
+★ **The promise stands; what lapsed is its continuous enforcement.** Owner ruling, 2026-08-13: the
+promises the oracle held stand and *"don't need to hold at every gate"*, and the oracle is rebuilt
+during the final rounds *"so we can make the same guarantees"* — the same ones, re-established rather
+than renegotiated. It is recorded, with an empty command cell, in [VALIDATION.md](VALIDATION.md) §1;
+its named carrier is `den-hoag-gkkh`, under ADR-0025 item 2, whose contract makes the reference a
+parameter rather than a frozen input so a ruled grammar change registers as a named divergence instead
+of a red.
 
 Underneath sit the per-library nix-unit suites — the [gen-merge](https://github.com/sini/gen-merge)
 byte-mode engine's 206 tests (at `9f20fb1`) and the [gen-flake](https://github.com/sini/gen-flake)

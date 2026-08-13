@@ -50,7 +50,7 @@ Every proof, its one command, and how it fails. The rest of this document expand
 
 | Proof | Command | Fails if |
 |---|---|---|
-| Whole-stack byte-parity (`rehost-byte-parity`) | — | NOT CURRENTLY ASSERTED — carrier den-hoag-gkkh |
+| **Module system compatibility** (was `rehost-byte-parity`) | — | GATE SUSPENDED, PROMISE STANDS — rebuilt at the final rounds; carrier den-hoag-gkkh |
 | Real-den byte-parity (`rehost-den-parity`) | `nix flake check ./ci` | den's real registry shape diverges across stacks |
 | gen-merge engine suite (167) | `nix flake check ./ci` (in the gen-merge repo) | any merge / lint / classify / warm / provenance test regresses |
 | gen-flake terminal suite (89) | `nix flake check ./ci` (in the gen-flake repo) | compose / override / diff / realize / terminal regresses |
@@ -81,11 +81,29 @@ The perf bench (§5) applies the same distinction: 12 of its 14 matrix rows keep
 and win-gate; the 2 `aspects` rows are **pure-only** and keep their linearity gates and absolute
 counters, but assert no pure/ref digest parity and no pure/ref CPU or counter win-gate.
 
-### rehost-byte-parity — RETIRED, and the claim it held is NOT CURRENTLY ASSERTED
+### rehost-byte-parity — RETIRED as a GATE; the promise it held STANDS and is rebuilt at the final rounds
 
-- **The claim, unchanged:** *gen's module system agrees with nixpkgs' on the shared grammar.* This
-  is a compatibility claim about an external interface — what anyone **migrating from nixpkgs
-  modules** relies on — not a claim about gen's internals. **No command re-runs it today.**
+- ★★ **The governing ruling, owner, 2026-08-13, verbatim:**
+
+  > *"I want to proceed with development towards correctness rather than burden ourselves with a
+  > legacy trust oracle. The promises by the oracle stand; but they don't need to hold at every gate.
+  > We can rebuild the oracle during the final rounds so we can make the same guarantees."*
+
+  and, naming what the promises are:
+
+  > *"they are on module system compatibility"*
+
+  ⇒ **What is suspended is CONTINUOUS GATE ENFORCEMENT, not the commitment.** This row is not a
+  withdrawn claim and must not be read as one: the promise is still owed, and the same guarantees are
+  to be re-established — not renegotiated — when the oracle is rebuilt at the final rounds. A reader
+  who finds this section and concludes gen no longer claims the property has read it backwards.
+
+- **The promise, named: MODULE SYSTEM COMPATIBILITY.** Concretely — *gen's module system agrees with
+  nixpkgs' on the shared grammar*, which is what anyone **migrating from nixpkgs modules** relies on.
+  ★ It is a claim about an **external interface**, not about gen's internals, and that is why it
+  needs an oracle with a reference at all: internal correctness is provable against gen's own suites,
+  compatibility is not. **No command re-runs it today** — a statement about the instrument, never
+  about the promise.
 
 - **Command:** none — the Command cell in the inventory table above is empty, and that empty cell is
   the record. This document is an inventory of claims paired with the commands that re-run them, so a
