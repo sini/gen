@@ -216,51 +216,60 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 |---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.011 | 0.007 | 0.664 | 0.271 | 0.340 | ok |
-| scalar | 2000 | 0.031 | 0.019 | 0.626 | 0.878 | 0.706 | ok |
-| scalar | 8000 | 0.090 | 0.059 | 0.653 | 0.882 | 0.708 | ok |
-| registry | 500 | 0.046 | 0.027 | 0.585 | 0.523 | 0.423 | ok |
-| registry | 2000 | 0.163 | 0.081 | 0.498 | 0.524 | 0.423 | ok |
-| lazyRegistry | 2000 | 0.168 | 0.082 | 0.486 | 0.524 | 0.423 | ok |
-| schemaHosts | 400 | 0.065 | 0.041 | 0.639 | 0.648 | 0.544 | ok |
-| schemaHosts | 1600 | 0.232 | 0.134 | 0.578 | 0.650 | 0.545 | ok |
-| aspects | 400 | 0.091 | 0.039 | 0.428 | 0.386 | 0.311 | ok |
-| aspects | 1600 | 0.356 | 0.135 | 0.379 | 0.386 | 0.310 | ok |
-| wideFreeform | 2000 | 0.027 | 0.022 | 0.822 | 1.092 | 0.818 | ok |
-| wideFreeform | 8000 | 0.089 | 0.070 | 0.785 | 1.099 | 0.821 | ok |
-| deepSubmodule | 400 | 0.202 | 0.065 | 0.320 | 0.314 | 0.255 | ok |
-| deepSubmodule | 1600 | 1.397 | 0.229 | 0.164 | 0.314 | 0.255 | ok |
+| startup | 1 | 0.025 | 0.023 | 0.908 | 0.301 | 0.362 | ok |
+| scalar | 2000 | 0.076 | 0.058 | 0.759 | 0.822 | 0.660 | ok |
+| scalar | 8000 | 0.225 | 0.150 | 0.663 | 0.825 | 0.661 | ok |
+| registry | 500 | 0.139 | 0.070 | 0.505 | 0.538 | 0.435 | ok |
+| registry | 2000 | 0.202 | 0.097 | 0.481 | 0.538 | 0.435 | ok |
+| lazyRegistry | 2000 | 0.206 | 0.098 | 0.478 | 0.539 | 0.436 | ok |
+| schemaHosts | 400 | 0.075 | 0.056 | 0.749 | 0.702 | 0.595 | ok |
+| schemaHosts | 1600 | 0.544 | 0.182 | 0.335 | 0.703 | 0.595 | ok |
+| wideFreeform | 2000 | 0.075 | 0.061 | 0.816 | 1.041 | 0.779 | ok |
+| wideFreeform | 8000 | 0.091 | 0.084 | 0.914 | 1.047 | 0.782 | ok |
+| deepSubmodule | 400 | 0.249 | 0.082 | 0.331 | 0.338 | 0.276 | ok |
+| deepSubmodule | 1600 | 4.259 | 0.282 | 0.066 | 0.338 | 0.275 | ok |
 
 > wideFreeform thunks ride a parity band (gate ≤ 1.3, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs) and cpu rides a band (gate ≤ 0.95 — tiny load-sensitive cell); only alloc keeps the default win-gate. See ci/README.md.
+
+### pure-only workloads (no reference arm; report-only counters, gated on linearity below)
+
+| workload | n | pure cpu (s) | pure thunks | pure alloc |
+|---|---:|---:|---:|---:|
+| aspects | 400 | 0.141 | 630812 | 30492400 |
+| aspects | 1600 | 0.497 | 2519312 | 121674656 |
+
+> These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
+> track a grammar that moves by design ruling, so such a gate would red on ruled improvements
+> rather than on regressions. Their linearity gates and absolute counters are unaffected.
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 
 | workload | sizes | thunk growth | alloc growth |
 |---|---|---:|---:|
-| scalar | 2000 → 8000 | 3.991 | 3.988 |
-| registry | 500 → 2000 | 3.993 | 3.987 |
-| schemaHosts | 400 → 1600 | 3.991 | 3.989 |
-| aspects | 400 → 1600 | 3.993 | 3.990 |
-| wideFreeform | 2000 → 8000 | 3.988 | 3.985 |
-| deepSubmodule | 400 → 1600 | 3.998 | 3.996 |
+| scalar | 2000 → 8000 | 3.989 | 3.984 |
+| registry | 500 → 2000 | 3.992 | 3.986 |
+| schemaHosts | 400 → 1600 | 3.991 | 3.987 |
+| aspects | 400 → 1600 | 3.994 | 3.990 |
+| wideFreeform | 2000 → 8000 | 3.986 | 3.983 |
+| deepSubmodule | 400 → 1600 | 3.997 | 3.995 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
 
 | n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1345768 | 230621 | 0.171 | 0.187 | 0.296 | ok |
-| 1600 | 5375368 | 915221 | 0.170 | 0.215 | 0.233 | ok |
+| 400 | 1383251 | 237078 | 0.171 | 0.186 | 0.279 | ok |
+| 1600 | 5524451 | 940278 | 0.170 | 0.214 | 0.248 | ok |
 
-thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.969× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.966× (gate ≤ 5.5)
 
 ### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ 0.30 on thunks + alloc)
 
 | n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
 |---|---:|---:|---:|---:|---:|---|
-| 400 | 1368412 | 232030 | 0.170 | 0.174 | 0.263 | ok |
-| 1600 | 5464012 | 916630 | 0.168 | 0.172 | 0.200 | ok |
+| 400 | 1405859 | 238527 | 0.170 | 0.174 | 0.246 | ok |
+| 1600 | 5613059 | 941727 | 0.168 | 0.171 | 0.213 | ok |
 
-thunk linearity (400 → 1600, ×4 step): cold 3.993×, warm 3.950× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): cold 3.993×, warm 3.948× (gate ≤ 5.5)
 
 ALL GATES PASSED (parity + ratio + linearity)
 
