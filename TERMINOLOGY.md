@@ -23,7 +23,6 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
   - [gen-edge](#gen-edge--content-movement-contract)
   - [gen-product](#gen-product--graph-products)
   - [gen-settings](#gen-settings--stratified-settings-resolution)
-  - [gen-demand](#gen-demand--typed-demand-cascade)
   - [gen-pipe](#gen-pipe--scoped-channel-dataflow)
   - [gen-class](#gen-class--class-share-mechanism)
   - [gen-link](#gen-link--cross-flake-aspect-federation)
@@ -339,7 +338,7 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Its
 | **The invariant** | gen TYPES never leave the pure eval; only VALUES cross. A gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet never enters a consumer's options tree (`nixosConfigurations.<h>.options ? schema == false`), so nixpkgs never type-walks it. | value-injection; adios prior art |
 | **Reader escape hatch** | For shapes the shipped terminals do not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings): use `compose`/`injectArgs` for the pure values and keep your own terminal reading `genValues`, or hand your own evaluator to `mkSystemTerminal`. | — |
 
-*The five libraries below are nixpkgs-lib-free (Class B) L2 concern libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and all five are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `demand`, `pipe`).*
+*The four libraries below are nixpkgs-lib-free (Class B) L2 concern libraries built on the L1 substrate — each pins one algebra a configuration framework assembles with, and all four are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `pipe`). A fifth, gen-demand, retired: ADR-0008 §4 re-expresses its cascade over gen-scope, and its vocabulary section below is kept as the retiring surface's record.*
 
 ### gen-edge — Content-Movement Contract
 
@@ -388,9 +387,9 @@ Settings resolution as a pure layered fold with provenance, refs, and injection.
 | **Structured provenance** | Per-field ordered chain `{ scope; rendered; via; value; refs; }`; per-entry lazy ref substitution (forcing one entry never resolves another's refs). | Cheney et al. 2009 |
 | **Injection** | `injectAspectSettings` routes class content through gen-bind `wrap` (namespaced `settings.<key>.<field>`); `assembleHost` keys modules by `id_hash` pairs. | Cardelli 1997; Chitil 2012 (via gen-bind) |
 
-### gen-demand — Typed Demand Cascade
+### gen-demand — Typed Demand Cascade (RETIRED)
 
-A terminating, stratified demand cascade over a downward-only kind DAG. Depends on gen-prelude + gen-graph; gen-select optional.
+**Retired under ADR-0008 §4 — off the roster, archived for reference, take no new dependency on it.** A terminating, stratified demand cascade over a downward-only kind DAG; it depended on gen-prelude + gen-graph, with gen-select optional. The vocabulary below now lives in **gen-scope** (`lib/cascade.nix`, `lib/folds.nix`), where a demand is a **claim** — `mkClaim` and `resolveClaims` — named for the request it is rather than for the evaluation strategy that drove it. `adapters` retired with its construct and moved nowhere.
 
 | Term | Definition | Provenance |
 |------|-----------|------------|
@@ -604,7 +603,7 @@ ______________________________________________________________________
 | Apel et al. | 2009 | An overview of feature-oriented software development | Feature-oriented decomposition |
 | Thum et al. | 2014 | Analysis strategies for software product lines | Feature interaction detection |
 | Kahn, A. B. | 1962 | Topological sorting of large networks | Accumulator-DAG toposort (gen-edge) — distinct from Gilles Kahn 1974 |
-| Apt, Blair & Walker | 1988 | Towards a theory of declarative knowledge | Stratified bottom-up evaluation, stratum-local aggregation (gen-demand) |
-| Cheney, Chiticariu & Tan | 2009 | Provenance in databases: why, how, and where | Witness/derivation provenance traces (gen-demand, gen-pipe, gen-settings) |
+| Apt, Blair & Walker | 1988 | Towards a theory of declarative knowledge | Stratified bottom-up evaluation, stratum-local aggregation (gen-scope's cascade; formerly gen-demand) |
+| Cheney, Chiticariu & Tan | 2009 | Provenance in databases: why, how, and where | Witness/derivation provenance traces (gen-scope's cascade — formerly gen-demand — gen-pipe, gen-settings) |
 | Hammack, Imrich & Klavžar | 2011 | Handbook of Product Graphs (2nd ed.) | Four standard graph products, projections/layers (gen-product; gen-select `coord`) |
 | Mokhov, Mitchell & Peyton Jones | 2018 | Build Systems à la Carte | Applicative (static) task dependencies (gen-settings `refGraph`) |

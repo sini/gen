@@ -33,7 +33,6 @@ let
     "aspects"
     "bind"
     "class"
-    "demand"
     "dispatch"
     "edge"
     "flake"

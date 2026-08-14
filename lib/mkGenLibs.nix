@@ -7,7 +7,7 @@
 # (real consumers read `inputs.gen-X.lib` directly); kept as `_` for call-compat.
 #
 # The roster is bound ONCE, at stage 1, and every stage-2 application yields that same value.
-# Nineteen members are already shared across applications by input memoization; `class` is not,
+# Every member but `class` is already shared across applications by input memoization; `class` is not,
 # because it is an `import` the hub applies itself — bound per application it re-allocates, and two
 # routes to "the roster" then hold two evaluations of the same source rather than one value. The
 # stratum buckets select on that identity, so the roster has to be a value and not a recipe.
@@ -28,12 +28,14 @@ let
     resolve = genInputs.gen-resolve.lib;
     flake = genInputs.gen-flake.lib;
     # L2 concern libraries — each flake `.lib` self-resolves its own deps (edge: prelude+graph;
-    # product: prelude; settings: prelude+algebra+bind+graph; demand: prelude+graph; pipe:
-    # prelude+select+scope), so the hub re-exports them plainly like the self-wiring libs above.
+    # product: prelude; settings: prelude+algebra+bind+graph; pipe: prelude+select+scope), so the
+    # hub re-exports them plainly like the self-wiring libs above. gen-demand was one of these and
+    # is off the roster: ADR-0008 §4 retires it as a library and its cascade re-expresses over
+    # gen-scope, the sole evaluator (ADR-0006). The repository stays readable, orphaned for
+    # reference, and gains no new consumers.
     edge = genInputs.gen-edge.lib;
     product = genInputs.gen-product.lib;
     settings = genInputs.gen-settings.lib;
-    demand = genInputs.gen-demand.lib;
     pipe = genInputs.gen-pipe.lib;
     # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
     # plainly like the other self-wiring libs.
@@ -59,7 +61,10 @@ let
     #   framework  above the stack rather than a layer of it — a configuration framework assembles
     #              with this, and no substrate vocabulary may be defined in its terms
     #   retiring   on the roster and leaving it: its content is moving to another member, so it is
-    #              still reachable but no consumer should newly adopt it
+    #              still reachable but no consumer should newly adopt it. The end of that path is
+    #              removal from the roster once the content has landed — the member drops both
+    #              lines and the hub stops pinning it, and its repository is orphaned for
+    #              reference rather than deleted (gen-demand, ADR-0008 §4, is the first)
     #
     # `substrate`, `modules` and `aspects` publish consumer paths on the hub's `lib` output
     # (flake.nix). `framework` and `retiring` publish none — they are facts about the roster, and
@@ -81,7 +86,6 @@ let
       edge = "retiring";
       product = "substrate";
       settings = "framework";
-      demand = "retiring";
       pipe = "retiring";
       link = "aspects";
       class = "aspects";

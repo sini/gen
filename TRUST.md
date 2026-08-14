@@ -71,12 +71,13 @@ The token list is per library rather than uniform, because a library's own API n
   it does not recognise as strict — so a new pure file is guarded by default and the boundary cannot
   widen by accident.
 
-Two libraries carry no scanner. **gen-prelude** needs none: it declares no flake inputs, so nothing
-transitive can enter its lock and the flake structure is itself the proof. **gen-demand's is
-outstanding** — its `lib/` is nixpkgs-lib-free by inspection and its inputs are gen-prelude and
-gen-graph, but no check holds that today. **gen-vars** is the documented exception: it is deliberately
-`nixpkgs.lib`-tethered outside its bottom `pure/` tier, is not part of the pure plane, and is
-off-roster.
+One roster library carries no scanner. **gen-prelude** needs none: it declares no flake inputs, so
+nothing transitive can enter its lock and the flake structure is itself the proof. **gen-vars** is the
+documented exception: it is deliberately `nixpkgs.lib`-tethered outside its bottom `pure/` tier, is not
+part of the pure plane, and is off-roster. **gen-demand** left the roster with its scanner still
+outstanding and will not gain one — its `lib/` was nixpkgs-lib-free by inspection and by its input list
+(gen-prelude, gen-graph), but no check ever held that. The content that moved is covered: gen-scope's
+scanner is total over `lib/**.nix`, so the cascade modules came under it on arrival.
 
 gen-types additionally ships a teeth test, `test-detector-catches-injected-violation`, proving the
 scanner actually fires on an injected violation rather than passing because it matches nothing.

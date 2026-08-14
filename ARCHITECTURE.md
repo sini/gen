@@ -23,13 +23,15 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
-  mkGenLibs keys (twenty):
+  mkGenLibs keys (nineteen):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-graph · gen-select · gen-bind
     gen-dispatch · gen-resolve · gen-flake · gen-class
-    gen-edge · gen-product · gen-settings · gen-demand · gen-pipe   (L2 concern libs)
+    gen-edge · gen-product · gen-settings · gen-pipe   (L2 concern libs)
   standalone pure libs:
     gen-rebuild · gen-vars
+  retired, archived for reference (off-roster, not a hub input):
+    gen-demand   → re-expressed into gen-scope (ADR-0008 §4)
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
@@ -66,7 +68,6 @@ gen-vars     (standalone pure)
   gen-edge     (gen-prelude + gen-graph)
   gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
   gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
-  gen-demand   (gen-prelude + gen-graph; gen-select optional, for adapters.select)
   gen-pipe     (gen-prelude + gen-select + gen-scope)
 
   # the ONE nixpkgs boundary — pure core (compose/inject) is nixpkgs-lib-free;
@@ -78,7 +79,7 @@ Each library exposes a single `.lib` value output — the obsolete functor-call 
 
 The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions, incl the `id_hash` SHA); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with five gen siblings — it hosts the convergence loop that ties the dispatch step, scope evaluation, and rebuild together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
 
-Above the L1 substrate sit five **L2 concern libraries** — gen-edge, gen-product, gen-settings, gen-demand, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, typed demand, and scoped-channel dataflow. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `demand`, `pipe`) like the self-wiring libraries above.
+Above the L1 substrate sit four **L2 concern libraries** — gen-edge, gen-product, gen-settings, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, and scoped-channel dataflow. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `pipe`) like the self-wiring libraries above. A fifth, **gen-demand** (typed demand), retired: ADR-0008 §4 re-expresses its cascade over gen-scope, the sole engine, and its repository is archived for reference rather than deleted.
 
 ### The nixpkgs.lib policy
 
@@ -194,9 +195,9 @@ Builds the four standard graph products — Cartesian, tensor, strong, lexicogra
 
 Resolves an aspect's static `{ default; merge }` settings schema against an ordered layer list (least → most specific) as a pure layered fold — byte-identical to gen-algebra's `foldLayers` over the same strategies. Adds identity-bearing cross-aspect **refs** as inert data (statically computable dependency graph, definition-time cycle detection), structured per-field provenance, and graduated injection (`injectAspectSettings` / `assembleHost`) via gen-bind. Lattice-blind by design: the layer order arrives precomputed. Depends on gen-prelude, gen-algebra, and gen-bind; consumes gen-schema interface-only (`id_hash`).
 
-**gen-demand** — Typed demand cascade.
+**gen-demand** — Typed demand cascade. **RETIRED (ADR-0008 §4) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
 
-Graph nodes emit typed **demands**; registered **kinds** resolve each into resources, wiring, and sub-demands over a downward-only kind DAG. A stratified fold resolves the growing demand multiset in ≤ DAG-depth rounds (termination is a theorem, not a convergence loop), with pinned-order dedup and a full provenance trace. Emission is independent of consumption by signature. Produces pure data — it constructs no edges or modules. Depends on gen-prelude and gen-graph; gen-select is optional (subject-matching adapter).
+Graph nodes emitted typed **demands**; registered **kinds** resolved each into resources, wiring, and sub-demands over a downward-only kind DAG. A stratified fold resolved the growing demand multiset in ≤ DAG-depth rounds (termination a theorem, not a convergence loop), with pinned-order dedup and a full provenance trace. Emission independent of consumption by signature. It depended on gen-prelude and gen-graph, with gen-select optional (subject-matching adapter). All of that now lives in **gen-scope** as `lib/cascade.nix` + `lib/folds.nix`, under claim vocabulary — the request value is a `mkClaim`, named for what it is rather than for the evaluation strategy. The one export that did not move is `adapters`: it retires with its construct, and gen-scope takes no gen-select edge.
 
 **gen-pipe** — Scoped-channel dataflow algebra.
 

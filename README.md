@@ -31,8 +31,9 @@ configuration framework. The libraries themselves are generic — none of them k
 
 ## What it provides
 
-Twenty libraries are wired into the hub roster and reachable as `mkGenLibs` keys; two more are
-standalone and consumed directly. Each library's `flake.nix` `description` and its `AGENTS.md`
+Nineteen libraries are wired into the hub roster and reachable as `mkGenLibs` keys; two more are
+standalone and consumed directly; one more is retired and archived for reference, wired to nothing.
+Each library's `flake.nix` `description` and its `AGENTS.md`
 capability sheet are the authority on its scope — the sheet also records what the library explicitly
 does *not* own, and which sibling does.
 
@@ -70,7 +71,6 @@ does *not* own, and which sibling does.
 | [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch as one guard→effect **step**: walks a caller-supplied `groupOrder`, matches conditions against a threaded context, resolves conflicts, and buckets the opaque actions by group. It never sorts groups and never loops |
 | [gen-edge](https://github.com/sini/gen-edge) | The content-movement contract: every move of content between positions is one edge `(S,T,P,M)` — source, target, attrpath, mode — with edge-set derivation, Kahn-ordered materialization, and a frozen hashable edge trace as a cross-repo parity oracle |
 | [gen-pipe](https://github.com/sini/gen-pipe) | Scoped channels and a dataflow algebra over them: a channel's value at a position is a left fold over the contributions visible there under a pinned traversal, with `map` / `filter` / `fold` / `scan` / `route` / `join` / `tee` wiring channels into a DAG that `compose` validates and `run` evaluates demand-driven |
-| [gen-demand](https://github.com/sini/gen-demand) | The typed demand cascade: registered **kinds** resolve demand values into resources, wiring and sub-demands, and a stratified fold over a registration-time kind DAG resolves the whole multiset with a provenance trace — termination is a theorem, not a convergence loop |
 | [gen-settings](https://github.com/sini/gen-settings) | *Experimental — subject to replacement.* Stratified settings resolution: folds a static `{ default; merge }` schema against an ordered layer list into `{ value; provenance; }`, adding refs-as-data and the graduated injection construct |
 | [gen-class](https://github.com/sini/gen-class) | The class-share mechanism: groups nodes into classes by a caller-supplied key, computes each class's byte-identical shared **core** over a named projection, applies it back onto a member, and authorises every reuse claim by sha256 over canonical `toJSON` |
 | [gen-link](https://github.com/sini/gen-link) | Cross-flake aspect federation: normalizes each source aspect registry into an origin-free includes-graph, stamps every node with a federation origin, disjoint-unions the subgraphs, binds facet holes into instantiation identity, and returns a diffable resolution manifest |
@@ -87,6 +87,7 @@ does *not* own, and which sibling does.
 |---|---|
 | [gen-rebuild](https://github.com/sini/gen-rebuild) | The rebuilder dimension (Mokhov 2018) as a pure-Nix library: a flat relocatable result store, a per-key verifying trace, node-reuse decisions, and change propagation over a caller-supplied `recompute`. No `mkGenLibs` key — consumed as `inputs.gen-rebuild.lib` (today, by gen-resolve) |
 | [gen-vars](https://github.com/sini/gen-vars) | *Experimental — subject to replacement.* Target-agnostic vars/secrets: normalizes generator declarations, toposorts them into a backend-agnostic plan, and fans one resolution-free file handle out to many consumer targets in one evaluation, emitting a generate script it never runs. Off-roster and deliberately `nixpkgs.lib`-tethered outside its bottom `pure/` tier |
+| [gen-demand](https://github.com/sini/gen-demand) | *Retired — archived for reference.* The typed demand cascade: registered **kinds** resolved demand values into resources, wiring and sub-demands, and a stratified fold over a registration-time kind DAG resolved the whole multiset with a provenance trace — termination a theorem, not a convergence loop. ADR-0008 §4 retires it as a library; the cascade re-expresses over gen-scope, the sole engine, as `lib/cascade.nix` + `lib/folds.nix` under claim vocabulary. Off the roster and no longer a hub input, orphaned rather than deleted (ADR-0031's F3 pattern) — **take no new dependency on it.** Its `adapters` export retires with its construct and moves nowhere |
 
 ## Using it
 
@@ -135,11 +136,12 @@ it fails — is [TRUST.md](TRUST.md).
 
 **Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Eighteen of the twenty roster libraries carry
-it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter its
-lock, and the flake structure is the proof. gen-demand's scanner is outstanding; its purity today rests
-on its input list rather than on a check. gen-vars is the documented exception, and is off-roster for
-this reason.
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Eighteen of the nineteen roster libraries
+carry it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter
+its lock, and the flake structure is the proof. gen-vars is the documented exception, and is off-roster
+for this reason. Retired gen-demand never gained a scanner and now never will: its Class-B claim rested
+on its input list rather than on a check, and it leaves the roster with that gap open — the content
+that moved acquired an enforcer at the move, because gen-scope's scanner is total over `lib/**.nix`.
 
 **Full nixpkgs enters at exactly one file.** In gen-flake — the only library that consumes it —
 `lib/terminals.nix` is the single file the purity scanner excludes as the sanctioned boundary. Every
@@ -149,7 +151,7 @@ the boundary cannot widen by accident. Everywhere the ecosystem needs `lib.*` al
 visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for nineteen of the twenty roster keys — gen-class is the exception described below, and its flake
+for eighteen of the nineteen roster keys — gen-class is the exception described below, and its flake
 exports `.lib` too — so a library that renames, wraps or drops that output fails hub evaluation at its
 first consumer. All twenty-two library flakes declare it today.
 
@@ -207,8 +209,8 @@ gen-algebra input, gen-pipe its gen-select and gen-scope), so the hub does nothi
 
 The roster is bound once rather than per application, so every route to it — a bucket, the
 flakeModule, a direct call — holds one value rather than several evaluations of the same source.
-Nineteen members are shared that way anyway by input memoization; `class` is not, because it is an
-`import` the hub applies itself, and a per-application binding re-allocated it.
+Every member but `class` is shared that way anyway by input memoization; `class` is not, because it is
+an `import` the hub applies itself, and a per-application binding re-allocated it.
 
 **gen-class is the one exception.** Its flake `.lib` leaves the merge engine as `null` — every tier-1
 export works without it — so the hub re-imports gen-class's `./lib` with the gen-merge kernel injected
@@ -237,9 +239,12 @@ gen.lib.aspects     aspects class link
 
 The other two publish nothing. `framework` (gen-settings) sits above the stack rather than in it — a
 configuration framework assembles with it, and no substrate vocabulary is defined in its terms.
-`retiring` (gen-demand, gen-edge, gen-flake, gen-pipe, gen-resolve) marks a member whose content is
+`retiring` (gen-edge, gen-flake, gen-pipe, gen-resolve) marks a member whose content is
 moving elsewhere: still reachable on the flat roster, deliberately not offered as something to adopt.
-Both keep the declaration total without inviting a consumer onto a path that is about to close.
+Both keep the declaration total without inviting a consumer onto a path that is about to close. The end
+of the `retiring` path is leaving the roster once the content has landed — gen-demand took it first
+(ADR-0008 §4), dropping its binding, its stratum line and its hub pin together, and its repository is
+orphaned for reference rather than deleted.
 
 ### Dependency tiers
 
@@ -263,7 +268,6 @@ gen-dispatch  ← prelude
 gen-product   ← prelude
 gen-class     ← prelude (+ gen-merge injected by the hub for tier 2)
 gen-edge      ← prelude, graph
-gen-demand    ← prelude, graph (gen-select optional, for adapters.select)
 gen-pipe      ← prelude, select, scope
 gen-settings  ← prelude, algebra, bind, graph
 gen-resolve   ← prelude, scope, graph, rebuild, algebra, bind
@@ -303,7 +307,7 @@ lives in gen-resolve via `gen-scope.circular` (Kleene ascent). Recomputing at th
 action set a function of the converged state, so no cross-pass bookkeeping is needed.
 
 **Actions are opaque.** gen-dispatch groups actions but never interprets them; gen-edge moves content
-without knowing what content is; gen-demand produces pure data and constructs no modules. Libraries
+without knowing what content is; gen-scope's cascade produces pure data and constructs no modules. Libraries
 provide machinery, consumers provide meaning.
 
 ## Theoretical foundations

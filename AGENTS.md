@@ -32,7 +32,6 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `edge` | `gen-edge` — "gen-edge — the content-movement contract: the (S,T,P,M) edge algebra, toposorted materialization fold, and the frozen edge-trace parity oracle" |
 | `product` | `gen-product` — "gen-product — graph products as first-class operations over accessor-graphs (Cartesian / tensor / strong / lexicographic; cells, slices, fibers, projections, quotients, restriction, containment chains), lazy in and out" |
 | `settings` | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct" |
-| `demand` | `gen-demand` — "gen-demand — typed demand cascade (kinds resolve demands into resources + wiring + sub-demands; a stratified, terminating fold resolves the multiset with full provenance)" |
 | `pipe` | `gen-pipe` — "gen-pipe — scoped channels + dataflow algebra (map/filter/fold/scan/route/join/tee) with B5 determinism, provenance, dedup, and class-aware contributions" |
 | `link` | `gen-link` — "gen-link: cross-flake aspect federation over origin-labeled subgraphs" |
 
@@ -51,7 +50,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 ```
 
 ```json
-["gen-algebra","gen-aspects","gen-bind","gen-class","gen-demand","gen-dispatch","gen-edge","gen-flake","gen-graph","gen-link","gen-merge","gen-pipe","gen-prelude","gen-product","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types"]
+["gen-algebra","gen-aspects","gen-bind","gen-class","gen-dispatch","gen-edge","gen-flake","gen-graph","gen-link","gen-merge","gen-pipe","gen-prelude","gen-product","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types"]
 ```
 
 ## Exports
@@ -74,11 +73,11 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 Live: `gen-select`, `gen-schema`, `gen-class`, `gen-pipe`, `gen-link` all call `gen.lib.mkCi` from
 their `ci/flake.nix`.
 
-**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty-one keys: **twenty
+**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty keys: **nineteen
 members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
 `genInputs.gen-<key>.lib` verbatim except `class`.
 
-`algebra` `aspects` `bind` `class` `demand` `dispatch` `edge` `flake` `graph` `link` `merge` `pipe`
+`algebra` `aspects` `bind` `class` `dispatch` `edge` `flake` `graph` `link` `merge` `pipe`
 `prelude` `product` `resolve` `schema` `scope` `select` `settings` `types` — plus `strata`
 
 `class` is the one exception: the `class` binding re-imports `"${genInputs.gen-class}/lib"` with
@@ -103,14 +102,14 @@ its stratum. Five values:
 them would invite exactly the adoption `retiring` exists to prevent. Their members stay reachable on
 the flat roster, unchanged.
 
-Current assignment (9 / 2 / 3 / 1 / 5):
+Current assignment (9 / 2 / 3 / 1 / 4):
 
 ```
 substrate  algebra bind dispatch graph prelude product schema scope select
 modules    merge types
 aspects    aspects class link
 framework  settings
-retiring   demand edge flake pipe resolve
+retiring   edge flake pipe resolve
 ```
 
 **`lib.substrate` / `lib.modules` / `lib.aspects`** — the three stratum buckets, each a **selection
@@ -131,17 +130,17 @@ such overload.
 |---|---|
 | `flakeModules.genLibs` | a **path** (`builtins.typeOf` ⇒ `"path"`), not a module value — `./flakeModules/genLibs.nix` |
 
-Imported into a flake-parts consumer it sets `_module.args` to **eight** of the twenty roster keys,
+Imported into a flake-parts consumer it sets `_module.args` to **eight** of the nineteen roster keys,
 under camelCase `gen*` names (`flakeModules/genLibs.nix:13-22`):
 
 ```
 genAlgebra genAspects genBind genDispatch genGraph genSchema genScope genSelect
 ```
 
-The other twelve (`class` `demand` `edge` `flake` `link` `merge` `pipe` `prelude` `product` `resolve`
+The other eleven (`class` `edge` `flake` `link` `merge` `pipe` `prelude` `product` `resolve`
 `settings` `types`) are reachable via `inputs.gen.lib.mkGenLibs { }`, the sibling flake input
 directly, or — for the six that declare a published stratum (`class` `link` `merge` `prelude`
-`product` `types`) — the matching bucket. The other six publish no bucket path: `demand`, `edge`,
+`product` `types`) — the matching bucket. The other five publish no bucket path: `edge`,
 `flake`, `pipe`, `resolve` (`retiring`) and `settings` (`framework`).
 
 **Three names per library.** Flake input `gen-schema` · roster key `schema` · `_module.args` name
@@ -214,7 +213,7 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 Current output (verbatim):
 
 ```json
-{"flakeModules":["genLibs"],"lib":["aspects","mkCi","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","demand","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
+{"flakeModules":["genLibs"],"lib":["aspects","mkCi","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
 ```
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`
