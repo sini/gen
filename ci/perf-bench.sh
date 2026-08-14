@@ -118,20 +118,28 @@ declare -A OW_TR OW_AR OW_CR OW_BG
 OW_LIN_COLD=""
 OW_LIN_WARM=""
 FAILURES=()
+CELL=""
 
 # ── a dead cell names itself (exit 3) ─────────────────────────────────────────
-# A workload whose eval throws writes no stats file, and with the evaluator's stderr discarded the
-# whole bench used to exit figure-free and silent — the error was recoverable only by re-running the
-# cell's nix-instantiate by hand. The bench dies on the FIRST dead cell rather than reporting the
-# survivors: every downstream consumer of a cell's counters is unconditional (ratios, the printf
-# table, the small/big linearity pair), and --update would splice the holed table into the live
-# BENCHMARKS.md block, where a table that does not announce its hole is worse than no table.
-# An EMPTY capture is itself reported — rendering it as silence would be this defect in miniature.
+# A cell that cannot be MEASURED must not be reported, and it must say which cell it was: the whole
+# bench is comparative, and the operator's next move is always to re-run one cell by hand. So the
+# run aborts at the FIRST dead cell carrying that cell's identity and BOTH captured streams. Every
+# downstream consumer of a cell's counters is unconditional (the ratios, the printf table, the
+# small/big linearity pair), and --update would splice a holed table into the live BENCHMARKS.md
+# block, where a table that does not announce its hole is worse than no table.
+# An EMPTY stream is REPORTED as empty — rendering it as silence would be this defect in miniature.
 die_cell() {
-  local w=$1 n=$2 s=$3 rep=$4 status=$5 statf=$6 errf=$7
+  local reason=$1 status=$2 errf=$3 out=$4
   {
-    echo "perf-bench: CELL EVAL FAILED — workload=$w n=$n stack=$s rep=$rep exit=$status"
-    echo "perf-bench: no stats at $statf; captured stderr follows"
+    echo "perf-bench: CELL EVAL FAILED — $CELL exit=$status"
+    echo "perf-bench: $reason"
+    echo "-- begin evaluator stdout --"
+    if [[ -n "$out" ]]; then
+      printf '%s\n' "$out"
+    else
+      echo "(evaluator wrote nothing to stdout)"
+    fi
+    echo "-- end evaluator stdout --"
     echo "-- begin evaluator stderr ($errf) --"
     if [[ -s "$errf" ]]; then
       cat "$errf"
@@ -143,12 +151,21 @@ die_cell() {
   exit 3
 }
 
+# Every value that reaches a table is validated HERE, where the cell's identity is still in scope.
+# The counters are read through `jq -e … | numbers | select(. > 0)`, which collapses missing file,
+# unparseable JSON, absent field, non-numeric and zero into one non-zero status (measured: 2, 5, 4,
+# 4, 4 respectively). Zero is a refusal rather than a value because a zero counter is an ABSENT
+# INSTRUMENT — `.gc.totalBytes` is simply not emitted by a Nix built without the collector, and a
+# zero carried forward surfaces far downstream as an awk division-by-zero at report stage, after
+# the entire matrix has been measured and with no cell named. jq's own stderr is left unredirected
+# so its parse error reaches the operator ahead of the identity line.
 run_cell() {
   local w=$1 n=$2 s=$3
-  local cpus=() statf="" errf="" out="" rep status
+  local cpus=() statf="" errf="" out="" rep status cpu="" med="" thunks="" alloc="" dig=""
   for rep in $(seq 1 "$REPS"); do
     statf="$tmp/$w-$n-$s-$rep.json"
     errf="$tmp/$w-$n-$s-$rep.err"
+    CELL="workload=$w n=$n stack=$s rep=$rep"
     # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
     # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
     status=0
@@ -157,13 +174,27 @@ run_cell() {
       --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
     # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
     # report's shape, which is what a cross-rev comparison of this bench reads.
-    [[ -s "$statf" ]] || die_cell "$w" "$n" "$s" "$rep" "$status" "$statf" "$errf"
-    cpus+=("$(jq -r .cpuTime "$statf")")
+    [[ -s "$statf" ]] || die_cell "no stats file at $statf" "$status" "$errf" "$out"
+    cpu=$(jq -e '.cpuTime | numbers | select(. > 0)' "$statf") \
+      || die_cell "no usable .cpuTime in $statf" "$status" "$errf" "$out"
+    cpus+=("$cpu")
   done
-  CPU["$w,$n,$s"]=$(printf '%s\n' "${cpus[@]}" | sort -g | sed -n 2p)
-  THUNKS["$w,$n,$s"]=$(jq -r .nrThunks "$statf")
-  ALLOC["$w,$n,$s"]=$(jq -r '.gc.totalBytes // 0' "$statf")
-  DIG["$w,$n,$s"]=$(printf '%s' "$out" | grep -o 'digest = "[a-f0-9]*"' | cut -d'"' -f2)
+  med=$(printf '%s\n' "${cpus[@]}" | sort -g | sed -n 2p) || med=""
+  [[ -n "$med" ]] || die_cell "the median of $REPS cpu samples is empty" "$status" "$errf" "$out"
+  thunks=$(jq -e '.nrThunks | numbers | select(. > 0)' "$statf") \
+    || die_cell "no usable .nrThunks in $statf" "$status" "$errf" "$out"
+  alloc=$(jq -e '.gc.totalBytes | numbers | select(. > 0)' "$statf") \
+    || die_cell "no usable .gc.totalBytes in $statf" "$status" "$errf" "$out"
+  # The digest is the parity oracle's datum, and perf-bench.nix emits it for every cell: its absence
+  # from a SUCCESSFUL eval means the workload contract moved, not that parity failed. Reporting that
+  # as a MISMATCH would name the wrong defect, and on a `noref` row nothing reads the digest at all,
+  # so the absence would pass entirely unseen — the same silence, one surface over.
+  dig=$(printf '%s' "$out" | grep -o 'digest = "[a-f0-9]*"' | cut -d'"' -f2) || dig=""
+  [[ -n "$dig" ]] || die_cell "eval succeeded but stdout carries no digest" "$status" "$errf" "$out"
+  CPU["$w,$n,$s"]=$med
+  THUNKS["$w,$n,$s"]=$thunks
+  ALLOC["$w,$n,$s"]=$alloc
+  DIG["$w,$n,$s"]=$dig
 }
 
 ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
