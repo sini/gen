@@ -2,7 +2,8 @@
 # nix-instantiate + NIX_SHOW_STATS, checks regression gates, prints a markdown report.
 #
 # Usage:
-#   gen-perf-bench                     — report to stdout, enforce gates (exit 1 on regression)
+#   gen-perf-bench                     — report to stdout, enforce gates (exit 1 on regression;
+#                                        exit 3 if a workload cell's eval dies, with its stderr)
 #   gen-perf-bench --update FILE.md    — same, and splice the report into FILE.md's
 #                                        <!-- BEGIN PERF-BENCH --> / <!-- END PERF-BENCH --> block
 #                                        (the live BENCHMARKS.md section)
@@ -118,14 +119,45 @@ OW_LIN_COLD=""
 OW_LIN_WARM=""
 FAILURES=()
 
+# ── a dead cell names itself (exit 3) ─────────────────────────────────────────
+# A workload whose eval throws writes no stats file, and with the evaluator's stderr discarded the
+# whole bench used to exit figure-free and silent — the error was recoverable only by re-running the
+# cell's nix-instantiate by hand. The bench dies on the FIRST dead cell rather than reporting the
+# survivors: every downstream consumer of a cell's counters is unconditional (ratios, the printf
+# table, the small/big linearity pair), and --update would splice the holed table into the live
+# BENCHMARKS.md block, where a table that does not announce its hole is worse than no table.
+# An EMPTY capture is itself reported — rendering it as silence would be this defect in miniature.
+die_cell() {
+  local w=$1 n=$2 s=$3 rep=$4 status=$5 statf=$6 errf=$7
+  {
+    echo "perf-bench: CELL EVAL FAILED — workload=$w n=$n stack=$s rep=$rep exit=$status"
+    echo "perf-bench: no stats at $statf; captured stderr follows"
+    echo "-- begin evaluator stderr ($errf) --"
+    if [[ -s "$errf" ]]; then
+      cat "$errf"
+    else
+      echo "(evaluator wrote nothing to stderr)"
+    fi
+    echo "-- end evaluator stderr --"
+  } >&2
+  exit 3
+}
+
 run_cell() {
   local w=$1 n=$2 s=$3
-  local cpus=() statf="" out="" rep
+  local cpus=() statf="" errf="" out="" rep status
   for rep in $(seq 1 "$REPS"); do
     statf="$tmp/$w-$n-$s-$rep.json"
+    errf="$tmp/$w-$n-$s-$rep.err"
+    # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
+    # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
+    status=0
     out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
       "$PERF_WORKLOADS" --arg srcs "import $PERF_SRCS" \
-      --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>/dev/null)
+      --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
+    # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
+    # report's shape, which is what a cross-rev comparison of this bench reads.
+    [[ -s "$statf" ]] || die_cell "$w" "$n" "$s" "$rep" "$status" "$statf" "$errf"
     cpus+=("$(jq -r .cpuTime "$statf")")
   done
   CPU["$w,$n,$s"]=$(printf '%s\n' "${cpus[@]}" | sort -g | sed -n 2p)
