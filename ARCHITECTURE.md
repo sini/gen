@@ -181,7 +181,7 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Thr
 
 ### L2 Concern Libraries
 
-These five libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Each flake `.lib` self-resolves its own deps, so all five are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `demand`, `pipe`).
+These four libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Each flake `.lib` self-resolves its own deps, so all four are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `pipe`). A fifth, **gen-demand**, retired: ADR-0008 §4 re-expresses its cascade over gen-scope, the sole engine, so it is off the roster and no longer a hub input. Its section below is kept as the retiring surface's record.
 
 **gen-edge** — Content-movement contract.
 

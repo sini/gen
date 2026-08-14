@@ -77,7 +77,12 @@ documented exception: it is deliberately `nixpkgs.lib`-tethered outside its bott
 part of the pure plane, and is off-roster. **gen-demand** left the roster with its scanner still
 outstanding and will not gain one — its `lib/` was nixpkgs-lib-free by inspection and by its input list
 (gen-prelude, gen-graph), but no check ever held that. The content that moved is covered: gen-scope's
-scanner is total over `lib/**.nix`, so the cascade modules came under it on arrival.
+scanner enumerates `lib/` with `builtins.readDir`, so the cascade modules came under it on arrival
+without an edit to the scanner. ★ **That enumeration is one directory level — `lib/*.nix`, not
+`lib/**.nix`** — so its totality is a property of `lib/` being flat (15 files today), not of the
+scanner. A module added at `lib/sub/x.nix` would leave the scan silently, which is the failure mode
+this section exists to rule out; a recursive walk is the by-construction answer and is gen-scope's
+own work to spec.
 
 gen-types additionally ships a teeth test, `test-detector-catches-injected-violation`, proving the
 scanner actually fires on an injected violation rather than passing because it matches nothing.
