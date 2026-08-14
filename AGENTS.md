@@ -5,8 +5,10 @@
 The ecosystem hub: it owns no concern of its own. It publishes `mkGenLibs` — two-stage instantiation
 of the gen library roster (stage 1 captures `genInputs` at definition time and binds the roster; stage
 2 hands back that same value, each member flake's self-wired `.lib`) — the three **stratum buckets**
-cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), plus `mkCi`, the shared CI-flake
-wrapper every sibling's `ci/` calls, and one flake-parts module.
+cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), one flake-parts module, and an
+`mkCi` that two siblings still call. The CI-flake wrapper the rest of the ecosystem's `ci/` calls is
+`gen-harness.lib.mkCi`, in its own repository: the harness pins no gen library, so a sibling's `ci/`
+lock no longer drags the aggregator that pins that sibling.
 
 ## Not this library's job
 
@@ -70,8 +72,10 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 
 `builtins.functionArgs lib.mkCi` ⇒ `{"extraModules":true,"inputs":false,"name":false,"specialArgs":true,"testModules":false}`
 (`false` = required). `mkCi` is already stage-1-applied by the flake, so a consumer makes one call.
-Live: `gen-select`, `gen-schema`, `gen-class`, `gen-pipe`, `gen-link` all call `gen.lib.mkCi` from
-their `ci/flake.nix`.
+Live: `gen-flake` and `gen-vars`, and no others — every other library repo calls
+`gen-harness.lib.mkCi` from its `ci/flake.nix` instead, on the same signature. Measured across the
+twenty-two library repos, twenty are on the harness and these two on the hub; from a library root,
+`grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says which of the two that library is on.
 
 **`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty keys: **nineteen
 members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
@@ -156,7 +160,7 @@ directly, or — for the six that declare a published stratum (`class` `link` `m
 | Get one library | `inputs.gen-<name>.lib` directly — the roster adds nothing over the flake input, except for `class` |
 | Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib` |
 | Inject libs as flake-parts module args | `imports = [ inputs.gen.flakeModules.genLibs ];` (eight keys only) |
-| Stand up a sibling library's CI flake | `gen.lib.mkCi { inherit inputs; name = "gen-x"; testModules = ./tests; }` |
+| Stand up a sibling library's CI flake | `gen-harness.lib.mkCi { inherit inputs; name = "gen-x"; testModules = ./tests; }` — from `github:sini/gen-harness`, **not** this hub: pinning the hub for a harness pins every library, including the one under test |
 | Use `gen-rebuild` / `gen-vars` | their flake inputs directly — not in the roster, not hub inputs |
 | Run the hub's real gate | `nix flake check ./ci` (see Drift check) |
 | Look up a term or a citation | `TERMINOLOGY.md` (§Core Terms, §Per-Library Vocabulary, §Academic References) |
