@@ -174,6 +174,11 @@ run_cell() {
       --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
     # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
     # report's shape, which is what a cross-rev comparison of this bench reads.
+    # The status is judged BEFORE the artefacts. An evaluator that fails while still leaving a
+    # plausible stats file and a digest would otherwise be measured and REPORTED — a whole matrix of
+    # fabricated figures carrying a confident regression verdict, which names the wrong defect
+    # instead of merely losing the right one.
+    [[ $status -eq 0 ]] || die_cell "evaluator exited non-zero" "$status" "$errf" "$out"
     [[ -s "$statf" ]] || die_cell "no stats file at $statf" "$status" "$errf" "$out"
     cpu=$(jq -e '.cpuTime | numbers | select(. > 0)' "$statf") \
       || die_cell "no usable .cpuTime in $statf" "$status" "$errf" "$out"
