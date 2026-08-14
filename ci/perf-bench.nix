@@ -251,9 +251,9 @@ let
     P:
     let
       schema = P.aspects.mkAspectSchema {
-        classes = {
-          nixos = { };
-          home = { };
+        keySemantics = {
+          nixos.category = "class";
+          home.category = "class";
         };
       };
       fourth = i: builtins.bitAnd i 3 == 0;
