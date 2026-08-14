@@ -2050,11 +2050,11 @@
         "gen-prelude": "gen-prelude_55"
       },
       "locked": {
-        "lastModified": 1786493957,
-        "narHash": "sha256-kDuIhnB8LRoShrB2Vy5tKQK27oq6t73/lfTLWEVTYvQ=",
+        "lastModified": 1786668911,
+        "narHash": "sha256-aEsvo7EHoi5A5evfo88Br6A6HPxBX19FWc+gL2xqM9A=",
         "owner": "sini",
         "repo": "gen-scope",
-        "rev": "a5d5ef99db8e6abe52c23abffac107921590f2e3",
+        "rev": "a05f8b45cc985a6e163ae67f7ebb23ed312a763f",
         "type": "github"
       },
       "original": {
