@@ -26,7 +26,8 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix flake check ./ci
 
-  # Performance: perf-regression gates (parity at scale + cpu/counter ratios + linearity).
+  # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
+  # thunk/alloc ratios + linearity). cpu is reported but gated by nothing — see ci/README.md.
   perf-bench:
     runs-on: ubuntu-latest
     steps:

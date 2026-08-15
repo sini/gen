@@ -198,9 +198,11 @@
               '';
           # ── perf-regression bench (the PERFORMANCE twin of the parity oracles) ──
           # `nix run ./ci#perf-bench` — drives ci/perf-bench.nix (pure vs pinned-nixpkgs stack)
-          # through nix-instantiate + NIX_SHOW_STATS and gates on parity / cpu+counter ratios /
-          # counter linearity. An app, not a check derivation: timing needs an un-sandboxed
-          # evaluator run. CI runs it as a dedicated workflow step.
+          # through nix-instantiate + NIX_SHOW_STATS and gates on parity / thunk+alloc ratios /
+          # counter linearity — every gate a deterministic evaluator counter. cpu is measured and
+          # reported beside them but gated by nothing (ci/README.md). An app, not a check
+          # derivation: timing needs an un-sandboxed evaluator run, and the report is regenerated
+          # into BENCHMARKS.md. CI runs it as a dedicated workflow step.
           #
           # `gen-class` is the class-share mechanism lib: perf-bench drives its tier-2
           # `applyCoreFixed` against gen-merge's fixed-input kernel (the `classShare` workload —

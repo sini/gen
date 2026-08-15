@@ -422,9 +422,10 @@ The performance twin of the parity oracles. `nix run ./ci#perf-bench` drives `ci
 
 - **parity** — every cell's sha256 projection digest must match across stacks, so a "fast but
   wrong" change cannot pass; this ties the perf corpus to the same validation bar as §1.
-- **ratio** — the pure stack must stay faster and lighter than the nixpkgs stack (cpu plus thunk
-  and allocation counters, compared as machine-independent same-process ratios) at the largest
-  workload size.
+- **ratio** — the pure stack must stay lighter than the nixpkgs stack on the deterministic
+  evaluator counters (thunks and allocation) at the largest workload size. cpu is measured and
+  reported beside them but gated by nothing: a counter is a function of the evaluated expression
+  alone, whereas cpu is a function of that expression and the host's frequency state together.
 - **linearity** — the pure stack's counters must grow no worse than linearly across a ×4 size
   step; this is the net that caught the 2026-07-04 O(k²) `unique` key-union bug.
 

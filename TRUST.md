@@ -92,8 +92,9 @@ scanner actually fires on an injected violation rather than passing because it m
 [BENCHMARKS.md](BENCHMARKS.md) reports evaluation-time cost against that same frozen nixpkgs stack,
 **byte-parity-gated first** — a fast-but-wrong change cannot pass, whatever its timings say.
 
-`nix run ./ci#perf-bench` measures every cell, then evaluates three gate families: parity (every cell's
-digest matches across stacks), ratio (the pure stack stays faster and lighter at the largest workload),
+`nix run ./ci#perf-bench` measures every cell, then evaluates three gate families — all three on
+deterministic evaluator counters, never on cpu: parity (every cell's digest matches across stacks),
+ratio (the pure stack stays lighter on thunks and allocation at the largest workload),
 and linearity (counters grow no worse than linearly across a ×4 size step — the net that caught an
 O(k²) key-union bug). Every failing gate appends to a failure list and the run exits non-zero *after*
 the full report is emitted, so a failing run still records everything it measured and you see all

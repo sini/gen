@@ -24,7 +24,7 @@ consequences are live here, and both are unassertions rather than fixes:
   with an empty command cell; carrier `den-hoag-gkkh`.
 - The perf bench's two `aspects` matrix rows are **pure-only**. They keep their linearity gates and
   absolute counters and are reported in their own table, but assert **no** pure/ref digest parity
-  and **no** pure/ref CPU (0.85) or counter (0.90) win-gate. Whether that workload gets a ref-free
+  and **no** pure/ref counter (0.90) win-gate. Whether that workload gets a ref-free
   performance gate, and of what shape, is an open question carried by `den-hoag-gkkh`; a re-frozen
   baseline is explicitly not the answer, since it reproduces the same defect at smaller scale.
 
@@ -70,19 +70,46 @@ Three gate families (thresholds at the top of `perf-bench.sh`):
 
 - **parity** — every cell's sha256 projection digest must match across stacks. Ties the perf
   corpus to the validation bar: a "fast but wrong" change cannot pass.
-- **ratio** (largest size per workload) — pure cpu ≤ 0.85× ref (median of 3, same-process ratio so
-  host speed cancels); pure thunks/allocation ≤ 0.90× ref (deterministic evaluator counters).
-  Measured headroom is wide (see baseline): a regression that erodes the speedup below ~15–35%
-  margin fires the gate long before pure gets *slower* than nixpkgs. `wideFreeform` is the one
-  partial exception — only its ALLOC keeps the default win-gate; its THUNK ratio rides a band
-  (`WIDEFREEFORM_RATIO_MAX = 1.3`) rather than the 0.90 win-gate, because freeform absorption is
-  thunk-parity with nixpkgs (the same per-key type merges), and its CPU rides a band
-  (`WIDEFREEFORM_CPU_MAX = 0.95`) rather than the 0.85 win-gate, because that cell is tiny (~0.07s) and
-  load-sensitive so the default gate flakes on cpu noise. Its real teeth are the linearity net + the
-  thunk band + the deterministic counters (see the baseline block below for the rationale).
+- **ratio** (largest size per workload) — pure thunks/allocation ≤ 0.90× ref (deterministic
+  evaluator counters). Measured headroom is wide (see baseline): a regression that erodes the win
+  below ~15–35% margin fires the gate long before pure gets *heavier* than nixpkgs. `wideFreeform`
+  is the one partial exception — only its ALLOC keeps the default win-gate; its THUNK ratio rides a
+  band (`WIDEFREEFORM_RATIO_MAX = 1.3`) rather than the 0.90 win-gate, because freeform absorption
+  is thunk-parity with nixpkgs (the same per-key type merges). Its real teeth are the linearity
+  net, the thunk band, and the deterministic counters (see the baseline block below for the
+  rationale).
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
   ≥ 12×). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
   (fixed in gen-merge `976a87a`): pre-fix, scalar allocation grew ~11.5× over a 4× step.
+
+**cpu is measured, reported, and gated by nothing.** Each of the three families above reads a
+quantity that is a function of the evaluated expression alone; `cpuTime` is a function of the
+expression *and* the machine's state, so putting it through the same threshold comparison types a
+non-deterministic quantity as deterministic — a defect no constant and no rep count repairs. It was
+measured here, not assumed: this workstation evaluates one tree at two stable frequency regimes
+~2.2× apart (auto-cpufreq scaling 800 MHz–2.2 GHz) — a raw whole-cell ratio rather than a
+net-of-floor one, the distinction mattering because the startup floor is itself bimodal, so
+subtracting it removes a term that shrank along with the mode — and the pure/ref cpu ratio moved
+0.734–1.873 across runs of byte-identical trees while every counter stayed byte-identical. The
+fabrication runs in both directions: a false red *and* a false green, the second being the dangerous
+one. That noise exceeded the detection margin of five of the six cells the old cpu gate covered, so
+the gate could not distinguish a regression from a frequency transition; the only cpu-gate firing in
+this repo's record was itself a false positive, while the one real regression the bench has caught
+was caught by a thunk counter. Report-only cpu was already this harness's convention for
+`classShare` and `overrideWarm`, and it is already the *stated* rule of this repo's other
+measurement instruments: `ci/bench/baselines/README.md` and `ci/fleet-consistency.sh` both say in
+terms that `gcTotalBytes` and `cpuTime` are NEVER gated, and the three baseline JSONs record
+`cpuTime` as informational or omit it. perf-bench was the outlier; this brings it into line. To keep
+the reported figures as honest as an ungated figure can be, a row's arms are sampled
+**round-robin** — one rep of each arm in turn — rather than as separate blocks, so the two arms of a
+ratio see the same machine.
+
+What this leaves unguarded, stated: a regression that costs real time without costing counters —
+work moving into C++ builtins — since counters are a lower bound by construction. That class is not
+this bench's to catch. A change that *claims* a wall-clock win is accepted under the interleaved,
+NULL-parity P1–P5 protocol (den-architecture, canreach-split spec §W), which is where wall-clock
+evidence is admissible. The split is deliberate: perf-bench does counter-based regression
+*detection*; §W does per-remedy wall-clock *acceptance*.
 
 The `classShare` section adds its own two gates (own thresholds, not the pure/ref ones):
 
@@ -105,7 +132,8 @@ The `overrideWarm` section adds its own gates (own threshold, not the pure/ref o
 ### Baseline (2026-07-05, Nix 2.34.7, gen-merge `fdbf140`, gen-class `218c54f`)
 
 Whole matrix regenerated at a single gen-merge pin (every number from `nix run ./ci#perf-bench`;
-counters are deterministic per Nix version, cpu is same-process ratio context). Ratio row = the
+counters are deterministic per Nix version; the cpu columns are ungated context, valid only for the
+host and the moment that produced them). Ratio row = the
 largest size per workload:
 
 | workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
@@ -139,12 +167,15 @@ alongside declared options, with mkDefault/mkForce/mkIf layers driving priority 
 absorption path. Its **thunk** ratio sits in a parity band rather than below the 0.90 win-gate:
 freeform absorption rides the SAME per-key type merges nixpkgs.lib performs (the engine's thunk win is
 on DECLARED option paths), so thunk-parity is the honest contract on that counter (band-gated at
-`WIDEFREEFORM_RATIO_MAX = 1.3`, deterministic 1.099 + ~18% headroom). Its **cpu** also rides a band
-(`WIDEFREEFORM_CPU_MAX = 0.95`) rather than the 0.85 win-gate: absorption cpu IS genuinely sub-parity,
-but this cell is tiny (~0.07s at n=8000) so the ratio is load-sensitive — measured spread **0.776–0.888**
-across load conditions (quiet median ~0.80; an authoritative run under load hit 0.867), which flakes the
-default 0.85 win-gate on cpu noise, not a regression. The `0.95` ceiling sits above the load tail as a
-gross-regression cap. Only **alloc** keeps a default win-gate (deterministic 0.821). The band's real
+`WIDEFREEFORM_RATIO_MAX = 1.3`, deterministic 1.099 + ~18% headroom). Its **cpu** used to ride a band
+of its own (`0.95`, against the 0.85 win-gate) on the ground that the cell is tiny (~0.07s at n=8000)
+and therefore load-sensitive. That band is retired with the rest of the cpu gating, and its
+justification is worth recording as a lesson rather than a threshold: the spread it was fitted to
+(**0.776–0.888**) was produced by the blocked A-then-B protocol this harness no longer runs, and a
+figure a blocked protocol produced on a bimodal host is not evidence about its subject. Widening the
+band had already been tried on exactly this cell and it still flaked — the last shipped measurement
+put it at 0.914 against the 0.95 ceiling, 3.9% of headroom on an instrument whose noise floor is a
+~2.2× raw regime step. Only **alloc** keeps a default win-gate (deterministic 0.821). The band's real
 teeth are LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to
 expose (pre-fix, n=8000 pure thunks were 468× ref; gen-merge `976a87a`→`018bafa` coalesces the per-key
 unmatched defs per originating module, restoring linear absorption). Full pre-fix quadratic data:

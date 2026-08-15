@@ -12,15 +12,30 @@
 #   PERF_WORKLOADS — store path of the workload corpus (ci/perf-bench.nix)
 #   PERF_SRCS      — store path of a .nix attrset mapping lib names → source store paths
 #
-# Gates (rationale + baselines: ci/README.md):
+# Gates (rationale + baselines: ci/README.md) — every gate reads a DETERMINISTIC evaluator counter:
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
-#   ratio     — at the largest size per workload: pure cpu ≤ 0.85×ref; pure thunks/alloc ≤ 0.90×ref
-#               (wideFreeform exception: only ALLOC keeps the default gate; THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX
-#               and CPU rides a band ≤ WIDEFREEFORM_CPU_MAX — the cell is tiny + load-sensitive on cpu)
+#   ratio     — at the largest size per workload: pure thunks/alloc ≤ 0.90×ref
+#               (wideFreeform exception: only ALLOC keeps the default gate; THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX)
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×)
 #
-# cpu is the median of $REPS runs (same-process ratio, robust to host speed); thunk/alloc counters
-# are deterministic per nix version, taken from the last rep.
+# cpu is measured, reported, and GATED BY NOTHING. Every gated axis above is a function of the
+# evaluated expression alone; cpuTime is a function of the expression AND the machine's state, so
+# gating it through the same `lte` types a non-deterministic quantity as deterministic — a defect no
+# threshold and no rep count repairs. Measured: this host evaluates one tree at two stable frequency
+# regimes ~2.2× apart — a RAW whole-cell ratio, not net-of-floor, and the two differ because the
+# startup floor is itself bimodal — which exceeds the detection margin of five of the six cells the
+# cpu gate used to cover, and the pure/ref ratio moved 0.734–1.873 across runs of byte-identical
+# trees while every counter stayed byte-identical. The failure runs both ways, and the false GREEN (a regression
+# passing because the host sped up between arms) is the dangerous half. Report-only cpu is this
+# script's own prior convention: classShare's `cpu f/f` and overrideWarm's `cpu w/c` have always been
+# computed, printed, and read by no gate. This bench detects regressions on counters; a change
+# CLAIMING a wall-clock win is accepted under the P1–P5 protocol (den-architecture canreach-split
+# spec §W), never here. The class that leaves unguarded is work moving INTO C++ builtins — counters
+# are a lower bound by construction — and that is what §W acceptance is for.
+#
+# cpu is the median of $REPS INTERLEAVED samples: a row's arms are sampled round-robin, one rep of
+# each in turn, never as separate blocks (see run_row). thunk/alloc counters are deterministic per
+# nix version, taken from the last rep.
 
 UPDATE_FILE=""
 if [[ "${1:-}" == "--update" ]]; then
@@ -38,7 +53,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
-# (only alloc default-gated; thunks band ≤ WIDEFREEFORM_RATIO_MAX, cpu band ≤ WIDEFREEFORM_CPU_MAX), small/big = linearity pair (big = 4×small)
+# (only alloc default-gated; thunks band ≤ WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
 # noref = PURE-ONLY row: no reference cell is measured, so it carries no parity/ratio verdict and is
 # reported apart from the pure/ref table. A pure/ref gate is only meaningful where a frozen reference
 # can track its subject; the aspect grammar moves by design ruling, so no frozen aspect stack can (see
@@ -61,7 +76,6 @@ MATRIX=(
 )
 
 REPS=3
-CPU_RATIO_MAX=0.85
 COUNTER_RATIO_MAX=0.90
 GROWTH_MAX=5.5
 
@@ -76,22 +90,22 @@ CLASSSHARE_SMALL=400
 CLASSSHARE_BIG=1600
 CLASSSHARE_RATIO_MAX=0.30
 
-# ── wideFreeform — THUNK band + CPU band (only alloc keeps the default win-gate) ──
+# ── wideFreeform — THUNK band (only alloc keeps the default win-gate) ──
 # Freeform absorption is THUNK-parity with nixpkgs, not a pure win on that counter: unknown sibling keys
 # route through the root freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib
 # performs (the pure engine's thunk win is on DECLARED option paths — see scalar/registry/aspects). So
-# the THUNK ratio rides a band. CPU rides its OWN band too (same philosophy): absorption cpu IS genuinely
-# sub-parity, but this cell is tiny (~0.07s) and the ratio is load-sensitive — measured spread 0.776-0.888
-# at n=8000 across load conditions (quiet median ~0.80; an authoritative run under load hit 0.867), so the
-# default 0.85 win-gate flakes on cpu noise, not a regression. Only ALLOC stays on the default win-gate.
+# the THUNK ratio rides a band; only ALLOC stays on the default win-gate.
 # Deterministic anchors (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at n=8000: thunks 1.099, alloc 0.821.
-# The thunk ceiling 1.3 = measured 1.099 + ~18% headroom; the cpu ceiling 0.95 = above the load tail
-# (0.888) as a gross-regression cap. The real teeth are LINEARITY (the O(n^2) freeform blowup this workload
-# was built to catch — pre-fix n=8000 thunks were 468×ref, gated at GROWTH_MAX over a 4x step) + the thunk
-# band + the deterministic counters; the cpu band is only a gross-regression cap. See
-# den-architecture/parked/wideFreeform-b4/NOTES.md; regenerate via `nix run ./ci#perf-bench`.
+# The thunk ceiling 1.3 = measured 1.099 + ~18% headroom. The real teeth are LINEARITY (the O(n^2)
+# freeform blowup this workload was built to catch — pre-fix n=8000 thunks were 468×ref, gated at
+# GROWTH_MAX over a 4x step) + the thunk band + the deterministic counters. This cell also used to carry
+# a cpu band of its own; it was the thinnest-margin cpu gate in the matrix (0.914 measured against a 0.95
+# ceiling — 3.9% headroom on an instrument whose noise floor is a ~2.2× raw frequency-regime step) and it is
+# retired with the rest, along with the 0.776–0.888 spread that set it: that spread was produced by the
+# blocked A-then-B protocol this script no longer runs, and a figure a blocked protocol produced on this
+# host is not evidence about the subject. See den-architecture/parked/wideFreeform-b4/NOTES.md;
+# regenerate via `nix run ./ci#perf-bench`.
 WIDEFREEFORM_RATIO_MAX=1.3
-WIDEFREEFORM_CPU_MAX=0.95
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -108,8 +122,10 @@ OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
 OVERRIDEWARM_RATIO_MAX=0.30
 
-declare -A CPU THUNKS ALLOC DIG
+declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
+CELL_ERRF=""
+CELL_OUT=""
 declare -A LIN_SMALL LIN_BIG LIN_TG LIN_AG
 declare -A CS_TR CS_AR CS_CR CS_BG
 CS_LIN_FULL=""
@@ -159,33 +175,35 @@ die_cell() {
 # zero carried forward surfaces far downstream as an awk division-by-zero at report stage, after
 # the entire matrix has been measured and with no cell named. jq's own stderr is left unredirected
 # so its parse error reaches the operator ahead of the identity line.
-run_cell() {
-  local w=$1 n=$2 s=$3
-  local cpus=() statf="" errf="" out="" rep status cpu="" med="" thunks="" alloc="" dig=""
-  for rep in $(seq 1 "$REPS"); do
-    statf="$tmp/$w-$n-$s-$rep.json"
-    errf="$tmp/$w-$n-$s-$rep.err"
-    CELL="workload=$w n=$n stack=$s rep=$rep"
-    # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
-    # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
-    status=0
-    out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
-      "$PERF_WORKLOADS" --arg srcs "import $PERF_SRCS" \
-      --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
-    # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
-    # report's shape, which is what a cross-rev comparison of this bench reads.
-    # The status is judged BEFORE the artefacts. An evaluator that fails while still leaving a
-    # plausible stats file and a digest would otherwise be measured and REPORTED — a whole matrix of
-    # fabricated figures carrying a confident regression verdict, which names the wrong defect
-    # instead of merely losing the right one.
-    [[ $status -eq 0 ]] || die_cell "evaluator exited non-zero" "$status" "$errf" "$out"
-    [[ -s "$statf" ]] || die_cell "no stats file at $statf" "$status" "$errf" "$out"
-    cpu=$(jq -e '.cpuTime | numbers | select(. > 0)' "$statf") \
-      || die_cell "no usable .cpuTime in $statf" "$status" "$errf" "$out"
-    cpus+=("$cpu")
-  done
-  med=$(printf '%s\n' "${cpus[@]}" | sort -g | sed -n 2p) || med=""
-  [[ -n "$med" ]] || die_cell "the median of $REPS cpu samples is empty" "$status" "$errf" "$out"
+#
+# ONE REP of one cell. The counters and the digest are recorded on EVERY rep rather than read off the
+# last rep after the loop: they are deterministic per Nix version, so the recorded value is the same
+# either way, and validating each rep keeps every die_cell inside the scope that still holds that
+# rep's captured streams. The captures are also published as CELL_ERRF/CELL_OUT for the one check
+# that cannot run until every rep is in — the median, back in run_row.
+sample_cell() {
+  local w=$1 n=$2 s=$3 rep=$4
+  local statf="$tmp/$w-$n-$s-$rep.json" errf="$tmp/$w-$n-$s-$rep.err"
+  local out="" status cpu thunks alloc dig
+  CELL="workload=$w n=$n stack=$s rep=$rep"
+  # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
+  # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
+  status=0
+  out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
+    "$PERF_WORKLOADS" --arg srcs "import $PERF_SRCS" \
+    --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
+  CELL_ERRF=$errf
+  CELL_OUT=$out
+  # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
+  # report's shape, which is what a cross-rev comparison of this bench reads.
+  # The status is judged BEFORE the artefacts. An evaluator that fails while still leaving a
+  # plausible stats file and a digest would otherwise be measured and REPORTED — a whole matrix of
+  # fabricated figures carrying a confident regression verdict, which names the wrong defect
+  # instead of merely losing the right one.
+  [[ $status -eq 0 ]] || die_cell "evaluator exited non-zero" "$status" "$errf" "$out"
+  [[ -s "$statf" ]] || die_cell "no stats file at $statf" "$status" "$errf" "$out"
+  cpu=$(jq -e '.cpuTime | numbers | select(. > 0)' "$statf") \
+    || die_cell "no usable .cpuTime in $statf" "$status" "$errf" "$out"
   thunks=$(jq -e '.nrThunks | numbers | select(. > 0)' "$statf") \
     || die_cell "no usable .nrThunks in $statf" "$status" "$errf" "$out"
   alloc=$(jq -e '.gc.totalBytes | numbers | select(. > 0)' "$statf") \
@@ -196,10 +214,36 @@ run_cell() {
   # so the absence would pass entirely unseen — the same silence, one surface over.
   dig=$(printf '%s' "$out" | grep -o 'digest = "[a-f0-9]*"' | cut -d'"' -f2) || dig=""
   [[ -n "$dig" ]] || die_cell "eval succeeded but stdout carries no digest" "$status" "$errf" "$out"
-  CPU["$w,$n,$s"]=$med
+  CPU_SAMPLES["$w,$n,$s"]+="$cpu"$'\n'
   THUNKS["$w,$n,$s"]=$thunks
   ALLOC["$w,$n,$s"]=$alloc
   DIG["$w,$n,$s"]=$dig
+}
+
+# A ROW's arms, sampled ROUND-ROBIN: rep 1 of every arm, then rep 2 of every arm, and so on — never
+# block-sampled (every rep of one arm, then every rep of the next). A blocked protocol reads two
+# arms at two different moments, so on a host that changes frequency regime it fabricates the
+# between-arm ratio whenever the transition falls between the blocks — measured 2.1× on IDENTICAL
+# work — while the tight spread WITHIN each block reads as confidence, because the spread inside one
+# regime genuinely is small. Interleaving does not make cpu deterministic; nothing does, which is why
+# no gate reads it. It is the difference between a reported figure whose arms saw the same machine
+# and one whose arms did not. The arm list is variadic because every comparison in this script is a
+# row of arms: pure/ref, the single-arm noref rows, pure-full/pure-fixed, cold/warm.
+run_row() {
+  local w=$1 n=$2
+  shift 2
+  local rep s med
+  for rep in $(seq 1 "$REPS"); do
+    for s in "$@"; do
+      sample_cell "$w" "$n" "$s" "$rep"
+    done
+  done
+  for s in "$@"; do
+    med=$(printf '%s' "${CPU_SAMPLES[$w,$n,$s]}" | sort -g | sed -n 2p) || med=""
+    CELL="workload=$w n=$n stack=$s"
+    [[ -n "$med" ]] || die_cell "the median of $REPS cpu samples is empty" 0 "$CELL_ERRF" "$CELL_OUT"
+    CPU["$w,$n,$s"]=$med
+  done
 }
 
 ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
@@ -210,9 +254,10 @@ has_tag() { [[ ",$1," == *",$2,"* ]]; }
 echo "collecting: ${#MATRIX[@]} cells (pure) + the ref arm of every non-noref row × $REPS reps ..." >&2
 for row in "${MATRIX[@]}"; do
   read -r w n tags <<<"$row"
-  run_cell "$w" "$n" pure
-  if ! has_tag "$tags" noref; then
-    run_cell "$w" "$n" ref
+  if has_tag "$tags" noref; then
+    run_row "$w" "$n" pure
+  else
+    run_row "$w" "$n" pure ref
   fi
 done
 
@@ -232,15 +277,14 @@ for row in "${MATRIX[@]}"; do
     PAR["$w,$n"]="MISMATCH"
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
+  # CR is computed and reported but never gated — see the cpu note in the header.
   if has_tag "$tags" r; then
-    lte "${CR[$w,$n]}" "$CPU_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref cpu ${CR[$w,$n]} > $CPU_RATIO_MAX")
     lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
   elif has_tag "$tags" rb; then
-    # wideFreeform: only ALLOC keeps the DEFAULT win-gate; THUNKS and CPU each ride their own parity band.
+    # wideFreeform: only ALLOC keeps the DEFAULT win-gate; THUNKS ride their own parity band.
     lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
     lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
-    lte "${CR[$w,$n]}" "$WIDEFREEFORM_CPU_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref cpu ${CR[$w,$n]} > $WIDEFREEFORM_CPU_MAX")
   fi
 done
 
@@ -262,14 +306,13 @@ done
 
 # ── classShare — the gen-class tier-2 fixed-input spine gate (spec §2.5) ────────
 # DEDICATED section: classShare's two "stacks" are pure-full / pure-fixed (both the PURE engine), so
-# its ratios are fixed-vs-full — NOT the pure-vs-ref parity/CPU_RATIO_MAX semantics of the matrix loop
+# its ratios are fixed-vs-full — NOT the pure-vs-ref parity/counter-ratio semantics of the matrix loop
 # above. It runs its own two sizes × REPS, asserts the in-bench BYTE gate (full == fixed byte-for-byte,
 # the perf-scale twin of gateCore), gates the spine reduction against CLASSSHARE_RATIO_MAX, and owns its
 # linearity growth check. Failures print expected/actual/delta (the verbose STOP-on-diff discipline).
 delta() { awk "BEGIN{printf \"%+.4f\", ($1)-($2)}"; }
 for n in "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG"; do
-  run_cell classShare "$n" pure-full
-  run_cell classShare "$n" pure-fixed
+  run_row classShare "$n" pure-full pure-fixed
   # BYTE GATE (in-bench): the fixed-input reconstruction must be byte-identical to the full re-merge.
   if [[ -n "${DIG[classShare,$n,pure-full]}" && "${DIG[classShare,$n,pure-full]}" == "${DIG[classShare,$n,pure-fixed]}" ]]; then
     CS_BG[$n]="ok"
@@ -299,8 +342,7 @@ lte "$CS_LIN_FIXED" "$GROWTH_MAX" \
 # BYTE gate (warm == cold byte-for-byte, the perf-scale twin of gen-merge's warm-vs-cold byte oracle),
 # gates the warm reuse (thunks AND alloc) against OVERRIDEWARM_RATIO_MAX, and owns its linearity check.
 for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
-  run_cell overrideWarm "$n" cold
-  run_cell overrideWarm "$n" warm
+  run_row overrideWarm "$n" cold warm
   # BYTE GATE (in-bench): the warm re-eval must be byte-identical to the cold from-scratch eval.
   if [[ -n "${DIG[overrideWarm,$n,cold]}" && "${DIG[overrideWarm,$n,cold]}" == "${DIG[overrideWarm,$n,warm]}" ]]; then
     OW_BG[$n]="ok"
@@ -340,7 +382,7 @@ emit_report() {
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
-  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs) and cpu rides a band (gate ≤ %s — tiny load-sensitive cell); only alloc keeps the default win-gate. See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$WIDEFREEFORM_CPU_MAX"
+  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs); only alloc keeps the default win-gate. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$REPS"
   echo
   echo "### pure-only workloads (no reference arm; report-only counters, gated on linearity below)"
   echo
