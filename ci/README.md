@@ -4,10 +4,10 @@ Two permanent regression nets guard the pure-gen module system (gen-prelude → 
 gen-merge → re-hosted gen-schema/gen-aspects) against the frozen nixpkgs reference stack
 (original gen-schema/gen-aspects driven by pinned `github:nix-community/nixpkgs.lib`):
 
-| Net | What it proves | Runs as |
-|---|---|---|
-| **Byte-parity oracle** | pure stack output == nixpkgs stack output, byte-for-byte (incl the `id_hash` SHA), over a real-den registry sample; mutation-teeth prove the oracle discriminates | `nix flake check ./ci` — `rehost-den-parity` |
-| **Perf-regression bench** | pure stack stays FASTER and LIGHTER than the nixpkgs stack, and stays LINEAR in workload size | `nix run ./ci#perf-bench` |
+| Net                       | What it proves                                                                                                                                                    | Runs as                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Byte-parity oracle**    | pure stack output == nixpkgs stack output, byte-for-byte (incl the `id_hash` SHA), over a real-den registry sample; mutation-teeth prove the oracle discriminates | `nix flake check ./ci` — `rehost-den-parity` |
+| **Perf-regression bench** | pure stack stays FASTER and LIGHTER than the nixpkgs stack, and stays LINEAR in workload size                                                                     | `nix run ./ci#perf-bench`                    |
 
 Both sides are pinned reproducibly: the PURE side tracks the published re-host mains (a change
 that breaks parity or performance fails CI); the REFERENCE side is frozen at the pre-re-host rev
@@ -136,15 +136,15 @@ counters are deterministic per Nix version; the cpu columns are ungated context,
 host and the moment that produced them). Ratio row = the
 largest size per workload:
 
-| workload | n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
-|---|---:|---:|---:|---:|---:|---:|
-| scalar | 8000 | 0.105s | 0.073s | 0.695 | 0.882 | 0.708 |
-| registry | 2000 | 0.166s | 0.084s | 0.507 | 0.524 | 0.423 |
-| lazyRegistry | 2000 | 0.163s | 0.079s | 0.486 | 0.524 | 0.423 |
-| schemaHosts | 1600 | 0.221s | 0.139s | 0.628 | 0.650 | 0.545 |
-| aspects | 1600 | 0.350s | 0.133s | 0.380 | 0.386 | 0.310 |
-| wideFreeform | 8000 | 0.086s | 0.070s | 0.812 | 1.099 | 0.821 |
-| deepSubmodule | 1600 | 1.474s | 0.231s | 0.157 | 0.314 | 0.255 |
+| workload      |    n | ref cpu | pure cpu | cpu p/r | thunks p/r | alloc p/r |
+| ------------- | ---: | ------: | -------: | ------: | ---------: | --------: |
+| scalar        | 8000 |  0.105s |   0.073s |   0.695 |      0.882 |     0.708 |
+| registry      | 2000 |  0.166s |   0.084s |   0.507 |      0.524 |     0.423 |
+| lazyRegistry  | 2000 |  0.163s |   0.079s |   0.486 |      0.524 |     0.423 |
+| schemaHosts   | 1600 |  0.221s |   0.139s |   0.628 |      0.650 |     0.545 |
+| aspects       | 1600 |  0.350s |   0.133s |   0.380 |      0.386 |     0.310 |
+| wideFreeform  | 8000 |  0.086s |   0.070s |   0.812 |      1.099 |     0.821 |
+| deepSubmodule | 1600 |  1.474s |   0.231s |   0.157 |      0.314 |     0.255 |
 
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
 wideFreeform 3.988×/3.985×, deepSubmodule 3.998×/3.996×.
@@ -188,10 +188,10 @@ Full methodology, the pre-fix quadratic data, and the interpretation against the
 
 Fixed-input (`pure-fixed`) vs full re-merge (`pure-full`), 6-member class, ratios = fixed ÷ full:
 
-| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
-|---|---:|---:|---:|---:|---:|---|
-| 400 | 1,345,768 | 230,621 | 0.171 | 0.187 | 0.260 | ok |
-| 1600 | 5,375,368 | 915,221 | 0.170 | 0.215 | 0.240 | ok |
+| n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
+| ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
+| 400  |   1,345,768 |      230,621 |      0.171 |     0.187 |   0.260 | ok        |
+| 1600 |   5,375,368 |      915,221 |      0.170 |     0.215 |   0.240 | ok        |
 
 Thunk linearity (400 → 1600, ×4 step): pure-full 3.99×, pure-fixed 3.97×.
 
@@ -213,10 +213,10 @@ the workload is never deleted to make it pass.
 
 Warm re-eval (`warm`) vs cold from-scratch (`cold`), 6-override class, ratios = warm ÷ cold:
 
-| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
-|---|---:|---:|---:|---:|---:|---|
-| 400 | 1,368,412 | 232,030 | 0.170 | 0.174 | 0.298 | ok |
-| 1600 | 5,464,012 | 916,630 | 0.168 | 0.172 | 0.213 | ok |
+| n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
+| ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
+| 400  |   1,368,412 |     232,030 |      0.170 |     0.174 |   0.298 | ok        |
+| 1600 |   5,464,012 |     916,630 |      0.168 |     0.172 |   0.213 | ok        |
 
 Thunk linearity (400 → 1600, ×4 step): cold 3.99×, warm 3.95×.
 

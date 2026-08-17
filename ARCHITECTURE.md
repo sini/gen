@@ -280,11 +280,11 @@ Each call hits memoized values. No redundant computation between libraries.
 
 Three fixpoint loops, each at a different level:
 
-| Level | Library | What converges | Triggered by |
-|-------|---------|---------------|-------------|
-| Value | gen-algebra (search.converge) | Index state + continuations | Search monad operations |
-| Structure | gen-scope (circular attr) | Attribute values on nodes | Circular dependencies between attributes |
-| Dispatch | gen-resolve (via gen-scope.circular) | Rule context (domain state) | Enrichment actions that widen context |
+| Level     | Library                              | What converges              | Triggered by                             |
+| --------- | ------------------------------------ | --------------------------- | ---------------------------------------- |
+| Value     | gen-algebra (search.converge)        | Index state + continuations | Search monad operations                  |
+| Structure | gen-scope (circular attr)            | Attribute values on nodes   | Circular dependencies between attributes |
+| Dispatch  | gen-resolve (via gen-scope.circular) | Rule context (domain state) | Enrichment actions that widen context    |
 
 The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies only the pure step (`dispatch`, a function of `(rules, context)`), and gen-resolve drives it to convergence with `gen-scope.circular` (Kleene ascent) by threading the plain domain state and reading actions off the fixpoint. The consumer (den) coordinates these: gen-resolve's loop runs the dispatch step, which may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
 
@@ -292,25 +292,25 @@ The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies onl
 
 ### Memoization Strategy
 
-| Library | Mechanism | Scope |
-|---------|-----------|-------|
-| gen-scope | `_eval` attrset co-located on each node | Per-node, per-attribute |
-| gen-graph | Accessor functions (caller's responsibility) | Delegates to source (gen-scope `_eval` when wired) |
-| gen-dispatch | `fired` set across loop iterations (loop driven by gen-resolve) | Per-dispatch-session |
-| gen-select | None (stateless predicate evaluation) | Each match is fresh but data access hits gen-scope cache |
+| Library      | Mechanism                                                       | Scope                                                    |
+| ------------ | --------------------------------------------------------------- | -------------------------------------------------------- |
+| gen-scope    | `_eval` attrset co-located on each node                         | Per-node, per-attribute                                  |
+| gen-graph    | Accessor functions (caller's responsibility)                    | Delegates to source (gen-scope `_eval` when wired)       |
+| gen-dispatch | `fired` set across loop iterations (loop driven by gen-resolve) | Per-dispatch-session                                     |
+| gen-select   | None (stateless predicate evaluation)                           | Each match is fresh but data access hits gen-scope cache |
 
 ### Cost Model
 
-| Operation | Cost | Bottleneck |
-|-----------|------|-----------|
-| Attribute access (cached) | O(1) | Nix attrset lookup |
-| Attribute access (first, root) | O(1) | Lazy thunk evaluation |
-| Attribute access (first, synthesized) | O(depth) | Parent chain walk via parseParent |
-| Graph traversal (lazy) | O(reachable) | C-level BFS |
-| Graph traversal (global) | O(n) | Full node enumeration |
-| Selector match | O(selector complexity) | Short-circuit on first false/true |
-| Rule dispatch (one step) | O(rules × context checks) | fromFunctionMatch is O(1) per rule |
-| Convergence loop iteration | O(iterations × dispatch) | gen-resolve loop; identified rules fire at most once |
+| Operation                             | Cost                      | Bottleneck                                           |
+| ------------------------------------- | ------------------------- | ---------------------------------------------------- |
+| Attribute access (cached)             | O(1)                      | Nix attrset lookup                                   |
+| Attribute access (first, root)        | O(1)                      | Lazy thunk evaluation                                |
+| Attribute access (first, synthesized) | O(depth)                  | Parent chain walk via parseParent                    |
+| Graph traversal (lazy)                | O(reachable)              | C-level BFS                                          |
+| Graph traversal (global)              | O(n)                      | Full node enumeration                                |
+| Selector match                        | O(selector complexity)    | Short-circuit on first false/true                    |
+| Rule dispatch (one step)              | O(rules × context checks) | fromFunctionMatch is O(1) per rule                   |
+| Convergence loop iteration            | O(iterations × dispatch)  | gen-resolve loop; identified rules fire at most once |
 
 ### Fleet Scale Guidance
 

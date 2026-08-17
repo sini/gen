@@ -48,20 +48,20 @@ rev is the anchor — a reader checks out that exact rev and reproduces the coun
 
 Every proof, its one command, and how it fails. The rest of this document expands each row.
 
-| Proof | Command | Fails if |
-|---|---|---|
-| **Module system compatibility** (was `rehost-byte-parity`) | — | GATE SUSPENDED, PROMISE STANDS — rebuilt at the final rounds; carrier den-hoag-gkkh |
-| Real-den byte-parity (`rehost-den-parity`) | `nix flake check ./ci` | den's real registry shape diverges across stacks |
-| gen-merge engine suite (167) | `nix flake check ./ci` (in the gen-merge repo) | any merge / lint / classify / warm / provenance test regresses |
-| gen-flake terminal suite (89) | `nix flake check ./ci` (in the gen-flake repo) | compose / override / diff / realize / terminal regresses |
-| Per-library suites (§2 table) | `nix flake check ./ci` (per lib repo) | any lib's nix-unit suite fails |
-| Purity — nixpkgs-lib-free cores | `nix-unit --flake ./ci#tests.purity` (per pure lib) | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/` |
-| Config-thunk deferral | `nix-unit --flake ./ci#tests.deferral` (gen-merge) | a marker forces early, or diverges from nixpkgs at the terminal |
-| Migrated demos (canaries) | each demo's `nix flake check` / eval | a re-hosted demo stops producing byte-identical output |
-| Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note) |
-| 3-way comparison (drvPath equivalence) | `nix run ./ci#flake-compare` | any output builds differently across flake-parts / adios / gen-flake |
-| Fleet-scale dedup gates | `nix run ./ci#fleet-gates` (hola) | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached |
-| Fleet-number consistency (in-repo) | `nix run ./ci#fleet-consistency` | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor) |
+| Proof                                                      | Command                                             | Fails if                                                                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Module system compatibility** (was `rehost-byte-parity`) | —                                                   | GATE SUSPENDED, PROMISE STANDS — rebuilt at the final rounds; carrier den-hoag-gkkh                                                                         |
+| Real-den byte-parity (`rehost-den-parity`)                 | `nix flake check ./ci`                              | den's real registry shape diverges across stacks                                                                                                            |
+| gen-merge engine suite (167)                               | `nix flake check ./ci` (in the gen-merge repo)      | any merge / lint / classify / warm / provenance test regresses                                                                                              |
+| gen-flake terminal suite (89)                              | `nix flake check ./ci` (in the gen-flake repo)      | compose / override / diff / realize / terminal regresses                                                                                                    |
+| Per-library suites (§2 table)                              | `nix flake check ./ci` (per lib repo)               | any lib's nix-unit suite fails                                                                                                                              |
+| Purity — nixpkgs-lib-free cores                            | `nix-unit --flake ./ci#tests.purity` (per pure lib) | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/`                                                                                           |
+| Config-thunk deferral                                      | `nix-unit --flake ./ci#tests.deferral` (gen-merge)  | a marker forces early, or diverges from nixpkgs at the terminal                                                                                             |
+| Migrated demos (canaries)                                  | each demo's `nix flake check` / eval                | a re-hosted demo stops producing byte-identical output                                                                                                      |
+| Performance (parity + ratio + linearity)                   | `nix run ./ci#perf-bench`                           | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note) |
+| 3-way comparison (drvPath equivalence)                     | `nix run ./ci#flake-compare`                        | any output builds differently across flake-parts / adios / gen-flake                                                                                        |
+| Fleet-scale dedup gates                                    | `nix run ./ci#fleet-gates` (hola)                   | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached                                                                         |
+| Fleet-number consistency (in-repo)                         | `nix run ./ci#fleet-consistency`                    | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor)                                                              |
 
 ## 1. The byte-parity oracle, and the claim its retired sibling held
 
@@ -200,25 +200,25 @@ unforced flake input, not the witness.
 Every gen library ships a nix-unit suite. The counts below are the `N/N successful` figure
 nix-unit prints — i.e. every listed test **executed and passed** — at the recorded revision.
 
-| Library | rev | tests | suite artifact |
-|---|---|---:|---|
-| gen-prelude | `968579c` | 41 | `ci/tests/` |
-| gen-algebra | `40147f4` | 128 | `ci/tests/` |
-| gen-types | `3513399` | 105 | `ci/tests/` |
-| gen-merge | `fdbf140` | 167 | `ci/tests/` (detail below) |
-| gen-schema | `05a18be` | 398 | `ci/tests/` |
-| gen-aspects | `dda5ab2` | 110 | `ci/tests/` |
-| gen-scope | `8599e5f` | 167 | `ci/tests/` |
-| gen-graph | `df7c893` | 153 | `ci/tests/` |
-| gen-select | `7b1cdae` | 104 | `ci/tests/` |
-| gen-bind | `f08a103` | 65 | `ci/tests/` |
-| gen-dispatch | `f2956fb` | 55 | `ci/tests/` |
-| gen-resolve | `d429eb3` | 58 | `ci/tests/` |
-| gen-flake | `88f639c` | 89 | `ci/tests/` (detail below) |
-| gen-class | `218c54f` | 90 | `ci/tests/` |
-| gen-rebuild | `7a87691` | 211 | `ci/tests/` |
-| gen-vars | `56d1911` | 47 | `ci/tests/` |
-| **total** | | **1988** | |
+| Library      | rev       |    tests | suite artifact             |
+| ------------ | --------- | -------: | -------------------------- |
+| gen-prelude  | `968579c` |       41 | `ci/tests/`                |
+| gen-algebra  | `40147f4` |      128 | `ci/tests/`                |
+| gen-types    | `3513399` |      105 | `ci/tests/`                |
+| gen-merge    | `fdbf140` |      167 | `ci/tests/` (detail below) |
+| gen-schema   | `05a18be` |      398 | `ci/tests/`                |
+| gen-aspects  | `dda5ab2` |      110 | `ci/tests/`                |
+| gen-scope    | `8599e5f` |      167 | `ci/tests/`                |
+| gen-graph    | `df7c893` |      153 | `ci/tests/`                |
+| gen-select   | `7b1cdae` |      104 | `ci/tests/`                |
+| gen-bind     | `f08a103` |       65 | `ci/tests/`                |
+| gen-dispatch | `f2956fb` |       55 | `ci/tests/`                |
+| gen-resolve  | `d429eb3` |       58 | `ci/tests/`                |
+| gen-flake    | `88f639c` |       89 | `ci/tests/` (detail below) |
+| gen-class    | `218c54f` |       90 | `ci/tests/`                |
+| gen-rebuild  | `7a87691` |      211 | `ci/tests/`                |
+| gen-vars     | `56d1911` |       47 | `ci/tests/`                |
+| **total**    |           | **1988** |                            |
 
 - **Command (gate):** clone the repo, then from its root `nix flake check ./ci`.
 - **Command (count):** `nix develop ./ci -c nix-unit --flake ./ci#tests` prints the `N/N successful`
@@ -235,25 +235,25 @@ nix-unit prints — i.e. every listed test **executed and passed** — at the re
 gen-merge is the `lib.evalModules` / `lib.types` replacement — the byte-mode merge half of the
 module system — so its suite is the densest correctness surface in the ecosystem. Measured per suite:
 
-| suite | tests | proves |
-|---|---:|---|
-| oracle | 22 | byte-identity vs the nixpkgs merge over the shared parity corpus, its mutation teeth, and the freeform-absorption trio |
-| merge | 15 | the core `(loc, defs)` merge, priority discharge, `mkIf`/`mkMerge`/`mkDefault`/`mkForce` |
-| combinators | 7 | `listOf` / `nullOr` / `oneOf` / `either` type combinators |
-| checking | 2 | leaf-type verification through gen-types |
-| introspection | 3 | the options-introspection surface (sub-options, defaults) |
-| freeform | 2 | `freeformType` absorption of unknown keys |
-| deferred | 1 | `deferredModule` |
-| moduleArgs | 1 | `_module.args` threading |
-| deferral | 12 | config-thunk carry through compose → route → terminal (see §4) |
-| compat | 12 | compat mode — nixpkgs `lib.types` drive the engine byte-identically at leaf types; the structural boundary is proven, not asserted |
-| core-kernel | 12 | the fixed-input kernel (`evalModuleTree { coreShortCircuit }` + `mkCoreValue`) — default-off, byte-identical where it fires, deterministic firing |
-| lint | 34 | the portable-subset lint — accepts every parity-corpus module, rejects one fixture per unsupported construct, and inherits the engine's forcing profile (totality) |
-| classify | 12 | source-class threading + the `pureModule` marker + the `configOf` strip |
-| warm | 22 | warm re-eval byte oracles, incl. the adversarial **lying-marker** and the **group-splice hazard** teeth |
-| provenance | 9 | provenance records (winners / priority / defaulted) + the **values-untouched** tooth |
-| purity | 1 | the nixpkgs-lib-free source scan (see §3) |
-| **total** | **167** | |
+| suite         |   tests | proves                                                                                                                                                             |
+| ------------- | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| oracle        |      22 | byte-identity vs the nixpkgs merge over the shared parity corpus, its mutation teeth, and the freeform-absorption trio                                             |
+| merge         |      15 | the core `(loc, defs)` merge, priority discharge, `mkIf`/`mkMerge`/`mkDefault`/`mkForce`                                                                           |
+| combinators   |       7 | `listOf` / `nullOr` / `oneOf` / `either` type combinators                                                                                                          |
+| checking      |       2 | leaf-type verification through gen-types                                                                                                                           |
+| introspection |       3 | the options-introspection surface (sub-options, defaults)                                                                                                          |
+| freeform      |       2 | `freeformType` absorption of unknown keys                                                                                                                          |
+| deferred      |       1 | `deferredModule`                                                                                                                                                   |
+| moduleArgs    |       1 | `_module.args` threading                                                                                                                                           |
+| deferral      |      12 | config-thunk carry through compose → route → terminal (see §4)                                                                                                     |
+| compat        |      12 | compat mode — nixpkgs `lib.types` drive the engine byte-identically at leaf types; the structural boundary is proven, not asserted                                 |
+| core-kernel   |      12 | the fixed-input kernel (`evalModuleTree { coreShortCircuit }` + `mkCoreValue`) — default-off, byte-identical where it fires, deterministic firing                  |
+| lint          |      34 | the portable-subset lint — accepts every parity-corpus module, rejects one fixture per unsupported construct, and inherits the engine's forcing profile (totality) |
+| classify      |      12 | source-class threading + the `pureModule` marker + the `configOf` strip                                                                                            |
+| warm          |      22 | warm re-eval byte oracles, incl. the adversarial **lying-marker** and the **group-splice hazard** teeth                                                            |
+| provenance    |       9 | provenance records (winners / priority / defaulted) + the **values-untouched** tooth                                                                               |
+| purity        |       1 | the nixpkgs-lib-free source scan (see §3)                                                                                                                          |
+| **total**     | **167** |                                                                                                                                                                    |
 
 - **The teeth that matter:** `warm.test-adversarial-lying-marker-diverges-visibly` (a data module
   that lies about being pure stale-splices and is caught at the byte oracle),
@@ -280,27 +280,27 @@ gen-flake is the one nixpkgs boundary (compose purely → inject resolved VALUES
 systems) and the home of the observability surfaces (provenance / diff / decision trace). Measured
 per suite:
 
-| suite | tests | proves |
-|---|---:|---|
-| compose | 6 | the v1 pure compose over a gen tree (gen-merge engine, no nixpkgs) |
-| compose-empty | 3 | empty / edge-case composes |
-| compose-engine-args | 4 | the `engineArgs` guard |
-| compose-select-hosts | 5 | the `selectHosts` guard |
-| compose-override | 19 | the **standing override tooth** — warm ≡ cold on values + provenance digests — plus chained `.override` variants |
-| diff-added-removed | 4 | the diff surface (options added / removed between two composes) |
-| diff-changed | 4 | diff of changed options (winner / priority) |
-| diff-provenance-shape | 2 | the diff provenance record shape |
-| diff-lazy | 4 | diff laziness pins (unforced thunks stay unforced) |
-| realize-shape | 4 | the realize output shape |
-| realize-nodes | 2 | per-node realization |
-| realize-bindings | 3 | binding injection through gen-bind |
-| realize-osconfig | 2 | `osConfig` threading |
-| realize-multi-class | 2 | multi-class realize |
-| terminal-inject | 3 | value-injection into a consumer's nixpkgs eval via `_module.args` |
-| terminal-nixos | 5 | the `nixosSystem` terminal (realizes only NixOS hosts) |
-| flake-module | 16 | the `flakeModule` v1 surface |
-| purity | 1 | the pure half is nixpkgs-lib-free |
-| **total** | **89** | |
+| suite                 |  tests | proves                                                                                                           |
+| --------------------- | -----: | ---------------------------------------------------------------------------------------------------------------- |
+| compose               |      6 | the v1 pure compose over a gen tree (gen-merge engine, no nixpkgs)                                               |
+| compose-empty         |      3 | empty / edge-case composes                                                                                       |
+| compose-engine-args   |      4 | the `engineArgs` guard                                                                                           |
+| compose-select-hosts  |      5 | the `selectHosts` guard                                                                                          |
+| compose-override      |     19 | the **standing override tooth** — warm ≡ cold on values + provenance digests — plus chained `.override` variants |
+| diff-added-removed    |      4 | the diff surface (options added / removed between two composes)                                                  |
+| diff-changed          |      4 | diff of changed options (winner / priority)                                                                      |
+| diff-provenance-shape |      2 | the diff provenance record shape                                                                                 |
+| diff-lazy             |      4 | diff laziness pins (unforced thunks stay unforced)                                                               |
+| realize-shape         |      4 | the realize output shape                                                                                         |
+| realize-nodes         |      2 | per-node realization                                                                                             |
+| realize-bindings      |      3 | binding injection through gen-bind                                                                               |
+| realize-osconfig      |      2 | `osConfig` threading                                                                                             |
+| realize-multi-class   |      2 | multi-class realize                                                                                              |
+| terminal-inject       |      3 | value-injection into a consumer's nixpkgs eval via `_module.args`                                                |
+| terminal-nixos        |      5 | the `nixosSystem` terminal (realizes only NixOS hosts)                                                           |
+| flake-module          |     16 | the `flakeModule` v1 surface                                                                                     |
+| purity                |      1 | the pure half is nixpkgs-lib-free                                                                                |
+| **total**             | **89** |                                                                                                                  |
 
 - **The tooth that matters:** `compose-override`'s warm-vs-cold check — a warm (memoized) override
   must produce values AND provenance digests byte-identical to a cold re-eval. This is the A4

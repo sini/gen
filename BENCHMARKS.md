@@ -17,14 +17,14 @@ The wins reported here are on the **composition plane** — den registry/aspect/
 
 Post-fix pure-gen vs the nixpkgs reference stack, median cpu on den composition shapes (from the 2026-07-04 module-system audit):
 
-| workload | n | nixpkgs | pure-gen | speedup | thunks× | alloc× |
-|---|---:|---:|---:|---:|---:|---:|
-| aspects | 1600 | 0.353s | 0.126s | 2.80× | 2.99× | 3.60× |
-| registry | 2000 | 0.165s | 0.073s | 2.27× | 2.20× | 2.64× |
-| lazyRegistry | 2000 | 0.165s | 0.077s | 2.14× | 2.20× | 2.64× |
-| schemaHosts | 1600 | 0.223s | 0.126s | 1.77× | 1.75× | 2.04× |
-| scalar | 16000 | 0.182s | 0.114s | 1.59× | 1.27× | 1.52× |
-| startup | 1 | 11.6ms | 7.7ms | 1.5× | — | — |
+| workload     |     n | nixpkgs | pure-gen | speedup | thunks× | alloc× |
+| ------------ | ----: | ------: | -------: | ------: | ------: | -----: |
+| aspects      |  1600 |  0.353s |   0.126s |   2.80× |   2.99× |  3.60× |
+| registry     |  2000 |  0.165s |   0.073s |   2.27× |   2.20× |  2.64× |
+| lazyRegistry |  2000 |  0.165s |   0.077s |   2.14× |   2.20× |  2.64× |
+| schemaHosts  |  1600 |  0.223s |   0.126s |   1.77× |   1.75× |  2.04× |
+| scalar       | 16000 |  0.182s |   0.114s |   1.59× |   1.27× |  1.52× |
+| startup      |     1 |  11.6ms |    7.7ms |    1.5× |       — |      — |
 
 `thunks×`/`alloc×` are nixpkgs ÷ pure-gen (higher = pure allocates less). Scaling is linear on both stacks; pure-gen's per-item slope is lower everywhere. Engine size: gen-merge `lib/` is 936 lines vs nixpkgs `modules.nix` + `types.nix` at 4225 lines. The audit also caught and fixed one quadratic key-union bug (`prelude.unique`, O(k²)) that the linearity gate now guards against permanently.
 
@@ -40,11 +40,11 @@ The pure-side counter ratios carry one deliberate, measured overhead. The always
 
 A `hybrid` stack — the gen-merge engine driven with **real** nixpkgs `lib.types`/`mkOption`/`mkDefault`, zero adapter code — runs the same corpus byte-identically, because nixpkgs option types already speak the `(loc, defs)` merge contract and its property tags are byte-compatible with gen-merge's priority pass:
 
-| workload | n | hybrid/ref cpu | pure/ref cpu |
-|---|---:|---:|---:|
-| scalar (leaf types) | 16000 | 0.62 | 0.63 |
-| registry (attrsOf submodule) | 2000 | 0.96 | 0.44 |
-| lazyRegistry | 2000 | 0.97 | 0.46 |
+| workload                     |     n | hybrid/ref cpu | pure/ref cpu |
+| ---------------------------- | ----: | -------------: | -----------: |
+| scalar (leaf types)          | 16000 |           0.62 |         0.63 |
+| registry (attrsOf submodule) |  2000 |           0.96 |         0.44 |
+| lazyRegistry                 |  2000 |           0.97 |         0.46 |
 
 **Boundary:** leaf-type shims are free (the engine does the merging; a nixpkgs leaf `.merge` is trivial), but structural-type shims give the whole win back — nixpkgs `submodule.merge` runs `lib.evalModules` per instance, dragging the nixpkgs engine into every subtree. Compat mode is an opt-in migration/escape hatch (bring a custom `mkOptionType` along during a port), not a way to run the ecosystem fast.
 
@@ -62,57 +62,57 @@ Two honest caveats frame the read. First, the deltas are **small** next to adios
 
 ### Summary — median CPU time
 
-| Benchmark | flake-parts | adios-flake | gen-flake |
-|:---|---:|---:|---:|
-| packages.x86_64-linux (1 system) | 0.153s | 0.150s | 0.166s |
-| formatter (3 systems) | 0.331s | 0.321s | 0.321s |
-| devShells (3 systems) | 0.345s | 0.352s | 0.345s |
+| Benchmark                        | flake-parts | adios-flake | gen-flake |
+| :------------------------------- | ----------: | ----------: | --------: |
+| packages.x86_64-linux (1 system) |      0.153s |      0.150s |    0.166s |
+| formatter (3 systems)            |      0.331s |      0.321s |    0.321s |
+| devShells (3 systems)            |      0.345s |      0.352s |    0.345s |
 
 ### packages.x86_64-linux (1 system)
 
-| Metric | flake-parts | adios-flake | gen-flake |
-|:---|---:|---:|---:|
-| Function calls | 90,979 | 84,009 | 81,587 |
-| Prim op calls | 61,934 | 61,910 | 57,144 |
-| Thunks created | 200,245 | 187,663 | 185,097 |
-| Attr lookups | 59,504 | 52,542 | 53,068 |
-| Attrset updates | 27,829 | 26,858 | 27,085 |
-| Values copied (//) | 1,113,420 | 1,111,963 | 1,112,090 |
-| GC heap | 42.4 MiB | 41.8 MiB | 41.6 MiB |
+| Metric             | flake-parts | adios-flake | gen-flake |
+| :----------------- | ----------: | ----------: | --------: |
+| Function calls     |      90,979 |      84,009 |    81,587 |
+| Prim op calls      |      61,934 |      61,910 |    57,144 |
+| Thunks created     |     200,245 |     187,663 |   185,097 |
+| Attr lookups       |      59,504 |      52,542 |    53,068 |
+| Attrset updates    |      27,829 |      26,858 |    27,085 |
+| Values copied (//) |   1,113,420 |   1,111,963 | 1,112,090 |
+| GC heap            |    42.4 MiB |    41.8 MiB |  41.6 MiB |
 
 ### formatter (3 systems)
 
-| Metric | flake-parts | adios-flake | gen-flake |
-|:---|---:|---:|---:|
-| Function calls | 253,165 | 241,731 | 237,842 |
-| Prim op calls | 149,592 | 147,146 | 141,749 |
-| Thunks created | 618,624 | 599,795 | 595,426 |
-| Attr lookups | 138,881 | 129,030 | 128,765 |
-| Attrset updates | 66,321 | 65,131 | 65,180 |
-| Values copied (//) | 3,965,501 | 3,963,635 | 3,963,721 |
-| GC heap | 133.7 MiB | 132.7 MiB | 132.4 MiB |
+| Metric             | flake-parts | adios-flake | gen-flake |
+| :----------------- | ----------: | ----------: | --------: |
+| Function calls     |     253,165 |     241,731 |   237,842 |
+| Prim op calls      |     149,592 |     147,146 |   141,749 |
+| Thunks created     |     618,624 |     599,795 |   595,426 |
+| Attr lookups       |     138,881 |     129,030 |   128,765 |
+| Attrset updates    |      66,321 |      65,131 |    65,180 |
+| Values copied (//) |   3,965,501 |   3,963,635 | 3,963,721 |
+| GC heap            |   133.7 MiB |   132.7 MiB | 132.4 MiB |
 
 ### devShells (3 systems)
 
-| Metric | flake-parts | adios-flake | gen-flake |
-|:---|---:|---:|---:|
-| Function calls | 269,458 | 259,364 | 255,528 |
-| Prim op calls | 157,910 | 156,223 | 150,860 |
-| Thunks created | 646,974 | 630,071 | 625,789 |
-| Attr lookups | 148,325 | 139,345 | 139,120 |
-| Attrset updates | 71,754 | 70,625 | 70,674 |
-| Values copied (//) | 3,989,828 | 3,988,162 | 3,988,248 |
-| GC heap | 136.4 MiB | 135.6 MiB | 135.3 MiB |
+| Metric             | flake-parts | adios-flake | gen-flake |
+| :----------------- | ----------: | ----------: | --------: |
+| Function calls     |     269,458 |     259,364 |   255,528 |
+| Prim op calls      |     157,910 |     156,223 |   150,860 |
+| Thunks created     |     646,974 |     630,071 |   625,789 |
+| Attr lookups       |     148,325 |     139,345 |   139,120 |
+| Attrset updates    |      71,754 |      70,625 |    70,674 |
+| Values copied (//) |   3,989,828 |   3,988,162 | 3,988,248 |
+| GC heap            |   136.4 MiB |   135.6 MiB | 135.3 MiB |
 
 ### Derivation equivalence (drvPath across all three variants)
 
-| output | x86_64-linux | aarch64-linux | x86_64-darwin |
-|:---|:---:|:---:|:---:|
-| packages.<sys>.greeter | identical | identical | identical |
-| packages.<sys>.farewell | identical | identical | identical |
-| packages.<sys>.notes | identical | identical | identical |
-| devShells.<sys>.default | identical | identical | identical |
-| formatter.<sys> | identical | identical | identical |
+| output                  | x86_64-linux | aarch64-linux | x86_64-darwin |
+| :---------------------- | :----------: | :-----------: | :-----------: |
+| packages.<sys>.greeter  |  identical   |   identical   |   identical   |
+| packages.<sys>.farewell |  identical   |   identical   |   identical   |
+| packages.<sys>.notes    |  identical   |   identical   |   identical   |
+| devShells.<sys>.default |  identical   |   identical   |   identical   |
+| formatter.<sys>         |  identical   |   identical   |   identical   |
 
 gen-flake carries the **lowest** function-call, prim-op, and thunk counts of the three on every benchmark (packages: 81,587 fcalls vs adios 84,009 vs flake-parts 90,979; prim ops 57,144 vs 61,910 vs 61,934), and the **drvPath equivalence holds 15/15** — all five outputs × three systems build byte-identically across the frameworks. The counter wins are on identical build products, not a cheaper different result.
 
@@ -144,12 +144,12 @@ Composition (a derivation-free walk of the merged option tree) / terminal
 projections of the same eval** — a comparison of two projections, **not** a part/whole share
 of the terminal's own composition work (reconcile, do not equate):
 
-| host | nrFunctionCalls | //-copies (merge storm) |
-|---|---:|---:|
-| bitstream | 55.2% | 13.7% |
-| blade | 40.3% | 4.1% |
-| cortex | 36.1% | 3.9% |
-| **fleet (Σ/Σ)** | **42.5%** | **5.2%** |
+| host            | nrFunctionCalls | //-copies (merge storm) |
+| --------------- | --------------: | ----------------------: |
+| bitstream       |           55.2% |                   13.7% |
+| blade           |           40.3% |                    4.1% |
+| cortex          |           36.1% |                    3.9% |
+| **fleet (Σ/Σ)** |       **42.5%** |                **5.2%** |
 
 Fleet-wide, composition is only **5.2%** of the terminal's `//`-merge storm — ~95% of merge
 cost lives in value/derivation realization, corroborating the prior `hola perf` time profile
@@ -158,11 +158,11 @@ cost lives in value/derivation realization, corroborating the prior `hola perf` 
 
 ### The dedup arms — the three planes, all byte-gated
 
-| plane | measurement | number |
-|---|---|---|
-| **deploy-time incremental** (Arm R, gen-rebuild) | a localized single-host edit recomputes only that host and skips the rest, byte-identical to a full rebuild (`resultEqualsFullRebuild`) | edit at bitstream **skips 66.7%** of fleet composition (blade + cortex = 35,350,336 fcalls); pessimal shared-node edit saves 0 |
-| **in-eval declaration** (Arm C keystone, den s2) | is the shared option-declaration tree free to share within one eval? | blade+cortex from one `out` = **18,836,571** fcalls ≈ **1.066×** a single host — already free via native memoization; den@s2 adds **+4.6%** overhead here (byte-sound: terminal drvPath byte-identical, no win) |
-| **in-eval realization** (Task 7b, config-merge) | is host-specific realization free to share within one eval? | blade+cortex `systemd.units` from one `out` ≈ **1.489×** a single host; injecting the byte-identical shared core saves ~**1.6%**/member |
+| plane                                            | measurement                                                                                                                             | number                                                                                                                                                                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **deploy-time incremental** (Arm R, gen-rebuild) | a localized single-host edit recomputes only that host and skips the rest, byte-identical to a full rebuild (`resultEqualsFullRebuild`) | edit at bitstream **skips 66.7%** of fleet composition (blade + cortex = 35,350,336 fcalls); pessimal shared-node edit saves 0                                                                                  |
+| **in-eval declaration** (Arm C keystone, den s2) | is the shared option-declaration tree free to share within one eval?                                                                    | blade+cortex from one `out` = **18,836,571** fcalls ≈ **1.066×** a single host — already free via native memoization; den@s2 adds **+4.6%** overhead here (byte-sound: terminal drvPath byte-identical, no win) |
+| **in-eval realization** (Task 7b, config-merge)  | is host-specific realization free to share within one eval?                                                                             | blade+cortex `systemd.units` from one `out` ≈ **1.489×** a single host; injecting the byte-identical shared core saves ~**1.6%**/member                                                                         |
 
 **Arm R** is incremental reuse *across a change*, not a single-eval speedup (gen-rebuild does
 not beat `O(|cone|)`); the win exists because a prior store is reused after a localized edit.
@@ -214,29 +214,29 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 ## gen module-system perf bench (pure vs pinned nixpkgs.lib stack)
 
-| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
-|---|---:|---:|---:|---:|---:|---:|---|
-| startup | 1 | 0.025 | 0.023 | 0.908 | 0.301 | 0.362 | ok |
-| scalar | 2000 | 0.076 | 0.058 | 0.759 | 0.822 | 0.660 | ok |
-| scalar | 8000 | 0.225 | 0.150 | 0.663 | 0.825 | 0.661 | ok |
-| registry | 500 | 0.139 | 0.070 | 0.505 | 0.538 | 0.435 | ok |
-| registry | 2000 | 0.202 | 0.097 | 0.481 | 0.538 | 0.435 | ok |
-| lazyRegistry | 2000 | 0.206 | 0.098 | 0.478 | 0.539 | 0.436 | ok |
-| schemaHosts | 400 | 0.075 | 0.056 | 0.749 | 0.702 | 0.595 | ok |
-| schemaHosts | 1600 | 0.544 | 0.182 | 0.335 | 0.703 | 0.595 | ok |
-| wideFreeform | 2000 | 0.075 | 0.061 | 0.816 | 1.041 | 0.779 | ok |
-| wideFreeform | 8000 | 0.091 | 0.084 | 0.914 | 1.047 | 0.782 | ok |
-| deepSubmodule | 400 | 0.249 | 0.082 | 0.331 | 0.338 | 0.276 | ok |
-| deepSubmodule | 1600 | 4.259 | 0.282 | 0.066 | 0.338 | 0.275 | ok |
+| workload      |    n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
+| ------------- | ---: | ----------: | -----------: | ------: | ---------: | --------: | ------ |
+| startup       |    1 |       0.025 |        0.023 |   0.908 |      0.301 |     0.362 | ok     |
+| scalar        | 2000 |       0.076 |        0.058 |   0.759 |      0.822 |     0.660 | ok     |
+| scalar        | 8000 |       0.225 |        0.150 |   0.663 |      0.825 |     0.661 | ok     |
+| registry      |  500 |       0.139 |        0.070 |   0.505 |      0.538 |     0.435 | ok     |
+| registry      | 2000 |       0.202 |        0.097 |   0.481 |      0.538 |     0.435 | ok     |
+| lazyRegistry  | 2000 |       0.206 |        0.098 |   0.478 |      0.539 |     0.436 | ok     |
+| schemaHosts   |  400 |       0.075 |        0.056 |   0.749 |      0.702 |     0.595 | ok     |
+| schemaHosts   | 1600 |       0.544 |        0.182 |   0.335 |      0.703 |     0.595 | ok     |
+| wideFreeform  | 2000 |       0.075 |        0.061 |   0.816 |      1.041 |     0.779 | ok     |
+| wideFreeform  | 8000 |       0.091 |        0.084 |   0.914 |      1.047 |     0.782 | ok     |
+| deepSubmodule |  400 |       0.249 |        0.082 |   0.331 |      0.338 |     0.276 | ok     |
+| deepSubmodule | 1600 |       4.259 |        0.282 |   0.066 |      0.338 |     0.275 | ok     |
 
 > wideFreeform thunks ride a parity band (gate ≤ 1.3, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs); only alloc keeps the default win-gate. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of 3 interleaved samples). See ci/README.md.
 
 ### pure-only workloads (no reference arm; report-only counters, gated on linearity below)
 
-| workload | n | pure cpu (s) | pure thunks | pure alloc |
-|---|---:|---:|---:|---:|
-| aspects | 400 | 0.141 | 630812 | 30492400 |
-| aspects | 1600 | 0.497 | 2519312 | 121674656 |
+| workload |    n | pure cpu (s) | pure thunks | pure alloc |
+| -------- | ---: | -----------: | ----------: | ---------: |
+| aspects  |  400 |        0.141 |      630812 |   30492400 |
+| aspects  | 1600 |        0.497 |     2519312 |  121674656 |
 
 > These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
 > track a grammar that moves by design ruling, so such a gate would red on ruled improvements
@@ -244,30 +244,30 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 ### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ 5.5)
 
-| workload | sizes | thunk growth | alloc growth |
-|---|---|---:|---:|
-| scalar | 2000 → 8000 | 3.989 | 3.984 |
-| registry | 500 → 2000 | 3.992 | 3.986 |
-| schemaHosts | 400 → 1600 | 3.991 | 3.987 |
-| aspects | 400 → 1600 | 3.994 | 3.990 |
-| wideFreeform | 2000 → 8000 | 3.986 | 3.983 |
-| deepSubmodule | 400 → 1600 | 3.997 | 3.995 |
+| workload      | sizes       | thunk growth | alloc growth |
+| ------------- | ----------- | -----------: | -----------: |
+| scalar        | 2000 → 8000 |        3.989 |        3.984 |
+| registry      | 500 → 2000  |        3.992 |        3.986 |
+| schemaHosts   | 400 → 1600  |        3.991 |        3.987 |
+| aspects       | 400 → 1600  |        3.994 |        3.990 |
+| wideFreeform  | 2000 → 8000 |        3.986 |        3.983 |
+| deepSubmodule | 400 → 1600  |        3.997 |        3.995 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
 
-| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
-|---|---:|---:|---:|---:|---:|---|
-| 400 | 1383251 | 237078 | 0.171 | 0.186 | 0.279 | ok |
-| 1600 | 5524451 | 940278 | 0.170 | 0.214 | 0.248 | ok |
+| n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
+| ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
+| 400  |     1383251 |       237078 |      0.171 |     0.186 |   0.279 | ok        |
+| 1600 |     5524451 |       940278 |      0.170 |     0.214 |   0.248 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): pure-full 3.994×, pure-fixed 3.966× (gate ≤ 5.5)
 
 ### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ 0.30 on thunks + alloc)
 
-| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
-|---|---:|---:|---:|---:|---:|---|
-| 400 | 1405859 | 238527 | 0.170 | 0.174 | 0.246 | ok |
-| 1600 | 5613059 | 941727 | 0.168 | 0.171 | 0.213 | ok |
+| n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
+| ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
+| 400  |     1405859 |      238527 |      0.170 |     0.174 |   0.246 | ok        |
+| 1600 |     5613059 |      941727 |      0.168 |     0.171 |   0.213 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): cold 3.993×, warm 3.948× (gate ≤ 5.5)
 
