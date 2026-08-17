@@ -285,10 +285,12 @@
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
-          # ../mkCi.nix → flakeModule.nix and get a `ci` nix-unit hook), the hub is the
-          # parity/perf harness: it exposes flake `checks` + a perf `app`, NOT a nix-unit
-          # `tests` output. So it must NOT carry the shared `ci` hook (`nix-unit --flake
-          # ./ci#tests` would fail "does not provide attribute 'tests'"). Format-only here.
+          # `gen-harness.lib.mkCi` → its `flakeModule.nix` and get a `ci` nix-unit hook —
+          # `gen-flake` and `gen-vars` still take the same path through this hub's own
+          # `mkCi.nix`), the hub is the parity/perf harness: it exposes flake `checks` +
+          # a perf `app`, NOT a nix-unit `tests` output. So it must NOT carry the shared
+          # `ci` hook (`nix-unit --flake ./ci#tests` would fail "does not provide
+          # attribute 'tests'"). Format-only here.
           pre-commit = {
             check.enable = false;
             settings.hooks.treefmt = {

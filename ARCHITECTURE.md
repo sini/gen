@@ -41,6 +41,26 @@ plane* is nixpkgs: `gen-flake` is the single boundary that injects those values 
 nixpkgs eval and builds NixOS systems. The invariant across the crossing: **gen TYPES never leave the
 pure eval; only VALUES cross** (value-injection, not type-driving).
 
+### The CI harness is not a library, and it does not live here
+
+`gen-harness` (`github:sini/gen-harness`) owns **`mkCi`**, the flake wrapper each gen repo's `ci/` is
+built from. It is not on the roster, not a hub input, and exports no gen concern — it is CI packaging,
+not a library. What makes it a separate repository is that **it pins no gen library**: a library's
+`ci/` lock would otherwise drag in the aggregator that pins that same library, which is the
+hub → lib → lib's `ci` → hub cycle `den-hoag-i8wc` measured and the extraction exists to cut.
+
+**Who consumes it.** Every gen repo's `ci/flake.nix` calls `gen-harness.lib.mkCi` — except `gen-flake`
+and `gen-vars`, which still call this hub's own `ci/mkCi.nix`, the copy the harness was extracted from.
+From any library root, `grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says which of the two that repo
+is on, so the split is re-derived rather than remembered.
+
+**The split as it stands today, stated because the hub currently carries both sides.** `ci/mkCi.nix`
+and `ci/flakeModule.nix` are still live in this repository, serving those two remaining consumers; and
+the hub's own `ci/` is a parity/perf harness that exposes flake `checks` and a perf `app` rather than a
+nix-unit `tests` output, so it does not consume `mkCi`'s `ci` hook itself. **Retiring the hub-side
+duplicates is specified but NOT landed** — see `specs/2026-08-17-gen-hub-ci-extraction-completion-spec.md`
+in `den-architecture`. A reader meeting two `mkCi`s here is meeting the current topology, not a defect.
+
 ## Dependency Graph
 
 Libraries have minimal inter-dependencies. Most are independent.
