@@ -12,10 +12,9 @@ numbers cannot silently drift from their own arithmetic.
 - **Source:** [`github:sini/hola`](https://github.com/sini/hola) `@4bab613`,
   `ci/bench/baselines/{g6-split,dedup-savings,class-share-realization}.json` — byte-identical
   copies (verify with `sha256sum`). hola is the **LAB**: it owns re-MEASUREMENT of the fleet.
-- **The formal write-up:** the A1 fleet-measurement report
-  (`~/Documents/papers/den-architecture/gen-specs/gen-class/2026-07-05-a1-fleet-measurement-report.md`)
-  — the protocol, results, prior reconciliation, threats to validity, and the two-tier counter
-  policy these files' framing refers to. hola's `ci/bench/MEASUREMENT.md` +
+- **The formal write-up:** the A1 fleet-measurement report — the protocol, results, prior
+  reconciliation, threats to validity, and the two-tier counter policy these files' framing refers
+  to — is held outside this repository, so nothing here can be checked against it. hola's `ci/bench/MEASUREMENT.md` +
   `ci/bench/baselines/README.md` carry the full lab-side detail (measurement harness, arm
   definitions, the reproduce/refresh recipes).
 - **Owner principle:** libraries (gen-class, gen-rebuild, …) stay UNBURDENED by fleet metrics —

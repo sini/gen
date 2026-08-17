@@ -14,7 +14,7 @@
     "nix-config": "8f84aa62168994714d5dc18459d4c5fe96650239",
     "den": "5df0987658d6e44268abba953406480e9f066928",
     "nixpkgs-master-channel": "5e8ca42db8804dbe70af4d4d3fcd1c71e8409e60",
-    "_priorAnalysis": "~/Documents/papers/hola-architecture/analysis/experiments/synthetic-fleet/instantiate-pattern-realization.md — the N=96 synthetic-class instantiate-pattern mechanism + numbers this arm reproduces IN-SCOPE on the real corpus.",
+    "_priorAnalysis": "The N=96 synthetic-class instantiate-pattern mechanism, and the numbers this arm reproduces IN-SCOPE on the real corpus. The prior analysis itself is held outside this repository; hola is the lab that owns the fleet measurement it came from.",
     "_meta": "underscore-prefixed keys are prose annotations / pointers, not revs; consumers skip them. den + master-channel are the pinned baseline fleet (NO s1/s2 override — this arm is a resolution-layer PATTERN measurement, orthogonal to den@s2)."
   },
   "class": {

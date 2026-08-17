@@ -179,11 +179,16 @@ put it at 0.914 against the 0.95 ceiling, 3.9% of headroom on an instrument whos
 ~2.2× raw regime step. Only **alloc** keeps a default win-gate (deterministic 0.821). The band's real
 teeth are LINEARITY, which catches the O(n²) freeform-absorption blowup this workload was built to
 expose (pre-fix, n=8000 pure thunks were 468× ref; gen-merge `976a87a`→`018bafa` coalesces the per-key
-unmatched defs per originating module, restoring linear absorption). Full pre-fix quadratic data:
-`den-architecture/parked/wideFreeform-b4/NOTES.md`.
+unmatched defs per originating module, restoring linear absorption). The full pre-fix quadratic
+series was recorded outside this repository and nothing here reproduces it; what IS reproducible is
+the gate that replaced it — the linearity arm, re-run with `nix run ./ci#perf-bench`, whose growth
+ceiling is what now catches the blowup.
 
-Full methodology, the pre-fix quadratic data, and the interpretation against the hola/zen priors:
-`den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md` (papers archive).
+The full methodology, the pre-fix quadratic data and the interpretation against the hola/zen priors
+were written up outside this repository. What this repository carries is the reproducible half, and
+it is enough to re-derive every gate above: the workload definitions (`ci/perf-bench.nix`), the
+driver and its thresholds (`ci/flake.nix`'s `perf-bench` app and `ci/perf-bench.sh`), the rationale
+for each gate (this file), and the committed baselines under `ci/bench/baselines/`.
 
 ### classShare baseline (2026-07-05, Nix 2.34.7, gen-merge `fdbf140`, gen-class `218c54f`)
 

@@ -14,8 +14,8 @@
 #
 # This file only DEFINES workloads; timing/counters/gates live in the `perf-bench` app
 # (ci/flake.nix), which drives it through `nix-instantiate --eval` + NIX_SHOW_STATS per cell.
-# Baselines + gate rationale: ci/README.md and the 2026-07-04 benchmark report
-# (den-architecture/gen-specs/gen-merge/2026-07-04-module-system-benchmarks.md).
+# Baselines + gate rationale: ci/README.md, which carries both in full. The 2026-07-04 benchmark
+# report that first recorded them is not part of this repository and is not needed to re-derive them.
 #
 # The `classShare` workload (gen-class tier 2, spec §2.5) is the ODD ONE OUT: its two "stacks" are
 # `pure-full` / `pure-fixed` (both the PURE engine), NOT pure/ref. It IGNORES the shared provider `P`

@@ -103,8 +103,8 @@ CLASSSHARE_RATIO_MAX=0.30
 # ceiling — 3.9% headroom on an instrument whose noise floor is a ~2.2× raw frequency-regime step) and it is
 # retired with the rest, along with the 0.776–0.888 spread that set it: that spread was produced by the
 # blocked A-then-B protocol this script no longer runs, and a figure a blocked protocol produced on this
-# host is not evidence about the subject. See den-architecture/parked/wideFreeform-b4/NOTES.md;
-# regenerate via `nix run ./ci#perf-bench`.
+# host is not evidence about the subject. The same reasoning, with these figures, is written out in
+# ci/README.md's wideFreeform section; regenerate via `nix run ./ci#perf-bench`.
 WIDEFREEFORM_RATIO_MAX=1.3
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
