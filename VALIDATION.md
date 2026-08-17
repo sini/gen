@@ -50,7 +50,7 @@ Every proof, its one command, and how it fails. The rest of this document expand
 
 | Proof                                                      | Command                                             | Fails if                                                                                                                                                    |
 | ---------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Module system compatibility** (was `rehost-byte-parity`) | —                                                   | GATE SUSPENDED, PROMISE STANDS — rebuilt at the final rounds; carrier den-hoag-gkkh                                                                         |
+| **Module system compatibility** (was `rehost-byte-parity`) | —                                                   | GATE SUSPENDED, PROMISE STANDS — owner ruling 2026-08-13; rebuilt at the final rounds (§1)                                                                  |
 | Real-den byte-parity (`rehost-den-parity`)                 | `nix flake check ./ci`                              | den's real registry shape diverges across stacks                                                                                                            |
 | gen-merge engine suite (167)                               | `nix flake check ./ci` (in the gen-merge repo)      | any merge / lint / classify / warm / provenance test regresses                                                                                              |
 | gen-flake terminal suite (89)                              | `nix flake check ./ci` (in the gen-flake repo)      | compose / override / diff / realize / terminal regresses                                                                                                    |
@@ -118,7 +118,7 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
   reference cannot follow it. The gate therefore reddened on ruled improvements while being unable
   to say which conjunct a red belonged to — the divergence grows monotonically, by construction.
 
-- **Carrier of the successor: `den-hoag-gkkh`.** ADR-0025 item 2 rules that P1's enforcer is hola's
+- **The successor, and what it is required to do.** ADR-0025 item 2 rules that P1's enforcer is hola's
   harness extracted and generalized into a gen library whose reference side is a **parameter**, not
   a frozen input, and in which every assertion names the proposition it belongs to, so a deliberate
   grammar change is expressible as a named divergence rather than a red. The retired oracle's gate
@@ -134,8 +134,12 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
   **aspect-grammar** layer specifically: that was the retired oracle's unique contribution over
   `rehost-den-parity`, and it is exactly the layer whose reference could not follow.
 
-- **Retired:** 2026-08-13, ruling record `den-hoag-oyib`, spec
-  `den-architecture/specs/2026-08-13-rehost-byte-parity-retirement-spec.md`.
+- **Retired:** 2026-08-13, by owner ruling, under a retirement spec of its own. What the ruling
+  settled is stated in full above — why the frozen reference could not follow the subject, what the
+  successor owes, and what `rehost-den-parity` still covers — so this document does not depend on
+  reading the spec to be acted on. The retired implementation stays readable in git history at
+  `ci/rehost-byte-parity.nix`, and §1 carries the row with an empty command cell for as long as the
+  claim is unasserted.
 
 ### rehost-den-parity — the real-den acceptance gate
 

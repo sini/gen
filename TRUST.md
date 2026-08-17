@@ -33,10 +33,10 @@ with nixpkgs across the aspect grammar*, the property anyone migrating from nixp
 ★ **The promise stands; what lapsed is its continuous enforcement.** Owner ruling, 2026-08-13: the
 promises the oracle held stand and *"don't need to hold at every gate"*, and the oracle is rebuilt
 during the final rounds *"so we can make the same guarantees"* — the same ones, re-established rather
-than renegotiated. It is recorded, with an empty command cell, in [VALIDATION.md](VALIDATION.md) §1;
-its named carrier is `den-hoag-gkkh`, under ADR-0025 item 2, whose contract makes the reference a
-parameter rather than a frozen input so a ruled grammar change registers as a named divergence instead
-of a red.
+than renegotiated. It is recorded, with an empty command cell, in [VALIDATION.md](VALIDATION.md) §1,
+which also carries the successor's terms: under ADR-0025 item 2 the reference side is a **parameter**
+rather than a frozen input, so a ruled grammar change registers as a named divergence instead of a
+red.
 
 Underneath sit the per-library nix-unit suites — the [gen-merge](https://github.com/sini/gen-merge)
 byte-mode engine's 206 tests (at `9f20fb1`) and the [gen-flake](https://github.com/sini/gen-flake)

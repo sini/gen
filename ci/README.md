@@ -19,14 +19,15 @@ not — it moves by design ruling, so a frozen aspect reference diverges from th
 monotonically and a gate built on one reds on ruled improvements rather than on defects. Two
 consequences are live here, and both are unassertions rather than fixes:
 
-- The whole-stack aspect-grammar oracle `rehost-byte-parity` was **retired** (2026-08-13, ruling
-  record `den-hoag-oyib`). Its claim is recorded unasserted in [VALIDATION.md](../VALIDATION.md) §1
-  with an empty command cell; carrier `den-hoag-gkkh`.
+- The whole-stack aspect-grammar oracle `rehost-byte-parity` was **retired** by owner ruling on
+  2026-08-13. Its claim is recorded unasserted in [VALIDATION.md](../VALIDATION.md) §1 with an empty
+  command cell, and that section also carries the successor's terms under ADR-0025 item 2.
 - The perf bench's two `aspects` matrix rows are **pure-only**. They keep their linearity gates and
   absolute counters and are reported in their own table, but assert **no** pure/ref digest parity
   and **no** pure/ref counter (0.90) win-gate. Whether that workload gets a ref-free
-  performance gate, and of what shape, is an open question carried by `den-hoag-gkkh`; a re-frozen
-  baseline is explicitly not the answer, since it reproduces the same defect at smaller scale.
+  performance gate, and of what shape, is an **open question** — it rides with the rest of the
+  successor's terms in [VALIDATION.md](../VALIDATION.md) §1; a re-frozen baseline is explicitly not
+  the answer, since it reproduces the same defect at smaller scale.
 
 ## Validation — the parity oracle
 

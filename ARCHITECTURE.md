@@ -47,7 +47,10 @@ pure eval; only VALUES cross** (value-injection, not type-driving).
 built from. It is not on the roster, not a hub input, and exports no gen concern — it is CI packaging,
 not a library. What makes it a separate repository is that **it pins no gen library**: a library's
 `ci/` lock would otherwise drag in the aggregator that pins that same library, which is the
-hub → lib → lib's `ci` → hub cycle `den-hoag-i8wc` measured and the extraction exists to cut.
+hub → lib → lib's `ci` → hub cycle the extraction exists to cut. The cut is a property of the pins,
+so it is read off them rather than remembered: in `gen-harness`,
+`grep -oE '"gen-[a-z]+"' flake.lock` returns nothing, while the same command in any library's
+`ci/flake.lock` returns that library's gen inputs.
 
 **Who consumes it.** Every gen repo's `ci/flake.nix` calls `gen-harness.lib.mkCi` — except `gen-flake`
 and `gen-vars`, which still call this hub's own `ci/mkCi.nix`, the copy the harness was extracted from.
