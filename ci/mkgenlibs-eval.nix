@@ -38,6 +38,7 @@ let
     "flake"
     "graph"
     "link"
+    "memo"
     "merge"
     "pipe"
     "prelude"

@@ -19,6 +19,11 @@ let
     types = genInputs.gen-types.lib;
     merge = genInputs.gen-merge.lib;
     scope = genInputs.gen-scope.lib;
+    # gen-memo is the INCREMENTAL PLANE over the evaluator above it (ADR-0008 §2): a decision layer
+    # that never evaluates, defined by byte-parity against a cold evaluation. It sits beside `scope`
+    # here because that is what it is a plane over, and it is self-wiring like the rest of this
+    # block — its flake `.lib` resolves its own gen-prelude and gen-graph.
+    memo = genInputs.gen-memo.lib;
     graph = genInputs.gen-graph.lib;
     bind = genInputs.gen-bind.lib;
     schema = genInputs.gen-schema.lib;
@@ -75,6 +80,7 @@ let
       types = "modules";
       merge = "modules";
       scope = "substrate";
+      memo = "substrate";
       graph = "substrate";
       bind = "substrate";
       schema = "substrate";

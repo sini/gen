@@ -14,6 +14,7 @@
     gen-schema.url = "github:sini/gen-schema";
     gen-aspects.url = "github:sini/gen-aspects";
     gen-scope.url = "github:sini/gen-scope";
+    gen-memo.url = "github:sini/gen-memo";
     gen-graph.url = "github:sini/gen-graph";
     gen-select.url = "github:sini/gen-select";
     gen-bind.url = "github:sini/gen-bind";
