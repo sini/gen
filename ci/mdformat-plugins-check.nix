@@ -84,7 +84,7 @@ pkgs.runCommand "${name}-mdformat-plugins"
     # Read off the wrapper the config actually runs, so a set that is present in the expression
     # but absent from the artefact still fails.
     missing=""
-    for plugin in mdformat-footnote mdformat-frontmatter mdformat-simple-breaks; do
+    for plugin in mdformat-footnote mdformat-frontmatter mdformat-gfm mdformat-simple-breaks; do
       if ! grep -q "$plugin" "$md"; then
         missing="$missing $plugin"
       fi
@@ -93,8 +93,9 @@ pkgs.runCommand "${name}-mdformat-plugins"
       echo "MDFORMAT PLUGIN REGRESSION: the formatter is missing base plugins:$missing" >&2
       echo "  command: $md" >&2
       echo "These defend representational invariants — whether a leading '---' block is data," >&2
-      echo "whether a '[^1]:' line is a footnote, how a thematic break renders. They are not" >&2
-      echo "stylistic, and dropping one silently rewrites documents that use the construct." >&2
+      echo "whether a '[^1]:' line is a footnote, whether a '|'-delimited row is a table, how a" >&2
+      echo "thematic break renders. They are not stylistic, and dropping one silently rewrites" >&2
+      echo "documents that use the construct." >&2
       echo "Note programs.mdformat.plugins REPLACES: to add a plugin, extend the base set" >&2
       echo "through gen.ci.mdformat.extraPlugins rather than assigning plugins directly." >&2
       exit 1
