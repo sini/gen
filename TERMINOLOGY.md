@@ -34,15 +34,15 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
 ## Design Principles
 
 1. **Every term has academic provenance.** No novel coinages for library concepts. Novel names only in user-facing effect vocabularies where clarity to non-academics takes priority.
-1. **Same pattern, same name.** gen-schema collections and den collections are the same abstract pattern (multi-contributor aggregation with merge) at different levels (definition-time vs evaluation-time).
-1. **Traits are for types, attributes are for values, collections are for aggregation, combinators are for composition.** Four orthogonal concerns, four terms, no overlap.
-1. **The graph vocabulary (nodes, edges, constraints) is the structural substrate.** Everything else operates ON the graph.
-1. **Prefix conventions are consistent across the ecosystem:**
+2. **Same pattern, same name.** gen-schema collections and den collections are the same abstract pattern (multi-contributor aggregation with merge) at different levels (definition-time vs evaluation-time).
+3. **Traits are for types, attributes are for values, collections are for aggregation, combinators are for composition.** Four orthogonal concerns, four terms, no overlap.
+4. **The graph vocabulary (nodes, edges, constraints) is the structural substrate.** Everything else operates ON the graph.
+5. **Prefix conventions are consistent across the ecosystem:**
    - `_key` on module-system configs = internal computed/read-only options (e.g., `_topology`, `_strict`, `_module`)
    - `__key` on plain attrsets = framework markers and pipeline internals (e.g., `__functor`, `__isWrappedFn`, `__sel`)
-1. **No wasted work, by construction (Lévy 1978).** Laziness discharges Lévy's type-1 obligation (never evaluate a discarded subexpression) for free (Barendregt 1987); first-order acyclic scope/attribute evaluation never instantiates Lévy's type-2 (interior-sharing) problem. So no optimal-reduction engine is needed — `_eval`/dedup is Wadsworth DAG sharing, not interior sharing.
+6. **No wasted work, by construction (Lévy 1978).** Laziness discharges Lévy's type-1 obligation (never evaluate a discarded subexpression) for free (Barendregt 1987); first-order acyclic scope/attribute evaluation never instantiates Lévy's type-2 (interior-sharing) problem. So no optimal-reduction engine is needed — `_eval`/dedup is Wadsworth DAG sharing, not interior sharing.
 
-______________________________________________________________________
+---
 
 ## Core Terms
 
@@ -65,7 +65,7 @@ These terms are shared across multiple libraries.
 | **Value-injection** | Composing purely, then injecting resolved config VALUES (never gen TYPES) into a consumer's nixpkgs eval via `_module.args`. The invariant: a pure engine cannot be driven by foreign nixpkgs-module libraries, so only values cross. | gen-flake | adios (adisbladis) — `compose → value → nixpkgs` prior art |
 | **Two-plane split** | The composition plane (pure, nixpkgs-lib-free: `gen-types → gen-merge → { gen-schema, gen-aspects }`) vs the terminal plane (nixpkgs: `gen-flake.terminals.nixosSystem`, driven by `realize`). One sanctioned crossing. | gen-merge, gen-flake | — |
 
-______________________________________________________________________
+---
 
 ## Per-Library Vocabulary
 
@@ -453,7 +453,7 @@ Federates several source aspect registries into one graph: normalizes each into 
 | **Manifest** | The diffable resolution record: deterministically ordered `{ kind; from; to; via }` rows, `kind` ∈ `includes` / `hole`. gen-link writes nothing to disk — serializing a lock is the consuming flake's job. | Merkle 1987; Dolstra 2006 |
 | **resolved** | Keyed by the **holeless** `nodeId`, never by the bound instantiation id. A node with no `includes` gets no entry at all — absent, not `null`. | Hedin 2000 |
 
-______________________________________________________________________
+---
 
 ## Den v2 Vocabulary (Consumer)
 
@@ -498,7 +498,7 @@ Den wires the gen libraries with domain-specific semantics. These terms are den-
 | `pipe.target [aspects]` | Delivery: only these aspects receive |
 | `pipe.channel "Y"` | Redirect to different collection |
 
-______________________________________________________________________
+---
 
 ## Classes: The Output Dimension
 
@@ -520,7 +520,7 @@ Aspect key → classified as:
   └── nested key (unregistered)                      → sub-aspect → recurse
 ```
 
-______________________________________________________________________
+---
 
 ## Cross-Cutting Patterns
 
@@ -566,7 +566,7 @@ Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 | gen-bind | `contract.mk` — assertions fire only when bound value demanded | Chitil 2012 |
 | gen-aspects | `deferredModule` — class content as lazy constructor, inspectable before forcing | Lorenzen 2025 §1-2.3 |
 
-______________________________________________________________________
+---
 
 ## Academic References
 

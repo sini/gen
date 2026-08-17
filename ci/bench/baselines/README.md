@@ -68,10 +68,10 @@ verbatim** — the lab is the only place a stranger re-runs the arms.
    `jq` regenerators). Do NOT reproduce that recipe here — it needs the fleet, the pinned
    nix-config corpus, the den s1/s2 worktree branches, and a deep-eval stack limit; it is the
    lab's, and duplicating it would be a second source of truth.
-1. Copy the regenerated JSONs verbatim into this directory (`cp` from hola; then `sha256sum` both
+2. Copy the regenerated JSONs verbatim into this directory (`cp` from hola; then `sha256sum` both
    sides to confirm byte-identity) and update the `@<rev>` in "Provenance" above to the hola rev
    they came from.
-1. Re-run the trust-surface roster: `nix run ./ci#fleet-consistency` (all 9 gates PASS) and
+3. Re-run the trust-surface roster: `nix run ./ci#fleet-consistency` (all 9 gates PASS) and
    `nix run ./ci#fleet-consistency -- --selftest` (the teeth fire). If a legitimate lab re-measure
    shifts a baseline, re-pin these files and update the cited numbers in `BENCHMARKS.md` /
    `VALIDATION.md` in the SAME PR citing the new run — never lower a floor or delete a workload to
