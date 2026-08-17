@@ -17,6 +17,31 @@
     gen.url = "path:..";
     gen.inputs.nixpkgs.follows = "nixpkgs";
 
+    # ── THE CI HARNESS — the machinery this gate is built from, now consumed rather than copied ──
+    # gen-harness is the extraction of ci from this repository. Until now the hub kept its own copy
+    # of the shared gate machinery, because the hub is not an mkCi consumer (see the pre-commit
+    # block below) and the surface it needed was file layout rather than declared outputs. The copy
+    # bought nothing but drift: the same repair was authored twice on four separate days, three of
+    # those pairs carrying the same commit subject verbatim, and twice the second copy went stale
+    # in prose while the first was fixed.
+    #
+    # THE TRADE, taken deliberately: this gate gains one external pin, so if gen-harness breaks the
+    # hub's gate breaks with it, and a lock bump joins every harness-surface change. No cycle
+    # re-opens — gen-harness declares eight inputs and all eight are tools, by construction and by
+    # its own acceptance test, so this is a leaf rather than a back edge.
+    #
+    # The follows lines below are the whole overlap of the two input sets (six of them); without
+    # them each shared tool would appear twice in this lock. gen-harness's remaining two inputs
+    # (nix-unit, import-tree) serve mkCi, which this flake does not call — they arrive in the lock
+    # and are never evaluated.
+    gen-harness.url = "github:sini/gen-harness";
+    gen-harness.inputs.nixpkgs.follows = "nixpkgs";
+    gen-harness.inputs.flake-parts.follows = "flake-parts";
+    gen-harness.inputs.flake-root.follows = "flake-root";
+    gen-harness.inputs.treefmt-nix.follows = "treefmt-nix";
+    gen-harness.inputs.devshell.follows = "devshell";
+    gen-harness.inputs.git-hooks-nix.follows = "git-hooks-nix";
+
     # ── REFERENCE side (frozen golden nixpkgs stack) for the re-host parity oracle ──
     # ORIGINAL nixpkgs-signature gen-schema (`{ lib, algebra }`), pinned to its pre-re-host rev (the
     # last commit before the pure re-host changed the signature). A PERMANENT golden-reference pin
@@ -59,8 +84,8 @@
 
       # The root flake's own inputs — the sibling route. `gen.inputs.gen-X` is the root's pin BY
       # REFERENCE, so no sibling revision is written in this file and none can be written stale:
-      # `nix flake update gen-X` here reports that no such input exists. `mkCi.nix` gives the same
-      # value the same name, for the same reason.
+      # `nix flake update gen-X` here reports that no such input exists. `gen-harness`'s `mkCi.nix`
+      # gives the same value the same name, for the same reason.
       genInputs = inputs.gen.inputs;
 
       # ── re-host byte-parity oracle (permanent regression) ──
@@ -97,10 +122,15 @@
       # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
-      # The same file `flakeModule.nix` reads. The comment above this treefmt block says the set
-      # here may not be trimmed below the one consumers receive; reading it from one place makes
-      # that hold by construction rather than by two lists being kept in agreement by hand.
-      mdformatBasePlugins = import ./mdformat-plugins.nix;
+      # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
+      # comment above this treefmt block says the set here may not be trimmed below the one
+      # consumers receive; reading it from the harness makes that hold by construction, across the
+      # repository boundary, rather than by two lists kept in agreement by hand.
+      #
+      # `{ names, plugins }`: the membership fact and the `programs.mdformat.plugins` value built
+      # from it. The guard below is handed the names from here rather than restating them.
+      mdformatBase = inputs.gen-harness.lib.mdformatBasePlugins;
+      mdformatBasePlugins = mdformatBase.plugins;
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = lib.systems.flakeExposed;
@@ -285,12 +315,15 @@
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
-          # `gen-harness.lib.mkCi` → its `flakeModule.nix` and get a `ci` nix-unit hook —
-          # `gen-flake` and `gen-vars` still take the same path through this hub's own
-          # `mkCi.nix`), the hub is the parity/perf harness: it exposes flake `checks` +
-          # a perf `app`, NOT a nix-unit `tests` output. So it must NOT carry the shared
-          # `ci` hook (`nix-unit --flake ./ci#tests` would fail "does not provide
-          # attribute 'tests'"). Format-only here.
+          # `gen-harness.lib.mkCi` → its `flakeModule.nix` and get a `ci` nix-unit hook),
+          # the hub is the parity/perf harness: it exposes flake `checks` + a perf `app`,
+          # NOT a nix-unit `tests` output. So it must NOT carry the shared `ci` hook
+          # (`nix-unit --flake ./ci#tests` would fail "does not provide attribute
+          # 'tests'"). Format-only here.
+          #
+          # That is why this flake consumes gen-harness's CHECK BUILDERS rather than its
+          # flake module: the hub cannot take a module built around a `tests` output, but
+          # the gates themselves are pure functions of `pkgs` and apply here unchanged.
           pre-commit = {
             check.enable = false;
             settings.hooks.treefmt = {
@@ -302,8 +335,10 @@
           checks = {
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
-            # The hub carries the tree-root oracle it ships to consumers (flakeModule.nix).
-            treefmt-tree-root = import ./treefmt-tree-root.nix {
+            # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
+            # the repository that ships a gate is gated by it, and now by the one instance of it
+            # rather than by a second copy that has to be kept in agreement.
+            treefmt-tree-root = inputs.gen-harness.lib.checks.treefmtTreeRoot {
               inherit pkgs;
               name = "gen";
               formatter = self'.formatter;
@@ -311,10 +346,13 @@
 
             # The plugin set is a property of the GENERATED formatter, not of the expression
             # above: the defect this guards was a list that was written and then discarded.
-            mdformat-plugins = import ./mdformat-plugins-check.nix {
+            # `expected` comes from the same value installed in the treefmt block, so the guard
+            # cannot fall behind the set it guards.
+            mdformat-plugins = inputs.gen-harness.lib.checks.mdformatPlugins {
               inherit pkgs;
               name = "gen";
               formatter = self'.formatter;
+              expected = mdformatBase.names;
             };
           };
 
@@ -334,14 +372,17 @@
           };
 
           treefmt = {
-            # TREE ROOT — see flakeModule.nix for the mechanism in full. A `.git/config` marker
-            # walk is worktree-blind: a linked worktree's `.git` is a gitdir-pointer file, so the
-            # walk escapes the worktree and formats the main checkout. `null` rather than
-            # omission, because flake-parts' `mkDefault "flake.nix"` would pin the tree root to
-            # `ci/`; `tree-root-cmd` then STATES the root instead of inheriting treefmt's default.
-            # Mirrors flakeModule.nix, the module mkCi hands to consumers — root detection, the
-            # program set, and the tree-root check alike: the repo that ships the gate is gated by
-            # it, so this list may not be trimmed below the one consumers receive.
+            # TREE ROOT — see `gen-harness`'s `flakeModule.nix` for the mechanism in full. A
+            # `.git/config` marker walk is worktree-blind: a linked worktree's `.git` is a
+            # gitdir-pointer file, so the walk escapes the worktree and formats the main checkout.
+            # `null` rather than omission, because flake-parts' `mkDefault "flake.nix"` would pin
+            # the tree root to `ci/`; `tree-root-cmd` then STATES the root instead of inheriting
+            # treefmt's default.
+            # Mirrors the module mkCi hands to consumers — root detection, the program set, and
+            # the tree-root check alike: the repo that ships the gate is gated by it, so this list
+            # may not be trimmed below the one consumers receive. Since the plugin set and both
+            # check builders now come from `gen-harness` itself, that agreement holds by
+            # construction rather than by two copies being maintained in step.
             projectRootFile = null;
             flakeCheck = false;
             enableDefaultExcludes = true;

@@ -5,10 +5,11 @@
 The ecosystem hub: it owns no concern of its own. It publishes `mkGenLibs` — two-stage instantiation
 of the gen library roster (stage 1 captures `genInputs` at definition time and binds the roster; stage
 2 hands back that same value, each member flake's self-wired `.lib`) — the three **stratum buckets**
-cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), one flake-parts module, and an
-`mkCi` that two siblings still call. The CI-flake wrapper the rest of the ecosystem's `ci/` calls is
-`gen-harness.lib.mkCi`, in its own repository: the harness pins no gen library, so a sibling's `ci/`
-lock no longer drags the aggregator that pins that sibling.
+cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), and one flake-parts module.
+It publishes **no `mkCi`**: the CI-flake wrapper every library's `ci/` calls is
+`gen-harness.lib.mkCi`, in its own repository. The harness pins no gen library, so a sibling's `ci/`
+lock no longer drags the aggregator that pins that sibling — and since the hub no longer re-exports
+it, there is no second route back to that edge.
 
 ## Not this library's job
 
@@ -62,20 +63,18 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 
 **`lib`**
 
-| Export          | Signature                                                                             |
-| --------------- | ------------------------------------------------------------------------------------- |
-| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix` binds it as `_`)       |
-| `lib.mkCi`      | `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs` |
-| `lib.substrate` | the S1 stratum bucket — 9 members, selected from the flat roster                      |
-| `lib.modules`   | the S2 (module-system) stratum bucket — 2 members                                     |
-| `lib.aspects`   | the S3 (aspect-layer) stratum bucket — 3 members                                      |
+| Export          | Signature                                                                       |
+| --------------- | ------------------------------------------------------------------------------- |
+| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix` binds it as `_`) |
+| `lib.substrate` | the S1 stratum bucket — 9 members, selected from the flat roster                |
+| `lib.modules`   | the S2 (module-system) stratum bucket — 2 members                               |
+| `lib.aspects`   | the S3 (aspect-layer) stratum bucket — 3 members                                |
 
-`builtins.functionArgs lib.mkCi` ⇒ `{"extraModules":true,"inputs":false,"name":false,"specialArgs":true,"testModules":false}`
-(`false` = required). `mkCi` is already stage-1-applied by the flake, so a consumer makes one call.
-Live: `gen-flake` and `gen-vars`, and no others — every other library repo calls
-`gen-harness.lib.mkCi` from its `ci/flake.nix` instead, on the same signature. Measured across the
-twenty-two library repos, twenty are on the harness and these two on the hub; from a library root,
-`grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says which of the two that library is on.
+**There is no `lib.mkCi` here.** It lives at `gen-harness.lib.mkCi`, on the signature
+`{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs`, already
+stage-1-applied so a consumer makes one call. Every library repository calls it from its own
+`ci/flake.nix`. `gen-vars` still calls a hub `mkCi` that no longer exists, at a pinned older hub
+revision; it is excluded from the inventory by ADR-0003 and is knowingly left there.
 
 **`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty keys: **nineteen
 members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
@@ -186,7 +185,7 @@ stratum rows, were re-run when `strata` landed; the rest carry their original ru
 | Every application of `mkGenLibs` returns the **same value**, so `lib.substrate.class == (lib.mkGenLibs { }).class`                                                                                                                                                                               | the `roster` binding sits in stage 1, above the `_:`. Measured across two applications: `tryEval (r1.${k} == r2.${k})` ⇒ 21/21 `true`, 0 throws. Before the roster was hoisted into stage 1 the same instrument returned 19/20 with **`class` false** — it is an `import` the hub applies itself, so a per-application binding re-allocated it. Live negative control both runs (each member against a different member) ⇒ 0 `true`                                                |
 | `(mkGenLibs { }).class` and `inputs.gen-class.lib` expose the **same ten attribute names** but are not interchangeable: only the hub's supports tier-2                                                                                                                                           | both `attrNames` ⇒ `["applyCoreExtend","applyCoreFixed","applyCoreMerge","compareCounters","gateCore","invariantUnder","mkClass","mkClasses","mkCore","mkCoreRecord"]`, and `? applyCoreFixed` ⇒ `true` on both. Calling it on a valid core: hub ⇒ `success = true`, raw input ⇒ `success = false` (`gen-class/lib/apply.nix:166-167` throws when `merge == null`). Positive control on the same two libs: `mkCore` and tier-1 `applyCoreMerge` both ⇒ `success = true`            |
 | `mkCore` rejects a hand-built `{ members; archetype; }` attrset — the `class` argument must come from `mkClass`                                                                                                                                                                                  | `gen-class/lib/apply.nix` → `contract.mkCoreRecord`: `error: gen-class: mkCoreRecord: class must be a gen-class/class record`. `mkClass { key = "k"; members = [ "a" "b" ]; }` then works                                                                                                                                                                                                                                                                                          |
-| `mkCi`'s input resolution silently **falls back to the hub's pins** for any input the consumer does not declare                                                                                                                                                                                  | `ci/mkCi.nix:27`: `resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name}` — affects `flake-parts`, `import-tree`, `treefmt-nix`, `devshell`, `flake-root`, `git-hooks-nix`, `gen-prelude`. Read, not exercised in this run                                                                                                                                                                                                                                |
+| `mkCi`'s input resolution falls back to the HARNESS's pins for any tool the consumer does not declare — never to this hub's                                                                                                                                                                      | `gen-harness/mkCi.nix`: `resolve = name: if inputs ? ${name} then inputs.${name} else genInputs.${name}`, where `genInputs` is gen-harness's own input set. This hub declares no tool inputs at all, so there is nothing here to fall back to                                                                                                                                                                                                                                      |
 | Two independent lock files: root `flake.lock` and `ci/flake.lock`                                                                                                                                                                                                                                | 20 vs 19 `gen-*` edges (above). Bumping the root lock does not move what CI checks, and vice versa                                                                                                                                                                                                                                                                                                                                                                                 |
 | The hub's CI workflow is **not** the shared sibling workflow — it runs four jobs, and `nix flake check` is not at the sibling line numbers                                                                                                                                                       | `.github/workflows/ci.yml` (`cat -n`): `:13` `working-directory: ci`, `:18` `nix fmt -- --ci`, `:27` `nix flake check ./ci`, `:36` `nix run ./ci#perf-bench`, `:46` `nix run ./ci#fleet-consistency`. Only `:27` was executed in this run                                                                                                                                                                                                                                          |
 
@@ -217,7 +216,7 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 Current output (verbatim):
 
 ```json
-{"flakeModules":["genLibs"],"lib":["aspects","mkCi","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
+{"flakeModules":["genLibs"],"lib":["aspects","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
 ```
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`

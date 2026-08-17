@@ -23,10 +23,11 @@ graph queries, selection, binding, dispatch, dataflow — names it after the lit
 and ships its own test suite and CI gate. They talk to each other through accessor functions and plain
 attrsets rather than deep coupling, so you can take gen-graph for graph queries without gen-scope, or
 gen-schema for typed registries without knowing what an aspect is. This repository is the hub: it owns
-no concern of its own, and publishes the roster (`mkGenLibs`), one flake-parts module, and an `mkCi`
-that two libraries still call — the CI wrapper the rest of the ecosystem builds on now lives in
+no concern of its own, and publishes the roster (`mkGenLibs`) and one flake-parts module. The CI
+wrapper the ecosystem builds on lives in
 [gen-harness](https://github.com/sini/gen-harness), which pins no gen library and so cannot close the
-harness↔aggregator cycle the hub's copy carried.
+harness↔aggregator cycle the hub's copy carried. This hub no longer ships an `mkCi` of its own — the
+extraction is complete, and even this repository's own gate is built from the harness's.
 
 The primary consumer is [den](https://github.com/denful/den), a NixOS / nix-darwin / home-manager
 configuration framework. The libraries themselves are generic — none of them knows what NixOS is.
@@ -157,13 +158,13 @@ for eighteen of the nineteen roster keys — gen-class is the exception describe
 exports `.lib` too — so a library that renames, wraps or drops that output fails hub evaluation at its
 first consumer. All twenty-two library flakes declare it today.
 
-**Every library gates on its own CI.** All twenty-two library repos build their `ci/flake.nix` on an
-`mkCi` that `import-tree`s the whole `ci/tests/` directory — a new test file becomes a gate the moment
-it lands, with no registration step. Twenty of them call `gen-harness.lib.mkCi`; gen-flake and
-gen-vars still call this hub's copy, which the harness was extracted from. From a library root,
-`grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says which of the two that library is on.
-`nix flake check ./ci` from any repo root runs the suite, and every roster library carries a GitHub
-Actions workflow that runs it on push and pull request.
+**Every library gates on its own CI.** All twenty-two library repos build their `ci/flake.nix` on
+`gen-harness.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes
+a gate the moment it lands, with no registration step. `nix flake check ./ci` from any repo root runs
+the suite, and every roster library carries a GitHub Actions workflow that runs it on push and pull
+request. This hub is not among them: it exposes flake `checks` and a perf `app` rather than a
+nix-unit `tests` output, so it consumes the harness's check builders directly instead of its module —
+the repository that ships a gate is gated by it.
 
 **The pure module system is byte-identical to the nixpkgs one it replaced.** The parity oracle in this
 hub's `ci/` — `rehost-den-parity` over den's actual registry shape — compares resolved projections

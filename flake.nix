@@ -1,17 +1,11 @@
 {
   inputs = {
+    # The only non-gen input, and it is here because `ci/flake.nix` follows it — this flake
+    # evaluates no nixpkgs itself. The seven tool inputs that used to sit beside it (nix-unit,
+    # import-tree, treefmt-nix, devshell, flake-root, git-hooks-nix, flake-parts) existed to feed
+    # `mkCi`'s `resolve` fallback through `genInputs`. `mkCi` lives in gen-harness now and that
+    # repository declares them itself, so here they were reachable from nothing.
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-root.url = "github:srid/flake-root";
-    nix-unit.url = "github:nix-community/nix-unit";
-    nix-unit.inputs.nixpkgs.follows = "nixpkgs";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-    devshell.url = "github:numtide/devshell";
-    devshell.inputs.nixpkgs.follows = "nixpkgs";
-    import-tree.url = "github:sini/import-tree";
-    git-hooks-nix.url = "github:cachix/git-hooks.nix";
-    git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     gen-prelude.url = "github:sini/gen-prelude";
     gen-algebra.url = "github:sini/gen-algebra";
@@ -55,7 +49,10 @@
         );
     in
     {
-      lib.mkCi = import ./ci/mkCi.nix { inherit inputs; };
+      # `lib.mkCi` is NOT here, and its absence is the point rather than an omission: the CI
+      # wrapper is `gen-harness.lib.mkCi`, in its own repository. A library's test harness must
+      # not depend on the aggregator that pins that library, and re-exporting it from here was
+      # the last edge that made it.
       lib.mkGenLibs = mkGenLibs;
 
       # The three stack layers, each selected by the roster's own stratum declaration. The

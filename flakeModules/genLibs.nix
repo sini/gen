@@ -5,6 +5,9 @@
 #
 # This makes genAlgebra, genSchema, etc. available as top-level arguments in
 # every flake-parts module evaluated by the consumer.
+#
+# The flake-parts this runs under is the CONSUMER's; this hub declares no flake-parts input
+# because it evaluates none. A module is a value handed to a host, not a host.
 { lib, inputs, ... }:
 let
   genLibs = inputs.gen.lib.mkGenLibs { inherit lib; };
