@@ -17,6 +17,12 @@ in
 let
   tests = config.flake.tests;
 
+  # The markdown invariants, from the one file both this module and the hub's own ci read, so
+  # the two cannot drift apart the way the three copies of the discarded list did.
+  mdformatBasePlugins = import ./mdformat-plugins.nix;
+  # Bound HERE rather than inside `perSystem`, whose own `config` argument shadows this one.
+  mdformatExtra = config.gen.ci.mdformat.extraPlugins;
+
   assertTests = lib.mapAttrsToList (
     suite: subtests:
     lib.mapAttrsToList (
@@ -33,6 +39,21 @@ in
     type = lib.types.lazyAttrsOf (lib.types.lazyAttrsOf lib.types.raw);
     default = { };
     description = "Test suites: { suite-name.test-name = { expr; expected; }; }";
+  };
+
+  # The EXTENSION point, and it is an extension rather than an override on purpose. The base set
+  # defends representational invariants of markdown, which are uniform across every repository
+  # that writes markdown and are therefore not a per-corpus preference. What IS per-corpus — gfm
+  # being the measured case — arrives here, added to the base rather than replacing it.
+  options.gen.ci.mdformat.extraPlugins = lib.mkOption {
+    type = lib.types.functionTo (lib.types.listOf lib.types.package);
+    default = _: [ ];
+    description = ''
+      Plugins ADDED to mkCi's base mdformat set. The base set is not reachable for removal
+      through this option, by construction: `programs.mdformat.plugins` replaces rather than
+      extends, so a consumer setting it directly would silently drop frontmatter, footnote and
+      simple-breaks and nothing would report it.
+    '';
   };
 
   config = {
@@ -125,13 +146,17 @@ in
             nixfmt.enable = true;
             mdformat = {
               enable = true;
-              package = pkgs.mdformat.withPlugins (p: [
-                p.mdformat-beautysh
-                p.mdformat-footnote
-                p.mdformat-frontmatter
-                p.mdformat-gfm
-                p.mdformat-simple-breaks
-              ]);
+              # ★ THE SET GOES THROUGH `plugins`, AND THERE IS NO `package` LINE TO GUARD.
+              # treefmt-nix builds its final package as `cfg.package.withPlugins cfg.plugins`,
+              # and mdformat's `withPlugins` wraps a HARDCODED plain base rather than the package
+              # it is called on. So `package` and `plugins` do not union: a list written into
+              # `package` is discarded outright and the formatter that ships is plain mdformat,
+              # store-path-identical to it. Setting both would encode a union that does not
+              # exist, which is why the line is deleted rather than supplemented.
+              plugins = p: mdformatBasePlugins p ++ mdformatExtra p;
+              # Ordered lists renumber rather than repeating `1.`, so a reordered list reads
+              # correctly in plain text as well as rendered.
+              settings.number = true;
             };
           };
         };
@@ -139,6 +164,14 @@ in
         # The tree-root invariant is a property of the GENERATED artefacts, so it is gated
         # where they are built rather than trusted to the settings above staying put.
         checks.treefmt-tree-root = import ./treefmt-tree-root.nix {
+          inherit pkgs name;
+          formatter = self'.formatter;
+        };
+
+        # The plugin set is a property of the GENERATED formatter, not of the expression above:
+        # the defect this guards was a list that was written and then discarded. Gated where the
+        # artefact is built, for the same reason the tree root is.
+        checks.mdformat-plugins = import ./mdformat-plugins-check.nix {
           inherit pkgs name;
           formatter = self'.formatter;
         };

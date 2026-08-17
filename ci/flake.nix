@@ -96,6 +96,11 @@
       # entry the same value as its flat member. `.gate` is the per-key wiring-ok record + the roster
       # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
+
+      # The same file `flakeModule.nix` reads. The comment above this treefmt block says the set
+      # here may not be trimmed below the one consumers receive; reading it from one place makes
+      # that hold by construction rather than by two lists being kept in agreement by hand.
+      mdformatBasePlugins = import ./mdformat-plugins.nix;
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = lib.systems.flakeExposed;
@@ -301,6 +306,14 @@
               name = "gen";
               formatter = self'.formatter;
             };
+
+            # The plugin set is a property of the GENERATED formatter, not of the expression
+            # above: the defect this guards was a list that was written and then discarded.
+            mdformat-plugins = import ./mdformat-plugins-check.nix {
+              inherit pkgs;
+              name = "gen";
+              formatter = self'.formatter;
+            };
           };
 
           apps.perf-bench = {
@@ -337,13 +350,13 @@
               nixfmt.enable = true;
               mdformat = {
                 enable = true;
-                package = pkgs.mdformat.withPlugins (p: [
-                  p.mdformat-beautysh
-                  p.mdformat-footnote
-                  p.mdformat-frontmatter
-                  p.mdformat-gfm
-                  p.mdformat-simple-breaks
-                ]);
+                # ★ THROUGH `plugins`, WITH NO `package` LINE TO GUARD — `package` and `plugins`
+                # do not union. treefmt-nix builds `cfg.package.withPlugins cfg.plugins`, and
+                # mdformat's `withPlugins` wraps a hardcoded plain base rather than the package
+                # it is called on, so a list written into `package` is discarded and the shipped
+                # formatter is plain mdformat, store-path-identical to it.
+                plugins = mdformatBasePlugins;
+                settings.number = true;
               };
             };
           };
