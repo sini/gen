@@ -5,7 +5,7 @@
 # the wiring silently — no consumer catches it until their OWN eval throws. This forces every key of
 # the hub's mkGenLibs so a broken wiring — or a dropped/added roster key — fails `nix flake check ./ci`.
 #
-# It also checks the STRATUM PARTITION: that every member declares a layer, that the three published
+# It also checks the STRATUM PARTITION: that every member declares a layer, that the published
 # buckets carry exactly what the declaration assigns them, and that a bucket entry is the same VALUE
 # as the flat member rather than a second evaluation of the same source.
 #
