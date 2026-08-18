@@ -56,13 +56,21 @@
       # the last edge that made it.
       lib.mkGenLibs = mkGenLibs;
 
-      # The three stack layers, each selected by the roster's own stratum declaration. The
-      # `framework` and `retiring` declarations publish no path here by design: they are facts
-      # about the roster, and inviting a consumer to select a leaving library is the adoption the
-      # `retiring` value exists to prevent. Both remain reachable on the flat roster.
+      # The stack layers, each selected by the roster's own stratum declaration. The `retiring`
+      # declaration publishes no path here by design: inviting a consumer to select a library on its
+      # way off the roster is the adoption that value exists to prevent, and its members stay
+      # reachable through `mkGenLibs`.
+      #
+      # `framework` DOES publish, and the asymmetry with `retiring` is the point rather than an
+      # inconsistency. The two were once excluded by one sentence whose stated ground — a consumer
+      # selecting a leaving library — is true of `retiring` alone; a framework library is not
+      # leaving. What forced the reading is that a framework TOOLKIT is a library every assembling
+      # framework is meant to reach, so withholding its path made the intended consumption path the
+      # one case the hub does not serve.
       lib.substrate = bucket "substrate";
       lib.modules = bucket "modules";
       lib.aspects = bucket "aspects";
+      lib.framework = bucket "framework";
 
       flakeModules.genLibs = ./flakeModules/genLibs.nix;
     };

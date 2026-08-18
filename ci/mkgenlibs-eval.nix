@@ -72,15 +72,15 @@ let
   strata = genLibs.${declKey};
   declaredKeys = builtins.attrNames strata;
 
-  # The stratum values that publish a consumer path on the hub's `lib` output. `framework` and
-  # `retiring` are declarations only — they name no bucket, so nothing selects them here.
+  # The stratum values that publish a consumer path on the hub's `lib` output. `retiring` is a
+  # declaration only — it names no bucket, so nothing selects it here.
   publishedStrata = [
     "substrate"
     "modules"
     "aspects"
+    "framework"
   ];
   knownStrata = publishedStrata ++ [
-    "framework"
     "retiring"
   ];
 

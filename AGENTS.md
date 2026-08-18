@@ -5,7 +5,8 @@
 The ecosystem hub: it owns no concern of its own. It publishes `mkGenLibs` — two-stage instantiation
 of the gen library roster (stage 1 captures `genInputs` at definition time and binds the roster; stage
 2 hands back that same value, each member flake's self-wired `.lib`) — the three **stratum buckets**
-cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`), and one flake-parts module.
+cut from that roster (`lib.substrate`, `lib.modules`, `lib.aspects`, `lib.framework`), and one
+flake-parts module.
 It publishes **no `mkCi`**: the CI-flake wrapper every library's `ci/` calls is
 `gen-harness.lib.mkCi`, in its own repository. The harness pins no gen library, so a sibling's `ci/`
 lock no longer drags the aggregator that pins that sibling — and since the hub no longer re-exports
@@ -66,9 +67,10 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 | Export          | Signature                                                                       |
 | --------------- | ------------------------------------------------------------------------------- |
 | `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix` binds it as `_`) |
-| `lib.substrate` | the S1 stratum bucket — 9 members, selected from the flat roster                |
+| `lib.substrate` | the S1 stratum bucket — 10 members, selected from the flat roster               |
 | `lib.modules`   | the S2 (module-system) stratum bucket — 2 members                               |
 | `lib.aspects`   | the S3 (aspect-layer) stratum bucket — 3 members                                |
+| `lib.framework` | the framework bucket — 1 member                                                 |
 
 **There is no `lib.mkCi` here.** It lives at `gen-harness.lib.mkCi`, on the signature
 `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs`, already
@@ -76,11 +78,11 @@ stage-1-applied so a consumer makes one call. Every library repository calls it 
 `ci/flake.nix`. `gen-vars` still calls a hub `mkCi` that no longer exists, at a pinned older hub
 revision; it is excluded from the inventory by ADR-0003 and is knowingly left there.
 
-**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty keys: **nineteen
+**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty-one keys: **twenty
 members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
 `genInputs.gen-<key>.lib` verbatim except `class`.
 
-`algebra` `aspects` `bind` `class` `dispatch` `edge` `flake` `graph` `link` `merge` `pipe`
+`algebra` `aspects` `bind` `class` `dispatch` `edge` `flake` `graph` `link` `memo` `merge` `pipe`
 `prelude` `product` `resolve` `schema` `scope` `select` `settings` `types` — plus `strata`
 
 `class` is the one exception: the `class` binding re-imports `"${genInputs.gen-class}/lib"` with
@@ -98,7 +100,7 @@ its stratum. Five values:
 | `substrate` | the base layer: values, graphs, selection, evaluation                                                                                            | `lib.substrate`   |
 | `modules`   | the module system: the checking half and the merging half                                                                                        | `lib.modules`     |
 | `aspects`   | the aspect layer, built on the module system                                                                                                     | `lib.aspects`     |
-| `framework` | above the stack rather than a layer of it — a configuration framework assembles with it, and no substrate vocabulary may be defined in its terms | **no**            |
+| `framework` | above the stack rather than a layer of it — a configuration framework assembles with it, and no substrate vocabulary may be defined in its terms | `lib.framework`   |
 | `retiring`  | on the roster and leaving it: content is moving to another member, so it stays reachable but no consumer should newly adopt it                   | **no**            |
 
 `framework` and `retiring` are facts about the roster, not consumer surfaces: publishing a path for
@@ -115,8 +117,8 @@ framework  settings
 retiring   edge flake pipe resolve
 ```
 
-**`lib.substrate` / `lib.modules` / `lib.aspects`** — the three stratum buckets, each a **selection
-from the flat roster**, never a re-import: `lib.substrate.prelude` and the flat `prelude` are one
+**`lib.substrate` / `lib.modules` / `lib.aspects` / `lib.framework`** — the four stratum buckets,
+each a **selection from the flat roster**, never a re-import: `lib.substrate.prelude` and the flat `prelude` are one
 value rather than two evaluations of the same source. The distinction is invisible to a
 names-and-types comparison — a library re-imported at a different pin has identical names and
 identical types while being a different build — so `ci/mkgenlibs-eval.nix` holds it by value equality
@@ -133,7 +135,7 @@ such overload.
 | ---------------------- | -------------------------------------------------------------------------------------------- |
 | `flakeModules.genLibs` | a **path** (`builtins.typeOf` ⇒ `"path"`), not a module value — `./flakeModules/genLibs.nix` |
 
-Imported into a flake-parts consumer it sets `_module.args` to **eight** of the nineteen roster keys,
+Imported into a flake-parts consumer it sets `_module.args` to **eight** of the twenty roster keys,
 under camelCase `gen*` names (`flakeModules/genLibs.nix:13-22`):
 
 ```
@@ -154,7 +156,7 @@ directly, or — for the six that declare a published stratum (`class` `link` `m
 | Task                                                 | Reach for                                                                                                                                                                                                            |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Get the whole roster in a consumer                   | `inputs.gen.lib.mkGenLibs { }`                                                                                                                                                                                       |
-| Get one stratum                                      | `inputs.gen.lib.substrate` / `.modules` / `.aspects` — the members of that layer, selected from the flat roster                                                                                                      |
+| Get one stratum                                      | `inputs.gen.lib.substrate` / `.modules` / `.aspects` / `.framework` — the members of that layer, selected from the flat roster                                                                                       |
 | Find out which layer a library is in                 | `(inputs.gen.lib.mkGenLibs { }).strata.<key>` — total, and forceable with no `genInputs` at all                                                                                                                      |
 | Get one library                                      | `inputs.gen-<name>.lib` directly — the roster adds nothing over the flake input, except for `class`                                                                                                                  |
 | Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib`                                                                                                                                              |

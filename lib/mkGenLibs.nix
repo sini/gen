@@ -71,9 +71,10 @@ let
     #              lines and the hub stops pinning it, and its repository is orphaned for
     #              reference rather than deleted (gen-demand, ADR-0008 §4, is the first)
     #
-    # `substrate`, `modules` and `aspects` publish consumer paths on the hub's `lib` output
-    # (flake.nix). `framework` and `retiring` publish none — they are facts about the roster, and
-    # their members stay reachable exactly where they are today, on the flat roster.
+    # `substrate`, `modules`, `aspects` and `framework` publish consumer paths on the hub's `lib`
+    # output (flake.nix). `retiring` publishes none: a consumer selecting a library on its way off
+    # the roster is the adoption that value exists to prevent, and its members stay reachable on the
+    # flat roster through `mkGenLibs`.
     strata = {
       prelude = "substrate";
       algebra = "substrate";

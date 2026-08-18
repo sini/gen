@@ -34,7 +34,7 @@ configuration framework. The libraries themselves are generic — none of them k
 
 ## What it provides
 
-Nineteen libraries are wired into the hub roster and reachable as `mkGenLibs` keys; two more are
+Twenty libraries are wired into the hub roster and reachable as `mkGenLibs` keys; two more are
 standalone and consumed directly; one more is retired and archived for reference, wired to nothing.
 Each library's `flake.nix` `description` and its `AGENTS.md`
 capability sheet are the authority on its scope — the sheet also records what the library explicitly
@@ -127,8 +127,8 @@ A consumer's ordinary nixpkgs modules then read those values as one module argum
 ```
 
 The hub is optional. `mkGenLibs` gives you the whole roster under short keys (`genLibs.graph`,
-`genLibs.merge`, …) when you want it, and `gen.lib.substrate` / `gen.lib.modules` / `gen.lib.aspects`
-give you one layer of it at a time — but a consumer reading `inputs.gen-X.lib` directly never needs
+`genLibs.merge`, …) when you want it, and `gen.lib.substrate` / `gen.lib.modules` /
+`gen.lib.aspects` / `gen.lib.framework` give you one layer of it at a time — but a consumer reading `inputs.gen-X.lib` directly never needs
 this repository at all.
 
 ## What it promises
@@ -139,7 +139,7 @@ it fails — is [TRUST.md](TRUST.md).
 
 **Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Eighteen of the nineteen roster libraries
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Nineteen of the twenty roster libraries
 carry it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter
 its lock, and the flake structure is the proof. gen-vars is the documented exception, and is off-roster
 for this reason. Retired gen-demand never gained a scanner and now never will: its Class-B claim rested
@@ -154,7 +154,7 @@ the boundary cannot widen by accident. Everywhere the ecosystem needs `lib.*` al
 visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for eighteen of the nineteen roster keys — gen-class is the exception described below, and its flake
+for nineteen of the twenty roster keys — gen-class is the exception described below, and its flake
 exports `.lib` too — so a library that renames, wraps or drops that output fails hub evaluation at its
 first consumer. All twenty-two library flakes declare it today.
 
