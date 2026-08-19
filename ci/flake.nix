@@ -55,6 +55,16 @@
     # surface this pin guards is; the aspect grammar is not — it moves by design ruling, so no frozen
     # aspect reference can track it and a parity gate built on one reds on every ruled improvement
     # rather than on a defect. That is why only the schema half of the golden pair survives here.
+    #
+    # ★ AND THE SAME PRECONDITION HAS SINCE FAILED ON ONE AXIS OF THE SURVIVING HALF: the IDENTITY
+    # ENCODING. gen-schema `75d40c1` re-minted `id_hash` by design ruling (ADR-0016) — the kind left
+    # the digest for a `"<kind>:"` tag and the preimage became `toJSON` of the ⟨label,value⟩ pairs —
+    # so the frozen witness reds on a ruled improvement here exactly as it would on the aspect
+    # grammar, and no forward golden pin can carry the new encoding because every nixpkgs-signature
+    # revision predates it. The identity axis is therefore EXCLUDED from the comparison: the parity
+    # arms restate over instance key sets and every non-identity field (which do still hold
+    # byte-for-byte), and `id_hash` is held by a teeth arm on the PURE engine instead of against the
+    # frozen witness. ci/rehost-den-parity.nix states the exclusion and the arm at the arms.
     gen-schema-orig.url = "github:sini/gen-schema/2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6";
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
     # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
@@ -91,7 +101,9 @@
       # ── re-host byte-parity oracle (permanent regression) ──
       # PURE side tracks the published re-host mains; REFERENCE side is the frozen original
       # nixpkgs-signature gen-schema driven through the pinned nixpkgs.lib. A future gen-merge /
-      # re-host change that breaks byte-parity (incl the id_hash SHA) makes this check fail.
+      # re-host change that breaks byte-parity on the instance key sets or on any non-identity field
+      # makes this check fail. The `id_hash` is the one excluded axis (see the golden pin above) and
+      # is held by `teeth-mutation-pure` on the pure engine, which ships its own seeded control.
       denParity = import ./rehost-den-parity.nix {
         inherit (genInputs)
           gen-prelude
@@ -110,6 +122,8 @@
         "parity-instances"
         "both-evaluated"
         "teeth-mutation"
+        "teeth-mutation-pure"
+        "arming-teeth-mutation-pure"
         "teeth-parity"
         "parity-nested"
       ];
