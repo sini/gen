@@ -207,6 +207,17 @@ let
     {
       from = "schema";
       to = "types";
+      # ★ THE REPAIR HAS LANDED UPSTREAM AND IS NOT YET VISIBLE HERE. gen-schema declared gen-types
+      # and called it zero times — a dependency named on gen-merge's behalf — and gen-schema
+      # 996097c deleted the declaration, so the edge is gone at gen-schema's main. This check
+      # governs the HUB'S PINNED revisions, and the hub still pins gen-schema at 017062c where the
+      # edge IS declared: deleting this entry today would make the check refuse a real upward edge
+      # and take the gate red. The pin cannot move yet — `rehost-den-parity` regresses on ANY
+      # forward bump of gen-schema, measured identically at 87f54bd (which PREDATES the deletion)
+      # and at 996097c: parity-instances, parity-nested and teeth-parity all false, against green
+      # at 017062c. So the parity break is not this edge's, and it is what blocks the retirement.
+      # When the pin moves, this entry reports STALE and is removed together with narrowing the
+      # width below to 1.
       cause = "declared for gen-merge's benefit, not consumed by gen-schema: the library entry takes prelude, merge and algebra, and gen-types is never injected into it; the standalone non-flake entry fetches gen-types only to construct gen-merge's own types argument";
       retirementCarrier = "den-hoag-iogq";
     }
@@ -221,7 +232,8 @@ let
 
   # The owner ruling of 2026-08-18 admits EXACTLY these edges. Changing this number in EITHER
   # direction is a ruling-visible act, not an edit: widening it is a new ruling, and narrowing it on
-  # a landed retirement is the ruling admitting fewer than it did.
+  # a landed retirement is the ruling admitting fewer than it did. It narrows to 1 the moment the
+  # hub's gen-schema pin can move (see the second entry).
   ruledExceptionWidth = 2;
 
   mkException =
@@ -384,23 +396,25 @@ let
     e: classify seedStrata chain ruledException e == "unranked"
   ) seedStrataTouched;
 
-  # Axis 4 — the EXCEPTION SET. An uncaused entry, an uncarried entry and an appended third must
-  # each be refused; the ruled set itself must be ACCEPTED, which is the positive control that
-  # makes those three refusals readings rather than a broken constructor.
+  # Axis 4 — the EXCEPTION SET. An uncaused entry, an uncarried entry and an appended one must each
+  # be refused; the ruled set itself must be ACCEPTED, which is the positive control that makes
+  # those three refusals readings rather than a broken constructor.
+  #
+  # The two malformed seeds mutate the HEAD and keep the tail, so they carry the ruled width at any
+  # width: a seed that also changed the count would be refused by the width line and the arm would
+  # pass for the wrong reason — a control firing on the wrong cause is not a control.
   accepts = entries: (builtins.tryEval (builtins.deepSeq (mkException entries) true)).success;
-  seedUncaused = [
-    (builtins.removeAttrs (builtins.elemAt ruledExceptionEntries 0) [ "cause" ])
-    (builtins.elemAt ruledExceptionEntries 1)
-  ];
-  seedUncarried = [
-    (builtins.elemAt ruledExceptionEntries 0)
-    (builtins.removeAttrs (builtins.elemAt ruledExceptionEntries 1) [ "retirementCarrier" ])
-  ];
-  seedThirdEntry = ruledExceptionEntries ++ [
+  seedWithoutField =
+    f:
+    [ (builtins.removeAttrs (builtins.head ruledExceptionEntries) [ f ]) ]
+    ++ builtins.tail ruledExceptionEntries;
+  seedUncaused = seedWithoutField "cause";
+  seedUncarried = seedWithoutField "retirementCarrier";
+  seedWidened = ruledExceptionEntries ++ [
     {
       from = "prelude";
       to = "aspects";
-      cause = "a third entry appended by edit rather than by ruling";
+      cause = "an entry appended by edit rather than by ruling";
       retirementCarrier = "den-hoag-none";
     }
   ];
@@ -454,7 +468,7 @@ let
       ruledSetAccepted = accepts ruledExceptionEntries;
       uncausedAccepted = accepts seedUncaused;
       uncarriedAccepted = accepts seedUncarried;
-      thirdEntryAccepted = accepts seedThirdEntry;
+      widenedAccepted = accepts seedWidened;
     };
     seededOffRoster = {
       declaration = seededOffRoster;
@@ -498,7 +512,7 @@ let
     arming-exception-ruled-set-accepted = arming.seededException.ruledSetAccepted;
     arming-exception-refuses-uncaused = !arming.seededException.uncausedAccepted;
     arming-exception-refuses-uncarried = !arming.seededException.uncarriedAccepted;
-    arming-exception-refuses-third-entry = !arming.seededException.thirdEntryAccepted;
+    arming-exception-refuses-widening = !arming.seededException.widenedAccepted;
     # ARMING — axis 5, the declared input set. The live off-roster figure is a zero; this is what
     # makes it a reading.
     arming-off-roster-named =
