@@ -237,6 +237,21 @@
         "type": "github"
       }
     },
+    "gen-assemble": {
+      "locked": {
+        "lastModified": 1787121215,
+        "narHash": "sha256-n8+MdyM8D4+iyitHHZSp/GC9xoBbV8YZAh0I6b+548k=",
+        "owner": "sini",
+        "repo": "gen-assemble",
+        "rev": "772fcc39c17fa1780b12af193457e28d82d42fe6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-assemble",
+        "type": "github"
+      }
+    },
     "gen-bind": {
       "inputs": {
         "gen-prelude": "gen-prelude_8"
@@ -2372,6 +2387,7 @@
       "inputs": {
         "gen-algebra": "gen-algebra",
         "gen-aspects": "gen-aspects",
+        "gen-assemble": "gen-assemble",
         "gen-bind": "gen-bind",
         "gen-class": "gen-class",
         "gen-dispatch": "gen-dispatch",

@@ -27,6 +27,7 @@
     gen-settings.url = "github:sini/gen-settings";
     gen-pipe.url = "github:sini/gen-pipe";
     gen-link.url = "github:sini/gen-link";
+    gen-assemble.url = "github:sini/gen-assemble";
   };
 
   outputs =

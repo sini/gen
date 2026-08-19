@@ -30,6 +30,7 @@ let
   # member from a declaration, so the declaration key is listed here too.
   expectedKeys = [
     "algebra"
+    "assemble"
     "aspects"
     "bind"
     "class"

@@ -53,6 +53,17 @@ let
       merge = genInputs.gen-merge.lib;
     };
 
+    # gen-assemble declares NO inputs at all: the shared framework toolkit takes its whole substrate
+    # as injected values and constructs inside the consumer's own evaluation, which is what the
+    # gen↔gen boundary rule asks of a library that composes another's constructor. So the hub wires
+    # it the way it wires gen-class rather than re-exporting a self-resolved `.lib` — and a consumer
+    # taking this input gains no transitive pin from it.
+    assemble = import "${genInputs.gen-assemble}/lib" {
+      prelude = genInputs.gen-prelude.lib;
+      scope = genInputs.gen-scope.lib;
+      algebra = genInputs.gen-algebra.lib;
+    };
+
     # The stratum declaration — which layer of the stack each member belongs to. It is TOTAL and
     # EXPLICIT: a member with no entry here is a build error, never a member of an implicit residue
     # bucket. A defaulted stratum would let a new library join the roster and land silently in
@@ -93,6 +104,7 @@ let
       edge = "retiring";
       product = "substrate";
       settings = "framework";
+      assemble = "framework";
       pipe = "retiring";
       link = "aspects";
       class = "aspects";
