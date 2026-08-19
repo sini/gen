@@ -187,39 +187,26 @@ let
       null;
 
   # ── THE RULED EXCEPTION ──
-  # Closed at exactly two edges, keyed by EDGE and never by member, so no member is exempt: an
+  # Closed at exactly one edge, keyed by EDGE and never by member, so no member is exempt: an
   # upward edge out of gen-schema to a member this list does not name is refused. This is NOT the
   # per-member allow-list the spec refutes — that shape had neither a cause nor a retirement
   # condition, so nothing bounded it and nothing retired it, and it grew by an edit each round.
   # Each entry here MUST state its cause and its retirement carrier, an entry that cannot name both
   # is refused rather than admitted, and the width is asserted against the ruling — an appended
-  # third entry takes this check red at the line naming the ruling it would have to change.
+  # second entry takes this check red at the line naming the ruling it would have to change.
   #
-  # ★ THE TWO EDGES DO NOT SHARE A CAUSE. Reading them as one cause misattributes the second, and
-  # they retire independently: neither carrier discharges the other's edge.
+  # ★ IT WAS RULED AT TWO AND STANDS AT ONE, WHICH IS THE TWO CAUSES BEING DIFFERENT — DISCHARGED BY
+  # EVENT RATHER THAN BY ARGUMENT. `schema -> types` was a declaration made on gen-merge's behalf
+  # that gen-schema never consumed; gen-schema 996097c deleted it, the entry reported STALE at the
+  # hub pin bump that made the deletion visible, and it retired ALONE — the surviving entry did not
+  # move with it, and its carrier never touched it. Reading the two as one cause would have
+  # misattributed the second and retired both on this one landing.
   ruledExceptionEntries = [
     {
       from = "schema";
       to = "merge";
       cause = "option/type vocabulary: gen-schema declares kinds whose fields are options, so it needs the module system's vocabulary to say what a field is. Measured at gen-schema 87f54bd: of 45 calls through the injected merge formal, 40 are merge.types.*/mkOption/mkOptionType and merging semantics proper is 2. gen-schema is substrate BY ROLE and written in modules' language";
       retirementCarrier = "den-hoag-b91m";
-    }
-    {
-      from = "schema";
-      to = "types";
-      # ★ THE REPAIR HAS LANDED UPSTREAM AND IS NOT YET VISIBLE HERE. gen-schema declared gen-types
-      # and called it zero times — a dependency named on gen-merge's behalf — and gen-schema
-      # 996097c deleted the declaration, so the edge is gone at gen-schema's main. This check
-      # governs the HUB'S PINNED revisions, and the hub still pins gen-schema at 017062c where the
-      # edge IS declared: deleting this entry today would make the check refuse a real upward edge
-      # and take the gate red. The pin cannot move yet — `rehost-den-parity` regresses on ANY
-      # forward bump of gen-schema, measured identically at 87f54bd (which PREDATES the deletion)
-      # and at 996097c: parity-instances, parity-nested and teeth-parity all false, against green
-      # at 017062c. So the parity break is not this edge's, and it is what blocks the retirement.
-      # When the pin moves, this entry reports STALE and is removed together with narrowing the
-      # width below to 1.
-      cause = "declared for gen-merge's benefit, not consumed by gen-schema: the library entry takes prelude, merge and algebra, and gen-types is never injected into it; the standalone non-flake entry fetches gen-types only to construct gen-merge's own types argument";
-      retirementCarrier = "den-hoag-iogq";
     }
   ];
 
@@ -230,11 +217,13 @@ let
     "retirementCarrier"
   ];
 
-  # The owner ruling of 2026-08-18 admits EXACTLY these edges. Changing this number in EITHER
-  # direction is a ruling-visible act, not an edit: widening it is a new ruling, and narrowing it on
-  # a landed retirement is the ruling admitting fewer than it did. It narrows to 1 the moment the
-  # hub's gen-schema pin can move (see the second entry).
-  ruledExceptionWidth = 2;
+  # The owner ruling of 2026-08-18 admits AT MOST the edges it named, and it named two. Changing
+  # this number in EITHER direction is a ruling-visible act, not an edit: widening it is a new
+  # ruling, and narrowing it on a landed retirement is the ruling admitting fewer than it did. This
+  # value is at 1 by the second kind — `schema -> types` retired when its declaration was deleted
+  # upstream and the hub's pin moved to see it, which the lint spec's COST clause states costs no
+  # new ruling. Widening it back to 2 does.
+  ruledExceptionWidth = 1;
 
   mkException =
     entries:
@@ -351,7 +340,7 @@ let
 
   # Axis 1 — the EDGE SET. Two upward edges at DIFFERENT rank gaps (one arm can pass on an
   # accidentally narrow predicate), plus one out of the excepted member to a target the exception
-  # does not name, which is what separates a two-edge exception from a member exemption.
+  # does not name, which is what separates an edge-keyed exception from a member exemption.
   seedAspects = trueEdges ++ [
     {
       from = "prelude";
@@ -427,8 +416,9 @@ let
   seedOffRosterDeclared =
     k: trueDeclared k ++ (if k == seedOffRosterMember then [ seedOffRosterInput ] else [ ]);
 
-  # Axis 6 — the STALE branch of the exception report, which the live tree cannot exercise while
-  # both entries are active.
+  # Axis 6 — the STALE branch of the exception report, which the live tree cannot exercise while the
+  # surviving entry is active. It fired for real once, on `schema -> types` at the pin bump that
+  # retired it; this seed is what keeps the branch armed now that no live entry reads stale.
   seedExceptionStale = builtins.filter (e: !(e.from == "schema" && e.to == "merge")) trueEdges;
 
   # ── THE VERDICTS ──
@@ -490,7 +480,7 @@ let
     no-upward-edge = ruledRefused == [ ];
     # The edge-set path accounted for in full (the three classes sum to what was declared).
     partition-total = partitionTotalOf trueDeclared;
-    # The exception is what moves the two edges — not a hole in the rank function.
+    # The exception is what moves the edges it covers — not a hole in the rank function.
     exception-covers-chain-refusals = ruledExcepted == chainOnlyRefused && chainOnlyRefused != [ ];
 
     # ARMING — axis 1, the edge set.
