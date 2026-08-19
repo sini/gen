@@ -33,7 +33,7 @@ A few terms used throughout, for readers new to the ecosystem:
 Run the whole hub-side proof set:
 
 ```bash
-nix flake check ./ci        # rehost-den-parity oracle + mkGenLibs wiring + treefmt
+nix flake check ./ci        # rehost-den-parity oracle + mkGenLibs wiring + direction lint + treefmt
 nix run ./ci#perf-bench     # parity + ratio + linearity performance gates
 nix run ./ci#flake-compare  # the 3-way real-flake drvPath-equivalence check (15/15)
 ```

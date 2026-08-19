@@ -122,6 +122,18 @@
       # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
+      # ── direction-of-dependence lint ──
+      # ADR-0015's enforcement half: no roster member may declare an input on a HIGHER stratum than
+      # its own, under the chain substrate < modules < aspects < framework, save the closed
+      # two-edge exception ruled 2026-08-18 (which is printed entry by entry, with its cause and
+      # its retirement carrier, on every run). The observable is the DECLARED root-flake input
+      # NAME — never a revision, so the lock graph ADR-0015 forbids as the enforcement source is
+      # not what this reads. Like the check above it governs the hub's PINNED revisions, which is
+      # the surface consumers get. `.gate` is the per-arm record incl. the in-tree arming; the
+      # failure it guards is silent, so `refused: 0` travels with controls that fire in the same
+      # run.
+      directionOfDependence = import ./direction-of-dependence.nix { inherit (inputs) gen; };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -149,6 +161,8 @@
         den = denParity;
       };
       flake.lib.mkGenLibsEval = mkGenLibsEval;
+      #   nix eval ./ci#lib.direction.report --json | jq
+      flake.lib.direction = directionOfDependence;
 
       perSystem =
         {
@@ -227,6 +241,34 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "mkGenLibs WIRING REGRESSION — a lib key failed to evaluate, the roster drifted, or the stratum partition broke" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the direction-of-dependence check: prints the full report — the class tallies,
+          # every edge a reader must act on (refused, excepted, unranked, off-roster), the
+          # exception entry by entry with its cause and carrier, and the arming — and FAILS the
+          # build if any gate arm is not `true`. A failing arm is either an upward edge (the lint
+          # firing) or an arming arm that stopped firing (the lint gone blind); both are red,
+          # because a guard that can no longer refuse is not a passing guard.
+          mkDirectionCheck =
+            name: d:
+            let
+              allOk = builtins.all (k: d.gate.${k} == true) d.gateKeys;
+              failed = builtins.filter (k: d.gate.${k} != true) d.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // d.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "DIRECTION OF DEPENDENCE — a roster member declares an input above its own stratum, or the guard's own arming stopped firing" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -335,6 +377,7 @@
           checks = {
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
+            direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.

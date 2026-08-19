@@ -237,6 +237,13 @@ roster and land silently in whatever bucket the default happened to name. Adding
 lines in one commit — the binding and its stratum — and `ci/mkgenlibs-eval.nix` fails the gate
 otherwise.
 
+The declaration is **enforced in one direction as well as in totality**. Packaging separation does
+not do it: the ecosystem is already maximally separated at 23 repositories, and that did not stop a
+substrate library taking a modules-stratum input. So `ci/direction-of-dependence.nix` reads each
+member's declared root-flake input NAMES at the hub's pins and refuses, by name, any edge that runs
+UP the chain `substrate < modules < aspects < framework` — with one closed, caused, edge-keyed
+exception that is printed on every run rather than filed away.
+
 Three of the five values publish a consumer path, each a **selection from the flat roster** rather
 than a re-import, so `gen.lib.substrate.prelude` and the flat `prelude` are one value and not two
 evaluations of the same source:

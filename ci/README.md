@@ -36,6 +36,28 @@ parent topology, instances with `id_hash`, den's two-level nested option shape) 
 BOTH gen-schema generations via a shared provider `P`; the resolved projections are deep-compared.
 Gate keys are listed in `flake.nix`; any `false` fails the check derivation.
 
+## Architecture — the direction-of-dependence lint
+
+`direction-of-dependence.nix` — ADR-0015's enforcement half. No roster member may declare a root
+flake input on a HIGHER stratum than its own, under the chain
+`substrate < modules < aspects < framework`. The observable is the **declared input NAME**, never a
+revision: the lock resolves names to revisions and the ADR forbids buying enforcement with pin
+separation, so a pin bump that changes no declared name changes no result here. Like
+`mkgenlibs-eval.nix` it governs the hub's **pinned** revisions — the surface consumers get.
+
+The failure it guards is silent: a substrate library that acquires an aspects input just evaluates.
+So the check carries its own arming in tree — seeded upward edges at two rank gaps, an inverted
+rank, a seeded missing layer, a seeded off-roster input and three malformed exception sets — and a
+seeded arm that STOPS firing is as red as an upward edge, because a guard that can no longer refuse
+is not a passing guard.
+
+One closed exception is ruled (2026-08-18), keyed by **edge** and not by member, and it is printed
+entry by entry with its cause and its retirement carrier on every run, including runs where it
+refuses nothing. Each entry must name both fields or it is refused, and the set's width is asserted
+against the ruling in **both** directions — widening it is a new ruling, and narrowing it on a
+landed retirement is the ruling admitting fewer than it did. Edges with a `retiring` endpoint carry
+no layer, so they are unrankable: they are named and counted, and they do not take the run red.
+
 ## Performance — the perf bench
 
 `perf-bench.nix` holds the workload corpus (same provider-`P` trick, scaled to ~200× the oracle
