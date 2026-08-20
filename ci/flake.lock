@@ -98,6 +98,7 @@
         "gen-edge": "gen-edge",
         "gen-flake": "gen-flake",
         "gen-graph": "gen-graph_2",
+        "gen-identity": "gen-identity",
         "gen-link": "gen-link",
         "gen-memo": "gen-memo",
         "gen-merge": "gen-merge_7",
@@ -784,6 +785,21 @@
       "original": {
         "owner": "sini",
         "repo": "gen-harness",
+        "type": "github"
+      }
+    },
+    "gen-identity": {
+      "locked": {
+        "lastModified": 1787248094,
+        "narHash": "sha256-FfBRtY/lnemVU5WZEXRsSwjEjs3PqYCSQU7LKL6qeak=",
+        "owner": "sini",
+        "repo": "gen-identity",
+        "rev": "58c114cb76329fc5a6bb3ee0d29a34f63efc2030",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-identity",
         "type": "github"
       }
     },

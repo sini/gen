@@ -38,6 +38,7 @@ let
     "edge"
     "flake"
     "graph"
+    "identity"
     "link"
     "memo"
     "merge"

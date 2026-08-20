@@ -8,6 +8,7 @@
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
 
     gen-prelude.url = "github:sini/gen-prelude";
+    gen-identity.url = "github:sini/gen-identity";
     gen-algebra.url = "github:sini/gen-algebra";
     gen-types.url = "github:sini/gen-types";
     gen-merge.url = "github:sini/gen-merge";

@@ -15,6 +15,10 @@
 let
   roster = {
     prelude = genInputs.gen-prelude.lib;
+    # Self-contained: no inputs, so nothing to wire. The one minting authority
+    # (ADR-0016 ruling 5) as a dependency-free leaf — which is what lets libraries UPSTREAM of
+    # gen-schema reach it without closing a flake cycle, the whole reason it is its own library.
+    identity = genInputs.gen-identity.lib;
     algebra = genInputs.gen-algebra.lib;
     types = genInputs.gen-types.lib;
     merge = genInputs.gen-merge.lib;
@@ -88,6 +92,13 @@ let
     # flat roster through `mkGenLibs`.
     strata = {
       prelude = "substrate";
+      # ADR-0016 ruling 5 assigned this concern to the SUBSTRATE in the sentence that created it —
+      # "the substrate refuses rather than inventing an identity" — so extracting the code into its
+      # own library relocated the code and not the assignment. It also fits the bucket's own gloss:
+      # a total function from an inert value to a string, carrying no module-system, aspect or
+      # framework notion. Its consumers span four buckets, which is what a base-layer library looks
+      # like from above.
+      identity = "substrate";
       algebra = "substrate";
       types = "modules";
       merge = "modules";
