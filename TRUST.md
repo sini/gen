@@ -56,7 +56,7 @@ oracle's reference side legitimately use `nixpkgs.lib`.
 
 The token list is per library rather than uniform, because a library's own API names must stay legal:
 
-- **The pure siblings** — gen-algebra, gen-bind, gen-dispatch, gen-graph, gen-link, gen-rebuild,
+- **The pure siblings** — gen-algebra, gen-bind, gen-dispatch, gen-graph, gen-link, gen-memo,
   gen-resolve, gen-scope, gen-select, gen-types — ban `lib.` outright, along with `nixpkgs`, the
   `{ lib }` / `{ lib,` parameter signatures, `evalModules` and `mkOption`. No `lib.` call of any kind
   survives there.

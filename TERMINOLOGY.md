@@ -71,7 +71,7 @@ These terms are shared across multiple libraries.
 
 ### gen-prelude — Pure Utility Base
 
-The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-types, gen-merge, gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-rebuild are all built on it (Class B). With the module-system substrate (`gen-types → gen-merge`) now hosting gen-schema and gen-aspects, the whole library level is nixpkgs-lib-free — full nixpkgs enters only at the gen-flake terminal.
+The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-types, gen-merge, gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-memo are all built on it (Class B). With the module-system substrate (`gen-types → gen-merge`) now hosting gen-schema and gen-aspects, the whole library level is nixpkgs-lib-free — full nixpkgs enters only at the gen-flake terminal.
 
 | Term                 | Definition                                                                                              | Provenance |
 | -------------------- | ------------------------------------------------------------------------------------------------------- | ---------- |
@@ -309,7 +309,7 @@ Pure relational rule dispatch — **rule evaluation only**, a function of `(rule
 
 ### gen-resolve — RAG Evaluator + Convergence Loop
 
-Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** that the dispatch step lacks. Class B: five gen siblings (gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind).
+Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** that the dispatch step lacks. Class B: four gen siblings (gen-scope, gen-graph, gen-algebra, gen-bind).
 
 | Term                      | Definition                                                                                                                                                                           | Provenance                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
@@ -419,7 +419,7 @@ Content-agnostic dataflow algebra for scoped channels. Depends on gen-prelude + 
 
 ### gen-class — Class-Share Mechanism
 
-Groups nodes into classes by a caller-supplied key, computes each class's byte-identical shared **core** over a named projection, applies that core back onto a member, and authorises every reuse claim by sha256 over canonical `toJSON`. gen-prelude is the sole flake input (Class B); the gen-merge kernel arrives as an *injected value*, never as an input. Intra-process only — cross-evaluation reuse belongs to gen-rebuild.
+Groups nodes into classes by a caller-supplied key, computes each class's byte-identical shared **core** over a named projection, applies that core back onto a member, and authorises every reuse claim by sha256 over canonical `toJSON`. gen-prelude is the sole flake input (Class B); the gen-merge kernel arrives as an *injected value*, never as an input. Intra-process only — cross-evaluation reuse belongs to gen-memo.
 
 | Term                    | Definition                                                                                                                                                                                                                                                          | Provenance                   |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |

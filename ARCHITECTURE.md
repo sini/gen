@@ -23,15 +23,16 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
 └─────────────────────────────────────────────────────────────────┘
      │
      ▼
-  mkGenLibs keys (nineteen):
+  mkGenLibs keys (the roster of record is lib/mkGenLibs.nix, never a count — ADR-0015):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
-    gen-aspects · gen-scope · gen-graph · gen-select · gen-bind
-    gen-dispatch · gen-resolve · gen-flake · gen-class
-    gen-edge · gen-product · gen-settings · gen-pipe   (L2 concern libs)
+    gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
+    gen-dispatch · gen-resolve · gen-flake · gen-class · gen-link
+    gen-edge · gen-product · gen-settings · gen-pipe · gen-assemble   (L2 concern libs)
   standalone pure libs:
-    gen-rebuild · gen-vars
+    gen-vars
   retired, archived for reference (off-roster, not a hub input):
     gen-demand   → re-expressed into gen-scope (ADR-0008 §4)
+    gen-rebuild  → content moved onto the gen-memo plane (ADR-0008 §4, ADR-0005)
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
@@ -83,8 +84,7 @@ gen-graph    (gen-prelude)
 gen-select   (zero deps — Class A, builtins only)
 gen-bind     (gen-prelude)
 gen-dispatch (gen-prelude only)
-gen-rebuild  (gen-prelude)
-gen-resolve  (gen-scope + gen-graph + gen-rebuild + gen-algebra + gen-bind)
+gen-resolve  (gen-scope + gen-graph + gen-algebra + gen-bind)
 gen-vars     (standalone pure)
 
   # L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
@@ -100,7 +100,7 @@ gen-flake    (import-tree + gen-merge + gen-schema + gen-aspects + gen-bind + ni
 
 Each library exposes a single `.lib` value output — the obsolete functor-call form `gen-graph { inherit lib; }` is gone (`__functor` is banned ecosystem-wide). Dependency classes are declared honestly: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib, **D** nixpkgs-lib + gen-dep.
 
-The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions, incl the `id_hash` SHA); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with five gen siblings — it hosts the convergence loop that ties the dispatch step, scope evaluation, and rebuild together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
+The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions, incl the `id_hash` SHA); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with four gen siblings — it hosts the convergence loop that ties the dispatch step and scope evaluation together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
 
 Above the L1 substrate sit four **L2 concern libraries** — gen-edge, gen-product, gen-settings, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, and scoped-channel dataflow. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `pipe`) like the self-wiring libraries above. A fifth, **gen-demand** (typed demand), retired: ADR-0008 §4 re-expresses its cascade over gen-scope, the sole engine, and its repository is archived for reference rather than deleted.
 
@@ -114,7 +114,7 @@ Anywhere the gen ecosystem needs nixpkgs *lib* only, it uses a pinned `github:ni
 
 **gen-prelude** — Pure nixpkgs-lib-free utility base.
 
-Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. It is the substrate that lets gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-rebuild be nixpkgs-lib-free.
+Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. It is the substrate that lets gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-memo be nixpkgs-lib-free.
 
 **gen-algebra** — Pure primitives shared across the ecosystem.
 
@@ -187,7 +187,7 @@ Production rule system: rules (condition + action producer + identity) dispatche
 
 **gen-resolve** — Demand-driven RAG evaluator over scope graphs.
 
-A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOAG gate + two-stratum partition, cold/warm fold into `gen-scope.eval`). It **owns the convergence loop**: `gen-scope.circular` iterates a step over the domain state to a fixpoint (Kleene ascent, Sloane 2010 §2.2); a relational-dispatch fixpoint is expressed by making that step a one-shot `gen-dispatch.dispatch` whose output context is the next iterate, then reading the actions off the converged context. Class B — five gen siblings (gen-scope, gen-graph, gen-rebuild, gen-algebra, gen-bind).
+A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOAG gate + two-stratum partition, cold/warm fold into `gen-scope.eval`). It **owns the convergence loop**: `gen-scope.circular` iterates a step over the domain state to a fixpoint (Kleene ascent, Sloane 2010 §2.2); a relational-dispatch fixpoint is expressed by making that step a one-shot `gen-dispatch.dispatch` whose output context is the next iterate, then reading the actions off the converged context. Class B — four gen siblings (gen-scope, gen-graph, gen-algebra, gen-bind).
 
 ### Terminal Layer
 

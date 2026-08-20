@@ -42,10 +42,9 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 **Sibling repos that exist but are NOT in the roster and NOT hub flake inputs.** Consumers reach these
 directly, not through `mkGenLibs`.
 
-| Repo          | Description (verbatim `flake.nix`)                                              |
-| ------------- | ------------------------------------------------------------------------------- |
-| `gen-rebuild` | "gen-rebuild: pure-Nix incremental rebuilder core (Mokhov rebuilder dimension)" |
-| `gen-vars`    | "gen-vars: scope-driven, multi-target variable generation"                      |
+| Repo       | Description (verbatim `flake.nix`)                         |
+| ---------- | ---------------------------------------------------------- |
+| `gen-vars` | "gen-vars: scope-driven, multi-target variable generation" |
 
 Enumeration command (from the hub repo root) and its output:
 
@@ -162,7 +161,7 @@ directly, or — for the six that declare a published stratum (`class` `link` `m
 | Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib`                                                                                                                                              |
 | Inject libs as flake-parts module args               | `imports = [ inputs.gen.flakeModules.genLibs ];` (eight keys only)                                                                                                                                                   |
 | Stand up a sibling library's CI flake                | `gen-harness.lib.mkCi { inherit inputs; name = "gen-x"; testModules = ./tests; }` — from `github:sini/gen-harness`, **not** this hub: pinning the hub for a harness pins every library, including the one under test |
-| Use `gen-rebuild` / `gen-vars`                       | their flake inputs directly — not in the roster, not hub inputs                                                                                                                                                      |
+| Use `gen-vars`                                       | their flake inputs directly — not in the roster, not hub inputs                                                                                                                                                      |
 | Run the hub's real gate                              | `nix flake check ./ci` (see Drift check)                                                                                                                                                                             |
 | Look up a term or a citation                         | `TERMINOLOGY.md` (§Core Terms, §Per-Library Vocabulary, §Academic References)                                                                                                                                        |
 | Look up layering / dependency DAG / constraints      | `ARCHITECTURE.md` (§Dependency Graph, §Library Roles, §Design Constraints)                                                                                                                                           |
