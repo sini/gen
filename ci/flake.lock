@@ -328,11 +328,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783298849,
-        "narHash": "sha256-r4HGl9R7IT+y738Yq/ZkO5+4OkZfkEvuqjA1MXW6pSE=",
+        "lastModified": 1787010628,
+        "narHash": "sha256-ZcJ/7oCv7TrnNyEbN4G80gM60/0y/8jhkzC695QYED0=",
         "owner": "sini",
         "repo": "gen-aspects",
-        "rev": "c46f8f3195d2d475bb08ef3a74f5004204f68488",
+        "rev": "93806f8eea8fa32f40ef1b08f7dc611d2c508455",
         "type": "github"
       },
       "original": {
@@ -557,11 +557,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1783655514,
-        "narHash": "sha256-sFUn4Sj/tq5U6ceYg4oGsJz7Jrpi3a8vY0TZBA8+cXc=",
+        "lastModified": 1787195841,
+        "narHash": "sha256-C3KaVQMUbCRSceN8VsWefUwTqPbJH2ar89pxHUZzDfI=",
         "owner": "sini",
         "repo": "gen-flake",
-        "rev": "9812caf6cfb3f1946692f8304d74e04e055c3ebb",
+        "rev": "37a3f376e334aaaf3e86d5d2755ccbc0aa00c62f",
         "type": "github"
       },
       "original": {
@@ -901,11 +901,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783294485,
-        "narHash": "sha256-Le6VR9NAY8rpS8ezGXtHLPaJ3X4hplElRl7w29IeFow=",
+        "lastModified": 1787001441,
+        "narHash": "sha256-FSi21EXUUoa8GCniQV2KdUSmJdyL9BcgWkRw3wdk2j8=",
         "owner": "sini",
         "repo": "gen-merge",
-        "rev": "fdbf140bf84bcca27e5aff411e5759f0edac5852",
+        "rev": "1adf749bb158c240abfa64b38fa1a6f6ea76b5e0",
         "type": "github"
       },
       "original": {
@@ -2051,19 +2051,14 @@
           "gen",
           "gen-flake",
           "gen-prelude"
-        ],
-        "gen-types": [
-          "gen",
-          "gen-flake",
-          "gen-types"
         ]
       },
       "locked": {
-        "lastModified": 1783282742,
-        "narHash": "sha256-RMJH6zT2AduCIh8a2pMWqFHe8zPcoXRUzE96GV8BAes=",
+        "lastModified": 1787099613,
+        "narHash": "sha256-BVjFRykkwCefacerPCvx3vqyj3eEKx68agzbwh66YYg=",
         "owner": "sini",
         "repo": "gen-schema",
-        "rev": "016f4cf963b170f226ae5b28386f2aaf463e29e2",
+        "rev": "996097c2f8552ab25fb9d578f3555505ea68a7a7",
         "type": "github"
       },
       "original": {
