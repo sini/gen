@@ -32,7 +32,7 @@ in
   # Shortcuts for the most common primitives (gen-algebra is the flat value set).
   inherit (genAlgebra)
     mkIntensional
-    intensionalEq
+    conservativeEq
     either
     record
     search
