@@ -84,9 +84,9 @@ does *not* own, and which sibling does.
 
 ### Terminal
 
-| Library                                        | What it owns                                                                                                                                                                                                                                                                                                                                                      |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [gen-flake](https://github.com/sini/gen-flake) | The single nixpkgs / flake-parts boundary. Its pure core is `compose` (resolves a gen module tree through gen-merge into values, a flat aspect registry, a per-host class projection and the provenance channel), plus `injectArgs`, `realize` and `diff`; `terminals.mkSystemTerminal` / `mkFlakeTerminal` are where a nixpkgs evaluator actually builds systems |
+| Library                                        | What it owns                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [gen-flake](https://github.com/sini/gen-flake) | *Dissolving (ADR-0031) — take no new dependency; the hub's `flakeModule` is the INTERIM entry surface.* The single nixpkgs / flake-parts boundary. Its pure core is `compose` (resolves a gen module tree through gen-merge into values, a flat aspect registry, a per-host class projection and the provenance channel), plus `injectArgs`, `realize` and `diff`; `terminals.mkSystemTerminal` / `mkFlakeTerminal` are where a nixpkgs evaluator actually builds systems |
 
 ### Standalone (off-roster)
 
@@ -108,6 +108,7 @@ dependencies, so there is nothing to wire:
 ```nix
 {
   inputs.gen-graph.url = "github:sini/gen-graph";
+<!-- INTERIM (ADR-0031): this example still binds gen-flake directly; it retargets to the hub's flakeModule with f3px unit 7's consumer migration. gen-flake is dissolving — do not copy this as a new dependency. -->
   inputs.gen-flake.url = "github:sini/gen-flake";
 
   outputs =
