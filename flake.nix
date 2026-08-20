@@ -74,5 +74,16 @@
       lib.framework = bucket "framework";
 
       flakeModules.genLibs = ./flakeModules/genLibs.nix;
+
+      # The flake-parts entry surface, rehomed from gen-flake under ADR-0031 F1 — the hub is the
+      # single input a consumer takes, so the ergonomics module belongs beside the roster it binds
+      # against. `default` is flake-parts' own convention and the name the source exported under, so
+      # a consumer's `imports = [ inputs.gen.flakeModules.default ]` reads unchanged.
+      #
+      # INTERIM. It does NOT satisfy ADR-0027; the true framework surface arrives with den v2 /
+      # quiver bound against that interface, and this module is what that replaces. The file header
+      # carries the marker and names the two measured defects that travelled with it unfixed
+      # (den-hoag-es9g).
+      flakeModules.default = ./flakeModules/default.nix;
     };
 }
