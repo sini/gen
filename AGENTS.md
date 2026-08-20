@@ -77,9 +77,10 @@ stage-1-applied so a consumer makes one call. Every library repository calls it 
 `ci/flake.nix`. `gen-vars` still calls a hub `mkCi` that no longer exists, at a pinned older hub
 revision; it is excluded from the inventory by ADR-0003 and is knowingly left there.
 
-**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`. Twenty-one keys: **twenty
-members**, all unprefixed, plus the **`strata` declaration** (below). Each member value is
-`genInputs.gen-<key>.lib` verbatim except `class`.
+**`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`, which is the roster of
+record and never a count (ADR-0015): the members are all unprefixed, plus the **`strata` declaration**
+(below), which is total over them. Each member value is `genInputs.gen-<key>.lib` verbatim except
+`class`. Enumerate by evaluation — `nix eval ./ci#… .#lib --apply 'x: builtins.attrNames (x.mkGenLibs {})'`.
 
 `algebra` `aspects` `bind` `class` `dispatch` `edge` `flake` `graph` `link` `memo` `merge` `pipe`
 `prelude` `product` `resolve` `schema` `scope` `select` `settings` `types` — plus `strata`
@@ -106,13 +107,13 @@ its stratum. Five values:
 them would invite exactly the adoption `retiring` exists to prevent. Their members stay reachable on
 the flat roster, unchanged.
 
-Current assignment (9 / 2 / 3 / 1 / 4):
+Current assignment (derive it from `strata`, never from this heading):
 
 ```
-substrate  algebra bind dispatch graph prelude product schema scope select
+substrate  algebra bind dispatch graph memo prelude product schema scope select
 modules    merge types
 aspects    aspects class link
-framework  settings
+framework  assemble settings
 retiring   edge flake pipe resolve
 ```
 

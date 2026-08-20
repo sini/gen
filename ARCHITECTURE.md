@@ -27,7 +27,7 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
     gen-dispatch · gen-resolve · gen-flake · gen-class · gen-link
-    gen-edge · gen-product · gen-settings · gen-pipe · gen-assemble   (L2 concern libs)
+    gen-edge · gen-product · gen-settings · gen-pipe · gen-assemble
   standalone pure libs:
     gen-vars
   retired, archived for reference (off-roster, not a hub input):
@@ -84,6 +84,8 @@ gen-graph    (gen-prelude)
 gen-select   (zero deps — Class A, builtins only)
 gen-bind     (gen-prelude)
 gen-dispatch (gen-prelude only)
+gen-memo     (gen-prelude + gen-graph)
+gen-assemble (ZERO inputs by design — substrate injected by the consumer, ADR-0014)
 gen-resolve  (gen-scope + gen-graph + gen-algebra + gen-bind)
 gen-vars     (standalone pure)
 
