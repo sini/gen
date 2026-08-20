@@ -52,6 +52,7 @@ let
     "settings"
     "strata"
     "types"
+    "view"
   ];
 
   missing = builtins.filter (k: !(builtins.elem k actualKeys)) expectedKeys;

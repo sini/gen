@@ -481,6 +481,27 @@
         "type": "github"
       }
     },
+    "gen-graph_11": {
+      "inputs": {
+        "gen-prelude": [
+          "gen-view",
+          "gen-prelude"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787255445,
+        "narHash": "sha256-T+m7i4iAGj8pSJKl8J9dT/yEGIIvLmWreV86gZ72gkE=",
+        "owner": "sini",
+        "repo": "gen-graph",
+        "rev": "ba4e90e6d5d28be57a8adb52aa8e6511a9270366",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-graph",
+        "type": "github"
+      }
+    },
     "gen-graph_2": {
       "inputs": {
         "gen-prelude": "gen-prelude_15"
@@ -1720,6 +1741,21 @@
         "type": "github"
       }
     },
+    "gen-prelude_60": {
+      "locked": {
+        "lastModified": 1787250746,
+        "narHash": "sha256-dppdrxqvJmYeRgEUud4oX0DuvNiEKpr3udXXN3icKuQ=",
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "rev": "9feba69b3e83836bdafd98f48a7fc58202dbd5c4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "type": "github"
+      }
+    },
     "gen-prelude_7": {
       "locked": {
         "lastModified": 1783016618,
@@ -2337,6 +2373,25 @@
         "type": "github"
       }
     },
+    "gen-view": {
+      "inputs": {
+        "gen-graph": "gen-graph_11",
+        "gen-prelude": "gen-prelude_60"
+      },
+      "locked": {
+        "lastModified": 1787266389,
+        "narHash": "sha256-M7Bghfewvs1uLapEvEtHbHMub+6XUX4SDLcwqcGsgMw=",
+        "owner": "sini",
+        "repo": "gen-view",
+        "rev": "23c91176c6c68d1608b342901be85f26a2008b29",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-view",
+        "type": "github"
+      }
+    },
     "import-tree": {
       "locked": {
         "lastModified": 1783029876,
@@ -2418,6 +2473,7 @@
         "gen-select": "gen-select_2",
         "gen-settings": "gen-settings",
         "gen-types": "gen-types_12",
+        "gen-view": "gen-view",
         "nixpkgs": "nixpkgs_2"
       }
     }

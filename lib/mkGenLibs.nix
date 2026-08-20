@@ -49,6 +49,22 @@ let
     # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
     # plainly like the other self-wiring libs.
     link = genInputs.gen-link.lib;
+    # ★★ TEMPORARY / WAY-STATION, and the marking is load-bearing rather than a note. The owner ruled
+    # the name PROVISIONAL: "keep gen-view for now; we're going to fold its constructs into a
+    # consolidated library later; gen-view is a temporary name." The CONSTRUCTS migrate at the
+    # survivor consolidation; the CONTAINER does not. ⇒ NO CONSUMER SHOULD ADOPT THIS CONTAINER AS A
+    # STABLE HOME, and the marking travels with every citation of the name.
+    #
+    # ★ TEMPORARY IS NOT THROWAWAY, and the distinction is the owner's own: "it should still be
+    # grounded -- the lib will be a sublibrary of a larger domain library." The name DESCENDS INTO A
+    # NAMESPACE rather than dissolving, which is why that library grounds its terms at a primary
+    # instead of deferring them — and why this is a way-station rather than a `retiring` member.
+    # `retiring` names a library whose content is moving OUT to an existing member and which no
+    # consumer should newly adopt; this one's content is moving DOWN into a library that does not
+    # exist yet, and it is the live home in the meantime.
+    #
+    # Self-wiring like the block above: its flake `.lib` resolves its own gen-prelude and gen-graph.
+    view = genInputs.gen-view.lib;
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
@@ -119,6 +135,14 @@ let
       pipe = "retiring";
       link = "aspects";
       class = "aspects";
+      # ★ OWNER-RULED. gen-view is the FOURTH DESTINATION of the same retirement that sends gen-pipe
+      # and gen-edge into S1 vocabulary — alongside select, graph and scope, which are substrate —
+      # so it takes their bucket. ★★ AND THE DECLARATION IS WHY THE ROW MAY EXIST AT ALL: under
+      # ADR-0015 as amended a member with no stratum takes `strata-total` FALSE and names itself, so
+      # a way-station could not enter this roster before its stratum was ruled. The TEMPORARY marking
+      # is on the binding above and is about the NAME, never about the layer: a way-station sits in a
+      # real layer while it stands, and `retiring` is not that marking — see the binding for why.
+      view = "substrate";
     };
   };
 in
