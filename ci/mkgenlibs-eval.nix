@@ -43,6 +43,7 @@ let
     "merge"
     "prelude"
     "product"
+    "program"
     "resolve"
     "schema"
     "scope"

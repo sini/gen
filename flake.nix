@@ -28,6 +28,7 @@
     gen-link.url = "github:sini/gen-link";
     gen-assemble.url = "github:sini/gen-assemble";
     gen-view.url = "github:sini/gen-view";
+    gen-program.url = "github:sini/gen-program";
   };
 
   outputs =

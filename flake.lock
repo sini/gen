@@ -1551,6 +1551,21 @@
         "type": "github"
       }
     },
+    "gen-program": {
+      "locked": {
+        "lastModified": 1787251997,
+        "narHash": "sha256-Yo/Kl8TzrVy47uGubriFICSJa4+rZVsrx/KtTEXJ8U4=",
+        "owner": "sini",
+        "repo": "gen-program",
+        "rev": "55d300a812944d0a54998dca0db7e9bfc7c40736",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-program",
+        "type": "github"
+      }
+    },
     "gen-resolve": {
       "inputs": {
         "gen-algebra": "gen-algebra_5",
@@ -2063,6 +2078,7 @@
         "gen-merge": "gen-merge_6",
         "gen-prelude": "gen-prelude_31",
         "gen-product": "gen-product",
+        "gen-program": "gen-program",
         "gen-resolve": "gen-resolve_2",
         "gen-schema": "gen-schema_4",
         "gen-scope": "gen-scope_4",

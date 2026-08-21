@@ -81,6 +81,16 @@ let
     #
     # Self-wiring like the block above: its flake `.lib` resolves its own gen-prelude and gen-graph.
     view = genInputs.gen-view.lib;
+
+    # gen-program turns a framework's policy declarations into a PROGRAM and reaches the solver
+    # (gen-scope engine.solve). ADJACENT to the assembly layer, never inside it: gen-assemble's own
+    # published principle is "The toolkit never evaluates", and this library's ruled purpose is to
+    # evaluate through the sole evaluator (owner-ruled; policy spec R§2.11, O8). Entry landed when
+    # content existed, per the ruled roster timing.
+    program = genInputs.gen-program.lib {
+      prelude = genInputs.gen-prelude.lib;
+      scope = genInputs.gen-scope.lib;
+    };
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
@@ -151,6 +161,7 @@ let
       product = "substrate";
       settings = "framework";
       assemble = "framework";
+      program = "framework";
       link = "aspects";
       class = "aspects";
       # ★ OWNER-RULED. gen-view is the FOURTH DESTINATION of the same retirement that sends gen-pipe
