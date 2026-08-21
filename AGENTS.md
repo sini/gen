@@ -33,11 +33,20 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `resolve`            | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)"                                                                                        |
 | `flake`              | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem"                                                                                                                                                   |
 | `class`              | `gen-class` — "gen-class — pure-Nix class-share mechanism (partition / contract / apply / gate) for the pure-gen module system"                                                                                                              |
-| `edge`               | `gen-edge` — "gen-edge — the content-movement contract: the (S,T,P,M) edge algebra, toposorted materialization fold, and the frozen edge-trace parity oracle"                                                                                |
 | `product`            | `gen-product` — "gen-product — graph products as first-class operations over accessor-graphs (Cartesian / tensor / strong / lexicographic; cells, slices, fibers, projections, quotients, restriction, containment chains), lazy in and out" |
 | `settings`           | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct"                                                                     |
-| `pipe`               | `gen-pipe` — "gen-pipe — scoped channels + dataflow algebra (map/filter/fold/scan/route/join/tee) with B5 determinism, provenance, dedup, and class-aware contributions"                                                                     |
 | `link`               | `gen-link` — "gen-link: cross-flake aspect federation over origin-labeled subgraphs"                                                                                                                                                         |
+
+**Repos that WERE roster members and have left.** Each is off the roster, is no longer a hub flake
+input, and is archived for reference under ADR-0031 F3 — no content is deleted. They are recorded
+here because the roster is where a reader asks "why is there no `edge` key?", and an unexplained
+absence reads as a drop rather than as a ruling. **Bind the destination, never these.**
+
+| Former key | Repo         | Ruling      | Where the content went                                                                                                                                                                                                      |
+| ---------- | ------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demand`   | `gen-demand` | ADR-0008 §4 | `scope` — the demand/kind folds re-express over the sole evaluator (ADR-0006); `adapters` retired without moving rather than give the evaluator a selector-algebra dependency                                               |
+| `edge`     | `gen-edge`   | ADR-0010 §3 | `view` — the fourth destination §3 gained on 2026-08-20, beside `select`, `graph` and `scope`. The (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization each name their destination construct per export |
+| `pipe`     | `gen-pipe`   | ADR-0010 §3 | `view` for the channel and dataflow constructs, `select` for `sel`. B5's determinism and provenance laws are restated as properties of the query construction rather than dropped                                           |
 
 **Sibling repos that exist but are NOT in the roster and NOT hub flake inputs.** Consumers reach these
 directly, not through `mkGenLibs`.
@@ -53,7 +62,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 ```
 
 ```json
-["gen-algebra","gen-aspects","gen-bind","gen-class","gen-dispatch","gen-edge","gen-flake","gen-graph","gen-link","gen-merge","gen-pipe","gen-prelude","gen-product","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types"]
+["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-dispatch","gen-flake","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
 
 ## Exports

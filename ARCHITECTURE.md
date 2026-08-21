@@ -27,12 +27,14 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
     gen-dispatch · gen-resolve · gen-flake · gen-class · gen-link
-    gen-edge · gen-product · gen-settings · gen-pipe · gen-assemble
+    gen-product · gen-settings · gen-assemble · gen-view
   standalone pure libs:
     gen-vars
   retired, archived for reference (off-roster, not a hub input):
     gen-demand   → re-expressed into gen-scope (ADR-0008 §4)
     gen-rebuild  → content moved onto the gen-memo plane (ADR-0008 §4, ADR-0005)
+    gen-edge     → movement vocabulary, gen-view the fourth destination (ADR-0010 §3)
+    gen-pipe     → movement vocabulary: gen-view, and gen-select for `sel` (ADR-0010 §3)
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
@@ -90,10 +92,8 @@ gen-resolve  (gen-scope + gen-graph + gen-algebra + gen-bind)
 gen-vars     (standalone pure)
 
   # L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
-  gen-edge     (gen-prelude + gen-graph)
   gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
   gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
-  gen-pipe     (gen-prelude + gen-select + gen-scope)
 
   # the ONE nixpkgs boundary — pure core (compose/inject) is nixpkgs-lib-free;
   # only its terminals (realize + terminals.* / flakeModule) touch nixpkgs
@@ -104,7 +104,7 @@ Each library exposes a single `.lib` value output — the obsolete functor-call 
 
 The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions over every non-identity field; the re-minted `id_hash` is the ADR-0016 excluded axis, held by a teeth arm on the pure engine rather than against the frozen witness); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with four gen siblings — it hosts the convergence loop that ties the dispatch step and scope evaluation together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
 
-Above the L1 substrate sit four **L2 concern libraries** — gen-edge, gen-product, gen-settings, gen-pipe — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: content movement, graph products, layered settings, and scoped-channel dataflow. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `edge`, `product`, `settings`, `pipe`) like the self-wiring libraries above. A fifth, **gen-demand** (typed demand), retired: ADR-0008 §4 re-expresses its cascade over gen-scope, the sole engine, and its repository is archived for reference rather than deleted.
+Above the L1 substrate sit two **L2 concern libraries** — gen-product and gen-settings — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: graph products and layered settings. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `product`, `settings`) like the self-wiring libraries above. Three more stood here and have retired, each archived for reference rather than deleted: **gen-demand** (typed demand), whose cascade ADR-0008 §4 re-expresses over gen-scope, the sole engine; and **gen-edge** (content movement) and **gen-pipe** (scoped-channel dataflow), which ADR-0010 §3 retires together into the movement vocabulary — the substrate constructs of gen-view, gen-select, gen-graph and gen-scope. The L2 tier shrinking is the point of that ruling rather than an accident of it: a concern expressible in substrate vocabulary did not need a library of its own.
 
 ### The nixpkgs.lib policy
 
@@ -206,11 +206,11 @@ The single sanctioned crossing from the pure composition plane into nixpkgs. Thr
 
 ### L2 Concern Libraries
 
-These four libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Each flake `.lib` self-resolves its own deps, so all four are hub-wired via `mkGenLibs` (keys `edge`, `product`, `settings`, `pipe`). A fifth, **gen-demand**, retired: ADR-0008 §4 re-expresses its cascade over gen-scope, the sole engine, so it is off the roster and no longer a hub input. Its section below is kept as the retiring surface's record.
+These libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Two remain — gen-product and gen-settings — and each flake `.lib` self-resolves its own deps, so both are hub-wired via `mkGenLibs` (keys `product`, `settings`). Three retired and are off the roster and no longer hub inputs: **gen-demand** (ADR-0008 §4, re-expressed over gen-scope, the sole engine), **gen-edge** and **gen-pipe** (ADR-0010 §3, retired together into the movement vocabulary). Their sections below are kept as the retired surfaces' record — each states where its content went, because a section deleted outright leaves a reader who meets the name in old code with nowhere to go.
 
-**gen-edge** — Content-movement contract.
+**gen-edge** — Content-movement contract. **RETIRED (ADR-0010 §3) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
 
-Everything that moves content between graph positions is an edge `(S, T, P, M)` — source, target, attrpath, mode. gen-edge owns the edge record and its constructors, edge-set derivation for a root (`edgesFor`), toposorted materialization (Kahn's algorithm over the accumulator dependency relation) into a per-root/per-channel content map, and a frozen, hashable **edge trace** that renders edge identities without forcing resolved content — a cross-repo parity oracle. Positions, channels, and content are all opaque; it depends on gen-prelude and gen-graph.
+Everything that moved content between graph positions was an edge `(S, T, P, M)` — source, target, attrpath, mode. gen-edge owned the edge record and its constructors, edge-set derivation for a root (`edgesFor`), toposorted materialization (Kahn's algorithm over the accumulator dependency relation) into a per-root/per-channel content map, and a frozen, hashable **edge trace** that rendered edge identities without forcing resolved content — a cross-repo parity oracle. Positions, channels, and content were all opaque; it depended on gen-prelude and gen-graph. Twelve of its eighteen exports name destination constructs in **gen-view**, the fourth destination ADR-0010 §3 gained on 2026-08-20, with the Kahn arm reached through `accumulatorOrder` over the relation `accumulatorRelation` builds. The edge trace was the instrument that validated the very spec retiring it, so the oracle cluster retired last, after movement AC-7 ran; that run demoted the trace from acceptance authority to topology evidence, because two runs with different answers can share a byte-equal fingerprint.
 
 **gen-product** — Graph products over accessor-graphs.
 
@@ -224,9 +224,9 @@ Resolves an aspect's static `{ default; merge }` settings schema against an orde
 
 Graph nodes emitted typed **demands**; registered **kinds** resolved each into resources, wiring, and sub-demands over a downward-only kind DAG. A stratified fold resolved the growing demand multiset in ≤ DAG-depth rounds (termination a theorem, not a convergence loop), with pinned-order dedup and a full provenance trace. Emission independent of consumption by signature. It depended on gen-prelude and gen-graph, with gen-select optional (subject-matching adapter). All of that now lives in **gen-scope** as `lib/cascade.nix` + `lib/folds.nix`, under claim vocabulary — the request value is a `mkClaim`, named for what it is rather than for the evaluation strategy. The one export that did not move is `adapters`: it retires with its construct, and gen-scope takes no gen-select edge.
 
-**gen-pipe** — Scoped-channel dataflow algebra.
+**gen-pipe** — Scoped-channel dataflow algebra. **RETIRED (ADR-0010 §3) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
 
-A channel is a typed, named accumulation lane whose value at a scope position is a deterministic fold (pinned traversal, associative-only combine) over the contributions visible there. Operators (`map`, `filter`, `fold`, `scan`, `route`, `join`, `tee`) connect channels into a dataflow DAG, validated at composition time and evaluated demand-driven. Contributions carry structured provenance and a class tag; a `classInvariant` flag records config-dependence statically. Depends on gen-prelude, gen-select, and gen-scope.
+A channel was a typed, named accumulation lane whose value at a scope position was a deterministic fold (pinned traversal, associative-only combine) over the contributions visible there. Operators (`map`, `filter`, `fold`, `scan`, `route`, `join`, `tee`) connected channels into a dataflow DAG, validated at composition time and evaluated demand-driven. Contributions carried structured provenance and a class tag; a `classInvariant` flag recorded config-dependence statically. It depended on gen-prelude, gen-select, and gen-scope. Twelve of its seventeen exports name destination constructs in **gen-view**; `sel` was a gen-select re-export and consumers bind gen-select directly; `join` has no single successor construct and is a caller-side composition. The B5 laws survive as properties of the query construction rather than of a library — first-appearance walk order, a whitelist of declared associative combines, and a record for every drop or reorder.
 
 ## Composition Patterns
 

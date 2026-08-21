@@ -36,16 +36,32 @@ let
     dispatch = genInputs.gen-dispatch.lib;
     resolve = genInputs.gen-resolve.lib;
     flake = genInputs.gen-flake.lib;
-    # L2 concern libraries — each flake `.lib` self-resolves its own deps (edge: prelude+graph;
-    # product: prelude; settings: prelude+algebra+bind+graph; pipe: prelude+select+scope), so the
-    # hub re-exports them plainly like the self-wiring libs above. gen-demand was one of these and
-    # is off the roster: ADR-0008 §4 retires it as a library and its cascade re-expresses over
-    # gen-scope, the sole evaluator (ADR-0006). The repository stays readable, orphaned for
-    # reference, and gains no new consumers.
-    edge = genInputs.gen-edge.lib;
+    # L2 concern libraries — each flake `.lib` self-resolves its own deps (product: prelude;
+    # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
+    # self-wiring libs above.
+    #
+    # THREE MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling and each with its content
+    # landed somewhere else. The bindings are gone rather than commented out — a `retiring` member
+    # is still reachable and this is the state past that, where the hub no longer pins the input at
+    # all — but the rulings are recorded here because the roster is where a reader asks "why is
+    # there no `edge` key?" and an unanswered absence reads as a drop.
+    #
+    #   gen-demand  ADR-0008 §4 retires it as a library; its cascade re-expresses over gen-scope,
+    #               the sole evaluator (ADR-0006).
+    #   gen-edge    ADR-0010 §3 retires the content-movement contract into the movement vocabulary;
+    #               its (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization
+    #               landed in `view` (the fourth destination §3 gained on 2026-08-20) alongside
+    #               `select`, `graph` and `scope`. Its edge trace was the oracle that validated the
+    #               spec retiring it, so it retired last, after movement AC-7 ran.
+    #   gen-pipe    ADR-0010 §3, same retirement: scoped channels and the dataflow algebra over
+    #               them re-express as `view` constructs, `sel` binds `select` directly, and the
+    #               B5 determinism/provenance laws are restated as properties of the query
+    #               construction rather than lost.
+    #
+    # All three repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
+    # is deleted — and none of them gains a new consumer.
     product = genInputs.gen-product.lib;
     settings = genInputs.gen-settings.lib;
-    pipe = genInputs.gen-pipe.lib;
     # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
     # plainly like the other self-wiring libs.
     link = genInputs.gen-link.lib;
@@ -100,7 +116,11 @@ let
     #              still reachable but no consumer should newly adopt it. The end of that path is
     #              removal from the roster once the content has landed — the member drops both
     #              lines and the hub stops pinning it, and its repository is orphaned for
-    #              reference rather than deleted (gen-demand, ADR-0008 §4, is the first)
+    #              reference rather than deleted. That end has now been reached three times:
+    #              gen-demand (ADR-0008 §4) was the first, and gen-edge and gen-pipe walked it
+    #              together on ADR-0010 §3 once their content landed in `view`. The value is not
+    #              a waiting room — a member sits here only while its destination is still being
+    #              built, and `flake` and `resolve` are what remains of that
     #
     # `substrate`, `modules`, `aspects` and `framework` publish consumer paths on the hub's `lib`
     # output (flake.nix). `retiring` publishes none: a consumer selecting a library on its way off
@@ -128,11 +148,9 @@ let
       dispatch = "substrate";
       resolve = "retiring";
       flake = "retiring";
-      edge = "retiring";
       product = "substrate";
       settings = "framework";
       assemble = "framework";
-      pipe = "retiring";
       link = "aspects";
       class = "aspects";
       # ★ OWNER-RULED. gen-view is the FOURTH DESTINATION of the same retirement that sends gen-pipe

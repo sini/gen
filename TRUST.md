@@ -66,11 +66,14 @@ The token list is per library rather than uniform, because a library's own API n
   gen-resolve, gen-scope, gen-select, gen-types — ban `lib.` outright, along with `nixpkgs`, the
   `{ lib }` / `{ lib,` parameter signatures, `evalModules` and `mkOption`. No `lib.` call of any kind
   survives there.
-- **The module-system libraries** — gen-aspects, gen-class, gen-edge, gen-merge, gen-pipe, gen-product,
-  gen-schema, gen-settings — export their own `mkOption` / `mkMerge`, so a bare-token ban would reject
-  their own surface. They enumerate the nixpkgs forms instead — `lib.types`, `lib.mkOption`,
-  `lib.evalModules`, `evalModules`, `nixpkgs` and the `{ lib }` / `{ lib,` signatures, with
-  `lib.mkMerge` and `lib.mkForce` added where the library has cause to.
+- **The module-system libraries** — gen-aspects, gen-class, gen-merge, gen-product, gen-schema,
+  gen-settings, plus the retired gen-edge and gen-pipe — export their own `mkOption` / `mkMerge`, so a
+  bare-token ban would reject their own surface. They enumerate the nixpkgs forms instead —
+  `lib.types`, `lib.mkOption`, `lib.evalModules`, `evalModules`, `nixpkgs` and the `{ lib }` /
+  `{ lib,` signatures, with `lib.mkMerge` and `lib.mkForce` added where the library has cause to.
+  The two retired repositories are named because their scanners still stand and still pass in their
+  archived clones — the claim is about what is enforced where, and archiving removed neither the
+  scanner nor its result. Neither is a roster member or a hub input any longer (ADR-0010 §3).
 - **gen-flake** tiers it. The module-system *call* tether is forbidden in every library file, wiring
   included. The nixpkgs *import* tether is additionally forbidden in the strict pure core. Exactly one
   file, `lib/terminals.nix`, is excluded as the sanctioned boundary, and the classifier treats any file

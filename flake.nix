@@ -23,10 +23,8 @@
     gen-resolve.url = "github:sini/gen-resolve";
     gen-flake.url = "github:sini/gen-flake";
     gen-class.url = "github:sini/gen-class";
-    gen-edge.url = "github:sini/gen-edge";
     gen-product.url = "github:sini/gen-product";
     gen-settings.url = "github:sini/gen-settings";
-    gen-pipe.url = "github:sini/gen-pipe";
     gen-link.url = "github:sini/gen-link";
     gen-assemble.url = "github:sini/gen-assemble";
     gen-view.url = "github:sini/gen-view";

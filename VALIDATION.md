@@ -347,9 +347,11 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 asserted in prose.
 
 - **The token-scanner (21 libraries).** Each of gen-algebra, gen-aspects, gen-bind, gen-class,
-  gen-dispatch, gen-edge, gen-flake, gen-graph, gen-link, gen-lsp, gen-memo, gen-merge, gen-pipe,
+  gen-dispatch, gen-flake, gen-graph, gen-link, gen-lsp, gen-memo, gen-merge,
   gen-product, gen-rebuild, gen-resolve, gen-schema, gen-scope, gen-select and gen-settings carries
-  `ci/tests/purity.nix`, and gen-types carries the same scanner as
+  `ci/tests/purity.nix` — as do the retired gen-edge and gen-pipe, whose scanners stand and still
+  pass in their archived clones (ADR-0010 §3 took them off the roster, not out of the enforcement
+  record) — and gen-types carries the same scanner as
   `ci/tests/types-purity.nix` — 21 in all. **The count is the output of a command, not a tally kept
   by hand** — re-run it rather than trusting the number above:
 
