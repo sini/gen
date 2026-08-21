@@ -33,16 +33,24 @@ pre-re-host revision and driven through a pinned `github:nix-community/nixpkgs.l
 
 A frozen reference keeps the **bar** from drifting, but it cannot follow a **subject** that moves by
 design ruling — and the aspect grammar does. So the sibling oracle over that grammar
-(`rehost-byte-parity`, retired 2026-08-13) is **not** replaced by a re-pinned equivalent, and one
-promise is presently **enforced by no gate**: **module system compatibility** — *whole-stack agreement
-with nixpkgs across the aspect grammar*, the property anyone migrating from nixpkgs modules relies on.
-★ **The promise stands; what lapsed is its continuous enforcement.** Owner ruling, 2026-08-13: the
-promises the oracle held stand and *"don't need to hold at every gate"*, and the oracle is rebuilt
-during the final rounds *"so we can make the same guarantees"* — the same ones, re-established rather
-than renegotiated. It is recorded, with an empty command cell, in [VALIDATION.md](VALIDATION.md) §1,
-which also carries the successor's terms: under ADR-0025 item 2 the reference side is a **parameter**
-rather than a frozen input, so a ruled grammar change registers as a named divergence instead of a
-red.
+(`rehost-byte-parity`, retired 2026-08-13) was **not** replaced by a re-pinned equivalent, and the
+promise it carried — **module system compatibility**, the property anyone migrating from nixpkgs
+modules relies on — stood for eight days enforced by nothing. ★ **The promise stood; what had lapsed
+was its continuous enforcement.** Owner ruling, 2026-08-13: the promises the oracle held stand and
+*"don't need to hold at every gate"*, and the oracle is rebuilt *"so we can make the same
+guarantees"* — the same ones, re-established rather than renegotiated.
+
+★★ **THE ENFORCEMENT IS BACK FOR THE MODULE-SYSTEM CORE, AND STILL ABSENT FOR THE ASPECT GRAMMAR —
+the interval narrowed rather than closed.** The successor is the extracted harness ADR-0025 item 2
+ordered, [`gen-differential`](https://github.com/sini/gen-differential), whose reference side is a
+**parameter** rather than a frozen input, so a ruled grammar change registers as a **named
+divergence** instead of a red. Its first consumer is wired: gen-merge's own CI holds its engine
+against nixpkgs' across the shared grammar at two distinct substitution seams, with a seam-routed
+identity control and mutation teeth that are both **shown seedable to fail** — a control that cannot
+fail being indistinguishable from `true`. What remains unasserted is the **aspect-grammar** layer
+specifically: that was the retired oracle's unique contribution over `rehost-den-parity`, it does not
+live in gen-merge, and it awaits an instantiation that carries it. [VALIDATION.md](VALIDATION.md) §1
+carries both halves — the core's command, and the aspect layer's still-empty cell.
 
 Underneath sit the per-library nix-unit suites — the [gen-merge](https://github.com/sini/gen-merge)
 byte-mode engine's 206 tests (at `9f20fb1`) and the [gen-flake](https://github.com/sini/gen-flake)

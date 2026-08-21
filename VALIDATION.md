@@ -50,20 +50,21 @@ rev is the anchor — a reader checks out that exact rev and reproduces the coun
 
 Every proof, its one command, and how it fails. The rest of this document expands each row.
 
-| Proof                                                      | Command                                             | Fails if                                                                                                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Module system compatibility** (was `rehost-byte-parity`) | —                                                   | GATE SUSPENDED, PROMISE STANDS — owner ruling 2026-08-13; rebuilt at the final rounds (§1)                                                                  |
-| Real-den byte-parity (`rehost-den-parity`)                 | `nix flake check ./ci`                              | den's real registry shape diverges across stacks                                                                                                            |
-| gen-merge engine suite (167)                               | `nix flake check ./ci` (in the gen-merge repo)      | any merge / lint / classify / warm / provenance test regresses                                                                                              |
-| gen-flake terminal suite (89)                              | `nix flake check ./ci` (in the gen-flake repo)      | compose / override / diff / realize / terminal regresses                                                                                                    |
-| Per-library suites (§2 table)                              | `nix flake check ./ci` (per lib repo)               | any lib's nix-unit suite fails                                                                                                                              |
-| Purity — nixpkgs-lib-free cores                            | `nix-unit --flake ./ci#tests.purity` (per pure lib) | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/`                                                                                           |
-| Config-thunk deferral                                      | `nix-unit --flake ./ci#tests.deferral` (gen-merge)  | a marker forces early, or diverges from nixpkgs at the terminal                                                                                             |
-| Migrated demos (canaries)                                  | each demo's `nix flake check` / eval                | a re-hosted demo stops producing byte-identical output                                                                                                      |
-| Performance (parity + ratio + linearity)                   | `nix run ./ci#perf-bench`                           | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note) |
-| 3-way comparison (drvPath equivalence)                     | `nix run ./ci#flake-compare`                        | any output builds differently across flake-parts / adios / gen-flake                                                                                        |
-| Fleet-scale dedup gates                                    | `nix run ./ci#fleet-gates` (hola)                   | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached                                                                         |
-| Fleet-number consistency (in-repo)                         | `nix run ./ci#fleet-consistency`                    | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor)                                                              |
+| Proof                                                                           | Command                                                            | Fails if                                                                                                                                                                  |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Module system compatibility** — module-system core (was `rehost-byte-parity`) | `nix-unit --flake ./ci#tests.differential` (in the gen-merge repo) | gen-merge's engine and nixpkgs' `lib.evalModules` disagree on the shared grammar at either seam, the seam-routed identity control diverges, or a coverage-floor key fails |
+| **Module system compatibility** — aspect-grammar layer                          | —                                                                  | STILL UNENFORCED — the retired gate's unique contribution over `rehost-den-parity`; awaits an instantiation carrying that grammar (§1)                                    |
+| Real-den byte-parity (`rehost-den-parity`)                                      | `nix flake check ./ci`                                             | den's real registry shape diverges across stacks                                                                                                                          |
+| gen-merge engine suite (167)                                                    | `nix flake check ./ci` (in the gen-merge repo)                     | any merge / lint / classify / warm / provenance test regresses                                                                                                            |
+| gen-flake terminal suite (89)                                                   | `nix flake check ./ci` (in the gen-flake repo)                     | compose / override / diff / realize / terminal regresses                                                                                                                  |
+| Per-library suites (§2 table)                                                   | `nix flake check ./ci` (per lib repo)                              | any lib's nix-unit suite fails                                                                                                                                            |
+| Purity — nixpkgs-lib-free cores                                                 | `nix-unit --flake ./ci#tests.purity` (per pure lib)                | a `nixpkgs`/`lib.evalModules`/`lib.types` token appears in `lib/`                                                                                                         |
+| Config-thunk deferral                                                           | `nix-unit --flake ./ci#tests.deferral` (gen-merge)                 | a marker forces early, or diverges from nixpkgs at the terminal                                                                                                           |
+| Migrated demos (canaries)                                                       | each demo's `nix flake check` / eval                               | a re-hosted demo stops producing byte-identical output                                                                                                                    |
+| Performance (parity + ratio + linearity)                                        | `nix run ./ci#perf-bench`                                          | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note)               |
+| 3-way comparison (drvPath equivalence)                                          | `nix run ./ci#flake-compare`                                       | any output builds differently across flake-parts / adios / gen-flake                                                                                                      |
+| Fleet-scale dedup gates                                                         | `nix run ./ci#fleet-gates` (hola)                                  | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached                                                                                       |
+| Fleet-number consistency (in-repo)                                              | `nix run ./ci#fleet-consistency`                                   | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor)                                                                            |
 
 ## 1. The byte-parity oracle, and the claim its retired sibling held
 
@@ -139,6 +140,32 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
   (ADR-0016, the excluded axis below) — and is green. What is unasserted is the
   **aspect-grammar** layer specifically: that was the retired oracle's unique contribution over
   `rehost-den-parity`, and it is exactly the layer whose reference could not follow.
+
+- ★★★ **THE SUCCESSOR LANDED, AND THE INTERVAL NARROWS RATHER THAN CLOSING** (2026-08-21). The
+  extracted harness is [`gen-differential`](https://github.com/sini/gen-differential), and ADR-0025
+  item 2's first consumer is wired: gen-merge's own CI carries the differential cells at
+  `ci/tests/differential.nix` (gen-merge `fe45472`), pinning the machinery at `b10e69f`. **120 cells,
+  green on both counters** (`#tests` 398/398, `#testsError` 34/34, exits 0). What the successor was
+  required to do, and now does: every assertion names the **claim** it belongs to, so a deliberate
+  grammar change is expressible as a **named divergence** carrying its ruling instead of an
+  unattributable red — measured by a seeded divergence whose red prints its claim, and by a register
+  exercised in *both* directions (an admitted divergence goes green and is listed; a stale entry
+  reddens, which is what stops the register decaying into a suppression list). The reference side is
+  nixpkgs' **live** `lib`, so the P1/P2 conjunction that killed the predecessor cannot re-form: there
+  is no frozen second conjunct to confound the first.
+
+- **What the wiring covers, and what it does not.** It closes the **module-system core** — the shared
+  grammar itself, the layer everything above inherits — across two *genuinely distinct* substitution
+  seams, asserted at the library's own `distinctSubjects` oracle rather than read off the names: the
+  **lib-surface swap** (modules re-read through gen's vocabulary) and the **evaluator swap**
+  (nixpkgs-authored modules, only the evaluation entry point replaced). Three of the retired gate's
+  four coverage keys are met and asserted individually — `all-identical`, `both-evaluated`,
+  `teeth-mutation-diverges`, with the mutation teeth and the seam-routed identity control both shown
+  **seedable to fail**. ★ The fourth key, `den-realism`, is a property of a real domain tree gen-merge
+  does not have; a cell pins that the floor is three, so the shortfall is a measurement rather than a
+  silence. ★★ **And the ASPECT-GRAMMAR layer stays unasserted** — it is not in this repository, and it
+  was precisely the retired instrument's unique contribution. The row above therefore splits in two:
+  the core has a command again, the aspect layer keeps its empty cell.
 
 - **Retired:** 2026-08-13, by owner ruling, under a retirement spec of its own. What the ruling
   settled is stated in full above — why the frozen reference could not follow the subject, what the
