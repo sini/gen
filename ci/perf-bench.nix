@@ -204,7 +204,8 @@ let
   registry = mkRegistry "attrsOf";
   lazyRegistry = mkRegistry "lazyAttrsOf";
 
-  # schemaHosts — the parity oracle's schemaFleet at scale: kind + n instances incl id_hash.
+  # schemaHosts — the parity oracle's schemaFleet at scale: kind + n instances. The `id_hash` is
+  # minted and FORCED here but does not enter the digest — see the excluded axis at the projection.
   schemaHosts =
     P:
     let
@@ -235,14 +236,34 @@ let
         ];
       };
     in
-    builtins.mapAttrs (_: h: {
-      inherit (h)
-        addr
-        role
-        system
-        id_hash
-        ;
-    }) eval.config.hosts;
+    # ── THE EXCLUDED AXIS: `id_hash` IS FORCED BUT NOT DIGESTED (ADR-0016) ──
+    # This cell's digest is compared against the PERMANENT frozen `gen-schema-orig` pin, which
+    # ci/flake.nix documents as never swept forward. gen-schema `75d40c1` re-minted `id_hash` by
+    # design ruling (ADR-0016) — the kind left the digest for a `"<kind>:"` tag and the preimage
+    # became `toJSON` of the ⟨label,value⟩ pairs — and the reference side cannot learn it: it is
+    # called on the nixpkgs `{ lib, algebra }` signature, and every revision carrying that signature
+    # predates the encoding, so the frozen witness holds the OLD formula permanently. The identity
+    # axis is therefore excluded from the digest exactly as ci/rehost-den-parity.nix excludes it
+    # from the oracle's parity arms; identity's oracle is `teeth-mutation-pure` there plus
+    # gen-schema's own identity suite, and no replacement identity arm belongs in a perf bench.
+    #
+    # The `seq` stays, because this is a PERFORMANCE cell before it is a parity one. Minting n
+    # identities is real work on both stacks, and dropping it from the projection rather than from
+    # the digest would stop the bench measuring it: at n=400 the pure cell falls 506992 → 294589
+    # thunks and −40% alloc, turning a 0.71 counter ratio into 0.56 — an engine win no engine
+    # earned, spliced into BENCHMARKS.md by the next `--update` run. Forcing it also keeps the
+    # failure loud: an engine that stopped minting an `id_hash` at all throws on the missing
+    # attribute here instead of passing a narrowed digest.
+    builtins.mapAttrs (
+      _: h:
+      builtins.seq h.id_hash {
+        inherit (h)
+          addr
+          role
+          system
+          ;
+      }
+    ) eval.config.hosts;
 
   # aspects — n aspects with class content, every 4th with a nested child; flatten.
   # PURE-ONLY (header note): `refP` carries no `aspects`, so this workload runs on the pure stack

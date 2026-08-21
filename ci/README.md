@@ -4,10 +4,10 @@ Two permanent regression nets guard the pure-gen module system (gen-prelude → 
 gen-merge → re-hosted gen-schema/gen-aspects) against the frozen nixpkgs reference stack
 (original gen-schema/gen-aspects driven by pinned `github:nix-community/nixpkgs.lib`):
 
-| Net                       | What it proves                                                                                                                                                    | Runs as                                      |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Byte-parity oracle**    | pure stack output == nixpkgs stack output, byte-for-byte (incl the `id_hash` SHA), over a real-den registry sample; mutation-teeth prove the oracle discriminates | `nix flake check ./ci` — `rehost-den-parity` |
-| **Perf-regression bench** | pure stack stays FASTER and LIGHTER than the nixpkgs stack, and stays LINEAR in workload size                                                                     | `nix run ./ci#perf-bench`                    |
+| Net                       | What it proves                                                                                                                                                                                                                                                                                             | Runs as                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Byte-parity oracle**    | pure stack output == nixpkgs stack output, byte-for-byte over the instance key sets and every non-identity field, on a real-den registry sample; mutation-teeth prove the oracle discriminates, and a teeth arm on the pure engine holds the `id_hash` that ADR-0016 put beyond the frozen witness's reach | `nix flake check ./ci` — `rehost-den-parity` |
+| **Perf-regression bench** | pure stack stays FASTER and LIGHTER than the nixpkgs stack, and stays LINEAR in workload size                                                                                                                                                                                                              | `nix run ./ci#perf-bench`                    |
 
 Both sides are pinned reproducibly: the PURE side tracks the published re-host mains (a change
 that breaks parity or performance fails CI); the REFERENCE side is frozen at the pre-re-host rev
@@ -33,7 +33,9 @@ consequences are live here, and both are unassertions rather than fixes:
 
 `rehost-den-parity.nix` — den's actual registry config shape (collections, computed isEntity,
 parent topology, instances with `id_hash`, den's two-level nested option shape) evaluated through
-BOTH gen-schema generations via a shared provider `P`; the resolved projections are deep-compared.
+BOTH gen-schema generations via a shared provider `P`; the resolved projections are deep-compared
+on every axis but identity — `id_hash` is minted and forced on both engines, and compared by
+`teeth-mutation-pure` on the pure side rather than against the frozen witness (ADR-0016).
 Gate keys are listed in `flake.nix`; any `false` fails the check derivation.
 
 ## Architecture — the direction-of-dependence lint
@@ -64,8 +66,9 @@ no layer, so they are unrankable: they are named and counted, and they do not ta
 fixtures); `perf-bench.sh` drives it through `nix-instantiate --eval` + `NIX_SHOW_STATS`, 2 stacks
 × 3 reps per cell. Workloads are den shapes: `scalar` (wide flat option sets — the shape that
 catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule) instance
-registries), `schemaHosts` (gen-schema kind + instances incl id_hash), `aspects` (gen-aspects
-tree with flatten), `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
+registries), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
+of the digest — the ADR-0016 excluded axis), `aspects` (gen-aspects tree with flatten),
+`deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
 keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
 `startup` (fixed cost, report-only).

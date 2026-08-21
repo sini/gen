@@ -17,7 +17,9 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix fmt -- --ci
 
-  # Validation: re-host byte-parity oracles (pure stack == frozen nixpkgs stack, incl id_hash).
+  # Validation: re-host byte-parity oracles (pure stack == frozen nixpkgs stack over the instance
+  # key sets and every non-identity field). `id_hash` is the ADR-0016 excluded axis — no forward
+  # golden pin can carry the new encoding, so it is held by a teeth arm on the PURE engine instead.
   checks:
     runs-on: ubuntu-latest
     steps:
