@@ -346,13 +346,13 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 `lib.evalModules`/`lib.types` **replacement**, so it must not call them. This is enforced, not
 asserted in prose.
 
-- **The token-scanner (21 libraries).** Each of gen-algebra, gen-aspects, gen-bind, gen-class,
-  gen-dispatch, gen-flake, gen-graph, gen-link, gen-lsp, gen-memo, gen-merge,
-  gen-product, gen-rebuild, gen-resolve, gen-schema, gen-scope, gen-select and gen-settings carries
-  `ci/tests/purity.nix` — as do the retired gen-edge and gen-pipe, whose scanners stand and still
-  pass in their archived clones (ADR-0010 §3 took them off the roster, not out of the enforcement
-  record) — and gen-types carries the same scanner as
-  `ci/tests/types-purity.nix` — 21 in all. **The count is the output of a command, not a tally kept
+- **The token-scanner (25 libraries).** Each of gen-algebra, gen-aspects, gen-assemble, gen-bind,
+  gen-class, gen-dispatch, gen-flake, gen-graph, gen-identity, gen-link, gen-lsp, gen-memo,
+  gen-merge, gen-product, gen-program, gen-rebuild, gen-resolve, gen-schema, gen-scope, gen-select,
+  gen-settings and gen-view carries `ci/tests/purity.nix` — as do the retired gen-edge and gen-pipe,
+  whose scanners stand and still pass in their archived clones (ADR-0010 §3 took them off the roster,
+  not out of the enforcement record) — and gen-types carries the same scanner as
+  `ci/tests/types-purity.nix` — 25 in all. **The count is the output of a command, not a tally kept
   by hand** — re-run it rather than trusting the number above:
 
   ```sh
@@ -361,19 +361,22 @@ asserted in prose.
   done
   ```
 
-  The pattern is **anchored and alternated deliberately**. The looser `ci/tests/.*purity.*\.nix$` returns
-  the same 21 today — the two forms were compared and agree exactly — but it would also match a
-  hypothetical `impurity.nix`, and would then over-count silently. A substring predicate that happens to
-  be right today is still the wrong instrument for a figure meant to be re-run.
+  The pattern is **anchored and alternated deliberately**, and the reason is no longer hypothetical.
+  The looser `ci/tests/.*purity.*\.nix$` returns **29** today against the anchored form's 25: it also
+  matches four scanner *fixtures* — `ci/tests/_fixtures/purity-walk/{surface,nested/tethered}.nix` in
+  gen-scope and gen-types — which are inputs the scanner walks, not scanners. The two forms agreed
+  exactly when this pattern was chosen; they no longer do, and the substring form would have
+  over-counted silently. A predicate that happens to be right today is still the wrong instrument for
+  a figure meant to be re-run.
 
-  It reported 21 files across 21 repositories when this section was last measured. The thirteen
-  originally listed here are all still present and correct; eight libraries (gen-class, gen-edge,
-  gen-link, gen-lsp, gen-memo, gen-pipe, gen-product, gen-settings) gained scanners afterwards and
-  the figure was never restated, which is the failure mode a hand-kept count has and a command does
-  not. ★ The instrument's scope, stated because it bounds the claim: it reads the sibling **working
-  clones**, not this hub's locked inputs, so it measures the ecosystem as checked out rather than as
-  pinned. The test reads
-  every `lib/**.nix` (plus the root `flake.nix` / `default.nix`), strips comments, and asserts zero
+  It reported 25 files across 25 repositories when this section was last measured. The figure has now
+  gone stale twice: thirteen libraries at first writing, then eight more (gen-class, gen-edge,
+  gen-link, gen-lsp, gen-memo, gen-pipe, gen-product, gen-settings) by the restatement, then four
+  more (gen-assemble, gen-identity, gen-program, gen-view) within ten days of it — each time the
+  scanners spread and the number did not follow. That is the failure mode a hand-kept count has and
+  a command does not. ★ The instrument's scope, stated because it bounds the claim: it reads the
+  sibling **working clones**, not this hub's locked inputs, so it measures the ecosystem as checked
+  out rather than as pinned. The test reads every `lib/**.nix` (plus the root `flake.nix` / `default.nix`), strips comments, and asserts zero
   occurrences of the nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`,
   `lib.evalModules`, `evalModules`, `{ lib }`, `{ lib,`. The library's own API names
   (`mkOption`, `mkMerge`, …) are deliberately **not** forbidden — only the nixpkgs tether is.
