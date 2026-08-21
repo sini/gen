@@ -6,7 +6,9 @@ no claim appears here without a way to reproduce it.
 
 The load-bearing proof is the **byte-parity oracle** `rehost-den-parity`: it holds the pure-gen
 module system (gen-prelude → gen-types → gen-merge → re-hosted gen-schema, all nixpkgs-lib-free)
-byte-identical to the frozen nixpkgs reference stack it replaced, down to the `id_hash` SHA. It
+byte-identical to the frozen nixpkgs reference stack it replaced over the instance key sets and every
+non-identity field — `id_hash` is the ADR-0016 excluded axis, held by a teeth arm on the pure engine
+with its own seeded control (§1). It
 runs as a permanent regression on `nix flake check ./ci` in this hub (`cbf3a5f`). Its retired
 sibling over the **aspect** grammar, and the claim now left unasserted, are recorded in §1.
 Everything else — the per-library unit suites (§2), the engine and terminal suites (§2's gen-merge /
@@ -69,7 +71,9 @@ One check derivation in `ci/` asserts the pure stack's output equals the nixpkgs
 byte for byte. It takes the form of `mkParityCheck` (`ci/flake.nix`): it evaluates a set of result
 keys and fails the build if **any** required key is not `true`. The pure side tracks the published
 re-host mains; the reference side is frozen (see Pinning policy below). A future gen-merge or
-re-host change that breaks parity — including the `id_hash` SHA — fails `nix flake check ./ci`.
+re-host change that breaks parity on the instance key sets or on any non-identity field fails
+`nix flake check ./ci` — and one that breaks the pure engine's `id_hash` tracking fails the same check
+through `teeth-mutation-pure`, which carries that axis instead of the frozen witness.
 
 A frozen reference holds the **bar** still; it does not hold the **subject** still. Where the
 subject's grammar moves by design ruling, the reference cannot follow it and the gate reds on
@@ -129,8 +133,10 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
   no copy was made.
 
 - **What still holds, so this is not read as a wider hole than it is:** `rehost-den-parity` (below)
-  covers gen-prelude / gen-types / gen-merge / gen-algebra / gen-schema at the same byte bar —
-  including the `id_hash` SHA and the mutation teeth — and is green. What is unasserted is the
+  covers gen-prelude / gen-types / gen-merge / gen-algebra / gen-schema at the same byte bar over the
+  instance key sets and every non-identity field, with the mutation teeth — and with the `id_hash`
+  held by the pure-engine teeth arm and its seeded control rather than against the frozen witness
+  (ADR-0016, the excluded axis below) — and is green. What is unasserted is the
   **aspect-grammar** layer specifically: that was the retired oracle's unique contribution over
   `rehost-den-parity`, and it is exactly the layer whose reference could not follow.
 
@@ -143,12 +149,15 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
 
 ### rehost-den-parity — the real-den acceptance gate
 
-- **Claim:** den's **actual** registry shape is byte-identical through the re-hosted (pure)
-  gen-schema and the original nixpkgs gen-schema. The fixture is lifted verbatim from
+- **Claim:** den's **actual** registry shape resolves identically through the re-hosted (pure)
+  gen-schema and the original nixpkgs gen-schema — byte-identical over the instance key sets and
+  every non-identity field, with identity excluded from the frozen comparison and carried on the pure
+  engine instead (the excluded axis below). The fixture is lifted verbatim from
   `den/modules/options.nix`: the four collections (including the OR-merge `isEntity` / `isolated`),
   the `computed` `isEntity` derivation, the parent topology (`user`/`home` → `host`), the `conf`
-  kind imports, den-shaped instance registries **with `id_hash`**, and den's real two-level nested
-  option shape (`options.den.schema` / `options.den.hosts`).
+  kind imports, den-shaped instance registries **with `id_hash`** — minted and forced on both engines,
+  compared on the pure side — and den's real two-level nested option shape
+  (`options.den.schema` / `options.den.hosts`).
 
 - **Artifact:** `ci/rehost-den-parity.nix`.
 
@@ -160,17 +169,36 @@ counters, but assert no pure/ref digest parity and no pure/ref CPU or counter wi
     "parity-instances"
     "both-evaluated"
     "teeth-mutation"
+    "teeth-mutation-pure"
+    "arming-teeth-mutation-pure"
     "teeth-parity"
     "parity-nested"
   ];
   ```
 
   `parity-schema` — den's registry topology / collections / computed fields match across stacks.
-  `parity-instances` — den-shaped instances match **including the `id_hash` SHA**.
+  `parity-instances` — den-shaped instances match on the key sets and every non-identity field.
   `both-evaluated` — both stacks genuinely evaluated.
-  `teeth-mutation` — a mutated instance `addr` changes the `id_hash` on the reference side.
-  `teeth-parity` — pure and reference agree on the mutated `id_hash`.
-  `parity-nested` — den's real two-level option shape resolves identically through both engines.
+  `teeth-mutation` — a mutated instance `addr` changes the reference engine's record.
+  `teeth-mutation-pure` — on the pure engine, the mutated instance's `id_hash` moves **and** its
+  untouched sibling's stands still: identity tracks its own fields, and only its own. This arm carries
+  the identity load the two parity arms no longer read.
+  `arming-teeth-mutation-pure` — the seeded control on that arm, in the same run: the identical
+  predicate over an engine whose `id_hash` is frozen while `addr` still varies must be `false`.
+  `teeth-parity` — pure and reference agree on every non-identity field under the same mutation.
+  `parity-nested` — den's real two-level option shape resolves identically through both engines, on
+  the same non-identity domain.
+
+- **The excluded axis — `id_hash` (ADR-0016):** a frozen reference is only sound where the subject's
+  grammar is stable, and gen-schema `75d40c1` re-minted the identity encoding by design ruling — the
+  kind left the digest for a `"<kind>:"` tag, and the preimage became `toJSON` of the ⟨label,value⟩
+  pairs. The reference side is called on the nixpkgs `{ lib, algebra }` signature and every revision
+  carrying that signature predates the encoding, so no forward golden pin can carry it (`ci/flake.nix`,
+  the golden-pin block) and the frozen witness holds the old formula permanently. Identity is therefore
+  compared on the **pure** engine by `teeth-mutation-pure` with its seeded control, and upstream by
+  gen-schema's own identity suite — never against the frozen witness. What the exclusion does **not**
+  concede: `id_hash` is still minted and **forced** on both engines, so an engine that stopped minting
+  one fails loudly on the missing attribute rather than passing narrowly.
 
 - **Command:** `nix flake check ./ci` (builds the `rehost-den-parity` check). Raw result:
   `nix eval ./ci#lib.parity.den --json | jq`.

@@ -18,11 +18,17 @@ re-runs it and the way it fails.
 
 The load-bearing proof is the **byte-parity oracle** `rehost-den-parity` (`nix flake check ./ci`). It
 holds the pure stack — gen-prelude → gen-types → gen-merge → the re-hosted gen-schema — byte-identical
-to the frozen nixpkgs stack it replaced, down to the `id_hash` SHA, by running den's actual registry
-shape through both stacks. It carries **mutation teeth**: a perturbed host `addr` must change the
-`id_hash`, so "identical" cannot hold vacuously through a shared throw — without teeth, two stacks
-failing the same way would read as agreement. The reference side is pinned at the last pre-re-host
-revision and driven through a pinned `github:nix-community/nixpkgs.lib`. Design detail:
+to the frozen nixpkgs stack it replaced over the instance key sets and every non-identity field, by
+running den's actual registry shape through both stacks. The `id_hash` is the one **excluded axis**:
+gen-schema re-minted the identity encoding by design ruling (ADR-0016) and no forward golden pin can
+carry it, so identity is held by a teeth arm on the pure engine — with a seeded control firing in the
+same run — and by gen-schema's own identity suite, rather than against the frozen witness. The oracle
+carries **mutation teeth**: a perturbed host `addr` must move that instance's `id_hash` and leave its
+untouched sibling's standing, so "identical" cannot hold vacuously through a shared throw — without
+teeth, two stacks failing the same way would read as agreement. The exclusion concedes no minting
+either: `id_hash` is still forced on both engines, so an engine that stopped producing one fails loudly
+on the missing attribute rather than passing narrowly. The reference side is pinned at the last
+pre-re-host revision and driven through a pinned `github:nix-community/nixpkgs.lib`. Design detail:
 [`ci/README.md`](ci/README.md).
 
 A frozen reference keeps the **bar** from drifting, but it cannot follow a **subject** that moves by

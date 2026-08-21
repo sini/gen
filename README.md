@@ -175,9 +175,12 @@ request. This hub is not among them: it exposes flake `checks` and a perf `app` 
 nix-unit `tests` output, so it consumes the harness's check builders directly instead of its module —
 the repository that ships a gate is gated by it.
 
-**The pure module system is byte-identical to the nixpkgs one it replaced.** The parity oracle in this
-hub's `ci/` — `rehost-den-parity` over den's actual registry shape — compares resolved projections
-down to the `id_hash` SHA, and carries mutation teeth. `nix flake check ./ci`, wired as the `checks`
+**The pure module system is byte-identical to the nixpkgs one it replaced, on every axis but identity.**
+The parity oracle in this hub's `ci/` — `rehost-den-parity` over den's actual registry shape — compares
+resolved projections over the instance key sets and every non-identity field, and carries mutation
+teeth. `id_hash` is the ADR-0016 excluded axis: the re-minted encoding is beyond any forward golden
+pin's reach, so it is held by a teeth arm on the pure engine with its own seeded control, and forced on
+both engines so a missing mint still fails loudly. `nix flake check ./ci`, wired as the `checks`
 job. The reference side is pinned at a frozen pre-re-host revision, so the bar cannot drift. The
 sibling oracle over the **aspect** grammar was retired, because a frozen reference cannot follow a
 grammar that moves by design ruling; that claim is recorded unasserted in

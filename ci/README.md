@@ -90,7 +90,7 @@ evaluates the base once and reuses it via `warmFrom`/`editedModules`, so the reg
 1-module edit's dirty footprint — splices byte-for-byte and only the edited `nodeId` and the dirty
 `summary` re-merge. Both return the same projections byte-identically.
 
-The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section and emits the tables already in mdformat's canonical compact form (`|---|---:|`), so treefmt leaves the block untouched — the script never invokes a formatter.
+The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
 

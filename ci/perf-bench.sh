@@ -446,8 +446,9 @@ emit_report | tee "$tmp/report.md"
 
 # ── optional: splice the report into a doc's marker block ─────────────────────
 # The FAILURES exit fires AFTER the splice — a failing run still records what it measured.
-# Tables are emitted compact (`|---|---:|`), the form treefmt's mdformat leaves untouched, so a
-# re-run diffs only the timing values inside the markers (counters are deterministic).
+# Tables are spliced compact (`|---|---:|`); the repo's format-before-commit pass pads them to the
+# committed form, so run the formatter after an --update. Counters are deterministic, so a re-run then
+# diffs only the timing values inside the markers.
 if [[ -n "$UPDATE_FILE" ]]; then
   # report.md opens with a blank line and closes on the gate summary; the trailing `print ""`
   # supplies the blank line mdformat wants before the closing HTML comment, so the spliced block
