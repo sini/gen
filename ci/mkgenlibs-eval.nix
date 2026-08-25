@@ -34,6 +34,7 @@ let
     "aspects"
     "bind"
     "class"
+    "delivery"
     "dispatch"
     "flake"
     "graph"

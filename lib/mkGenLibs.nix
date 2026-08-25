@@ -91,6 +91,16 @@ let
       prelude = genInputs.gen-prelude.lib;
       scope = genInputs.gen-scope.lib;
     };
+    # gen-delivery is the DELIVERY-CLASS REALIZATION SURFACE (ADR-0028): the projection that
+    # discovers which aspect keys are declared delivery classes and the fold that hands each
+    # class's collected content to its target-owned terminal. Like gen-assemble and gen-program it
+    # declares no inputs and takes its substrate injected, so the hub wires it rather than
+    # re-exporting a self-resolved `.lib` — and a consumer taking this input gains no transitive
+    # pin from it. Entry landed when content existed, per the ruled roster timing.
+    delivery = genInputs.gen-delivery.lib {
+      algebra = genInputs.gen-algebra.lib;
+      aspects = genInputs.gen-aspects.lib;
+    };
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
@@ -162,6 +172,11 @@ let
       settings = "framework";
       assemble = "framework";
       program = "framework";
+      # ★ OWNER-RULED. The bucket turns on what the surface DOES, and this one is a thing
+      # frameworks plug into: it realizes delivery targets by invoking a caller-supplied terminal,
+      # which is "above the stack rather than a layer of it" on the bucket's own words. Putting the
+      # fold that calls a terminal INSIDE the aspect layer would make S3 name delivery.
+      delivery = "framework";
       link = "aspects";
       class = "aspects";
       # ★ OWNER-RULED. gen-view is the FOURTH DESTINATION of the same retirement that sends gen-pipe
