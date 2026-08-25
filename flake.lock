@@ -355,6 +355,21 @@
         "type": "github"
       }
     },
+    "gen-delivery": {
+      "locked": {
+        "lastModified": 1787637239,
+        "narHash": "sha256-Oydq76hdYLJGqTp/DAEF/6e8sPtePAyZ7w4hy4vBh34=",
+        "owner": "sini",
+        "repo": "gen-delivery",
+        "rev": "f2b27c194a8571896c11b8922b646d4b0f044fab",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-delivery",
+        "type": "github"
+      }
+    },
     "gen-dispatch": {
       "inputs": {
         "gen-prelude": "gen-prelude_10"
@@ -2069,6 +2084,7 @@
         "gen-assemble": "gen-assemble",
         "gen-bind": "gen-bind",
         "gen-class": "gen-class",
+        "gen-delivery": "gen-delivery",
         "gen-dispatch": "gen-dispatch",
         "gen-flake": "gen-flake",
         "gen-graph": "gen-graph",
