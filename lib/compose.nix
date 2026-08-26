@@ -7,10 +7,10 @@
 # THE CONSTRUCT BINDS NO CONSTRUCTOR VOCABULARY, AND `specialArgs` IS CALLER-TOTAL. ADR-0011's
 # strata place the aspect layer above the module system; a construct that composes a tree it is
 # HANDED cannot hold that tree's vocabulary set — which libraries a tree's modules need is a fact
-# about the tree, not about the invoker. So no `genAspects`/`genSchema`/`genTypes`/`genPrelude`
-# constant lives here: the caller supplies `specialArgs` whole and this construct merges nothing
-# into it. The injection pattern survives one level up, at the framework surface that fronts the
-# tree (the hub flakeModule performs `genLibs // specialArgs` as its own act).
+# about the tree, not about the invoker. So no constructor constant lives here: the caller
+# supplies `specialArgs` whole and this construct merges nothing into it. The injection pattern
+# survives one level up, at the framework surface that fronts the tree (the hub flakeModule
+# performs the constructor merge as its own act).
 #
 # Tree loading is likewise the caller's: `(importTree.addPath dir).files` is one expression, the
 # engine imports path leaves natively, and the source-layout convention belongs to whoever owns
