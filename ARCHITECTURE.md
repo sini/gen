@@ -26,7 +26,7 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
   mkGenLibs keys (the roster of record is lib/mkGenLibs.nix, never a count — ADR-0015):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
-    gen-dispatch · gen-resolve · gen-flake · gen-class · gen-link
+    gen-dispatch · gen-resolve · gen-class · gen-link
     gen-product · gen-settings · gen-assemble · gen-view
   standalone pure libs:
     gen-vars
@@ -35,14 +35,20 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
     gen-rebuild  → content moved onto the gen-memo plane (ADR-0008 §4, ADR-0005)
     gen-edge     → movement vocabulary, gen-view the fourth destination (ADR-0010 §3)
     gen-pipe     → movement vocabulary: gen-view, and gen-select for `sel` (ADR-0010 §3)
+    gen-flake    → dissolved to per-surface successors: compose → this hub's `lib.compose` /
+                   interim flakeModule; warm/override/trace → gen-memo; projection + realize →
+                   gen-delivery; inject/terminals → the crossing's Adapter set (ADR-0031 F3)
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
 nixpkgs-lib-free: a module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`)
 composes gen module trees to resolved VALUES without ever touching `lib.evalModules`. The *terminal
-plane* is nixpkgs: `gen-flake` is the single boundary that injects those values into a consumer's
-nixpkgs eval and builds NixOS systems. The invariant across the crossing: **gen TYPES never leave the
-pure eval; only VALUES cross** (value-injection, not type-driving).
+plane* is nixpkgs: gen-delivery's `realize` folds the composed projection through per-class terminals,
+with this hub's interim `flakeModules.default` supplying the default `nixos` terminal (a consumer may
+override or suppress it) — the boundary that injects those values into a consumer's nixpkgs eval and
+builds NixOS systems. Historically the sole boundary here was `gen-flake`; it dissolved and its repo
+orphans as reference (ADR-0031 F3; see Terminal Layer, below). The invariant across the crossing: **gen
+TYPES never leave the pure eval; only VALUES cross** (value-injection, not type-driving).
 
 ### The CI harness is not a library, and it does not live here
 
@@ -55,17 +61,23 @@ so it is read off them rather than remembered: in `gen-harness`,
 `grep -oE '"gen-[a-z]+"' flake.lock` returns nothing, while the same command in any library's
 `ci/flake.lock` returns that library's gen inputs.
 
-**Who consumes it.** Every gen repo's `ci/flake.nix` calls `gen-harness.lib.mkCi` — except `gen-flake`
-and `gen-vars`, which still call this hub's own `ci/mkCi.nix`, the copy the harness was extracted from.
-From any library root, `grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says which of the two that repo
-is on, so the split is re-derived rather than remembered.
+**Who consumes it.** Every gen repo's `ci/flake.nix` calls `gen-harness.lib.mkCi` — the one exception
+is `gen-vars`, excluded from the inventory by ADR-0003 and knowingly left at an older pin. gen-flake
+called it too, migrating onto the harness in its own commit before its later dissolution (ADR-0031 F3),
+so no repository was left holding a pin it could not move. From any library root,
+`grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says whether that repo is on the harness, so the fact is
+re-derived rather than remembered.
 
-**The split as it stands today, stated because the hub currently carries both sides.** `ci/mkCi.nix`
-and `ci/flakeModule.nix` are still live in this repository, serving those two remaining consumers; and
-the hub's own `ci/` is a parity/perf harness that exposes flake `checks` and a perf `app` rather than a
-nix-unit `tests` output, so it does not consume `mkCi`'s `ci` hook itself. **Retiring the hub-side
-duplicates is specified but NOT landed** — see `specs/2026-08-17-gen-hub-ci-extraction-completion-spec.md`
-in `den-architecture`. A reader meeting two `mkCi`s here is meeting the current topology, not a defect.
+**The hub itself is not an `mkCi` consumer.** `ci/mkCi.nix` and `ci/flakeModule.nix` — the copies the
+harness was extracted from — retired at `a19685b` (2026-08-17, five files); the hub's own gate now
+consumes `gen-harness`'s declared check builders (`lib.checks.treefmtTreeRoot`,
+`lib.checks.mdformatPlugins`, `lib.mdformatBasePlugins`) directly, and the root no longer publishes
+`lib.mkCi` at all — the hub's own `ci/` was always a parity/perf harness exposing flake `checks` and a
+perf `app`, never a `mkCi`-shaped `tests` output. The extraction this section once described as
+"specified but NOT landed" landed the same day it was specified — see
+`specs/2026-08-17-gen-hub-ci-extraction-completion-spec.md` in den-ag-design, stamped LANDED. A reader
+meeting `gen-harness.lib.mkCi` everywhere but the hub itself is meeting the current, single-copy
+topology, not a defect.
 
 ## Dependency Graph
 
@@ -95,20 +107,20 @@ gen-vars     (standalone pure)
   gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
   gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
 
-  # the ONE nixpkgs boundary — pure core (compose/inject) is nixpkgs-lib-free;
-  # only its terminals (realize + terminals.* / flakeModule) touch nixpkgs
-gen-flake    (import-tree + gen-merge + gen-schema + gen-aspects + gen-bind + nixpkgs)
+  # historically gen-flake sat here as the one nixpkgs boundary (import-tree + gen-merge +
+  # gen-schema + gen-aspects + gen-bind + nixpkgs); it dissolved (ADR-0031 F3) — see Overview
+  # and Terminal Layer for where full nixpkgs enters today
 ```
 
 Each library exposes a single `.lib` value output — the obsolete functor-call form `gen-graph { inherit lib; }` is gone (`__functor` is banned ecosystem-wide). Dependency classes are declared honestly: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib, **D** nixpkgs-lib + gen-dep.
 
-The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions over every non-identity field; the re-minted `id_hash` is the ADR-0016 excluded axis, held by a teeth arm on the pure engine rather than against the frozen witness); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with four gen siblings — it hosts the convergence loop that ties the dispatch step and scope evaluation together. **gen-flake** is the sole library that consumes full nixpkgs, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) is itself nixpkgs-lib-free.
+The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions over every non-identity field; the re-minted `id_hash` is the ADR-0016 excluded axis, held by a teeth arm on the pure engine rather than against the frozen witness); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with four gen siblings — it hosts the convergence loop that ties the dispatch step and scope evaluation together. No library on today's roster consumes full nixpkgs at all — historically **gen-flake** was the sole one that did, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) was itself nixpkgs-lib-free. gen-flake dissolved (ADR-0031 F3): its pure core lives on at this hub's `lib.compose`, still nixpkgs-lib-free, and its terminal now sits at this hub's interim `flakeModules.default` and gen-delivery's `realize` — see Overview and Terminal Layer.
 
 Above the L1 substrate sit two **L2 concern libraries** — gen-product and gen-settings — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: graph products and layered settings. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `product`, `settings`) like the self-wiring libraries above. Three more stood here and have retired, each archived for reference rather than deleted: **gen-demand** (typed demand), whose cascade ADR-0008 §4 re-expresses over gen-scope, the sole engine; and **gen-edge** (content movement) and **gen-pipe** (scoped-channel dataflow), which ADR-0010 §3 retires together into the movement vocabulary — the substrate constructs of gen-view, gen-select, gen-graph and gen-scope. The L2 tier shrinking is the point of that ruling rather than an accident of it: a concern expressible in substrate vocabulary did not need a library of its own.
 
 ### The nixpkgs.lib policy
 
-Anywhere the gen ecosystem needs nixpkgs *lib* only, it uses a pinned `github:nix-community/nixpkgs.lib` — not full nixpkgs. Full nixpkgs is pulled ONLY where `pkgs`/`nixosSystem` are genuinely needed: the nix-unit/treefmt CI runners and the gen-flake terminal. gen-flake is thus the single point where full nixpkgs is legitimately a build input.
+Anywhere the gen ecosystem needs nixpkgs *lib* only, it uses a pinned `github:nix-community/nixpkgs.lib` — not full nixpkgs. Full nixpkgs is pulled ONLY where `pkgs`/`nixosSystem` are genuinely needed: the nix-unit/treefmt CI runners and, at the library level, nowhere else — historically the gen-flake terminal, now this hub's interim `flakeModules.default` and gen-delivery's `realize` (ADR-0031 F3; see Terminal Layer). Those are the terminal-plane's single legitimate points of entry for full nixpkgs.
 
 ## Library Roles
 
@@ -193,16 +205,34 @@ A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOA
 
 ### Terminal Layer
 
-**gen-flake** — The value-injection boundary.
+The nixpkgs-facing crossing. **gen-flake was the sole boundary here; ADR-0031 F2 dissolved it into
+per-surface successors** — the compose S2 core at this hub's `lib.compose` / interim
+`flakeModules.default`; warm/override/trace in gen-memo; the projection + `realize` in gen-delivery;
+inject/terminals at the crossing's Adapter set. gen-flake's own section below is kept as the retired
+surface's record, in the same pattern as gen-edge and gen-demand above.
 
-The single sanctioned crossing from the pure composition plane into nixpkgs. Three ops:
+This hub's OWN `flakeModules.default` — rehomed from gen-flake under ADR-0031 F1, marked INTERIM (not
+yet ADR-0027) — is the current flake-parts ergonomics: one `imports` gives both the injected query
+surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose, over
+the option surface `gen.tree` / `gen.extraModules`. It consumes no gen-flake surface. The **invariant**
+gen-flake proved end-to-end (gen TYPES never leave the pure eval; only VALUES cross) carries forward
+architecturally at the new boundary; the hub's `ci/inject-payload.nix` (ADR-0023 (b), the crossing
+Adapter side) is a related live check that a gen TYPE riding as inert `_module.args` data stays
+un-type-walked.
 
-- **`compose { tree ? null, modules ? [], specialArgs ? {} } -> { values; classContent; hostContent }`** — loads a gen module tree (as a bare path list via the import-tree fork) and resolves it PURELY via gen-merge's `evalModuleTree`. Threads the gen constructors (`genMerge`/`genSchema`/`genAspects`/`genTypes`/`genPrelude`) to every module so definition modules declare their typed surfaces without nixpkgs. `values` = the resolved config; `classContent` = the flat aspect registry (query surface); `hostContent` = the per-host `(class, host)` projection (build surface).
-- **`injectArgs composed -> { _module.args.genValues = composed.values; }`** — packages the resolved VALUES as a plain query module so a consumer's nixpkgs modules read `{ genValues, ... }: … genValues.hosts.<h>.addr …`. Pure — no gen TYPE crosses.
-- **`realize { composed, terminals, bindings ? {}, extraModules ? {} } -> { <class> = { <host> = <built> } }`** — the terminal **driver**, and the split matters: `realize` is the class-major fold. Per class and host it selects `composed.hosts.<h>.classes.<c>`, merges the three binding layers (`hc.bindings // bindings // bindings.<host>`), knot-ties the colmena-style `nodes` accessor to the class's own lazily-built result set, and calls the terminal. It never partial-applies anything itself. Output keys are exactly the `terminals` keys. The **binding** happens one level down, in `terminals.mkSystemTerminal { evaluator }`: that is where `gen-bind.wrapAll { modules; bindings; }` runs, and where `nodes` reaches the modules as `specialArgs`. `mkSystemTerminal` names no system class and touches no nixpkgs; `terminals.nixosSystem { nixpkgs; }` is that generic terminal instantiated with `nixpkgs.lib.nixosSystem`, and is the ONE place that touches nixpkgs. `terminals.mkFlakeTerminal` is the flake-parts crossing beside it.
-  - The v0 terminal `mkSystems { hostContent; nixpkgs; extraModules; }` is **retired**, not renamed: it is absent from `gen-flake/lib/` entirely. Its replacement, per gen-flake's own migration table, is `realize { composed; terminals.nixos = terminals.nixosSystem { nixpkgs; }; extraModules; }`, and `composed.hostContent` became `composed.hosts`.
+**gen-flake** — The value-injection boundary. **ORPHANED AS REFERENCE (ADR-0031 F3) — dissolution
+complete; off the roster, not a hub input. Take no new dependency on it.**
 
-`flakeModules.default` is the flake-parts ergonomics — one `imports` gives both the injected query surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose. The **invariant** (gen TYPES never leave the pure eval; only VALUES cross) is proven end-to-end by a fixture consumer: a gen type rides as inert data in `_module.args` (`genValues.schema.<kind>.options.<f>.type.name` is a readable string) yet `nixosConfigurations.<h>.options ? schema == false`, so nixpkgs never type-walks it. This is the same one-way `compose → value → nixpkgs` trade adios (adisbladis) takes; a pure engine cannot be driven by foreign nixpkgs-module libraries. For shapes the shipped terminals do not fit (multi-target/terranix, nested `fleet.hosts`, reader-computed bindings), the reader escape hatch is `compose`/`injectArgs` plus your own terminal reading `genValues` — or `mkSystemTerminal` with your own evaluator.
+It was the single sanctioned crossing from the pure composition plane into nixpkgs. Three ops:
+
+- **`compose { tree ? null, modules ? [], specialArgs ? {} } -> { values; classContent; hostContent }`** — loaded a gen module tree (as a bare path list via the import-tree fork) and resolved it PURELY via gen-merge's `evalModuleTree`. Threaded the gen constructors (`genMerge`/`genSchema`/`genAspects`/`genTypes`/`genPrelude`) to every module so definition modules declared their typed surfaces without nixpkgs. `values` = the resolved config; `classContent` = the flat aspect registry (query surface); `hostContent` = the per-host `(class, host)` projection (build surface). Successor: this hub's `lib.compose`.
+- **`injectArgs composed -> { _module.args.genValues = composed.values; }`** — packaged the resolved VALUES as a plain query module so a consumer's nixpkgs modules read `{ genValues, ... }: … genValues.hosts.<h>.addr …`. Pure — no gen TYPE crosses. Successor: the crossing's Adapter set.
+- **`realize { composed, terminals, bindings ? {}, extraModules ? {} } -> { <class> = { <host> = <built> } }`** — the terminal **driver**, and the split mattered: `realize` was the class-major fold. Per class and host it selected `composed.hosts.<h>.classes.<c>`, merged the three binding layers (`hc.bindings // bindings // bindings.<host>`), knot-tied the colmena-style `nodes` accessor to the class's own lazily-built result set, and called the terminal. It never partial-applied anything itself. Output keys were exactly the `terminals` keys. The **binding** happened one level down, in `terminals.mkSystemTerminal { evaluator }`: that is where `gen-bind.wrapAll { modules; bindings; }` ran, and where `nodes` reached the modules as `specialArgs`. `mkSystemTerminal` named no system class and touched no nixpkgs; `terminals.nixosSystem { nixpkgs; }` was that generic terminal instantiated with `nixpkgs.lib.nixosSystem`, and was the ONE place that touched nixpkgs. `terminals.mkFlakeTerminal` was the flake-parts crossing beside it. Successor: gen-delivery's projection + `realize`.
+  - The v0 terminal `mkSystems { hostContent; nixpkgs; extraModules; }` was **retired**, not renamed, before the dissolution: it was absent from `gen-flake/lib/` entirely. Its replacement, per gen-flake's own migration table, was `realize { composed; terminals.nixos = terminals.nixosSystem { nixpkgs; }; extraModules; }`, and `composed.hostContent` became `composed.hosts`.
+
+`diff.nix` stays in the orphaned repo as reference — a named input to gen-memo's failure-attribution
+spec, not code to copy. This was the same one-way `compose → value → nixpkgs` trade adios (adisbladis)
+takes; a pure engine cannot be driven by foreign nixpkgs-module libraries.
 
 ### L2 Concern Libraries
 
@@ -353,5 +383,5 @@ The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies onl
 4. **Conditions are opaque (in core).** gen-dispatch's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
 5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
 6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either, identity) works without nixpkgs. Libraries that only need identity/search import it directly. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
-7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one place — the `gen-flake` terminal (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`) — plus the CI runners. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
+7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one plane — the terminal plane — plus the CI runners; historically that terminal was the `gen-flake` repository (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`), which dissolved (ADR-0031 F3) into this hub's interim `flakeModules.default` and gen-delivery's `realize`. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
 8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving).

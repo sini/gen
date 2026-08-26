@@ -215,8 +215,9 @@ the provenance authority.
 
 `ARCHITECTURE.md` (§Design Constraints) states the ecosystem invariants the hub's wiring
 presupposes: an acyclic library DAG, no library importing another's flake inputs, opaque
-actions/conditions, a nixpkgs-lib-free library level with nixpkgs entering only at `gen-flake`, and
-compose-purely/inject-VALUES-never-TYPES.
+actions/conditions, a nixpkgs-lib-free library level with nixpkgs entering only at the terminal plane
+(historically `gen-flake`, now this hub's interim `flakeModules.default` and gen-delivery's `realize` —
+ADR-0031 F3), and compose-purely/inject-VALUES-never-TYPES.
 
 ## Drift check
 
@@ -227,7 +228,7 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 Current output (verbatim):
 
 ```json
-{"flakeModules":["genLibs"],"lib":["aspects","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","bind","class","dispatch","edge","flake","graph","link","merge","pipe","prelude","product","resolve","schema","scope","select","settings","strata","types"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","resolve","schema","scope","select","settings","strata","types","view"]}
 ```
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`

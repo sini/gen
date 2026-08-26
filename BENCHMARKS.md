@@ -2,7 +2,7 @@
 
 Evaluation-time benchmarks for the pure-gen module system (gen-prelude → gen-types → gen-merge, with re-hosted gen-schema/gen-aspects) against the frozen nixpkgs reference stack (original gen-schema/gen-aspects driven by a pinned `github:nix-community/nixpkgs.lib`). Every measured cell is gated on **byte-parity** first: the pure stack and the nixpkgs stack must produce byte-identical output before any timing delta counts, so these numbers are pure engine overhead on identical results. The one field outside that digest is `id_hash` — the ADR-0016 excluded axis, minted and forced on both stacks (so the work of minting it is still measured, and a stack that stopped minting one still fails loudly) but not compared against the frozen reference, whose permanent pin definitionally predates the re-minted encoding. The parity oracles behind that precondition are documented in [VALIDATION.md](VALIDATION.md).
 
-The wins reported here are on the **composition plane** — den registry/aspect/graph resolution, den CI, fleet-wide dispatch, den-hoag internals. Single-host NixOS closure evaluation stays on nixpkgs behind the gen-flake terminal and is out of scope (see the terminal-plane dilution note below).
+The wins reported here are on the **composition plane** — den registry/aspect/graph resolution, den CI, fleet-wide dispatch, den-hoag internals. Single-host NixOS closure evaluation stays on nixpkgs behind the terminal plane — historically the gen-flake terminal, now this hub's interim `flakeModules.default` and gen-delivery's `realize` (ADR-0031 F3) — and is out of scope (see the terminal-plane dilution note below).
 
 ## Methodology
 

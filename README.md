@@ -153,8 +153,8 @@ it fails — is [TRUST.md](TRUST.md).
 
 **Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Nineteen of the twenty roster libraries
-carry it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Twenty-one of the twenty-two roster
+libraries carry it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter
 its lock, and the flake structure is the proof. gen-vars is the documented exception, and is off-roster
 for this reason. Retired gen-demand never gained a scanner and now never will: its Class-B claim rested
 on its input list rather than on a check, and it leaves the roster with that gap open — the content
@@ -169,9 +169,10 @@ ecosystem needs `lib.*` alone it pulls the pinned `github:nix-community/nixpkgs.
 nixpkgs — policy stated in `ci/flake.nix` and visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for nineteen of the twenty roster keys — gen-class is the exception described below, and its flake
-exports `.lib` too — so a library that renames, wraps or drops that output fails hub evaluation at its
-first consumer. All twenty-two library flakes declare it today.
+for twenty of the twenty-two roster keys — gen-class and gen-assemble are the exceptions (both
+hub-injected via `import "${genInputs.gen-<name>}/lib" { … }` rather than a direct `.lib` read), and
+their flakes export `.lib` too — so a library that renames, wraps or drops that output fails hub
+evaluation at its first consumer. All twenty-two library flakes declare it today.
 
 **Every library gates on its own CI.** All twenty-two library repos build their `ci/flake.nix` on
 `gen-harness.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes

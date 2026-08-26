@@ -53,9 +53,10 @@ live in gen-merge, and it awaits an instantiation that carries it. [VALIDATION.m
 carries both halves — the core's command, and the aspect layer's still-empty cell.
 
 Underneath sit the per-library nix-unit suites — the [gen-merge](https://github.com/sini/gen-merge)
-byte-mode engine's 206 tests (at `9f20fb1`) and the [gen-flake](https://github.com/sini/gen-flake)
-terminal's 98 (at `f6295f4`), measured by running the suites rather than quoted; the revision is the
-anchor, so a reader checks out that exact rev and reproduces the count. VALIDATION §2 carries the whole
+byte-mode engine's 206 tests (at `9f20fb1`) and, before its dissolution (ADR-0031 F3), the
+[gen-flake](https://github.com/sini/gen-flake) terminal's 98 (at `f6295f4`) — that suite is now
+orphaned as reference alongside the rest of that repo — measured by running the suites rather than
+quoted; the revision is the anchor, so a reader checks out that exact rev and reproduces the count. VALIDATION §2 carries the whole
 table with a revision per library. Alongside them sit the config-thunk deferral regression (den's
 `__configThunk` markers ride the engine unforced and resolve byte-identically at the terminal) and
 three migrated demos (gen-schema / gen-aspects / gen-vars) that byte-check whole small consumers across
@@ -82,11 +83,12 @@ The token list is per library rather than uniform, because a library's own API n
   The two retired repositories are named because their scanners still stand and still pass in their
   archived clones — the claim is about what is enforced where, and archiving removed neither the
   scanner nor its result. Neither is a roster member or a hub input any longer (ADR-0010 §3).
-- **gen-flake** tiers it. The module-system *call* tether is forbidden in every library file, wiring
-  included. The nixpkgs *import* tether is additionally forbidden in the strict pure core. Exactly one
-  file, `lib/terminals.nix`, is excluded as the sanctioned boundary, and the classifier treats any file
-  it does not recognise as strict — so a new pure file is guarded by default and the boundary cannot
-  widen by accident.
+- **gen-flake**, now orphaned as reference (ADR-0031 F3) — off the roster, not a hub input — tiered
+  it: the module-system *call* tether was forbidden in every library file, wiring included, and the
+  nixpkgs *import* tether was additionally forbidden in the strict pure core. Exactly one file,
+  `lib/terminals.nix`, was excluded as the sanctioned boundary, and the classifier treated any file it
+  did not recognise as strict — so a new pure file was guarded by default and the boundary could not
+  widen by accident. The scanner still stands and still passes in the archived clone.
 
 One roster library carries no scanner. **gen-prelude** needs none: it declares no flake inputs, so
 nothing transitive can enter its lock and the flake structure is itself the proof. **gen-vars** is the
@@ -137,11 +139,14 @@ touching the committed files.
 
 ## Observability
 
-The surface nixpkgs `evalModules` cannot offer. [gen-flake](https://github.com/sini/gen-flake) v1
-exposes provenance (which module set each option, at what priority), a diff between two composes, and a
-memoization decision trace — powered by [gen-merge](https://github.com/sini/gen-merge)'s always-on
-provenance channel and its warm re-eval, with [gen-class](https://github.com/sini/gen-class) carrying
-the class-share mechanism den-hoag consumes.
+The surface nixpkgs `evalModules` cannot offer. Historically
+[gen-flake](https://github.com/sini/gen-flake) v1 exposed provenance (which module set each option, at
+what priority), a diff between two composes, and a memoization decision trace — powered by
+[gen-merge](https://github.com/sini/gen-merge)'s always-on provenance channel and its warm re-eval, with
+[gen-class](https://github.com/sini/gen-class) carrying the class-share mechanism den-hoag consumes.
+gen-flake dissolved (ADR-0031 F3): the trace arm is now gen-memo's `warmTrace`/`warmAdmits`, and
+`diff.nix` stays in the orphaned repo as reference (a named input to gen-memo's failure-attribution
+spec).
 
 Every one of these surfaces is asserted in tests (VALIDATION §2), including the tooth that the
 provenance channel forces only its own records and never the config values, and the adversarial
