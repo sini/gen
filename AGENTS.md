@@ -31,7 +31,6 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `bind`               | `gen-bind` — "gen-bind: module binding with external arguments for Nix"                                                                                                                                                                      |
 | `dispatch`           | `gen-dispatch` — "gen-dispatch: relational rule dispatch over ordered groups (the dispatch STEP)"                                                                                                                                            |
 | `resolve`            | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)"                                                                                        |
-| `flake`              | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem"                                                                                                                                                   |
 | `class`              | `gen-class` — "gen-class — pure-Nix class-share mechanism (partition / contract / apply / gate) for the pure-gen module system"                                                                                                              |
 | `product`            | `gen-product` — "gen-product — graph products as first-class operations over accessor-graphs (Cartesian / tensor / strong / lexicographic; cells, slices, fibers, projections, quotients, restriction, containment chains), lazy in and out" |
 | `settings`           | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct"                                                                     |
@@ -42,11 +41,12 @@ input, and is archived for reference under ADR-0031 F3 — no content is deleted
 here because the roster is where a reader asks "why is there no `edge` key?", and an unexplained
 absence reads as a drop rather than as a ruling. **Bind the destination, never these.**
 
-| Former key | Repo         | Ruling      | Where the content went                                                                                                                                                                                                      |
-| ---------- | ------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `demand`   | `gen-demand` | ADR-0008 §4 | `scope` — the demand/kind folds re-express over the sole evaluator (ADR-0006); `adapters` retired without moving rather than give the evaluator a selector-algebra dependency                                               |
-| `edge`     | `gen-edge`   | ADR-0010 §3 | `view` — the fourth destination §3 gained on 2026-08-20, beside `select`, `graph` and `scope`. The (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization each name their destination construct per export |
-| `pipe`     | `gen-pipe`   | ADR-0010 §3 | `view` for the channel and dataflow constructs, `select` for `sel`. B5's determinism and provenance laws are restated as properties of the query construction rather than dropped                                           |
+| Former key | Repo         | Ruling      | Where the content went                                                                                                                                                                                                                                                                                                  |
+| ---------- | ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demand`   | `gen-demand` | ADR-0008 §4 | `scope` — the demand/kind folds re-express over the sole evaluator (ADR-0006); `adapters` retired without moving rather than give the evaluator a selector-algebra dependency                                                                                                                                           |
+| `edge`     | `gen-edge`   | ADR-0010 §3 | `view` — the fourth destination §3 gained on 2026-08-20, beside `select`, `graph` and `scope`. The (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization each name their destination construct per export                                                                                             |
+| `pipe`     | `gen-pipe`   | ADR-0010 §3 | `view` for the channel and dataflow constructs, `select` for `sel`. B5's determinism and provenance laws are restated as properties of the query construction rather than dropped                                                                                                                                       |
+| `flake`    | `gen-flake`  | ADR-0031    | The hub's `lib.compose` / interim `flakeModules.default` for the compose S2 core; `memo` for warm/override/trace; `delivery` for the projection + `realize`; the crossing's Adapter set for inject/terminals. `diff.nix` stays in the orphaned repo as reference (a named input to gen-memo's failure-attribution spec) |
 
 **Sibling repos that exist but are NOT in the roster and NOT hub flake inputs.** Consumers reach these
 directly, not through `mkGenLibs`.
@@ -62,7 +62,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 ```
 
 ```json
-["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-dispatch","gen-flake","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
+["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
 
 ## Exports

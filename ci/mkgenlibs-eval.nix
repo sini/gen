@@ -36,7 +36,6 @@ let
     "class"
     "delivery"
     "dispatch"
-    "flake"
     "graph"
     "identity"
     "link"

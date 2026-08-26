@@ -35,12 +35,11 @@ let
     select = genInputs.gen-select.lib;
     dispatch = genInputs.gen-dispatch.lib;
     resolve = genInputs.gen-resolve.lib;
-    flake = genInputs.gen-flake.lib;
     # L2 concern libraries — each flake `.lib` self-resolves its own deps (product: prelude;
     # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
     # self-wiring libs above.
     #
-    # THREE MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling and each with its content
+    # FOUR MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling and each with its content
     # landed somewhere else. The bindings are gone rather than commented out — a `retiring` member
     # is still reachable and this is the state past that, where the hub no longer pins the input at
     # all — but the rulings are recorded here because the roster is where a reader asks "why is
@@ -57,8 +56,13 @@ let
     #               them re-express as `view` constructs, `sel` binds `select` directly, and the
     #               B5 determinism/provenance laws are restated as properties of the query
     #               construction rather than lost.
+    #   gen-flake   ADR-0031 F2 dissolves it; every surface landed at a successor — compose S2
+    #               core at this hub's `lib.compose` / interim flakeModule, warm/override/trace
+    #               in gen-memo, projection + realize in gen-delivery, inject/terminals at the
+    #               crossing's Adapter set. Its repo orphans as reference per F3 (diff.nix stays
+    #               there by explicit ruling).
     #
-    # All three repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
+    # All four repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
     # is deleted — and none of them gains a new consumer.
     product = genInputs.gen-product.lib;
     settings = genInputs.gen-settings.lib;
@@ -136,11 +140,12 @@ let
     #              still reachable but no consumer should newly adopt it. The end of that path is
     #              removal from the roster once the content has landed — the member drops both
     #              lines and the hub stops pinning it, and its repository is orphaned for
-    #              reference rather than deleted. That end has now been reached three times:
-    #              gen-demand (ADR-0008 §4) was the first, and gen-edge and gen-pipe walked it
-    #              together on ADR-0010 §3 once their content landed in `view`. The value is not
-    #              a waiting room — a member sits here only while its destination is still being
-    #              built, and `flake` and `resolve` are what remains of that
+    #              reference rather than deleted. That end has now been reached four times:
+    #              gen-demand (ADR-0008 §4) was the first, gen-edge and gen-pipe walked it
+    #              together on ADR-0010 §3 once their content landed in `view`, and gen-flake
+    #              completed it under ADR-0031 once its surfaces dissolved to their successors.
+    #              The value is not a waiting room — a member sits here only while its
+    #              destination is still being built, and `resolve` is what remains of that
     #
     # `substrate`, `modules`, `aspects` and `framework` publish consumer paths on the hub's `lib`
     # output (flake.nix). `retiring` publishes none: a consumer selecting a library on its way off
@@ -167,7 +172,6 @@ let
       select = "substrate";
       dispatch = "substrate";
       resolve = "retiring";
-      flake = "retiring";
       product = "substrate";
       settings = "framework";
       assemble = "framework";
