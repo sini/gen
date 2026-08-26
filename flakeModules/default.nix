@@ -10,15 +10,28 @@
 # Rehomed from `gen-flake`'s repository-root `flakeModule.nix` under ADR-0031 F1, which sanctions the
 # move on the ground that the hub is the single input a consumer takes. The module body below is
 # carried CONTENT-IDENTICAL from that file — same options, same config, same comments. The only
-# additions are this header and the `genFlake` binding in the `let` (marked there), which replaces the
+# additions are this header and the roster bindings in the `let` (marked there), which replace the
 # partial application the source got from gen-flake's own `flake.nix`.
 #
 # SINCE AMENDED AT THE SUCCESSOR-COMPOSE RE-POINT (ADR-0031 F2's "compose S2 core → S2" row):
 # `compose` no longer reads off gen-flake — the successor landed at this hub (lib/compose.nix,
 # exposed as `gen.lib.compose`), and this module now performs the constructor merge and the tree
 # loading itself and carries the aspects/hosts projection verbatim from the dissolving compose
-# (both marked in the `let`). The body is otherwise the F1 carry; `injectArgs`/`realize`/
-# `terminals` still read off gen-flake pending their own successors' consumer re-points.
+# (both marked in the `let`).
+#
+# AND AT THE UNIT-5 RE-POINT, WHICH RETIRED THE LAST gen-flake READS. This module now consumes NO
+# gen-flake surface:
+#   * the `gen.inject` DEFAULT is the plain value `{ genValues = composedCore.values; }` — the
+#     successor's real interface. gen-bind's `injectAdapter` (crossing-adapter-set.nix) is the
+#     crossing-side successor of record for module-system targets; its header rules the module
+#     wrapper vestigial, and this module IS the arg-environment writer (`_module.args` below), so
+#     wrapping through a module here would re-introduce the wrapper the successor retired;
+#   * `realized` reads gen-delivery's `realize` (the layered fold; roster key `delivery`) over the
+#     carried projection, handed as `projected = { nodes = …; }`;
+#   * the default `nixos` terminal is gen-bind's `mkSystemTerminal` (crossing adapter set), bridged
+#     to the fold's terminal contract by the hub-local `terminalOf` in the `let` — the owed
+#     consumer-side reconstruction of the retired `nixosSystem` sugar (corpus G1).
+# The body is otherwise the F1 carry.
 #
 # Its two MEASURED defects travel with it UNFIXED and are beaded at den-hoag-es9g. They are deliberate
 # carry-over, never accepted behavior:
@@ -31,8 +44,9 @@
 # ── on the carried header below ──────────────────────────────────────────────────────────────────
 # Two of its sentences are true OF GEN-FLAKE'S REPOSITORY and are NOT descriptions of this hub. They
 # are carried verbatim rather than edited, so read them as source provenance:
-#   * "partially applied in flake.nix" — that was gen-flake's `flake.nix`. Here the module binds
-#     `genFlake` itself, from the hub roster, at consumer eval time (see the `let`).
+#   * "It is a FUNCTION of the constructed gen-flake lib … partially applied in flake.nix" — that
+#     was gen-flake's own wiring. Here the module binds its dependencies from the hub roster at
+#     consumer eval time (see the `let`), and since the unit-5 re-point none of them is gen-flake.
 #   * the `ci/tests/purity.nix` exclusion — that is gen-flake's purity suite. This hub runs no purity
 #     suite, so nothing here excludes anything; the sentence explains why the SOURCE file was exempt.
 # ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -60,8 +74,8 @@
 #               versions that force a `systems` declaration once any `perSystem` definition exists.
 #   * SYSTEMS — `flake.nixosConfigurations = (realize { terminals; … }).nixos or { }`, the `nixos`
 #               class realized per host from compose's `hosts` projection (each host's `nixos` class
-#               deferredModules, with the resolved instance partial-applied as the `host` binding by
-#               gen-bind's `wrapAll`). A host with no `nixos` content is not built (class-major); a
+#               deferredModules, with the resolved instance partial-applied as the `node` binding by
+#               gen-bind's wrap core). A host with no `nixos` content is not built (class-major); a
 #               registry with no `nixos` class at all yields the empty `or { }`.
 #   * TERMINALS — `gen.terminals` is the class-keyed registry `realize` consumes; `gen.realized` is the
 #               full class-major result (`{ <class>.<host> = artifact; }`), so a consumer wires
@@ -82,16 +96,16 @@
   ...
 }:
 let
-  # THE REHOME BINDING (added here; adjusted at the successor-compose re-point — see the header).
-  # The source was a function of the constructed gen-flake lib, applied by gen-flake's own
-  # `flake.nix`. The hub exports module PATHS and evaluates no flake-parts of its own, so the
+  # THE REHOME BINDINGS (added here; adjusted at the successor-compose and unit-5 re-points — see
+  # the header). The source was a function of the constructed gen-flake lib, applied by gen-flake's
+  # own `flake.nix`. The hub exports module PATHS and evaluates no flake-parts of its own, so the
   # module binds its dependencies at CONSUMER eval time off the hub roster — the same shape as
-  # `flakeModules/genLibs.nix`. `flake` is the roster key for gen-flake (lib/mkGenLibs.nix); the
-  # surfaces still read off it below are `injectArgs` / `realize` / `terminals` — their successors
-  # are the crossing adapter's and gen-delivery's, and re-pointing their consumers is that work,
-  # not this re-point's.
+  # `flakeModules/genLibs.nix`. Since the unit-5 re-point those dependencies are the successors:
+  # gen-bind's crossing adapter set (`bind`) and gen-delivery's fold (`delivery`); no surface below
+  # reads gen-flake.
   roster = inputs.gen.lib.mkGenLibs { inherit lib; };
-  genFlake = roster.flake;
+  genBind = roster.bind;
+  genDelivery = roster.delivery;
 
   inherit (lib) mkOption types;
   cfg = config.gen;
@@ -128,7 +142,10 @@ let
     specialArgs = genLibs // cfg.specialArgs;
   };
 
-  # ── THE CARRIED PROJECTION (INTERIM CARRY, code-identical from gen-flake lib/compose.nix) ─
+  # ── THE CARRIED PROJECTION (INTERIM CARRY from gen-flake lib/compose.nix; code-identical save
+  # ONE amendment: the binding formal renamed `host` → `node` at the unit-5 re-point — substrate
+  # vocabulary, R§6.3, matching gen-delivery's documented contract "`bindings.node` IS the resolved
+  # instance") ─
   # The successor compose does not project `aspects`/`hosts`: the settlement assigns them to
   # gen-delivery, whose realization predicate reads the key-category DECLARATION (`cnf`) — a value
   # this module's option surface does not carry and a compose result cannot reach. So the SYSTEMS
@@ -183,7 +200,7 @@ let
   # (`host.aspects`). `selectHosts` names WHICH resolved attrset holds the host instances; this
   # module applies the default projection (`values.hosts or { }`) — a nested registry layout is
   # the lower-level API's territory. Yields
-  #   { <host> = { bindings = { host = <resolved instance>; }; classes = { <class> = [ <deferredModule> ]; }; }; }
+  #   { <host> = { bindings = { node = <resolved instance>; }; classes = { <class> = [ <deferredModule> ]; }; }; }
   # PURE — no nixpkgs; the deferredModules stay unforced (opaque) until the terminal imports them.
   projectHosts =
     selectHosts: values: aspects:
@@ -213,7 +230,7 @@ let
         in
         {
           bindings = {
-            host = inst;
+            node = inst;
           };
           classes = builtins.listToAttrs (
             map (c: {
@@ -234,21 +251,50 @@ let
     hosts = projectHosts (values: values.hosts or { }) composedCore.values aspects;
   };
 
-  # The effective terminal registry `realize` consumes: the consumer's `gen.terminals`, plus a default
+  # ── THE TERMINAL BRIDGE (INTERIM — dies with this module at the ADR-0027 replacement) ─────
+  # gen-delivery's fold calls a terminal FUNCTION; the successor constructors (gen-bind's crossing
+  # adapter set) return a Terminal RECORD `{ adapter, locateConfig }` driven by the crossing's
+  # `close`. The crossing performs this walk for crossing consumers; the hub performs it for the
+  # degenerate one-member case, in `close`'s own order (bindFormals, then wrapUnit). `name` is
+  # absorbed unused (as the retired terminal absorbed it); `passthrough` is not forwarded because
+  # the carried projection never emits one (a future projection that does forwards it here — one
+  # line, and gen-bind's spine-read shadow refusal then governs). `locateConfig` rides the record
+  # for the crossing's `close`, not for the fold — this bridge does not consume it.
+  terminalOf =
+    record: args:
+    let
+      a = record.adapter { inherit (args) extent extraModules; };
+    in
+    a.wrapUnit (a.bindFormals args.bindings args.modules) [ ];
+
+  # The effective terminal registry the fold consumes: the consumer's `gen.terminals`, plus a default
   # `nixos` terminal wired to `gen.nixpkgs` UNLESS `gen.nixpkgs` is null or the consumer already
   # supplied their own `nixos` terminal (in which case theirs wins). A consumer replacing terminals
   # entirely (custom classes, `gen.nixpkgs = null`) gets exactly their registry — no default nixos.
+  # The default is the owed consumer-side reconstruction of the retired `nixosSystem` sugar (corpus
+  # G1): the substrate names no host builder, so the consumer's evaluator is threaded here.
   terminals =
     cfg.terminals
     // lib.optionalAttrs (cfg.nixpkgs != null && !(cfg.terminals ? nixos)) {
-      nixos = genFlake.terminals.nixosSystem { nixpkgs = cfg.nixpkgs; };
+      nixos = terminalOf (
+        genBind.crossing.mkSystemTerminal {
+          evaluator = cfg.nixpkgs.lib.nixosSystem;
+          locateConfig = a: a.config;
+        }
+      );
     };
 
-  # The class-major realize result (`{ <class>.<host> = artifact; }`). Reads only `composed`, the
-  # terminals above, and per-host extras — never the injected/built config below, so no cycle. Shared
-  # by the `gen.realized` handle and `flake.nixosConfigurations`.
-  realized = genFlake.realize {
-    inherit composed terminals;
+  # The class-major realize result (`{ <class>.<host> = artifact; }`) — gen-delivery's layered fold
+  # over the carried projection. Reads only `composed`, the terminals above, and per-host extras —
+  # never the injected/built config below, so no cycle. Shared by the `gen.realized` handle and
+  # `flake.nixosConfigurations`. The hub passes no `bindings`/`refinements`/`layerOrder`: the
+  # interim module grows no contract, and a consumer wanting the layered surface uses gen-delivery
+  # directly.
+  realized = genDelivery.realize {
+    projected = {
+      nodes = composed.hosts;
+    };
+    inherit terminals;
     extraModules = cfg.extraModules;
   };
 in
@@ -280,10 +326,16 @@ in
 
     inject = mkOption {
       type = types.attrsOf types.raw;
-      # The default REUSES `injectArgs` (the pure query surface): its `_module.args` attrset is
-      # exactly `{ genValues = composed.values; }`. The flakeModule then spreads that same attrset
-      # across the top-level (always) and perSystem (opt-in) arg scopes below.
-      default = (genFlake.injectArgs composed)._module.args;
+      # The default is the successor's REAL interface, inlined: gen-bind's `injectAdapter`
+      # (crossing-adapter-set.nix, the crossing-side successor of record for module-system targets)
+      # rules the retired `injectArgs` module wrapper vestigial — every live consumer read
+      # `._module.args` straight back out — so the `AttrsOf Value` is the interface, and THIS
+      # module is the arg-environment writer (`config._module.args = cfg.inject` below is the
+      # `(Formals, Substrate)` placement one level up). Wrapping through a module here would
+      # re-introduce the wrapper the successor retired.
+      default = {
+        genValues = composedCore.values;
+      };
       defaultText = lib.literalExpression "{ genValues = <the resolved gen config values>; }";
       description = ''
         The resolved gen VALUES to inject as consumer module args, keyed by arg NAME. Defaults to
@@ -328,15 +380,22 @@ in
     };
 
     terminals = mkOption {
-      # `raw`: each value is a terminal FUNCTION (the realize contract), fed to the pure fold — not a
-      # nixpkgs module. A default `nixos` terminal is merged in from `nixpkgs` below unless overridden.
+      # `raw`: each value is a terminal FUNCTION (gen-delivery's realize contract), fed to the pure
+      # fold — not a nixpkgs module. A default `nixos` terminal is merged in from `nixpkgs` below
+      # unless overridden.
       type = types.attrsOf types.raw;
       default = { };
       description = ''
-        The class-keyed terminal registry `realize` consumes: `{ <class> = <terminal>; }`. A default
-        `nixos` terminal (`terminals.nixosSystem { nixpkgs = config.gen.nixpkgs; }`) is added unless
-        `gen.nixpkgs` is null or this set already carries a `nixos` terminal. Read the realized
-        artifacts back off `gen.realized.<class>` to wire non-nixos classes into flake outputs.
+        The class-keyed terminal registry gen-delivery's `realize` consumes:
+        `{ <class> = <terminal>; }`. Each terminal is a function of one call-record per node:
+        `{ name, modules, bindings, extent, extraModules }` (plus `passthrough` iff the node's
+        projection entry carries one — the carried projection here never emits it).
+        `bindings.node` is the resolved instance; `extent` is this class's realized set itself (a
+        lazy cross-node accessor whose spine is the class's node keys). A default `nixos` terminal
+        (gen-bind's `mkSystemTerminal` over `config.gen.nixpkgs.lib.nixosSystem`, bridged to this
+        contract) is added unless `gen.nixpkgs` is null or this set already carries a `nixos`
+        terminal. Read the realized artifacts back off `gen.realized.<class>` to wire non-nixos
+        classes into flake outputs.
       '';
     };
 
@@ -365,7 +424,7 @@ in
       readOnly = true;
       internal = true;
       default = realized;
-      defaultText = lib.literalExpression "realize { inherit composed terminals; extraModules = config.gen.extraModules; }";
+      defaultText = lib.literalExpression "genDelivery.realize { projected = { nodes = <the carried hosts projection>; }; inherit terminals; extraModules = config.gen.extraModules; }";
       description = ''
         The full class-major realize result (`{ <class>.<host> = artifact; }`) over `gen.terminals`.
         `flake.nixosConfigurations` is `realized.nixos or { }`; a consumer maps any other class off
