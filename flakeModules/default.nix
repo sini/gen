@@ -128,7 +128,7 @@ let
     specialArgs = genLibs // cfg.specialArgs;
   };
 
-  # ── THE CARRIED PROJECTION (INTERIM CARRY, content-identical from gen-flake lib/compose.nix) ─
+  # ── THE CARRIED PROJECTION (INTERIM CARRY, code-identical from gen-flake lib/compose.nix) ─
   # The successor compose does not project `aspects`/`hosts`: the settlement assigns them to
   # gen-delivery, whose realization predicate reads the key-category DECLARATION (`cnf`) — a value
   # this module's option surface does not carry and a compose result cannot reach. So the SYSTEMS
