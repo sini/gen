@@ -112,6 +112,7 @@
         "gen-settings": "gen-settings",
         "gen-types": "gen-types_9",
         "gen-view": "gen-view",
+        "import-tree": "import-tree_2",
         "nixpkgs": [
           "nixpkgs"
         ]
@@ -741,7 +742,7 @@
         "git-hooks-nix": [
           "git-hooks-nix"
         ],
-        "import-tree": "import-tree_2",
+        "import-tree": "import-tree_3",
         "nix-unit": "nix-unit",
         "nixpkgs": [
           "nixpkgs"
@@ -824,11 +825,11 @@
         "gen-prelude": "gen-prelude_28"
       },
       "locked": {
-        "lastModified": 1787004621,
-        "narHash": "sha256-boy0XQL455KQtWpeYn/I8/nQWO0+MwjV5kF0ucCYSHA=",
+        "lastModified": 1787708623,
+        "narHash": "sha256-3tLpw3IWBIjCpEuNohEmRv8s/hdYGUhM2pW2+rjmi0o=",
         "owner": "sini",
         "repo": "gen-memo",
-        "rev": "cfa91b3a27fa0fb8557c10a2539313b720c89712",
+        "rev": "cd3206cdb2a6dbd309f716448aaa284fdaf916cf",
         "type": "github"
       },
       "original": {
@@ -2253,6 +2254,22 @@
       }
     },
     "import-tree_2": {
+      "locked": {
+        "lastModified": 1783029876,
+        "narHash": "sha256-iI88R3wHz8wTKQb5orvpc51L/Xr64AJyxid/0MKa/b8=",
+        "owner": "denful",
+        "repo": "import-tree",
+        "rev": "a164a12202f58eb67559bd33b5592f20660d9baf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "denful",
+        "repo": "import-tree",
+        "rev": "a164a12202f58eb67559bd33b5592f20660d9baf",
+        "type": "github"
+      }
+    },
+    "import-tree_3": {
       "locked": {
         "lastModified": 1749958812,
         "narHash": "sha256-zdo2CwxdUK3FpQjLBjkJnXvl7OPoTpjdW5OvOzQffoQ=",

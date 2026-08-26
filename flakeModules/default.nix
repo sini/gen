@@ -13,6 +13,13 @@
 # additions are this header and the `genFlake` binding in the `let` (marked there), which replaces the
 # partial application the source got from gen-flake's own `flake.nix`.
 #
+# SINCE AMENDED AT THE SUCCESSOR-COMPOSE RE-POINT (ADR-0031 F2's "compose S2 core → S2" row):
+# `compose` no longer reads off gen-flake — the successor landed at this hub (lib/compose.nix,
+# exposed as `gen.lib.compose`), and this module now performs the constructor merge and the tree
+# loading itself and carries the aspects/hosts projection verbatim from the dissolving compose
+# (both marked in the `let`). The body is otherwise the F1 carry; `injectArgs`/`realize`/
+# `terminals` still read off gen-flake pending their own successors' consumer re-points.
+#
 # Its two MEASURED defects travel with it UNFIXED and are beaded at den-hoag-es9g. They are deliberate
 # carry-over, never accepted behavior:
 #   1. the class-name hardcode — `flake.nixosConfigurations = realized.nixos or { }` names the `nixos`
@@ -75,24 +82,156 @@
   ...
 }:
 let
-  # THE REHOME BINDING (added here; everything below it is carried content-identical). The source was
-  # a function of the constructed gen-flake lib, applied by gen-flake's own `flake.nix`. The hub
-  # exports module PATHS and evaluates no flake-parts of its own, so the module binds its own
-  # dependency at CONSUMER eval time off the hub roster — the same shape as `flakeModules/genLibs.nix`.
-  # `flake` is the roster key for gen-flake (lib/mkGenLibs.nix), and the value it names carries exactly
-  # the four surfaces dereferenced below: compose / injectArgs / realize / terminals.
-  genFlake = (inputs.gen.lib.mkGenLibs { inherit lib; }).flake;
+  # THE REHOME BINDING (added here; adjusted at the successor-compose re-point — see the header).
+  # The source was a function of the constructed gen-flake lib, applied by gen-flake's own
+  # `flake.nix`. The hub exports module PATHS and evaluates no flake-parts of its own, so the
+  # module binds its dependencies at CONSUMER eval time off the hub roster — the same shape as
+  # `flakeModules/genLibs.nix`. `flake` is the roster key for gen-flake (lib/mkGenLibs.nix); the
+  # surfaces still read off it below are `injectArgs` / `realize` / `terminals` — their successors
+  # are the crossing adapter's and gen-delivery's, and re-pointing their consumers is that work,
+  # not this re-point's.
+  roster = inputs.gen.lib.mkGenLibs { inherit lib; };
+  genFlake = roster.flake;
 
   inherit (lib) mkOption types;
   cfg = config.gen;
 
+  # ── THE SUCCESSOR-COMPOSE RE-POINT ──────────────────────────────────────────────────────────
+  # `compose` is the hub's own successor construct (`gen.lib.compose`, lib/compose.nix). It takes
+  # `specialArgs` CALLER-TOTAL and has no tree formal, so the two acts gen-flake's compose
+  # performed internally are performed HERE, as this framework surface's own wiring:
+  #   * the CONSTRUCTOR MERGE — `genLibs // cfg.specialArgs`, the constructor set handed to every
+  #     module of a hub-fronted gen tree (carried from gen-flake compose.nix's `genLibs` constant;
+  #     the consumer's specialArgs merge LAST so a caller can override or extend the set);
+  #   * TREE LOADING — the import-tree fork's bare path list (`(addPath dir).files`); gen-merge
+  #     imports path leaves natively. The fork's pin lives at the hub root flake.nix.
+  compose = inputs.gen.lib.compose;
+  importTree = inputs.gen.inputs.import-tree;
+
+  genLibs = {
+    genMerge = roster.merge;
+    genSchema = roster.schema;
+    genAspects = roster.aspects;
+    genTypes = roster.types;
+    genPrelude = roster.prelude;
+  };
+
+  treeModules = if cfg.tree == null then [ ] else (importTree.addPath cfg.tree).files;
+
   # The ONE compose for this flake — driven by the consumer's `gen.tree`/`gen.modules`. Pure
   # (gen-merge's byte-mode evalModuleTree); reads only `tree`/`modules`/`specialArgs`, never any of
-  # the injected/built config below, so it introduces no fixpoint cycle.
-  composed = genFlake.compose {
-    tree = cfg.tree;
-    modules = cfg.modules;
-    specialArgs = cfg.specialArgs;
+  # the injected/built config below, so it introduces no fixpoint cycle. The successor result
+  # carries `values`/`provenance`/`override`; the `aspects`/`hosts` projections this module's
+  # SYSTEMS half consumes are re-attached below (the carried projection).
+  composedCore = compose {
+    modules = treeModules ++ cfg.modules;
+    specialArgs = genLibs // cfg.specialArgs;
+  };
+
+  # ── THE CARRIED PROJECTION (INTERIM CARRY, content-identical from gen-flake lib/compose.nix) ─
+  # The successor compose does not project `aspects`/`hosts`: the settlement assigns them to
+  # gen-delivery, whose realization predicate reads the key-category DECLARATION (`cnf`) — a value
+  # this module's option surface does not carry and a compose result cannot reach. So the SYSTEMS
+  # half of this interim module keeps the projection it has always shipped, carried VERBATIM from
+  # the dissolving compose so consumer behaviour is preserved, and it dies with this module at the
+  # ADR-0027 replacement. The structural-predicate defect it carries is MEASURED and beaded
+  # (den-hoag-jwm8 / den-hoag-t3q9 — the ADR-0028 Rider gap the carried comment below describes):
+  # deliberate carry-over in the same standing as the two den-hoag-es9g defects above, never
+  # accepted behaviour. The fix is gen-delivery's declared-category predicate, adopted when this
+  # module's replacement takes a declaration input. One shape delta, stated: `gen.composed`'s
+  # `override` handle returns the SUCCESSOR projection (no aspects/hosts re-attach on a
+  # re-compose); this module reads only the base compose.
+  #
+  # The class fields of a flat-registry aspect entry: keys whose value is a deferredModule (an
+  # attrset carrying an `imports` LIST). Structural — no hardcoded class-name list, so any class
+  # registered via `mkAspectSchema { keySemantics.<c>.category = "class"; }` is discovered. A class
+  # DECLARED but never given content reads `null` (gen-aspects represents absence rather than
+  # fabricating an empty deferredModule), so `isAttrs` below excludes THAT case. Reading `? imports`
+  # on an unforced deferredModule is cheap and does NOT force the class body.
+  #
+  # ★★ THE PROJECTION IS NOT CONTENT-DRIVEN. The filter discovers every declared class but not
+  # ONLY classes: it never consults a key's DECLARED CATEGORY, so a NON-class key whose value
+  # happens to carry an `imports` list is classified as a delivery class and `realize` calls its
+  # terminal for it. Measured on both non-class categories against the locked gen-aspects, with
+  # controls and a firing tripwire — gen-flake AGENTS.md's trap table carries the two rows and the
+  # figures. The exclusion that DOES hold is the contentless-class one above, and it rests on
+  # gen-aspects' representation choice rather than on this predicate.
+  classFieldsOf =
+    entry:
+    builtins.filter (
+      k:
+      let
+        v = entry.${k};
+      in
+      builtins.isAttrs v && v ? imports && builtins.isList v.imports
+    ) (builtins.attrNames entry);
+
+  # `dedup` — order-preserving unique over a string list, builtins-only (listToAttrs collapses dups).
+  dedup =
+    xs:
+    builtins.attrNames (
+      builtins.listToAttrs (
+        map (x: {
+          name = x;
+          value = null;
+        }) xs
+      )
+    );
+
+  # `projectHosts` — the host-keyed reshape of the FLAT aspect registry. For each host instance,
+  # gather the deferredModules of each class across the aspects the host declares membership in
+  # (`host.aspects`). `selectHosts` names WHICH resolved attrset holds the host instances; this
+  # module applies the default projection (`values.hosts or { }`) — a nested registry layout is
+  # the lower-level API's territory. Yields
+  #   { <host> = { bindings = { host = <resolved instance>; }; classes = { <class> = [ <deferredModule> ]; }; }; }
+  # PURE — no nixpkgs; the deferredModules stay unforced (opaque) until the terminal imports them.
+  projectHosts =
+    selectHosts: values: aspects:
+    let
+      hosts = selectHosts values;
+      _hostsCheck =
+        if builtins.isAttrs hosts then
+          null
+        else
+          throw "compose: selectHosts must return an attrset of host instances ({ <host> = <instance>; }), got ${builtins.typeOf hosts}";
+    in
+    builtins.seq _hostsCheck (
+      builtins.mapAttrs (
+        _hostName: inst:
+        let
+          memberAspects = builtins.filter (a: aspects ? ${a}) (inst.aspects or [ ]);
+          classNames = dedup (builtins.concatMap (a: classFieldsOf aspects.${a}) memberAspects);
+          collectClass =
+            class:
+            builtins.concatMap (
+              a:
+              let
+                entry = aspects.${a};
+              in
+              if builtins.elem class (classFieldsOf entry) then [ entry.${class} ] else [ ]
+            ) memberAspects;
+        in
+        {
+          bindings = {
+            host = inst;
+          };
+          classes = builtins.listToAttrs (
+            map (c: {
+              name = c;
+              value = collectClass c;
+            }) classNames
+          );
+        }
+      ) hosts
+    );
+
+  # The flat aspect registry (keyed by aspect path). Absent an `aspects` surface, empty.
+  aspects =
+    if composedCore.values ? aspects then roster.aspects.flatten composedCore.values.aspects else { };
+
+  composed = composedCore // {
+    inherit aspects;
+    hosts = projectHosts (values: values.hosts or { }) composedCore.values aspects;
   };
 
   # The effective terminal registry `realize` consumes: the consumer's `gen.terminals`, plus a default
