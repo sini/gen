@@ -124,8 +124,9 @@ exact thresholds are retuned in lockstep with engine changes and kept in one pla
 [BENCHMARKS.md](BENCHMARKS.md) for the numbers, [`ci/README.md`](ci/README.md) for the update policy.
 
 The
-[3-way comparison](BENCHMARKS.md#3-way-real-flake-comparison--gen-flake-vs-flake-parts-vs-adios-flake)
-puts [gen-flake](https://github.com/sini/gen-flake) head-to-head with flake-parts and adios-flake under
+[3-way comparison](BENCHMARKS.md#3-way-real-flake-comparison--gen-lib-vs-flake-parts-vs-adios-flake)
+puts the hub's `gen.lib` (the `gen-lib` column; formerly gen-flake, re-targeted at the hub
+consolidation) head-to-head with flake-parts and adios-flake under
 a drvPath-equivalence oracle (`nix run ./ci#flake-compare`, 15/15 byte-identical). Fleet-scale dedup
 numbers are measured in a separate lab ([hola](https://github.com/sini/hola)) and frozen as gates; this
 hub carries the arithmetic tooth over the committed baselines. `nix run ./ci#fleet-consistency`

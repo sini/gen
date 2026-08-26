@@ -54,55 +54,65 @@ A `hybrid` stack — the gen-merge engine driven with **real** nixpkgs `lib.type
 
 The workloads are not the same, and this is the point: adios-flake measures a **whole real flake** — nixpkgs import and upstream input processing included — where its framework speedup lands at ~1.3–1.4×. gen's 1.6–2.8× is on **isolated composition shapes** with the terminal plane excluded. The gap between the two quantifies terminal-plane dilution: at whole-flake scale the framework's share of eval work shrinks, consistent with the hola finding that ~94% of single-host eval cost is terminal-plane (nixpkgs closure construction), not composition.
 
-## 3-way real-flake comparison — gen-flake vs flake-parts vs adios-flake
+## 3-way real-flake comparison — gen-lib vs flake-parts vs adios-flake
 
-The section above cites adios's *published* numbers. This is our own head-to-head, run under adios's methodology so the shapes are directly comparable: one representative flake (three trivial packages + one devShell + one formatter, × 3 systems) expressed three ways — flake-parts, adios-flake, and gen-flake — under `nix eval` + `NIX_SHOW_STATS`, **5 reps per cell, flake eval-cache disabled, the same pinned nixpkgs across all three variants**. Regenerate: `nix run ./ci#flake-compare` (folded here without re-normalization).
+The section above cites adios's *published* numbers. This is our own head-to-head, run under adios's methodology so the shapes are directly comparable: one representative flake (three trivial packages + one devShell + one formatter, × 3 systems) expressed three ways — flake-parts, adios-flake, and the gen hub's `gen.lib` (the **gen-lib** column: a bare caller of `gen.lib.compose`, the successor construct) — under `nix eval` + `NIX_SHOW_STATS`, **5 reps per cell, flake eval-cache disabled, the same pinned nixpkgs across all three variants**. Regenerate: `nix run ./ci#flake-compare` (folded here without re-normalization).
+
+**Re-baseline note (hub consolidation, 2026-08-26):** the third column targeted gen-flake (`gen-flake.lib.compose`) until the hub consolidation re-pointed it at `gen.lib` — the column was renamed **gen-flake → gen-lib** and its counters re-measured against the hub at `8dd9fda` (pre-release; the counters were expected to move and did, in the small — the hub route adds the roster/constructor wiring the bare caller performs itself. **drvPath equivalence, the oracle, held 15/15 across the re-target.**) The third column's old → new, per benchmark (fcalls / prim ops / thunks / GC):
+
+| Benchmark             | old (gen-flake)                         | new (gen-lib)                           |
+| :-------------------- | :-------------------------------------- | :-------------------------------------- |
+| packages (1 system)   | 81,587 / 57,144 / 185,097 / 41.6 MiB    | 81,708 / 57,207 / 185,817 / 42.1 MiB    |
+| formatter (3 systems) | 237,842 / 141,749 / 595,426 / 132.4 MiB | 237,970 / 141,816 / 596,075 / 132.9 MiB |
+| devShells (3 systems) | 255,528 / 150,860 / 625,789 / 135.3 MiB | 255,658 / 150,926 / 626,452 / 135.8 MiB |
+
+Every counter moved up slightly (+121–130 fcalls, +63–67 prim ops, +649–720 thunks, +0.5 MiB GC per benchmark — attr lookups +130–135, attrset updates +88–96, //-copies +223–282); no counter improved. The column stays the lowest of the three on fcalls / prim ops / thunks throughout.
 
 Two honest caveats frame the read. First, the deltas are **small** next to adios's 28–30% because this is a light flake dominated by the shared nixpkgs terminal: the `//`-copies counter (~1.1M for the 1-system output, ~3.96M for the 3-system ones) is byte-identical across all three variants — that mass is the nixpkgs import every variant pays equally, so the framework's share is diluted. This is the same terminal-plane dilution the section above quantifies; adios's 28–30% came from a 36-input flake where the framework share is larger. Second, **cpu is within noise** at this size — the deterministic **counters are the signal**, and **drvPath equivalence is the oracle**.
 
 ### Summary — median CPU time
 
-| Benchmark                        | flake-parts | adios-flake | gen-flake |
-| :------------------------------- | ----------: | ----------: | --------: |
-| packages.x86_64-linux (1 system) |      0.153s |      0.150s |    0.166s |
-| formatter (3 systems)            |      0.331s |      0.321s |    0.321s |
-| devShells (3 systems)            |      0.345s |      0.352s |    0.345s |
+| Benchmark                        | flake-parts | adios-flake | gen-lib |
+| :------------------------------- | ----------: | ----------: | ------: |
+| packages.x86_64-linux (1 system) |      0.186s |      0.366s |  0.332s |
+| formatter (3 systems)            |      0.916s |      0.900s |  0.397s |
+| devShells (3 systems)            |      0.503s |      0.491s |  0.822s |
 
 ### packages.x86_64-linux (1 system)
 
-| Metric             | flake-parts | adios-flake | gen-flake |
+| Metric             | flake-parts | adios-flake |   gen-lib |
 | :----------------- | ----------: | ----------: | --------: |
-| Function calls     |      90,979 |      84,009 |    81,587 |
-| Prim op calls      |      61,934 |      61,910 |    57,144 |
-| Thunks created     |     200,245 |     187,663 |   185,097 |
-| Attr lookups       |      59,504 |      52,542 |    53,068 |
-| Attrset updates    |      27,829 |      26,858 |    27,085 |
-| Values copied (//) |   1,113,420 |   1,111,963 | 1,112,090 |
-| GC heap            |    42.4 MiB |    41.8 MiB |  41.6 MiB |
+| Function calls     |      90,979 |      84,009 |    81,708 |
+| Prim op calls      |      61,934 |      61,910 |    57,207 |
+| Thunks created     |     200,245 |     187,663 |   185,817 |
+| Attr lookups       |      59,504 |      52,542 |    53,203 |
+| Attrset updates    |      27,829 |      26,858 |    27,181 |
+| Values copied (//) |   1,113,420 |   1,111,963 | 1,112,372 |
+| GC heap            |    42.4 MiB |    41.8 MiB |  42.1 MiB |
 
 ### formatter (3 systems)
 
-| Metric             | flake-parts | adios-flake | gen-flake |
+| Metric             | flake-parts | adios-flake |   gen-lib |
 | :----------------- | ----------: | ----------: | --------: |
-| Function calls     |     253,165 |     241,731 |   237,842 |
-| Prim op calls      |     149,592 |     147,146 |   141,749 |
-| Thunks created     |     618,624 |     599,795 |   595,426 |
-| Attr lookups       |     138,881 |     129,030 |   128,765 |
-| Attrset updates    |      66,321 |      65,131 |    65,180 |
-| Values copied (//) |   3,965,501 |   3,963,635 | 3,963,721 |
-| GC heap            |   133.7 MiB |   132.7 MiB | 132.4 MiB |
+| Function calls     |     253,165 |     241,731 |   237,970 |
+| Prim op calls      |     149,592 |     147,146 |   141,816 |
+| Thunks created     |     618,624 |     599,795 |   596,075 |
+| Attr lookups       |     138,881 |     129,030 |   128,895 |
+| Attrset updates    |      66,321 |      65,131 |    65,268 |
+| Values copied (//) |   3,965,501 |   3,963,635 | 3,963,944 |
+| GC heap            |   133.7 MiB |   132.7 MiB | 132.9 MiB |
 
 ### devShells (3 systems)
 
-| Metric             | flake-parts | adios-flake | gen-flake |
+| Metric             | flake-parts | adios-flake |   gen-lib |
 | :----------------- | ----------: | ----------: | --------: |
-| Function calls     |     269,458 |     259,364 |   255,528 |
-| Prim op calls      |     157,910 |     156,223 |   150,860 |
-| Thunks created     |     646,974 |     630,071 |   625,789 |
-| Attr lookups       |     148,325 |     139,345 |   139,120 |
-| Attrset updates    |      71,754 |      70,625 |    70,674 |
-| Values copied (//) |   3,989,828 |   3,988,162 | 3,988,248 |
-| GC heap            |   136.4 MiB |   135.6 MiB | 135.3 MiB |
+| Function calls     |     269,458 |     259,364 |   255,658 |
+| Prim op calls      |     157,910 |     156,223 |   150,926 |
+| Thunks created     |     646,974 |     630,071 |   626,452 |
+| Attr lookups       |     148,325 |     139,345 |   139,252 |
+| Attrset updates    |      71,754 |      70,625 |    70,765 |
+| Values copied (//) |   3,989,828 |   3,988,162 | 3,988,488 |
+| GC heap            |   136.4 MiB |   135.6 MiB | 135.8 MiB |
 
 ### Derivation equivalence (drvPath across all three variants)
 
@@ -114,7 +124,7 @@ Two honest caveats frame the read. First, the deltas are **small** next to adios
 | devShells.<sys>.default |  identical   |   identical   |   identical   |
 | formatter.<sys>         |  identical   |   identical   |   identical   |
 
-gen-flake carries the **lowest** function-call, prim-op, and thunk counts of the three on every benchmark (packages: 81,587 fcalls vs adios 84,009 vs flake-parts 90,979; prim ops 57,144 vs 61,910 vs 61,934), and the **drvPath equivalence holds 15/15** — all five outputs × three systems build byte-identically across the frameworks. The counter wins are on identical build products, not a cheaper different result.
+gen-lib carries the **lowest** function-call, prim-op, and thunk counts of the three on every benchmark (packages: 81,708 fcalls vs adios 84,009 vs flake-parts 90,979; prim ops 57,207 vs 61,910 vs 61,934), and the **drvPath equivalence holds 15/15** — all five outputs × three systems build byte-identically across the frameworks. The counter wins are on identical build products, not a cheaper different result.
 
 ## Fleet-scale results
 

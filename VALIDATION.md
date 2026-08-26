@@ -62,7 +62,7 @@ Every proof, its one command, and how it fails. The rest of this document expand
 | Config-thunk deferral                                                           | `nix-unit --flake ./ci#tests.deferral` (gen-merge)                 | a marker forces early, or diverges from nixpkgs at the terminal                                                                                                           |
 | Migrated demos (canaries)                                                       | each demo's `nix flake check` / eval                               | a re-hosted demo stops producing byte-identical output                                                                                                                    |
 | Performance (parity + ratio + linearity)                                        | `nix run ./ci#perf-bench`                                          | a cell mis-digests, a ratio erodes past a win-gate, or growth is super-linear — over 12 of the 14 matrix rows; the 2 `aspects` rows are pure-only (§1 note)               |
-| 3-way comparison (drvPath equivalence)                                          | `nix run ./ci#flake-compare`                                       | any output builds differently across flake-parts / adios / gen-flake                                                                                                      |
+| 3-way comparison (drvPath equivalence)                                          | `nix run ./ci#flake-compare`                                       | any output builds differently across flake-parts / adios / gen-lib (`gen.lib`)                                                                                            |
 | Fleet-scale dedup gates                                                         | `nix run ./ci#fleet-gates` (hola)                                  | a byte gate flips, a saving no longer equals its arithmetic, or a floor is breached                                                                                       |
 | Fleet-number consistency (in-repo)                                              | `nix run ./ci#fleet-consistency`                                   | a cited fleet number drifts from its own arithmetic (pin / re-derivation / digest tie / floor)                                                                            |
 
@@ -500,10 +500,12 @@ re-eval vs cold — the warm path must build ≤ 0.30× the cold thunks *and* al
 the perf twin of gen-flake's standing override tooth in §2).
 
 The **3-way comparison** (`nix run ./ci#flake-compare`) is a separate hub gate: one representative
-flake expressed in gen-flake vs flake-parts vs adios-flake, run under adios's `NIX_SHOW_STATS`
-methodology, with a first-class **drvPath-equivalence** check — all **5 outputs × 3 systems = 15**
-must build byte-identically across the three frameworks (they do; gen-flake carries the lowest
-evaluator counters). This is the correctness oracle behind the 3-way counter tables in BENCHMARKS.
+flake expressed in gen-lib (the hub's `gen.lib`, consumed as a bare caller of `gen.lib.compose`;
+the column targeted gen-flake until the hub consolidation) vs flake-parts vs adios-flake, run under
+adios's `NIX_SHOW_STATS` methodology, with a first-class **drvPath-equivalence** check — all
+**5 outputs × 3 systems = 15** must build byte-identically across the three frameworks (they do;
+gen-lib carries the lowest function-call, prim-op, and thunk counts). This is the correctness
+oracle behind the 3-way counter tables in BENCHMARKS.
 
 A gate breach exits non-zero with the offending table. The exact thresholds — retuned in lockstep
 with engine changes, so kept in one place — and the full baseline numbers live in
