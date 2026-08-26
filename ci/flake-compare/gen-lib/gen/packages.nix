@@ -1,10 +1,11 @@
 # gen definition module: the package specs as a typed gen-schema registry (PURE — no nixpkgs).
 #
 # A `pkg` kind (each instance = a builder tag + its script/file text) and an instance registry of the
-# three comparison packages. `compose` (gen-flake) resolves this via gen-merge's byte-mode
-# `evalModuleTree` with zero nixpkgs; the flake's per-system data terminal then maps each resolved
-# spec to the SAME `writeShellScriptBin` / `writeText` derivation the flake-parts/ and adios/ variants
-# build directly. Mirrors the gen-schema instance idiom (gen-flake ci fixture tree/schema.nix).
+# three comparison packages. `gen.lib.compose` (the hub successor compose) resolves this via
+# gen-merge's byte-mode `evalModuleTree` with zero nixpkgs; the flake's per-system data terminal
+# then maps each resolved spec to the SAME `writeShellScriptBin` / `writeText` derivation the
+# flake-parts/ and adios/ variants build directly. Mirrors the gen-schema instance idiom
+# (originally modeled on gen-flake's ci fixture tree/schema.nix).
 {
   config,
   genSchema,

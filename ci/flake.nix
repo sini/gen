@@ -326,7 +326,7 @@
           };
 
           # ── flake-compare bench — the 3-way real-flake comparison ──
-          # `nix run ./ci#flake-compare` — evaluates ci/flake-compare/{flake-parts,adios,gen-flake}/
+          # `nix run ./ci#flake-compare` — evaluates ci/flake-compare/{flake-parts,adios,gen-lib}/
           # (the SAME outputs three ways) under adios-flake's BENCHMARKS.md methodology (5 nix eval
           # runs, NIX_SHOW_STATS counters, eval-cache off), prints a 3-way counter table + drvPath
           # equivalence. Report-only: pins the neighbour frameworks by rev but gates NOTHING (their
@@ -495,7 +495,7 @@
               }
               {
                 name = "flake-compare";
-                help = "Run the 3-way real-flake comparison bench (gen-flake vs flake-parts vs adios-flake)";
+                help = "Run the 3-way real-flake comparison bench (gen-lib vs flake-parts vs adios-flake)";
                 command = ''
                   nix run "$FLAKE_ROOT/ci#flake-compare"
                 '';

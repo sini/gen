@@ -1,7 +1,7 @@
 {
   # flake-parts variant of the 3-way comparison flake (ci/flake-compare).
   #
-  # The SAME outputs as the adios/ and gen-flake/ siblings — three trivial packages, one devShell,
+  # The SAME outputs as the adios/ and gen-lib/ siblings — three trivial packages, one devShell,
   # one formatter, across x86_64-linux / aarch64-linux / x86_64-darwin — expressed idiomatically with
   # flake-parts' `perSystem`. The derivation-constructing expressions (writeShellScriptBin / writeText
   # / mkShell) are byte-identical across all three variants, so `flake-compare.sh`'s drvPath
@@ -29,7 +29,7 @@
       perSystem =
         { system, pkgs, ... }:
         {
-          # Bare import — identical pkgs construction to the adios/ and gen-flake/ variants.
+          # Bare import — identical pkgs construction to the adios/ and gen-lib/ variants.
           _module.args.pkgs = import nixpkgs { inherit system; };
 
           packages = {

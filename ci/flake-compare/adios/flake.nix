@@ -1,7 +1,7 @@
 {
   # adios-flake variant of the 3-way comparison flake (ci/flake-compare).
   #
-  # The SAME outputs as the flake-parts/ and gen-flake/ siblings, expressed idiomatically with
+  # The SAME outputs as the flake-parts/ and gen-lib/ siblings, expressed idiomatically with
   # adios-flake's `mkFlake` + `perSystem`. adios-flake replaces flake-parts' NixOS-module-system
   # output assembly with adios's direct function dispatch + memoized eval tree — the thing its own
   # published BENCHMARKS.md measures at 28-30% less evaluator cost than flake-parts on a real flake.

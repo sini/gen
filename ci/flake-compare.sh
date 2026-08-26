@@ -1,7 +1,9 @@
-# flake-compare — 3-way real-flake evaluation bench: gen-flake vs flake-parts vs adios-flake.
+# flake-compare — 3-way real-flake evaluation bench: gen-lib (`gen.lib`, the hub) vs flake-parts
+# vs adios-flake. The third column targeted gen-flake until the hub consolidation re-pointed it at
+# `gen.lib.compose` (column renamed gen-flake → gen-lib; counters re-baselined in BENCHMARKS.md).
 #
 # One representative flake (three trivial packages, one devShell, one formatter, × 3 systems)
-# expressed THREE ways under ci/flake-compare/{flake-parts,adios,gen-flake}/. This driver replicates
+# expressed THREE ways under ci/flake-compare/{flake-parts,adios,gen-lib}/. This driver replicates
 # adios-flake/BENCHMARKS.md's methodology so the numbers are directly comparable with adios's
 # published figures:
 #
@@ -28,7 +30,7 @@ set -uo pipefail
 
 DIR="${FLAKE_COMPARE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/flake-compare" && pwd)}"
 
-VARIANTS=(flake-parts adios gen-flake)
+VARIANTS=(flake-parts adios gen-lib)
 SYSTEMS=(x86_64-linux aarch64-linux x86_64-darwin)
 REPS=5
 
@@ -100,20 +102,20 @@ for out in "${OUTPUTS[@]}"; do
       EQ["$out,$sys"]="ok"
     else
       EQ["$out,$sys"]="DIVERGE"
-      EQ_FAILURES+=("$attr: flake-parts=${paths[0]:-<none>} adios=${paths[1]:-<none>} gen-flake=${paths[2]:-<none>}")
+      EQ_FAILURES+=("$attr: flake-parts=${paths[0]:-<none>} adios=${paths[1]:-<none>} gen-lib=${paths[2]:-<none>}")
     fi
   done
 done
 
 # ── report (adios BENCHMARKS.md table shape, three variant columns) ────────────
 echo
-echo "## flake-compare — 3-way real-flake eval bench (gen-flake vs flake-parts vs adios-flake)"
+echo "## flake-compare — 3-way real-flake eval bench (gen-lib vs flake-parts vs adios-flake)"
 echo
 echo "5 \`nix eval\` runs per cell, \`NIX_SHOW_STATS\`, flake eval-cache disabled; same nixpkgs pinned across all three variants. cpu = median of 5 (evaluator CPU, same-host); counters are deterministic per nix version. Regenerate: \`nix run ./ci#flake-compare\`."
 echo
 echo "### Summary — median CPU time"
 echo
-echo "| Benchmark | flake-parts | adios-flake | gen-flake |"
+echo "| Benchmark | flake-parts | adios-flake | gen-lib |"
 echo "|:---|---:|---:|---:|"
 for row in "${BENCHMARKS[@]}"; do
   label=${row%|*}
@@ -129,7 +131,7 @@ for row in "${BENCHMARKS[@]}"; do
   ATTR=${row#*|}
   echo "### $label"
   echo
-  echo "| Metric | flake-parts | adios-flake | gen-flake |"
+  echo "| Metric | flake-parts | adios-flake | gen-lib |"
   echo "|:---|---:|---:|---:|"
   printf '| CPU time |'; for v in "${VARIANTS[@]}"; do printf ' %.3fs |' "${CPU[$v,$ATTR]}"; done; printf '\n'
   printf '| Function calls |'; for v in "${VARIANTS[@]}"; do printf " %'d |" "${FCALLS[$v,$ATTR]}"; done; printf '\n'
@@ -155,7 +157,7 @@ for out in "${OUTPUTS[@]}"; do
 done
 echo
 if [[ ${#EQ_FAILURES[@]} -eq 0 ]]; then
-  echo "All ${#OUTPUTS[@]} outputs × ${#SYSTEMS[@]} systems produce byte-identical drvPaths across flake-parts / adios-flake / gen-flake — no structural exceptions."
+  echo "All ${#OUTPUTS[@]} outputs × ${#SYSTEMS[@]} systems produce byte-identical drvPaths across flake-parts / adios-flake / gen-lib — no structural exceptions."
 else
   echo "EQUIVALENCE DIVERGENCE — ${#EQ_FAILURES[@]} output(s) differ across variants:"
   printf '  - %s\n' "${EQ_FAILURES[@]}"
