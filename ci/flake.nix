@@ -136,6 +136,14 @@
       # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
+      # ── inject-payload — the permanent O-INJ-2 cell ──
+      # Asserts the MEASURED ADR-0023 (b) ground the crossing's `injectAdapter` declares: a real
+      # `lib.compose` payload still reaches a function transitively (the schema sub-tree's gen
+      # types), with the plain-clean and planted-caught controls in the same run. If a schema
+      # change flips the predicate, this fails and the ADR-0023 disposition re-opens by
+      # construction. `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
+      injectPayload = import ./inject-payload.nix { inherit (inputs) gen; };
+
       # ── direction-of-dependence lint ──
       # ADR-0015's enforcement half: no roster member may declare an input on a HIGHER stratum than
       # its own, under the chain substrate < modules < aspects < framework, save the closed
@@ -175,6 +183,8 @@
         den = denParity;
       };
       flake.lib.mkGenLibsEval = mkGenLibsEval;
+      #   nix eval ./ci#lib.injectPayload.gate --json | jq
+      flake.lib.injectPayload = injectPayload;
       #   nix eval ./ci#lib.direction.report --json | jq
       flake.lib.direction = directionOfDependence;
 
@@ -287,6 +297,36 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the inject-payload check (the permanent O-INJ-2 cell): prints the per-key gate
+          # and FAILS the build if any key is not `true`. A failing key is either the measured
+          # ADR-0023 (b) ground moving (the payload no longer reaches a function — the declared
+          # opt-out's disposition re-opens) or a control gone blind; both are red, because a
+          # tripwire that can no longer fire is not a passing tripwire.
+          mkInjectCheck =
+            name: g:
+            let
+              allOk = builtins.all (k: g.gate.${k} == true) g.gateKeys;
+              failed = builtins.filter (k: g.gate.${k} != true) g.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                results = g.gate;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "INJECT-PAYLOAD PREDICATE MOVED — the ADR-0023 (b) measured ground changed, or a control went blind; the declared opt-out's disposition re-opens" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # ── perf-regression bench (the PERFORMANCE twin of the parity oracles) ──
           # `nix run ./ci#perf-bench` — drives ci/perf-bench.nix (pure vs pinned-nixpkgs stack)
           # through nix-instantiate + NIX_SHOW_STATS and gates on parity / thunk+alloc ratios /
@@ -391,6 +431,7 @@
           checks = {
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
+            inject-payload = mkInjectCheck "inject-payload" injectPayload;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
