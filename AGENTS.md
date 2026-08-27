@@ -61,9 +61,19 @@ Enumeration command (from the hub repo root) and its output:
 nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n == "gen-") (builtins.attrNames (builtins.getFlake (toString ./.)).inputs)'
 ```
 
+<!-- gen-inputs:begin -->
+
 ```json
 ["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
+
+<!-- gen-inputs:end -->
+
+CI-bound (den-hoag-bzcb4): `ci/agents-md-hub-inputs.nix` reads this block back out of the
+committed file between the two markers above and compares it, both directions, against the
+flake's own `gen-*` inputs (`gen.inputs`, filtered by prefix) — so the next hub input reddens
+`nix flake check ./ci` instead of leaving this block to rot silently the way it did once
+(den-hoag-8j5b, 19-vs-21).
 
 ## Exports
 

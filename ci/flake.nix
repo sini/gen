@@ -136,6 +136,14 @@
       # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
+      # ── agents-md-hub-inputs — the AGENTS.md hub-input sheet, CI-bound (den-hoag-bzcb4) ──
+      # Reads AGENTS.md's fenced gen-input enumeration block back out of the committed file and
+      # compares it, both directions, against the flake's own gen-* inputs (`genInputs`, filtered
+      # by prefix) — so a new hub input reddens this instead of leaving the sheet to rot silently
+      # the way it did once (den-hoag-8j5b, 19-vs-21). `.gate`/`.gateKeys` follow the same shape as
+      # every other check below.
+      hubInputSheet = import ./agents-md-hub-inputs.nix { inherit genInputs lib; };
+
       # ── inject-payload — the permanent O-INJ-2 cell ──
       # Asserts the MEASURED ADR-0023 (b) ground the crossing's `injectAdapter` declares: a real
       # `lib.compose` payload still reaches a function transitively (the schema sub-tree's gen
@@ -192,6 +200,8 @@
         den = denParity;
       };
       flake.lib.mkGenLibsEval = mkGenLibsEval;
+      #   nix eval ./ci#lib.hubInputSheet --json | jq
+      flake.lib.hubInputSheet = hubInputSheet;
       #   nix eval ./ci#lib.injectPayload.gate --json | jq
       flake.lib.injectPayload = injectPayload;
       #   nix eval ./ci#lib.declaredContent.gate --json | jq
@@ -276,6 +286,39 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "mkGenLibs WIRING REGRESSION — a lib key failed to evaluate, the roster drifted, or the stratum partition broke" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the agents-md-hub-inputs check: prints the documented/actual roster + the
+          # missing/extra diffs and FAILS the build if the sheet and the flake's own gen-*
+          # inputs disagree in either direction, or on order (byte-for-byte).
+          mkHubInputSheetCheck =
+            name: h:
+            let
+              allOk = builtins.all (k: h.gate.${k} == true) h.gateKeys;
+              failed = builtins.filter (k: h.gate.${k} != true) h.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                inherit (h)
+                  documented
+                  actual
+                  missing
+                  extra
+                  ;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "AGENTS.md HUB-INPUT SHEET DRIFT — the fenced enumeration block no longer matches the flake's own gen-* inputs" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -471,6 +514,7 @@
           checks = {
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
+            agents-md-hub-inputs = mkHubInputSheetCheck "agents-md-hub-inputs" hubInputSheet;
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
