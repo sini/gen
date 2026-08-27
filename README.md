@@ -268,13 +268,14 @@ than a re-import, so `gen.lib.substrate.prelude` and the flat `prelude` are one 
 evaluations of the same source:
 
 ```
-gen.lib.substrate   algebra bind dispatch graph prelude product schema scope select
+gen.lib.substrate   algebra bind dispatch graph identity memo prelude product schema scope select view
 gen.lib.modules     merge types
 gen.lib.aspects     aspects class link
 ```
 
-The other two publish nothing. `framework` (gen-settings) sits above the stack rather than in it — a
-configuration framework assembles with it, and no substrate vocabulary is defined in its terms.
+The other two publish nothing. `framework` (gen-assemble, gen-delivery, gen-program, gen-settings)
+sits above the stack rather than in it — a configuration framework assembles with it, and no
+substrate vocabulary is defined in its terms.
 `retiring` (gen-resolve) marks a member whose content is
 moving elsewhere: still reachable on the flat roster, deliberately not offered as something to adopt.
 Both keep the declaration total without inviting a consumer onto a path that is about to close. The end

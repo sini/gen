@@ -377,14 +377,15 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 `lib.evalModules`/`lib.types` **replacement**, so it must not call them. This is enforced, not
 asserted in prose.
 
-- **The token-scanner (25 libraries).** Each of gen-algebra, gen-aspects, gen-assemble, gen-bind,
-  gen-class, gen-dispatch, gen-graph, gen-identity, gen-link, gen-lsp, gen-memo,
-  gen-merge, gen-product, gen-program, gen-rebuild, gen-resolve, gen-schema, gen-scope, gen-select,
-  gen-settings and gen-view carries `ci/tests/purity.nix` — as do the retired gen-edge, gen-flake and
-  gen-pipe, whose scanners stand and still pass in their archived clones (gen-flake's per ADR-0031 F3,
-  the other two per ADR-0010 §3 — all three off the roster, not out of the enforcement record) — and
-  gen-types carries the same scanner as `ci/tests/types-purity.nix` — 25 in all. **The count is the
-  output of a command, not a tally kept by hand** — re-run it rather than trusting the number above:
+- **The token-scanner (27 libraries).** Each of gen-algebra, gen-aspects, gen-assemble, gen-bind,
+  gen-class, gen-delivery, gen-differential, gen-dispatch, gen-graph, gen-identity, gen-link, gen-lsp,
+  gen-memo, gen-merge, gen-product, gen-program, gen-resolve, gen-schema, gen-scope, gen-select,
+  gen-settings and gen-view carries `ci/tests/purity.nix` — as do the retired gen-edge, gen-flake,
+  gen-pipe and gen-rebuild, whose scanners stand and still pass in their archived clones (gen-flake's
+  per ADR-0031 F3; gen-edge and gen-pipe per ADR-0010 §3; gen-rebuild per ADR-0008 §4 / ADR-0005 — all
+  four off the roster, not out of the enforcement record) — and gen-types carries the same scanner as
+  `ci/tests/types-purity.nix` — 27 in all. **The count is the output of a command, not a tally kept by
+  hand** — re-run it rather than trusting the number above:
 
   ```sh
   for d in gen-*; do
@@ -401,11 +402,13 @@ asserted in prose.
   a figure meant to be re-run.
 
   It reported 25 files across 25 repositories when this section was last measured. The figure has now
-  gone stale twice: thirteen libraries at first writing, then eight more (gen-class, gen-edge,
+  gone stale three times: thirteen libraries at first writing, then eight more (gen-class, gen-edge,
   gen-link, gen-lsp, gen-memo, gen-pipe, gen-product, gen-settings) by the restatement, then four
-  more (gen-assemble, gen-identity, gen-program, gen-view) within ten days of it — each time the
-  scanners spread and the number did not follow. That is the failure mode a hand-kept count has and
-  a command does not. ★ The instrument's scope, stated because it bounds the claim: it reads the
+  more (gen-assemble, gen-identity, gen-program, gen-view) within ten days of it, and now gen-delivery
+  and gen-differential joining the roster's growth while gen-rebuild's own ADR-0008 §4/ADR-0005
+  retirement moved it out of the live count and into the retired one (net +2, 25 → 27) — each time
+  the scanners spread or the roster moved and the number did not follow. That is the failure mode a
+  hand-kept count has and a command does not. ★ The instrument's scope, stated because it bounds the claim: it reads the
   sibling **working clones**, not this hub's locked inputs, so it measures the ecosystem as checked
   out rather than as pinned. The test reads every `lib/**.nix` (plus the root `flake.nix` / `default.nix`), strips comments, and asserts zero
   occurrences of the nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`,
