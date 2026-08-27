@@ -48,7 +48,9 @@ with this hub's interim `flakeModules.default` supplying the default `nixos` ter
 override or suppress it) — the boundary that injects those values into a consumer's nixpkgs eval and
 builds NixOS systems. Historically the sole boundary here was `gen-flake`; it dissolved and its repo
 orphans as reference (ADR-0031 F3; see Terminal Layer, below). The invariant across the crossing: **gen
-TYPES never leave the pure eval; only VALUES cross** (value-injection, not type-driving).
+TYPES never leave the pure eval; only VALUES cross** (value-injection, not type-driving). This holds
+under ADR-0023's declared interim (checking off by default; unstated crossings become declared
+opt-outs with their price recorded) until the by-construction target (`den-hoag-zgps`) lands.
 
 ### The CI harness is not a library, and it does not live here
 
@@ -216,9 +218,10 @@ yet ADR-0027) — is the current flake-parts ergonomics: one `imports` gives bot
 surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose, over
 the option surface `gen.tree` / `gen.extraModules`. It consumes no gen-flake surface. The **invariant**
 gen-flake proved end-to-end (gen TYPES never leave the pure eval; only VALUES cross) carries forward
-architecturally at the new boundary; the hub's `ci/inject-payload.nix` (ADR-0023 (b), the crossing
-Adapter side) is a related live check that a gen TYPE riding as inert `_module.args` data stays
-un-type-walked.
+architecturally at the new boundary under ADR-0023's declared interim (b) — target-invoked checking off
+by default until the by-construction target (`den-hoag-zgps`) lands; the hub's `ci/inject-payload.nix`
+(ADR-0023 (b), the crossing Adapter side) is the live check that keeps that declared opt-out's price
+measured rather than assumed.
 
 **gen-flake** — The value-injection boundary. **ORPHANED AS REFERENCE (ADR-0031 F3) — dissolution
 complete; off the roster, not a hub input. Take no new dependency on it.**
@@ -384,4 +387,4 @@ The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies onl
 5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
 6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either, identity) works without nixpkgs. Libraries that only need identity/search import it directly. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
 7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one plane — the terminal plane — plus the CI runners; historically that terminal was the `gen-flake` repository (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`), which dissolved (ADR-0031 F3) into this hub's interim `flakeModules.default` and gen-delivery's `realize`. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
-8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving).
+8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving). Today this holds under ADR-0023's declared interim — checking off by default, unstated crossings recorded as declared opt-outs with their price — until the by-construction target (`den-hoag-zgps`) lands.

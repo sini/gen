@@ -223,7 +223,10 @@ invariant across the crossing is that **gen types never leave the pure eval; onl
 gen type may ride along as inert data a consumer can read, but it never enters the consumer's options
 tree, so nixpkgs never type-walks it. This is value-injection rather than type-driving, the same
 one-way trade [adios](https://github.com/adisbladis/adios) takes: a pure engine cannot be driven by
-foreign nixpkgs-module libraries.
+foreign nixpkgs-module libraries. Today the invariant holds under ADR-0023's declared interim —
+target-invoked checking off by default, unstated crossings recorded as declared opt-outs with their
+price (`gen-bind`'s `injectAdapter`) — until the by-construction target (`den-hoag-zgps`) lands as the
+checked form.
 
 ### Two-stage instantiation, self-wired members
 

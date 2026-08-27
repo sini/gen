@@ -345,13 +345,17 @@ in
         `{ genValues, ... }: …`.
 
         INVARIANT — do NOT project `schema` out of the injected values. `composed.values` includes
-        the schema sub-tree, whose `values.schema.<kind>.options.*.type` are inert gen TYPE objects.
-        This is invariant-SAFE here: the payload lands in `_module.args`, which nixpkgs does NOT
-        type-walk. The failure this design avoids — nixpkgs walking a gen type embedded in an
-        OPTIONS tree via `substSubModules`/`getSubOptions` — cannot occur for a plain `_module.args`
-        value. `renderDocs` legitimately reads `values.schema.<kind>.options.*.type.name` (a
-        string). A consumer that instead uses `values.schema.<kind>` AS AN OPTION `type` is doing
-        the explicitly out-of-scope thing (non-goal §11) and owns that hazard.
+        the schema sub-tree, whose `values.schema.<kind>.options.*.type` are inert gen TYPE objects
+        carrying `check`/`merge` FUNCTIONS, so the payload-side *provably-plain-data* predicate
+        fails here. This site takes ADR-0023's declared interim (b), not the by-construction target:
+        the payload lands in `_module.args`, which nixpkgs does NOT type-walk today, so the failure
+        this design avoids — a gen type embedded in an OPTIONS tree via
+        `substSubModules`/`getSubOptions` — does not occur for a plain `_module.args` value, but that
+        is a DECLARED opt-out with its price recorded, not a by-construction guarantee, and it lifts
+        when the by-construction target (`den-hoag-zgps`) lands. `renderDocs` legitimately reads
+        `values.schema.<kind>.options.*.type.name` (a string). A consumer that instead uses
+        `values.schema.<kind>` AS AN OPTION `type` is doing the explicitly out-of-scope thing
+        (non-goal §11) and owns that hazard.
       '';
     };
 
