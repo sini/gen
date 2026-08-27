@@ -144,6 +144,15 @@
       # construction. `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
       injectPayload = import ./inject-payload.nix { inherit (inputs) gen; };
 
+      # ── declared-content — the PERMANENT cell over the hub's CARRIED PROJECTION (den-hoag-jwm8) ──
+      # Re-derives gen-delivery's own declared-content oracle against `flakeModules/default.nix`'s
+      # carried `classFieldsOf`/`projectHosts` (copied verbatim, since they are not an exported
+      # library call) fed through `genDelivery.realize` with the REAL pinned `gen.lib.mkGenLibs`
+      # roster — the exact composition a consumer of this hub gets. Guards ADR-0028's Rider on the
+      # path gen-delivery's own suite cannot reach: the hub never calls `genDelivery.project`.
+      # `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
+      declaredContent = import ./declared-content.nix { inherit (inputs) gen; };
+
       # ── direction-of-dependence lint ──
       # ADR-0015's enforcement half: no roster member may declare an input on a HIGHER stratum than
       # its own, under the chain substrate < modules < aspects < framework, save the closed
@@ -185,6 +194,8 @@
       flake.lib.mkGenLibsEval = mkGenLibsEval;
       #   nix eval ./ci#lib.injectPayload.gate --json | jq
       flake.lib.injectPayload = injectPayload;
+      #   nix eval ./ci#lib.declaredContent.gate --json | jq
+      flake.lib.declaredContent = declaredContent;
       #   nix eval ./ci#lib.direction.report --json | jq
       flake.lib.direction = directionOfDependence;
 
@@ -327,6 +338,35 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the declared-content check (den-hoag-jwm8): prints the per-key gate and FAILS
+          # the build if any key is not `true`. A failing key is either the CARRIED projection
+          # realizing a declared-but-contentless class again (the jwm8 defect, un-guarded) or a
+          # control gone blind — the class going unregistered, or the tripwire losing its bite.
+          mkDeclaredContentCheck =
+            name: g:
+            let
+              allOk = builtins.all (k: g.gate.${k} == true) g.gateKeys;
+              failed = builtins.filter (k: g.gate.${k} != true) g.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                results = g.gate;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "CARRIED PROJECTION REGRESSION — the hub's classFieldsOf/projectHosts realizes a declared-but-contentless class (den-hoag-jwm8)" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # ── perf-regression bench (the PERFORMANCE twin of the parity oracles) ──
           # `nix run ./ci#perf-bench` — drives ci/perf-bench.nix (pure vs pinned-nixpkgs stack)
           # through nix-instantiate + NIX_SHOW_STATS and gates on parity / thunk+alloc ratios /
@@ -432,6 +472,7 @@
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
+            declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
