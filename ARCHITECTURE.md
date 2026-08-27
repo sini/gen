@@ -135,11 +135,11 @@ Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero depen
 **gen-algebra** — Pure primitives shared across the ecosystem.
 
 - Search monad (indexed state threading with convergence)
-- Intensional functions (program-point identity, conservative equality)
+- Intensional functions (program-point identity, conservative equality — the mint itself is injected, not owned)
 - Record algebra (scoped labels, mixin composition, `foldLayers` for per-field-strategy fold)
-- Either / validators / identity primitives
+- Either combinators
 
-gen-algebra is now **fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. Its old module tier (identity hashing, strict modules, ref types — the constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema. Every other gen-\* library that needs identity or search imports gen-algebra.
+gen-algebra is now **fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. Its old module tier (strict modules, ref types, validators — the constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema; identity minting split further, into `gen-identity` — the substrate's one minting authority (ADR-0016 ruling 5) — which gen-schema now takes injected rather than owning (`gen-schema/lib/id-hash.nix`). Every other gen-\* library that needs search imports gen-algebra; one that needs identity minting imports gen-identity.
 
 ### Module System Layer
 
@@ -385,6 +385,6 @@ The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies onl
 3. **Actions are opaque.** gen-dispatch doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
 4. **Conditions are opaque (in core).** gen-dispatch's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
 5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
-6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either, identity) works without nixpkgs. Libraries that only need identity/search import it directly. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
+6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either) works without nixpkgs. Libraries that only need search or the intensional constructors import it directly; identity minting is `gen-identity`'s (ADR-0016 ruling 5), taken injected. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
 7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one plane — the terminal plane — plus the CI runners; historically that terminal was the `gen-flake` repository (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`), which dissolved (ADR-0031 F3) into this hub's interim `flakeModules.default` and gen-delivery's `realize`. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
 8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving). Today this holds under ADR-0023's declared interim — checking off by default, unstated crossings recorded as declared opt-outs with their price — until the by-construction target (`den-hoag-zgps`) lands.
