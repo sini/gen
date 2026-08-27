@@ -71,15 +71,28 @@ oracle's reference side legitimately use `nixpkgs.lib`.
 
 The token list is per library rather than uniform, because a library's own API names must stay legal:
 
-- **The pure siblings** — gen-algebra, gen-bind, gen-dispatch, gen-graph, gen-link, gen-memo,
-  gen-resolve, gen-scope, gen-select, gen-types — ban `lib.` outright, along with `nixpkgs`, the
-  `{ lib }` / `{ lib,` parameter signatures, `evalModules` and `mkOption`. No `lib.` call of any kind
-  survives there.
-- **The module-system libraries** — gen-aspects, gen-class, gen-merge, gen-product, gen-schema,
-  gen-settings, plus the retired gen-edge and gen-pipe — export their own `mkOption` / `mkMerge`, so a
-  bare-token ban would reject their own surface. They enumerate the nixpkgs forms instead —
-  `lib.types`, `lib.mkOption`, `lib.evalModules`, `evalModules`, `nixpkgs` and the `{ lib }` /
-  `{ lib,` signatures, with `lib.mkMerge` and `lib.mkForce` added where the library has cause to.
+- **The pure siblings** — gen-algebra, gen-assemble, gen-bind, gen-dispatch, gen-graph, gen-identity,
+  gen-link, gen-memo, gen-program, gen-resolve, gen-scope, gen-select, gen-types, gen-view — ban
+  `lib.` outright, along with `nixpkgs`, the `{ lib }` / `{ lib,` parameter signatures, `evalModules`
+  and `mkOption`. No `lib.` call of any kind survives there (gen-assemble, gen-program and gen-view
+  each carry that exact six-token list verbatim in their own `ci/tests/purity.nix`). gen-identity's
+  scanner carries that same six-token list as its `forbiddenNixpkgs` half, then adds a second list no
+  other member carries — `forbiddenSubstrate` bans every gen substrate identifier by name (`prelude`,
+  `merge`, `algebra`, `schema`, `scope`, `graph`, `aspects`, `types`), because this library's claim is
+  dependency-free rather than merely nixpkgs-lib-free (the one minting authority upstream of
+  gen-schema, ADR-0016 ruling 5). That second list is a shape the bare-ban/enumerate-forms split does
+  not otherwise name; it is recorded here as an addition to the bare-ban bucket rather than a third
+  bucket, since the nixpkgs half is the unmodified bare-ban list.
+- **The module-system libraries** — gen-aspects, gen-class, gen-delivery, gen-merge, gen-product,
+  gen-schema, gen-settings, plus the retired gen-edge and gen-pipe — export their own `mkOption` /
+  `mkMerge`, so a bare-token ban would reject their own surface. They enumerate the nixpkgs forms
+  instead — `lib.types`, `lib.mkOption`, `lib.evalModules`, `evalModules`, `nixpkgs` and the
+  `{ lib }` / `{ lib,` signatures, with `lib.mkMerge` and `lib.mkForce` added where the library has
+  cause to. gen-delivery's own library source exports neither `mkOption` nor `mkMerge` — its
+  `ci/tests/purity.nix` header states it takes no sanctioned nixpkgs boundary at all, so every file
+  is strict — but its token list is built the same way as this bucket's rather than the bare-ban one:
+  `lib.types`, `lib.mkOption`, `lib.mkMerge`, `lib.evalModules`, `evalModules`, `nixpkgs`, `{ lib }`,
+  `{ lib,`, so it lands here by the shape of its scanner rather than by the bare-surface rationale.
   The two retired repositories are named because their scanners still stand and still pass in their
   archived clones — the claim is about what is enforced where, and archiving removed neither the
   scanner nor its result. Neither is a roster member or a hub input any longer (ADR-0010 §3).
