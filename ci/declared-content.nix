@@ -54,34 +54,41 @@ let
     selectHosts: values: aspects:
     let
       hosts = selectHosts values;
+      _hostsCheck =
+        if builtins.isAttrs hosts then
+          null
+        else
+          throw "compose: selectHosts must return an attrset of host instances ({ <host> = <instance>; }), got ${builtins.typeOf hosts}";
     in
-    builtins.mapAttrs (
-      _hostName: inst:
-      let
-        memberAspects = builtins.filter (a: aspects ? ${a}) (inst.aspects or [ ]);
-        classNames = dedup (builtins.concatMap (a: classFieldsOf aspects.${a}) memberAspects);
-        collectClass =
-          class:
-          builtins.concatMap (
-            a:
-            let
-              entry = aspects.${a};
-            in
-            if builtins.elem class (classFieldsOf entry) then [ entry.${class} ] else [ ]
-          ) memberAspects;
-      in
-      {
-        bindings = {
-          node = inst;
-        };
-        classes = builtins.listToAttrs (
-          map (c: {
-            name = c;
-            value = collectClass c;
-          }) classNames
-        );
-      }
-    ) hosts;
+    builtins.seq _hostsCheck (
+      builtins.mapAttrs (
+        _hostName: inst:
+        let
+          memberAspects = builtins.filter (a: aspects ? ${a}) (inst.aspects or [ ]);
+          classNames = dedup (builtins.concatMap (a: classFieldsOf aspects.${a}) memberAspects);
+          collectClass =
+            class:
+            builtins.concatMap (
+              a:
+              let
+                entry = aspects.${a};
+              in
+              if builtins.elem class (classFieldsOf entry) then [ entry.${class} ] else [ ]
+            ) memberAspects;
+        in
+        {
+          bindings = {
+            node = inst;
+          };
+          classes = builtins.listToAttrs (
+            map (c: {
+              name = c;
+              value = collectClass c;
+            }) classNames
+          );
+        }
+      ) hosts
+    );
 
   # ONE aspect declaring TWO classes, content on exactly one — `metrics` is the axis: declared by
   # the grammar, never set by any definition; `nixos` is the same-shape sibling that IS set. TWO
