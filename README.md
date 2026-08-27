@@ -169,7 +169,7 @@ ecosystem needs `lib.*` alone it pulls the pinned `github:nix-community/nixpkgs.
 nixpkgs — policy stated in `ci/flake.nix` and visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for twenty of the twenty-two roster keys — gen-class and gen-assemble are the exceptions (both
+for twenty of the twenty-two roster members — gen-class and gen-assemble are the exceptions (both
 hub-injected via `import "${genInputs.gen-<name>}/lib" { … }` rather than a direct `.lib` read), and
 their flakes export `.lib` too — so a library that renames, wraps or drops that output fails hub
 evaluation at its first consumer. All twenty-two library flakes declare it today.
