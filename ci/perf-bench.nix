@@ -22,7 +22,7 @@
 # (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
   stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm")
   workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm"
   n,
@@ -35,6 +35,7 @@ let
     types = genTypes;
   };
   genAlgebra = import "${srcs.gen-algebra}/lib";
+  genIdentity = import "${srcs.gen-identity}/lib";
   genSchemaNew = import "${srcs.gen-schema}/lib" {
     inherit prelude;
     merge = genMerge;
@@ -44,6 +45,7 @@ let
     inherit prelude;
     merge = genMerge;
     schema = genSchemaNew;
+    identity = genIdentity;
   };
   # gen-class wired for tier 2 (the injected gen-merge kernel enables `applyCoreFixed`). Only the
   # `classShare` workload touches this; every pure/ref cell ignores it.

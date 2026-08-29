@@ -430,6 +430,7 @@
               "gen-types" = "${genInputs.gen-types}";
               "gen-merge" = "${genInputs.gen-merge}";
               "gen-algebra" = "${genInputs.gen-algebra}";
+              "gen-identity" = "${genInputs.gen-identity}";
               "gen-schema" = "${genInputs.gen-schema}";
               "gen-aspects" = "${genInputs.gen-aspects}";
               "gen-class" = "${genInputs.gen-class}";
