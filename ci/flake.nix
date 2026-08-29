@@ -152,12 +152,12 @@
       # construction. `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
       injectPayload = import ./inject-payload.nix { inherit (inputs) gen; };
 
-      # ── declared-content — the PERMANENT cell over the hub's CARRIED PROJECTION (den-hoag-jwm8) ──
-      # Re-derives gen-delivery's own declared-content oracle against `flakeModules/default.nix`'s
-      # carried `classFieldsOf`/`projectHosts` (copied verbatim, since they are not an exported
-      # library call) fed through `genDelivery.realize` with the REAL pinned `gen.lib.mkGenLibs`
-      # roster — the exact composition a consumer of this hub gets. Guards ADR-0028's Rider on the
-      # path gen-delivery's own suite cannot reach: the hub never calls `genDelivery.project`.
+      # ── declared-content — the PERMANENT cell over the hub's DELIVERY-CLASS PROJECTION ──────
+      # ADR-0028's Rider on BOTH measured arms: the contentless class (den-hoag-jwm8) and the
+      # wrong-category channel (den-hoag-t3q9). Drives `genDelivery.project`/`realize` with the REAL
+      # pinned `gen.lib.mkGenLibs` roster, wired the way `flakeModules/default.nix` wires it — the
+      # exact composition a consumer of this hub gets — plus a lexical arm over the shipped module
+      # source, because the hub's CALL SITE is a path no gate here otherwise evaluates.
       # `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
       declaredContent = import ./declared-content.nix { inherit (inputs) gen; };
 
@@ -381,10 +381,13 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
-          # Build the declared-content check (den-hoag-jwm8): prints the per-key gate and FAILS
-          # the build if any key is not `true`. A failing key is either the CARRIED projection
-          # realizing a declared-but-contentless class again (the jwm8 defect, un-guarded) or a
-          # control gone blind — the class going unregistered, or the tripwire losing its bite.
+          # Build the declared-content check (den-hoag-jwm8 / den-hoag-t3q9): prints the per-key
+          # gate and FAILS the build if any key is not `true`. A failing key is the hub realizing a
+          # key ADR-0028's Rider excludes — a declared-but-contentless class, or a non-class
+          # category whose value is class-shaped — or a control gone blind: the key going
+          # unregistered, the tripwire losing its bite, the retired shape test no longer admitting
+          # the channel (which would make the wrong-category arm vacuous), or the lexical
+          # instrument reading everything as absent.
           mkDeclaredContentCheck =
             name: g:
             let
@@ -405,7 +408,7 @@
                 cat "$reportPath"
                 echo
                 ${lib.optionalString (!allOk) ''
-                  echo "CARRIED PROJECTION REGRESSION — the hub's classFieldsOf/projectHosts realizes a declared-but-contentless class (den-hoag-jwm8)" >&2
+                  echo "DELIVERY-CLASS PROJECTION REGRESSION — the hub realizes a key ADR-0028's Rider excludes, or a control went blind (den-hoag-jwm8 / den-hoag-t3q9)" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"

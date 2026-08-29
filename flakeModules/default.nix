@@ -16,8 +16,16 @@
 # SINCE AMENDED AT THE SUCCESSOR-COMPOSE RE-POINT (ADR-0031 F2's "compose S2 core → S2" row):
 # `compose` no longer reads off gen-flake — the successor landed at this hub (lib/compose.nix,
 # exposed as `gen.lib.compose`), and this module now performs the constructor merge and the tree
-# loading itself and carries the aspects/hosts projection verbatim from the dissolving compose
-# (both marked in the `let`).
+# loading itself (both marked in the `let`).
+#
+# AND AT THE PROJECTION RE-POINT (den-hoag-t3q9). The aspects/hosts projection this module carried
+# VERBATIM from the dissolving compose is gone: it classified a delivery class by SHAPE, which
+# ADR-0028's Rider forbids, and shape cannot see a key's declared category at all. The projection is
+# now gen-delivery's own `project`, which reads the DECLARATION — so this module takes one, the new
+# `gen.aspectCnf` option, and refuses by name when it is absent rather than degrading to shape. Two
+# sentences of the carried header below are stale by that change and are left as source provenance
+# like the two named further down: SYSTEMS' "from compose's `hosts` projection" (:75) and "from ONE
+# `compose`" (:67) — the SYSTEMS half now takes a second input, the declaration.
 #
 # AND AT THE UNIT-5 RE-POINT, WHICH RETIRED THE LAST gen-flake READS. This module now consumes NO
 # gen-flake surface:
@@ -26,8 +34,8 @@
 #     crossing-side successor of record for module-system targets; its header rules the module
 #     wrapper vestigial, and this module IS the arg-environment writer (`_module.args` below), so
 #     wrapping through a module here would re-introduce the wrapper the successor retired;
-#   * `realized` reads gen-delivery's `realize` (the layered fold; roster key `delivery`) over the
-#     carried projection, handed as `projected = { nodes = …; }`;
+#   * `realized` reads gen-delivery's `realize` (the layered fold; roster key `delivery`) over
+#     gen-delivery's own `project` result;
 #   * the default `nixos` terminal is gen-bind's `mkSystemTerminal` (crossing adapter set), bridged
 #     to the fold's terminal contract by the hub-local `terminalOf` in the `let` — the owed
 #     consumer-side reconstruction of the retired `nixosSystem` sugar (corpus G1).
@@ -136,119 +144,48 @@ let
   # (gen-merge's byte-mode evalModuleTree); reads only `tree`/`modules`/`specialArgs`, never any of
   # the injected/built config below, so it introduces no fixpoint cycle. The successor result
   # carries `values`/`provenance`/`override`; the `aspects`/`hosts` projections this module's
-  # SYSTEMS half consumes are re-attached below (the carried projection).
+  # SYSTEMS half consumes are re-attached below, by gen-delivery's `project`.
   composedCore = compose {
     modules = treeModules ++ cfg.modules;
     specialArgs = genLibs // cfg.specialArgs;
   };
 
-  # ── THE CARRIED PROJECTION (INTERIM CARRY from gen-flake lib/compose.nix; code-identical save
-  # ONE amendment: the binding formal renamed `host` → `node` at the unit-5 re-point — substrate
-  # vocabulary, R§6.3, matching gen-delivery's documented contract "`bindings.node` IS the resolved
-  # instance") ─
-  # The successor compose does not project `aspects`/`hosts`: the settlement assigns them to
-  # gen-delivery, whose realization predicate reads the key-category DECLARATION (`cnf`) — a value
-  # this module's option surface does not carry and a compose result cannot reach. So the SYSTEMS
-  # half of this interim module keeps the projection it has always shipped, carried VERBATIM from
-  # the dissolving compose so consumer behaviour is preserved, and it dies with this module at the
-  # ADR-0027 replacement. The structural-predicate defect it carries is MEASURED and beaded
-  # (den-hoag-jwm8 / den-hoag-t3q9 — the ADR-0028 Rider gap the carried comment below describes):
-  # deliberate carry-over in the same standing as the two den-hoag-es9g defects above, never
-  # accepted behaviour. The fix is gen-delivery's declared-category predicate, adopted when this
-  # module's replacement takes a declaration input. One shape delta, stated: `gen.composed`'s
-  # `override` handle returns the SUCCESSOR projection (no aspects/hosts re-attach on a
-  # re-compose); this module reads only the base compose.
+  # ── THE PROJECTION — gen-delivery's `project`, no longer a carried copy (den-hoag-t3q9) ─────
+  # This module used to carry gen-flake compose.nix's `classFieldsOf`/`projectHosts` VERBATIM, and
+  # that carried predicate classified a key of a flat-registry aspect entry by SHAPE: an attrset
+  # carrying an `imports` list. ADR-0028's Rider forbids exactly that — a delivery class realizes
+  # only on DECLARED content, never on structural shape — and the predicate failed it on two
+  # measured arms. It read clean on the contentless-class arm only by COINCIDENCE (gen-aspects
+  # renders a declared-but-unset class as `null`, a representation choice in another library), and
+  # on the WRONG-CATEGORY arm it was simply wrong: a key declared `category = "channel"` rides its
+  # value verbatim, so a channel carrying a module — the cross-framework exchange payload the
+  # category exists for — was classified as a delivery class and `realize` called its terminal. A
+  # facet declared with a permissive option type does the same.
   #
-  # The class fields of a flat-registry aspect entry: keys whose value is a deferredModule (an
-  # attrset carrying an `imports` LIST). Structural — no hardcoded class-name list, so any class
-  # registered via `mkAspectSchema { keySemantics.<c>.category = "class"; }` is discovered. A class
-  # DECLARED but never given content reads `null` (gen-aspects represents absence rather than
-  # fabricating an empty deferredModule), so `isAttrs` below excludes THAT case. Reading `? imports`
-  # on an unforced deferredModule is cheap and does NOT force the class body.
+  # No shape test can fix that, because the two are the SAME SHAPE and differ only in what was
+  # DECLARED. So the projection is gen-delivery's `project` (`deliveryClassesOf`: declared
+  # `category = "class"` AND content present, shape never consulted) rather than a second predicate
+  # here that can drift from it. `bindings.node` is the resolved instance and `selectHosts` keeps
+  # gen-delivery's default (`values.hosts or { }`) — the shape this module always shipped.
   #
-  # ★★ THE PROJECTION IS NOT CONTENT-DRIVEN. The filter discovers every declared class but not
-  # ONLY classes: it never consults a key's DECLARED CATEGORY, so a NON-class key whose value
-  # happens to carry an `imports` list is classified as a delivery class and `realize` calls its
-  # terminal for it. Measured on both non-class categories against the locked gen-aspects, with
-  # controls and a firing tripwire — gen-flake AGENTS.md's trap table carries the two rows and the
-  # figures. The exclusion that DOES hold is the contentless-class one above, and it rests on
-  # gen-aspects' representation choice rather than on this predicate.
-  classFieldsOf =
-    entry:
-    builtins.filter (
-      k:
-      let
-        v = entry.${k};
-      in
-      builtins.isAttrs v && v ? imports && builtins.isList v.imports
-    ) (builtins.attrNames entry);
-
-  # `dedup` — order-preserving unique over a string list, builtins-only (listToAttrs collapses dups).
-  dedup =
-    xs:
-    builtins.attrNames (
-      builtins.listToAttrs (
-        map (x: {
-          name = x;
-          value = null;
-        }) xs
-      )
-    );
-
-  # `projectHosts` — the host-keyed reshape of the FLAT aspect registry. For each host instance,
-  # gather the deferredModules of each class across the aspects the host declares membership in
-  # (`host.aspects`). `selectHosts` names WHICH resolved attrset holds the host instances; this
-  # module applies the default projection (`values.hosts or { }`) — a nested registry layout is
-  # the lower-level API's territory. Yields
-  #   { <host> = { bindings = { node = <resolved instance>; }; classes = { <class> = [ <deferredModule> ]; }; }; }
-  # PURE — no nixpkgs; the deferredModules stay unforced (opaque) until the terminal imports them.
-  projectHosts =
-    selectHosts: values: aspects:
-    let
-      hosts = selectHosts values;
-      _hostsCheck =
-        if builtins.isAttrs hosts then
-          null
-        else
-          throw "compose: selectHosts must return an attrset of host instances ({ <host> = <instance>; }), got ${builtins.typeOf hosts}";
-    in
-    builtins.seq _hostsCheck (
-      builtins.mapAttrs (
-        _hostName: inst:
-        let
-          memberAspects = builtins.filter (a: aspects ? ${a}) (inst.aspects or [ ]);
-          classNames = dedup (builtins.concatMap (a: classFieldsOf aspects.${a}) memberAspects);
-          collectClass =
-            class:
-            builtins.concatMap (
-              a:
-              let
-                entry = aspects.${a};
-              in
-              if builtins.elem class (classFieldsOf entry) then [ entry.${class} ] else [ ]
-            ) memberAspects;
-        in
-        {
-          bindings = {
-            node = inst;
-          };
-          classes = builtins.listToAttrs (
-            map (c: {
-              name = c;
-              value = collectClass c;
-            }) classNames
-          );
-        }
-      ) hosts
-    );
-
-  # The flat aspect registry (keyed by aspect path). Absent an `aspects` surface, empty.
-  aspects =
-    if composedCore.values ? aspects then roster.aspects.flatten composedCore.values.aspects else { };
+  # THE DECLARATION IS AN INPUT, NOT A DERIVATION, and that is measured rather than assumed: the
+  # aspect `keySemantics` reaches the compose result at `values.schema.<kind>.keySemantics` ONLY
+  # when the consumer's tree DEFINES a schema kind entry. A tree that merely declares
+  # `options.schema`, or neither, yields a byte-identical aspect registry with the declaration
+  # nowhere in it. A category source present for some consumers and absent for others is the silent
+  # degradation the Rider forbids, so it is the `gen.aspectCnf` option and its absence is
+  # gen-delivery's `requireCnf` refusal BY NAME — never a fallback to shape.
+  #
+  # One shape delta, stated: `gen.composed`'s `override` handle returns the SUCCESSOR projection (no
+  # aspects/hosts re-attach on a re-compose); this module reads only the base compose.
+  projected = genDelivery.project {
+    values = composedCore.values;
+    cnf = cfg.aspectCnf;
+  };
 
   composed = composedCore // {
-    inherit aspects;
-    hosts = projectHosts (values: values.hosts or { }) composedCore.values aspects;
+    inherit (projected) aspects;
+    hosts = projected.nodes;
   };
 
   # ── THE TERMINAL BRIDGE (INTERIM — dies with this module at the ADR-0027 replacement) ─────
@@ -257,7 +194,7 @@ let
   # `close`. The crossing performs this walk for crossing consumers; the hub performs it for the
   # degenerate one-member case, in `close`'s own order (bindFormals, then wrapUnit). `name` is
   # absorbed unused (as the retired terminal absorbed it); `passthrough` is not forwarded because
-  # the carried projection never emits one (a future projection that does forwards it here — one
+  # gen-delivery's projection never emits one (a future projection that does forwards it here — one
   # line, and gen-bind's spine-read shadow refusal then governs). `locateConfig` rides the record
   # for the crossing's `close`, not for the fold — this bridge does not consume it.
   terminalOf =
@@ -285,16 +222,13 @@ let
     };
 
   # The class-major realize result (`{ <class>.<host> = artifact; }`) — gen-delivery's layered fold
-  # over the carried projection. Reads only `composed`, the terminals above, and per-host extras —
-  # never the injected/built config below, so no cycle. Shared by the `gen.realized` handle and
-  # `flake.nixosConfigurations`. The hub passes no `bindings`/`refinements`/`layerOrder`: the
+  # over the `project` result above. Reads only `projected`, the terminals above, and per-host
+  # extras — never the injected/built config below, so no cycle. Shared by the `gen.realized` handle
+  # and `flake.nixosConfigurations`. The hub passes no `bindings`/`refinements`/`layerOrder`: the
   # interim module grows no contract, and a consumer wanting the layered surface uses gen-delivery
   # directly.
   realized = genDelivery.realize {
-    projected = {
-      nodes = composed.hosts;
-    };
-    inherit terminals;
+    inherit projected terminals;
     extraModules = cfg.extraModules;
   };
 in
@@ -322,6 +256,26 @@ in
       type = types.attrsOf types.raw;
       default = { };
       description = "Extra module args merged over the threaded gen libs during `compose`.";
+    };
+
+    aspectCnf = mkOption {
+      type = types.nullOr types.raw;
+      default = null;
+      description = ''
+        THE DECLARATION INPUT for the delivery-class projection: the consumer's OWN
+        `mkAspectSchema` argument (`{ keySemantics = { <key>.category = "class" | "channel" |
+        "facet"; }; … }`), handed to gen-delivery's `project`. ADR-0028's Rider — a delivery class
+        realizes only on DECLARED content, never on structural shape — so the projection reads a
+        key's declared category, and a channel or facet whose value happens to look like a
+        deferredModule is NOT realized as a class.
+
+        `null` is the ABSENT state, not a default. With no category source the projection has
+        nothing left to classify by but the shape test it replaces, so it REFUSES BY NAME
+        (gen-delivery's `requireCnf`) rather than degrading silently. Set it to the same value the
+        tree's `mkAspectSchema` call takes — factor that argument into a file both sides import,
+        since the declaration cannot be read back out of the compose result: `keySemantics` only
+        reaches `values.schema.<kind>` when the tree also DEFINES a schema kind entry.
+      '';
     };
 
     inject = mkOption {
@@ -393,7 +347,7 @@ in
         The class-keyed terminal registry gen-delivery's `realize` consumes:
         `{ <class> = <terminal>; }`. Each terminal is a function of one call-record per node:
         `{ name, modules, bindings, extent, extraModules }` (plus `passthrough` iff the node's
-        projection entry carries one — the carried projection here never emits it).
+        projection entry carries one — gen-delivery's projection never emits it).
         `bindings.node` is the resolved instance; `extent` is this class's realized set itself (a
         lazy cross-node accessor whose spine is the class's node keys). A default `nixos` terminal
         (gen-bind's `mkSystemTerminal` over `config.gen.nixpkgs.lib.nixosSystem`, bridged to this
@@ -428,7 +382,7 @@ in
       readOnly = true;
       internal = true;
       default = realized;
-      defaultText = lib.literalExpression "genDelivery.realize { projected = { nodes = <the carried hosts projection>; }; inherit terminals; extraModules = config.gen.extraModules; }";
+      defaultText = lib.literalExpression "genDelivery.realize { projected = <genDelivery.project { values; cnf = config.gen.aspectCnf; }>; inherit terminals; extraModules = config.gen.extraModules; }";
       description = ''
         The full class-major realize result (`{ <class>.<host> = artifact; }`) over `gen.terminals`.
         `flake.nixosConfigurations` is `realized.nixos or { }`; a consumer maps any other class off

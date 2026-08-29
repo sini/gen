@@ -135,9 +135,17 @@ surface rehomed under ADR-0031; the true framework surface arrives with the ADR-
   imports = [ inputs.gen.flakeModules.default ];
 
   gen.tree = ./gen-modules;                     # a directory of gen definition modules
+  gen.aspectCnf = import ./gen-modules/_aspect-cnf.nix; # the SAME arg the tree's mkAspectSchema takes
   gen.extraModules.myhost = [ ./hardware.nix ]; # per-host platform/base NixOS modules
 }
 ```
+
+`gen.aspectCnf` is the declaration the projection classifies against — ADR-0028's Rider, a delivery
+class realizes only on DECLARED content and never on structural shape, so a key declared
+`category = "channel"` is not built as a class merely because its value carries an `imports` list.
+It has no default: with no category source the projection refuses by name rather than falling back
+to the shape test it replaces, so factor the `mkAspectSchema` argument into a file the tree and the
+flake both import.
 
 A consumer's ordinary nixpkgs modules then read the resolved values as one module argument
 (`genValues`, injected by the flakeModule):
