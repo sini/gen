@@ -13,28 +13,42 @@
 # stratum buckets select on that identity, so the roster has to be a value and not a recipe.
 { genInputs }:
 let
+  # Every roster entry below reaches its own `gen-*` flake input through `genInputs.gen-X` — and if
+  # that key is entirely missing from `genInputs` (e.g. a `flake.nix` inputs edit landed without the
+  # matching roster edit, or vice versa), the bare selection aborts with a missing-attribute error.
+  # `tryEval` cannot catch that class on Nix 2.34.8 (measured: `tryEval (deepSeq (throw ...))` is
+  # caught; `tryEval (deepSeq ({ }.nope))` aborts uncaught) — so the ci roster tripwire's per-key
+  # `tryEval` wrapper (`ci/mkgenlibs-eval.nix:51`) aborted the whole eval unnamed instead of naming
+  # the broken key. `input` converts that uncatchable abort into a catchable, named `throw` at the
+  # one place every roster entry reaches an input, so the per-key wrapper downstream can isolate it.
+  input =
+    name:
+    if builtins.hasAttr name genInputs then
+      genInputs.${name}
+    else
+      throw "mkGenLibs: missing flake input \"${name}\"";
   roster = {
-    prelude = genInputs.gen-prelude.lib;
+    prelude = (input "gen-prelude").lib;
     # Self-contained: no inputs, so nothing to wire. The one minting authority
     # (ADR-0016 ruling 5) as a dependency-free leaf — which is what lets libraries UPSTREAM of
     # gen-schema reach it without closing a flake cycle, the whole reason it is its own library.
-    identity = genInputs.gen-identity.lib;
-    algebra = genInputs.gen-algebra.lib;
-    types = genInputs.gen-types.lib;
-    merge = genInputs.gen-merge.lib;
-    scope = genInputs.gen-scope.lib;
+    identity = (input "gen-identity").lib;
+    algebra = (input "gen-algebra").lib;
+    types = (input "gen-types").lib;
+    merge = (input "gen-merge").lib;
+    scope = (input "gen-scope").lib;
     # gen-memo is the INCREMENTAL PLANE over the evaluator above it (ADR-0008 §2): a decision layer
     # that never evaluates, defined by byte-parity against a cold evaluation. It sits beside `scope`
     # here because that is what it is a plane over, and it is self-wiring like the rest of this
     # block — its flake `.lib` resolves its own gen-prelude and gen-graph.
-    memo = genInputs.gen-memo.lib;
-    graph = genInputs.gen-graph.lib;
-    bind = genInputs.gen-bind.lib;
-    schema = genInputs.gen-schema.lib;
-    aspects = genInputs.gen-aspects.lib;
-    select = genInputs.gen-select.lib;
-    dispatch = genInputs.gen-dispatch.lib;
-    resolve = genInputs.gen-resolve.lib;
+    memo = (input "gen-memo").lib;
+    graph = (input "gen-graph").lib;
+    bind = (input "gen-bind").lib;
+    schema = (input "gen-schema").lib;
+    aspects = (input "gen-aspects").lib;
+    select = (input "gen-select").lib;
+    dispatch = (input "gen-dispatch").lib;
+    resolve = (input "gen-resolve").lib;
     # L2 concern libraries — each flake `.lib` self-resolves its own deps (product: prelude;
     # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
     # self-wiring libs above.
@@ -64,11 +78,11 @@ let
     #
     # All four repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
     # is deleted — and none of them gains a new consumer.
-    product = genInputs.gen-product.lib;
-    settings = genInputs.gen-settings.lib;
+    product = (input "gen-product").lib;
+    settings = (input "gen-settings").lib;
     # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
     # plainly like the other self-wiring libs.
-    link = genInputs.gen-link.lib;
+    link = (input "gen-link").lib;
     # ★★ TEMPORARY / WAY-STATION, and the marking is load-bearing rather than a note. The owner ruled
     # the name PROVISIONAL: "keep gen-view for now; we're going to fold its constructs into a
     # consolidated library later; gen-view is a temporary name." The CONSTRUCTS migrate at the
@@ -84,16 +98,16 @@ let
     # exist yet, and it is the live home in the meantime.
     #
     # Self-wiring like the block above: its flake `.lib` resolves its own gen-prelude and gen-graph.
-    view = genInputs.gen-view.lib;
+    view = (input "gen-view").lib;
 
     # gen-program turns a framework's policy declarations into a PROGRAM and reaches the solver
     # (gen-scope engine.solve). ADJACENT to the assembly layer, never inside it: gen-assemble's own
     # published principle is "The toolkit never evaluates", and this library's ruled purpose is to
     # evaluate through the sole evaluator (owner-ruled; policy spec R§2.11, O8). Entry landed when
     # content existed, per the ruled roster timing.
-    program = genInputs.gen-program.lib {
-      prelude = genInputs.gen-prelude.lib;
-      scope = genInputs.gen-scope.lib;
+    program = (input "gen-program").lib {
+      prelude = (input "gen-prelude").lib;
+      scope = (input "gen-scope").lib;
     };
     # gen-delivery is the DELIVERY-CLASS REALIZATION SURFACE (ADR-0028): the projection that
     # discovers which aspect keys are declared delivery classes and the fold that hands each
@@ -101,16 +115,16 @@ let
     # declares no inputs and takes its substrate injected, so the hub wires it rather than
     # re-exporting a self-resolved `.lib` — and a consumer taking this input gains no transitive
     # pin from it. Entry landed when content existed, per the ruled roster timing.
-    delivery = genInputs.gen-delivery.lib {
-      algebra = genInputs.gen-algebra.lib;
-      aspects = genInputs.gen-aspects.lib;
+    delivery = (input "gen-delivery").lib {
+      algebra = (input "gen-algebra").lib;
+      aspects = (input "gen-aspects").lib;
     };
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
-    class = import "${genInputs.gen-class}/lib" {
-      prelude = genInputs.gen-prelude.lib;
-      merge = genInputs.gen-merge.lib;
+    class = import "${(input "gen-class")}/lib" {
+      prelude = (input "gen-prelude").lib;
+      merge = (input "gen-merge").lib;
     };
 
     # gen-assemble declares NO inputs at all: the shared framework toolkit takes its whole substrate
@@ -118,10 +132,10 @@ let
     # gen↔gen boundary rule asks of a library that composes another's constructor. So the hub wires
     # it the way it wires gen-class rather than re-exporting a self-resolved `.lib` — and a consumer
     # taking this input gains no transitive pin from it.
-    assemble = import "${genInputs.gen-assemble}/lib" {
-      prelude = genInputs.gen-prelude.lib;
-      scope = genInputs.gen-scope.lib;
-      algebra = genInputs.gen-algebra.lib;
+    assemble = import "${(input "gen-assemble")}/lib" {
+      prelude = (input "gen-prelude").lib;
+      scope = (input "gen-scope").lib;
+      algebra = (input "gen-algebra").lib;
     };
 
     # The stratum declaration — which layer of the stack each member belongs to. It is TOTAL and
