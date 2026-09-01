@@ -132,8 +132,10 @@
       # Forces every key of the hub's published `gen.lib.mkGenLibs` so a broken lib wiring (bad pin
       # bump, drifted `.lib` signature) or a roster drift fails `nix flake check ./ci`. It also holds
       # the stratum partition: total declaration, published buckets matching it, and each bucket
-      # entry the same value as its flat member. `.gate` is the per-key wiring-ok record + the roster
-      # and stratum tripwires; `.gateKeys` the keys that MUST be `true`.
+      # entry the same value as its flat member, and the published EXPORT SURFACE: each member's
+      # published names fingerprinted against a hand-maintained pin, so a pin bump that CHANGES what
+      # a member publishes reddens as well as one that breaks it. `.gate` is the per-key wiring-ok
+      # record + the roster, stratum and surface tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
       # ── agents-md-hub-inputs — the AGENTS.md hub-input sheet, CI-bound (den-hoag-bzcb4) ──
@@ -272,6 +274,9 @@
                   bucketOverlap
                   resolveFailed
                   agreeFailed
+                  surfaceHash
+                  surfaceDrift
+                  surfaceDriftNames
                   ;
               };
             in
