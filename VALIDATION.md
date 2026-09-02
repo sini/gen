@@ -260,25 +260,25 @@ unforced flake input, not the witness.
 Every gen library ships a nix-unit suite. The counts below are the `N/N successful` figure
 nix-unit prints — i.e. every listed test **executed and passed** — at the recorded revision.
 
-| Library                                           | rev       |    tests | suite artifact             |
-| ------------------------------------------------- | --------- | -------: | -------------------------- |
-| gen-prelude                                       | `968579c` |       41 | `ci/tests/`                |
-| gen-algebra                                       | `40147f4` |      128 | `ci/tests/`                |
-| gen-types                                         | `3513399` |      105 | `ci/tests/`                |
-| gen-merge                                         | `fdbf140` |      167 | `ci/tests/` (detail below) |
-| gen-schema                                        | `05a18be` |      398 | `ci/tests/`                |
-| gen-aspects                                       | `dda5ab2` |      110 | `ci/tests/`                |
-| gen-scope                                         | `8599e5f` |      167 | `ci/tests/`                |
-| gen-graph                                         | `df7c893` |      153 | `ci/tests/`                |
-| gen-select                                        | `7b1cdae` |      104 | `ci/tests/`                |
-| gen-bind                                          | `f08a103` |       65 | `ci/tests/`                |
-| gen-dispatch                                      | `f2956fb` |       55 | `ci/tests/`                |
-| gen-resolve — orphaned as reference (ADR-0008 §4) | `d429eb3` |       58 | `ci/tests/`                |
-| gen-flake — orphaned as reference (ADR-0031 F3)   | `88f639c` |       89 | `ci/tests/` (detail below) |
-| gen-class                                         | `218c54f` |       90 | `ci/tests/`                |
-| gen-rebuild                                       | `7a87691` |      211 | `ci/tests/`                |
-| gen-vars                                          | `56d1911` |       47 | `ci/tests/`                |
-| **total**                                         |           | **1988** |                            |
+| Library                                                       | rev       |    tests | suite artifact             |
+| ------------------------------------------------------------- | --------- | -------: | -------------------------- |
+| gen-prelude                                                   | `968579c` |       41 | `ci/tests/`                |
+| gen-algebra                                                   | `40147f4` |      128 | `ci/tests/`                |
+| gen-types                                                     | `3513399` |      105 | `ci/tests/`                |
+| gen-merge                                                     | `fdbf140` |      167 | `ci/tests/` (detail below) |
+| gen-schema                                                    | `05a18be` |      398 | `ci/tests/`                |
+| gen-aspects                                                   | `dda5ab2` |      110 | `ci/tests/`                |
+| gen-scope                                                     | `8599e5f` |      167 | `ci/tests/`                |
+| gen-graph                                                     | `df7c893` |      153 | `ci/tests/`                |
+| gen-select                                                    | `7b1cdae` |      104 | `ci/tests/`                |
+| gen-bind                                                      | `f08a103` |       65 | `ci/tests/`                |
+| gen-dispatch                                                  | `f2956fb` |       55 | `ci/tests/`                |
+| gen-resolve — orphaned as reference (ADR-0008 §4)             | `d429eb3` |       58 | `ci/tests/`                |
+| gen-flake — orphaned as reference (ADR-0031 F3)               | `88f639c` |       89 | `ci/tests/` (detail below) |
+| gen-class                                                     | `218c54f` |       90 | `ci/tests/`                |
+| gen-rebuild — archived for reference (ADR-0008 §4 / ADR-0005) | `7a87691` |      211 | `ci/tests/`                |
+| gen-vars                                                      | `56d1911` |       47 | `ci/tests/`                |
+| **total**                                                     |           | **1988** |                            |
 
 - **Command (gate):** clone the repo, then from its root `nix flake check ./ci`.
 - **Command (count):** `nix develop ./ci -c nix-unit --flake ./ci#tests` prints the `N/N successful`
