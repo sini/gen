@@ -30,7 +30,6 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `select`             | `gen-select` — "gen-select: selector algebra for attributed graph positions"                                                                                                                                                                 |
 | `bind`               | `gen-bind` — "gen-bind: module binding with external arguments for Nix"                                                                                                                                                                      |
 | `dispatch`           | `gen-dispatch` — "gen-dispatch: relational rule dispatch over ordered groups (the dispatch STEP)"                                                                                                                                            |
-| `resolve`            | `gen-resolve` — "gen-resolve — demand-driven higher-order RAG evaluator over algebraic scope graphs (Knuth 1968 attribute schedule + Vogt 1989 HOAG)"                                                                                        |
 | `class`              | `gen-class` — "gen-class — pure-Nix class-share mechanism (partition / contract / apply / gate) for the pure-gen module system"                                                                                                              |
 | `product`            | `gen-product` — "gen-product — graph products as first-class operations over accessor-graphs (Cartesian / tensor / strong / lexicographic; cells, slices, fibers, projections, quotients, restriction, containment chains), lazy in and out" |
 | `settings`           | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct"                                                                     |
@@ -64,7 +63,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 <!-- gen-inputs:begin -->
 
 ```json
-["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-resolve","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
+["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
 
 <!-- gen-inputs:end -->

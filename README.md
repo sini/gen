@@ -66,7 +66,6 @@ does *not* own, and which sibling does.
 | [gen-scope](https://github.com/sini/gen-scope)     | The higher-order attribute grammar (HOAG) evaluator: you supply root descriptors and attribute definitions, and `eval` returns an accessor record whose attributes compute lazily and memoize on an `_eval` cache co-located on each node                                                                                                                                                                                       |
 | [gen-graph](https://github.com/sini/gen-graph)     | Accessor-based graph queries: the caller supplies `edges` / `nodes` / `parent` / `nodeData` as plain functions, and gen-graph answers reachability, SCC condensation, phase order, edge-map algebra, pre-order folds and label-regex queries over them — it never stores the graph                                                                                                                                              |
 | [gen-select](https://github.com/sini/gen-select)   | Selector algebra over attributed graph positions: `{ __sel = tag; … }` predicate values evaluated against a caller-supplied five-accessor context. Identity-bearing selectors match by `id_hash` or kind, never by `"kind:name"` strings                                                                                                                                                                                        |
-| [gen-resolve](https://github.com/sini/gen-resolve) | The reference attribute grammar (RAG) evaluator and the convergence loop: folds semantic equations into a sealed `ResolveCtx` through `gen-scope.eval`, owning only the static attribute-dependency schedule and the cold/warm fold                                                                                                                                                                                             |
 | [gen-product](https://github.com/sini/gen-product) | Graph products as first-class operations over accessor-graphs — Cartesian, tensor, strong, lexicographic — plus cells, slices, fibers, projections, quotients, sparse restriction and containment chains. Lazy in, lazy out                                                                                                                                                                                                     |
 | [gen-memo](https://github.com/sini/gen-memo)       | The incremental plane over the sole evaluator: a decision layer that never evaluates, only decides reuse. Inherits gen-resolve's warm fold plus override cone and gen-rebuild's dirty-cone propagation; its theory is Mokhov 2018 / RTD, and its DEFINITION is the byte-parity oracle against a cold evaluation — a plane output must be byte-identical to what the cold engine produces                                        |
 | [gen-view](https://github.com/sini/gen-view)       | *Temporary/way-station name (owner-ruled, ADR-0015 as amended) — the marking travels with every citation; its constructs migrate into a consolidated library later.* The substrate's derived-view constructor: the `(L, E, <, k)` carrier with van Antwerpen's relation sort published as a raw calculus, and the named compositions over it — the fourth destination for gen-edge and gen-pipe's retired content (ADR-0010 §3) |
@@ -296,16 +295,19 @@ gen.lib.framework   assemble delivery program settings
 `framework` (gen-assemble, gen-delivery, gen-program, gen-settings) sits above the stack rather than in
 it — a configuration framework assembles with it, and no substrate vocabulary is defined in its terms —
 but it still publishes `gen.lib.framework`, a roster selection per ADR-0015 as amended and never a
-re-export, so a bucket path and the flat name are one value and one build. `retiring` (gen-resolve) is
-the one value that publishes nothing: it marks a member whose content is moving elsewhere, still
-reachable on the flat roster, deliberately not offered as something to adopt. That keeps the declaration
+re-export, so a bucket path and the flat name are one value and one build. `retiring` is the one value
+that publishes nothing: it marks a member whose obligations are moving elsewhere, still reachable on the
+flat roster, deliberately not offered as something to adopt. That keeps the declaration
 total without inviting a consumer onto a path that is about to close. The end
-of the `retiring` path is leaving the roster once the content has landed — dropping the binding, the
-stratum line and the hub pin together, with the repository orphaned for reference rather than deleted.
-Four members have reached it: gen-demand took it first (ADR-0008 §4), gen-edge and gen-pipe
-walked it together on ADR-0010 §3 once their content landed in gen-view, and gen-flake completed it
-under ADR-0031 once its surfaces dissolved to their successors. The bucket is not a waiting
-room — a member sits in it only while its destination is still being built.
+of the `retiring` path is leaving the roster once every obligation the member carries has a named
+destination or a stated dissolution — dropping the binding, the stratum line and the hub pin together,
+with the repository orphaned for reference rather than deleted.
+Five members have reached it: gen-demand took it first (ADR-0008 §4), gen-edge and gen-pipe
+walked it together on ADR-0010 §3 once their content landed in gen-view, gen-flake completed it
+under ADR-0031 once its surfaces dissolved to their successors, and gen-resolve left on the
+2026-09-02 transfer ruling with its eleven exports dispositioned row by row (the roster file records
+the destinations). The bucket is not a waiting room — a member sits in it only while that disposition
+is still being settled — and it is **empty today**.
 
 ### Dependency tiers
 
@@ -329,8 +331,7 @@ gen-dispatch  ← prelude
 gen-product   ← prelude
 gen-class     ← prelude (+ gen-merge injected by the hub for tier 2)
 gen-settings  ← prelude, algebra, bind, graph
-gen-resolve   ← scope, graph, algebra, bind
-gen-link      ← prelude, scope, resolve, schema, algebra, aspects
+gen-link      ← prelude, scope, view, schema, algebra, aspects
 ```
 
 Libraries never import each other's flake inputs to reach a sibling's data — gen-select does not

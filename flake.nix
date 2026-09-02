@@ -20,7 +20,6 @@
     gen-select.url = "github:sini/gen-select";
     gen-bind.url = "github:sini/gen-bind";
     gen-dispatch.url = "github:sini/gen-dispatch";
-    gen-resolve.url = "github:sini/gen-resolve";
     gen-class.url = "github:sini/gen-class";
     gen-product.url = "github:sini/gen-product";
     gen-settings.url = "github:sini/gen-settings";

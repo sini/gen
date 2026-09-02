@@ -52,7 +52,6 @@ let
     "prelude"
     "product"
     "program"
-    "resolve"
     "schema"
     "scope"
     "select"
@@ -216,7 +215,6 @@ let
     prelude = "e5952bf9aeaf3603ae9a4641c71ad919e95cb5f7afaf24a968a58c8a85ddfd2f";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "7130554cb9c62b62122583e52459f46232d33b557b945388e60575abaa1cf952";
-    resolve = "23884276bd9e93b57aa4c2cd64eedb3ea67c4b6b7a79468ecfd4227900a34a69";
     schema = "96d6030ffe8cd5a4252a16989fe15d39dad5901cecbfb46d70ff8ac966f2463b";
     scope = "293b20b1b90fc8d27342d8265bd76e09a628c375520247abc396e99a47c7e2f8";
     select = "a1851c2323fa25fe4be9318d3dd0eec1a8ee10708eec82bdb2bb3cb0f0b27d86";

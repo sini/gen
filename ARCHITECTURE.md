@@ -26,7 +26,7 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
   mkGenLibs keys (the roster of record is lib/mkGenLibs.nix, never a count — ADR-0015):
     gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
     gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
-    gen-dispatch · gen-resolve · gen-class · gen-link
+    gen-dispatch · gen-class · gen-link
     gen-product · gen-settings · gen-assemble · gen-view · gen-identity · gen-program · gen-delivery
   standalone pure libs:
     gen-vars
@@ -38,6 +38,11 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
     gen-flake    → dissolved to per-surface successors: compose → this hub's `lib.compose` /
                    interim flakeModule; warm/override/trace → gen-memo; projection + realize →
                    gen-delivery; inject/terminals → the crossing's Adapter set (ADR-0031 F3)
+    gen-resolve  → left on the 2026-09-02 transfer ruling with its eleven exports dispositioned
+                   ROW BY ROW rather than moved as one content block: materialization vocabulary
+                   and the reference construct → gen-view; crossing terminal → gen-bind; schedule
+                   and the seal-level queries → gen-scope; the reuse key → gen-memo; `attr` and
+                   `cascade` dissolved by ruling (ADR-0008 §4; map at den-hoag-p3y9)
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and

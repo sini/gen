@@ -48,16 +48,23 @@ let
     aspects = (input "gen-aspects").lib;
     select = (input "gen-select").lib;
     dispatch = (input "gen-dispatch").lib;
-    resolve = (input "gen-resolve").lib;
     # L2 concern libraries — each flake `.lib` self-resolves its own deps (product: prelude;
     # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
     # self-wiring libs above.
     #
-    # FOUR MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling and each with its content
-    # landed somewhere else. The bindings are gone rather than commented out — a `retiring` member
-    # is still reachable and this is the state past that, where the hub no longer pins the input at
-    # all — but the rulings are recorded here because the roster is where a reader asks "why is
-    # there no `edge` key?" and an unanswered absence reads as a drop.
+    # FIVE MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling. The bindings are gone rather
+    # than commented out — a `retiring` member is still reachable and this is the state past that,
+    # where the hub no longer pins the input at all — but the rulings are recorded here because the
+    # roster is where a reader asks "why is there no `edge` key?" and an unanswered absence reads as
+    # a drop.
+    #
+    # WHAT LEAVES WITH A MEMBER IS ITS OBLIGATIONS, and they go to a NAMED DESTINATION or they are
+    # DISSOLVED WITH A REASON — owner-ruled 2026-09-02: "any obligations of a retired/retiring
+    # library transfer to their replacement -- if it's not relevant then the obligation dissolves
+    # and can be closed." The first four below leave with their CONTENT already landed elsewhere,
+    # which is the stronger case rather than the general one; a member may also leave on the
+    # transfer alone, its surface dispositioned row by row. Either way removal is not deletion:
+    # every repository below stays readable and keeps its surface.
     #
     #   gen-demand  ADR-0008 §4 retires it as a library; its cascade re-expresses over gen-scope,
     #               the sole evaluator (ADR-0006).
@@ -75,8 +82,17 @@ let
     #               in gen-memo, projection + realize in gen-delivery, inject/terminals at the
     #               crossing's Adapter set. Its repo orphans as reference per F3 (diff.nix stays
     #               there by explicit ruling).
+    #   gen-resolve ADR-0008 §4 retires it as a library, and it leaves on the TRANSFER above rather
+    #               than on a completed content move: its eleven published exports are
+    #               dispositioned ROW BY ROW — nine transfer to a named member (`view` takes the
+    #               materialization vocabulary and the reference construct, `bind` the crossing
+    #               terminal, `scope` the schedule and the seal-level queries, `memo` the reuse
+    #               key), two dissolve by ruling (`attr`, `cascade`), and two of the nine still
+    #               ride an open successor (`nta`, and `reference`'s `neededBy` reverse arm).
+    #               THE ROW-BY-ROW MAP IS den-hoag-p3y9; the sitting that dispositioned the
+    #               exports is den-hoag-8skr.
     #
-    # All four repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
+    # All five repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
     # is deleted — and none of them gains a new consumer.
     product = (input "gen-product").lib;
     settings = (input "gen-settings").lib;
@@ -152,14 +168,16 @@ let
     #              with this, and no substrate vocabulary may be defined in its terms
     #   retiring   on the roster and leaving it: its content is moving to another member, so it is
     #              still reachable but no consumer should newly adopt it. The end of that path is
-    #              removal from the roster once the content has landed — the member drops both
-    #              lines and the hub stops pinning it, and its repository is orphaned for
-    #              reference rather than deleted. That end has now been reached four times:
-    #              gen-demand (ADR-0008 §4) was the first, gen-edge and gen-pipe walked it
-    #              together on ADR-0010 §3 once their content landed in `view`, and gen-flake
-    #              completed it under ADR-0031 once its surfaces dissolved to their successors.
-    #              The value is not a waiting room — a member sits here only while its
-    #              destination is still being built, and `resolve` is what remains of that
+    #              removal from the roster once every obligation the member carries has a named
+    #              destination or a stated dissolution — the member drops both lines and the hub
+    #              stops pinning it, and its repository is orphaned for reference rather than
+    #              deleted. That end has now been reached five times: gen-demand (ADR-0008 §4) was
+    #              the first, gen-edge and gen-pipe walked it together on ADR-0010 §3 once their
+    #              content landed in `view`, gen-flake completed it under ADR-0031 once its
+    #              surfaces dissolved to their successors, and gen-resolve left on the 2026-09-02
+    #              transfer ruling with its exports dispositioned row by row (see the block above).
+    #              The value is not a waiting room — a member sits here only while that
+    #              disposition is still being settled, and no member sits here today.
     #
     # `substrate`, `modules`, `aspects` and `framework` publish consumer paths on the hub's `lib`
     # output (flake.nix). `retiring` publishes none: a consumer selecting a library on its way off
@@ -185,7 +203,6 @@ let
       aspects = "aspects";
       select = "substrate";
       dispatch = "substrate";
-      resolve = "retiring";
       product = "substrate";
       settings = "framework";
       assemble = "framework";
