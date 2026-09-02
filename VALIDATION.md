@@ -260,25 +260,25 @@ unforced flake input, not the witness.
 Every gen library ships a nix-unit suite. The counts below are the `N/N successful` figure
 nix-unit prints — i.e. every listed test **executed and passed** — at the recorded revision.
 
-| Library                                         | rev       |    tests | suite artifact             |
-| ----------------------------------------------- | --------- | -------: | -------------------------- |
-| gen-prelude                                     | `968579c` |       41 | `ci/tests/`                |
-| gen-algebra                                     | `40147f4` |      128 | `ci/tests/`                |
-| gen-types                                       | `3513399` |      105 | `ci/tests/`                |
-| gen-merge                                       | `fdbf140` |      167 | `ci/tests/` (detail below) |
-| gen-schema                                      | `05a18be` |      398 | `ci/tests/`                |
-| gen-aspects                                     | `dda5ab2` |      110 | `ci/tests/`                |
-| gen-scope                                       | `8599e5f` |      167 | `ci/tests/`                |
-| gen-graph                                       | `df7c893` |      153 | `ci/tests/`                |
-| gen-select                                      | `7b1cdae` |      104 | `ci/tests/`                |
-| gen-bind                                        | `f08a103` |       65 | `ci/tests/`                |
-| gen-dispatch                                    | `f2956fb` |       55 | `ci/tests/`                |
-| gen-resolve                                     | `d429eb3` |       58 | `ci/tests/`                |
-| gen-flake — orphaned as reference (ADR-0031 F3) | `88f639c` |       89 | `ci/tests/` (detail below) |
-| gen-class                                       | `218c54f` |       90 | `ci/tests/`                |
-| gen-rebuild                                     | `7a87691` |      211 | `ci/tests/`                |
-| gen-vars                                        | `56d1911` |       47 | `ci/tests/`                |
-| **total**                                       |           | **1988** |                            |
+| Library                                           | rev       |    tests | suite artifact             |
+| ------------------------------------------------- | --------- | -------: | -------------------------- |
+| gen-prelude                                       | `968579c` |       41 | `ci/tests/`                |
+| gen-algebra                                       | `40147f4` |      128 | `ci/tests/`                |
+| gen-types                                         | `3513399` |      105 | `ci/tests/`                |
+| gen-merge                                         | `fdbf140` |      167 | `ci/tests/` (detail below) |
+| gen-schema                                        | `05a18be` |      398 | `ci/tests/`                |
+| gen-aspects                                       | `dda5ab2` |      110 | `ci/tests/`                |
+| gen-scope                                         | `8599e5f` |      167 | `ci/tests/`                |
+| gen-graph                                         | `df7c893` |      153 | `ci/tests/`                |
+| gen-select                                        | `7b1cdae` |      104 | `ci/tests/`                |
+| gen-bind                                          | `f08a103` |       65 | `ci/tests/`                |
+| gen-dispatch                                      | `f2956fb` |       55 | `ci/tests/`                |
+| gen-resolve — orphaned as reference (ADR-0008 §4) | `d429eb3` |       58 | `ci/tests/`                |
+| gen-flake — orphaned as reference (ADR-0031 F3)   | `88f639c` |       89 | `ci/tests/` (detail below) |
+| gen-class                                         | `218c54f` |       90 | `ci/tests/`                |
+| gen-rebuild                                       | `7a87691` |      211 | `ci/tests/`                |
+| gen-vars                                          | `56d1911` |       47 | `ci/tests/`                |
+| **total**                                         |           | **1988** |                            |
 
 - **Command (gate):** clone the repo, then from its root `nix flake check ./ci`.
 - **Command (count):** `nix develop ./ci -c nix-unit --flake ./ci#tests` prints the `N/N successful`
@@ -377,15 +377,16 @@ The pure plane's core promise is that its libraries never touch `nixpkgs.lib` �
 `lib.evalModules`/`lib.types` **replacement**, so it must not call them. This is enforced, not
 asserted in prose.
 
-- **The token-scanner (27 libraries).** Each of gen-algebra, gen-aspects, gen-assemble, gen-bind,
+- **The token-scanner (28 libraries).** Each of gen-algebra, gen-aspects, gen-assemble, gen-bind,
   gen-class, gen-delivery, gen-differential, gen-dispatch, gen-graph, gen-identity, gen-link, gen-lsp,
-  gen-memo, gen-merge, gen-product, gen-program, gen-resolve, gen-schema, gen-scope, gen-select,
+  gen-memo, gen-merge, gen-prelude, gen-product, gen-program, gen-schema, gen-scope, gen-select,
   gen-settings and gen-view carries `ci/tests/purity.nix` — as do the retired gen-edge, gen-flake,
-  gen-pipe and gen-rebuild, whose scanners stand and still pass in their archived clones (gen-flake's
-  per ADR-0031 F3; gen-edge and gen-pipe per ADR-0010 §3; gen-rebuild per ADR-0008 §4 / ADR-0005 — all
-  four off the roster, not out of the enforcement record) — and gen-types carries the same scanner as
-  `ci/tests/types-purity.nix` — 27 in all. **The count is the output of a command, not a tally kept by
-  hand** — re-run it rather than trusting the number above:
+  gen-pipe, gen-rebuild and gen-resolve, whose scanners stand and still pass in their archived clones
+  (gen-flake's per ADR-0031 F3; gen-edge and gen-pipe per ADR-0010 §3; gen-rebuild per ADR-0008 §4 /
+  ADR-0005; gen-resolve per ADR-0008 §4 — all five off the roster, not out of the enforcement record)
+  — and gen-types carries the same scanner as `ci/tests/types-purity.nix` — 28 in all. **The count is
+  the output of a command, not a tally kept by hand** — re-run it rather than trusting the number
+  above:
 
   ```sh
   for d in gen-*; do

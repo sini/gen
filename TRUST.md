@@ -72,11 +72,14 @@ oracle's reference side legitimately use `nixpkgs.lib`.
 The token list is per library rather than uniform, because a library's own API names must stay legal:
 
 - **The pure siblings** — gen-algebra, gen-assemble, gen-bind, gen-dispatch, gen-graph, gen-identity,
-  gen-link, gen-memo, gen-program, gen-resolve, gen-scope, gen-select, gen-types, gen-view — ban
-  `lib.` outright, along with `nixpkgs`, the `{ lib }` / `{ lib,` parameter signatures, `evalModules`
-  and `mkOption`. No `lib.` call of any kind survives there (gen-assemble, gen-program and gen-view
-  each carry that exact six-token list verbatim in their own `ci/tests/purity.nix`). gen-identity's
-  scanner carries that same six-token list as its `forbiddenNixpkgs` half, then adds a second list no
+  gen-link, gen-memo, gen-program, gen-scope, gen-select, gen-types, gen-view, plus the orphaned
+  gen-resolve — ban `lib.` outright, along with `nixpkgs`, the `{ lib }` / `{ lib,` parameter
+  signatures, `evalModules` and `mkOption`. No `lib.` call of any kind survives there (gen-assemble,
+  gen-program and gen-view each carry that exact six-token list verbatim in their own
+  `ci/tests/purity.nix`). gen-resolve is named for the same reason the retired repositories are named
+  below — its scanner still stands and still passes in its orphaned clone, and it is no longer a
+  roster member or a hub input (ADR-0008 §4). gen-identity's scanner carries that same six-token list
+  as its `forbiddenNixpkgs` half, then adds a second list no
   other member carries — `forbiddenSubstrate` bans every gen substrate identifier by name (`prelude`,
   `merge`, `algebra`, `schema`, `scope`, `graph`, `aspects`, `types`), because this library's claim is
   dependency-free rather than merely nixpkgs-lib-free (the one minting authority upstream of

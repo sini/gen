@@ -18,7 +18,7 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
   - [gen-select](#gen-select--selector-algebra)
   - [gen-bind](#gen-bind--module-binding)
   - [gen-dispatch](#gen-dispatch--relational-rule-dispatch-step)
-  - [gen-resolve](#gen-resolve--rag-evaluator--convergence-loop)
+  - [gen-resolve](#gen-resolve--rag-evaluator--convergence-loop-orphaned-as-reference)
   - [gen-flake](#gen-flake--value-injection-boundary-orphaned-as-reference)
   - [gen-edge](#gen-edge--content-movement-contract-retired)
   - [gen-product](#gen-product--graph-products)
@@ -307,9 +307,9 @@ Pure relational rule dispatch — **rule evaluation only**, a function of `(rule
 | **Rule Composition**              | `restrict` (narrow condition), `override` (replace rule), `chain` (sequential: A's actions feed B).                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Inspired by Batory 2005 (AHEAD feature algebra); named operations are gen-dispatch's design       |
 | **Adapter**                       | gen-select bridge: `adapters.select.mkMatch` bridges selectors as conditions; `selectorSpecificity` for conflict resolution.                                                                                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                 |
 
-### gen-resolve — RAG Evaluator + Convergence Loop
+### gen-resolve — RAG Evaluator + Convergence Loop (ORPHANED AS REFERENCE)
 
-Demand-driven RAG evaluator over scope graphs. Owns the **convergence loop** that the dispatch step lacks. Class B: four gen siblings (gen-scope, gen-graph, gen-algebra, gen-bind).
+**Orphaned as reference under ADR-0008 §4 — off the roster, not a hub input, take no new dependency on it.** Demand-driven RAG evaluator over scope graphs. It owned the **convergence loop** that the dispatch step lacks. It was Class B with four gen siblings (gen-scope, gen-graph, gen-algebra, gen-bind).
 
 | Term                      | Definition                                                                                                                                                                           | Provenance                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
