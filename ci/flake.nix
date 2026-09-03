@@ -546,6 +546,20 @@
               formatter = self'.formatter;
               expected = mdformatBase.names;
             };
+
+            # The hub reaches this gate through `lib.checks` rather than the flake module,
+            # because it is not an mkCi consumer — and the hub's ci is exactly the case that
+            # symbol is published for. Its sheet is gated for the same reason the hub-input block
+            # above is: the repository that ships a gate is gated by it.
+            #
+            # `sourceInfo.outPath` and NOT `outPath`: this subflake is `?dir=ci`, so the latter
+            # is `<root>/ci` and both the sheet and the suite corpus would be sought one
+            # directory down, where the check would resolve nothing and say so.
+            agents-md-citations = inputs.gen-harness.lib.checks.agentsMdCitations {
+              inherit pkgs;
+              name = "gen";
+              root = self.sourceInfo.outPath;
+            };
           };
 
           apps.perf-bench = {
