@@ -40,9 +40,17 @@ The gen ecosystem is a set of decoupled Nix libraries that together provide the 
                    gen-delivery; inject/terminals → the crossing's Adapter set (ADR-0031 F3)
     gen-resolve  → left on the 2026-09-02 transfer ruling with its eleven exports dispositioned
                    ROW BY ROW rather than moved as one content block: materialization vocabulary
-                   and the reference construct → gen-view; crossing terminal → gen-bind; schedule
-                   and the seal-level queries → gen-scope; the reuse key → gen-memo; `attr` and
+                   and the reference construct → gen-view; crossing terminal → gen-bind; the
+                   seal-level queries → gen-scope; the reuse key → gen-memo; `attr` and
                    `cascade` dissolved by ruling (ADR-0008 §4; map at den-hoag-p3y9)
+                   ★ STRUCK 2026-09-03 — this row read "schedule and the seal-level queries →
+                   gen-scope", and the static SCHEDULE's destination is NOT gen-scope. The owner
+                   RULED it "THE QUERY-GATE HOME" (2026-08-11, den-hoag-ui5c; engine-spec R§5.2).
+                   That referent has NEVER been resolved to a named library — ADR-0008 §3's "no
+                   standalone analysis library" constrains the answer without supplying it — and
+                   the struck destination is unexecuted at the substrate (gen-scope.lib ⇒ 89
+                   exports, 0 matching [Ss]chedul, at a73bb80). Carrier resolving the referent:
+                   den-hoag-query-gate-home-static-schedule-6poeg
 ```
 
 The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
