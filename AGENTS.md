@@ -242,7 +242,7 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 Current output (verbatim):
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","resolve","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
 ```
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`
