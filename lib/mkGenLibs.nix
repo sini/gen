@@ -83,14 +83,24 @@ let
     #               crossing's Adapter set. Its repo orphans as reference per F3 (diff.nix stays
     #               there by explicit ruling).
     #   gen-resolve ADR-0008 §4 retires it as a library, and it leaves on the TRANSFER above rather
-    #               than on a completed content move: its eleven published exports are
-    #               dispositioned ROW BY ROW — nine transfer to a named member (`view` takes the
-    #               materialization vocabulary and the reference construct, `bind` the crossing
-    #               terminal, `scope` the schedule and the seal-level queries, `memo` the reuse
-    #               key), two dissolve by ruling (`attr`, `cascade`), and two of the nine still
-    #               ride an open successor (`nta`, and `reference`'s `neededBy` reverse arm).
-    #               THE ROW-BY-ROW MAP IS den-hoag-p3y9; the sitting that dispositioned the
-    #               exports is den-hoag-8skr.
+    #               than on a completed content move: its published exports are dispositioned ROW
+    #               BY ROW — `view` takes the materialization vocabulary and the reference
+    #               construct, `bind` the crossing terminal, `scope` the seal-level queries, `memo`
+    #               the reuse key, two dissolve by ruling (`attr`, `cascade`), and two of the
+    #               transfers still ride an open successor (`nta`, and `reference`'s `neededBy`
+    #               reverse arm). THE ROW-BY-ROW MAP IS den-hoag-p3y9; the 2026-08-15 sitting that
+    #               dispositioned the ELEVEN is den-hoag-8skr.
+    #               ★ `_buildSchedule` AND `_scheduleWith` ARE NOT AMONG THAT ELEVEN AND THIS
+    #               ROSTER ASSERTS NO DESTINATION FOR THEM. den-hoag-8skr HELD THEM OUT
+    #               deliberately — they travel with the static-schedule phase, which engine-spec
+    #               R§1.2 sequences OUT — so it is not authority for placing them anywhere. The
+    #               owner ruled their home on 2026-08-11 (den-hoag-ui5c OPEN 4(a), normative at
+    #               engine-spec R§5.2) and that ruling REJECTED `scope`, which was arm 4(b); an
+    #               earlier form of this row asserted `scope` anyway, on 8skr's authority. WHICH
+    #               MEMBER instantiates the ruled home is an OPEN owner reading, so this row names
+    #               none — den-hoag-roster-wrong-schedule-destination-cbpfc. gen-scope's own
+    #               lib/fold-equations.nix agrees it is not the builder: the schedule arrives
+    #               there validated.
     #
     # All five repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
     # is deleted — and none of them gains a new consumer.
