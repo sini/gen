@@ -175,6 +175,27 @@
       # run.
       directionOfDependence = import ./direction-of-dependence.nix { inherit (inputs) gen; };
 
+      # ── sole-evaluator scan ──
+      # ADR-0006's enforcement half, and readiness-bar term T2(a)'s instrument: gen-scope is the
+      # sole evaluator, so no other tree in the scanned domain — the roster read by evaluation,
+      # plus the hub — may exhibit an evaluation-driving construct. The ruled DOMAIN is a property
+      # ("anything that evaluates, wherever hosted"), which is not statically decidable, so the
+      # criterion UNDER-approximates it and the check says so on every run: a green is a statement
+      # about the instrument's reach, never about the property. `domain-total` is the tripwire — the
+      # roster ENUMERATES and `ci/flake.lock` NOTIFIES, so a tree the walk would be blind to is red
+      # rather than absent. `.gate` is the per-arm record incl. the in-tree arming.
+      #
+      # `hubSource` is `self.sourceInfo.outPath` and NOT `inputs.gen.outPath`: the hub enters this
+      # lock as `path:..`, whose fetcher copies the raw directory — `.git`, `.direnv`, `result`
+      # symlinks and any `.worktrees/` checkout come with it, and the scan's population would then
+      # move with a developer's local state. Same value, and the same reason, as the
+      # `agents-md-citations` wiring below.
+      soleEvaluator = import ./sole-evaluator.nix {
+        inherit (inputs) gen;
+        inherit lib;
+        hubSource = self.sourceInfo.outPath;
+      };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -210,6 +231,8 @@
       flake.lib.declaredContent = declaredContent;
       #   nix eval ./ci#lib.direction.report --json | jq
       flake.lib.direction = directionOfDependence;
+      #   nix eval ./ci#lib.soleEvaluator.report --json | jq
+      flake.lib.soleEvaluator = soleEvaluator;
 
       perSystem =
         {
@@ -352,6 +375,35 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "DIRECTION OF DEPENDENCE — a roster member declares an input above its own stratum, or the guard's own arming stopped firing" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the sole-evaluator check: prints the full report — the class tallies, every tree a
+          # reader must act on named with the FILE AND LINE of each match, the three ruled entry
+          # sets entry by entry with their causes and carriers, the per-tree read/excluded counts
+          # and the arming — and FAILS the build if any gate arm is not `true`. Same shape as
+          # `mkDirectionCheck`, and a failing arm is read the same way: either the lint firing (a
+          # tree outside gen-scope exhibits the criterion) or an arming arm that stopped firing (the
+          # scan gone blind), and both are red.
+          mkSoleEvaluatorCheck =
+            name: s:
+            let
+              allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "SOLE EVALUATOR — a tree in the scanned domain exhibits an evaluation construct outside gen-scope, or the scan's own arming stopped firing. A refusal is the RULED PROPERTY being true of that tree: it is disposed of by an exception entry carrying a cause and a carrier, or by the reading standing — NEVER by narrowing the criterion until the tree passes" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -527,6 +579,7 @@
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
+            sole-evaluator = mkSoleEvaluatorCheck "sole-evaluator" soleEvaluator;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.
