@@ -7,25 +7,94 @@
     # repository declares them itself, so here they were reachable from nothing.
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
 
+    # ── THE ROSTER — and every cross-dependency edge follows back to this list ──
+    # One `follows` line per sibling edge, so a gen library resolves to exactly ONE version across
+    # the whole graph. Without them nix must materialise a node per (input, path): 90 of 114 nodes
+    # in this lock were duplicates, `gen-prelude` alone reaching 44 copies, and a lock read by node
+    # NAME then returns a transitive copy rather than the pin the hub declares.
+    #
+    # The convergence is the point rather than a tidy-up. A member that cannot evaluate against the
+    # hub's rev of a sibling now reds its own check, where the divergence used to be silent and
+    # permanent — that failure is a regression caught, not a price paid for the dedup.
+    #
+    # The list is DERIVED: each line mirrors an edge the sibling's own flake declares. A sibling
+    # that grows an input needs its line here, or that one input re-forks while the rest converge.
     gen-prelude.url = "github:sini/gen-prelude";
     gen-identity.url = "github:sini/gen-identity";
     gen-algebra.url = "github:sini/gen-algebra";
+
     gen-types.url = "github:sini/gen-types";
+    gen-types.inputs.gen-identity.follows = "gen-identity";
+    gen-types.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-merge.url = "github:sini/gen-merge";
+    gen-merge.inputs.gen-prelude.follows = "gen-prelude";
+    gen-merge.inputs.gen-types.follows = "gen-types";
+
     gen-schema.url = "github:sini/gen-schema";
+    gen-schema.inputs.gen-algebra.follows = "gen-algebra";
+    gen-schema.inputs.gen-identity.follows = "gen-identity";
+    gen-schema.inputs.gen-merge.follows = "gen-merge";
+    gen-schema.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-aspects.url = "github:sini/gen-aspects";
+    gen-aspects.inputs.gen-identity.follows = "gen-identity";
+    gen-aspects.inputs.gen-merge.follows = "gen-merge";
+    gen-aspects.inputs.gen-prelude.follows = "gen-prelude";
+    gen-aspects.inputs.gen-schema.follows = "gen-schema";
+
     gen-scope.url = "github:sini/gen-scope";
+    gen-scope.inputs.gen-graph.follows = "gen-graph";
+    gen-scope.inputs.gen-identity.follows = "gen-identity";
+    gen-scope.inputs.gen-prelude.follows = "gen-prelude";
+    gen-scope.inputs.gen-schema.follows = "gen-schema";
+
     gen-memo.url = "github:sini/gen-memo";
+    gen-memo.inputs.gen-graph.follows = "gen-graph";
+    gen-memo.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-graph.url = "github:sini/gen-graph";
+    gen-graph.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-select.url = "github:sini/gen-select";
+    gen-select.inputs.gen-algebra.follows = "gen-algebra";
+
     gen-bind.url = "github:sini/gen-bind";
+    gen-bind.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-dispatch.url = "github:sini/gen-dispatch";
+    gen-dispatch.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-class.url = "github:sini/gen-class";
+    gen-class.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-product.url = "github:sini/gen-product";
+    gen-product.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-settings.url = "github:sini/gen-settings";
+    gen-settings.inputs.gen-algebra.follows = "gen-algebra";
+    gen-settings.inputs.gen-bind.follows = "gen-bind";
+    gen-settings.inputs.gen-graph.follows = "gen-graph";
+    gen-settings.inputs.gen-identity.follows = "gen-identity";
+    gen-settings.inputs.gen-prelude.follows = "gen-prelude";
+    gen-settings.inputs.gen-schema.follows = "gen-schema";
+    gen-settings.inputs.gen-types.follows = "gen-types";
+
     gen-link.url = "github:sini/gen-link";
+    gen-link.inputs.gen-algebra.follows = "gen-algebra";
+    gen-link.inputs.gen-aspects.follows = "gen-aspects";
+    gen-link.inputs.gen-identity.follows = "gen-identity";
+    gen-link.inputs.gen-prelude.follows = "gen-prelude";
+    gen-link.inputs.gen-schema.follows = "gen-schema";
+    gen-link.inputs.gen-scope.follows = "gen-scope";
+    gen-link.inputs.gen-view.follows = "gen-view";
+
     gen-assemble.url = "github:sini/gen-assemble";
+
     gen-view.url = "github:sini/gen-view";
+    gen-view.inputs.gen-graph.follows = "gen-graph";
+    gen-view.inputs.gen-prelude.follows = "gen-prelude";
+
     gen-program.url = "github:sini/gen-program";
     gen-delivery.url = "github:sini/gen-delivery";
 
