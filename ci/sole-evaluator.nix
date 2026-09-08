@@ -312,13 +312,19 @@ let
       builtins.filter (e: e.type == "directory" && builtins.elem e.entry excludedDirs) (topEntries t.src)
     );
 
-  # ── THE STRIP: `#` LINE COMMENTS AND STRING-LITERAL BODIES, INTERPOLATION-AWARE ──
-  # A `#` starts a comment only OUTSIDE any string — Nix gives it no meaning inside one, so a
-  # stripper that cuts on a bare `#` regardless of context truncates live code whenever a string
-  # contains one (`"aspect(${a.name}#${h})"` was a real, measured instance: the naive cut read
-  # that line as ending at the `#`, discarding everything after with no signal). A string's own
-  # text is not evaluated code either, so it is blanked from matching for the same reason a
-  # comment is — EXCEPT a `${ ... }` interpolation inside a string IS evaluated code, and
+  # ── THE STRIP: STRING-LITERAL BODIES, INTERPOLATION-AWARE ──
+  # Comments are ALREADY stripped, by the pre-existing `cut` below (unchanged) — a `#` starts a
+  # comment only OUTSIDE any string, and `cut`'s naive "first `#` on the line" search is sound
+  # exactly because THIS function runs first and removes every literal `#` a string body could
+  # contain, structurally closing the one soundness gap `cut` had on its own (a `#` inside a
+  # string would otherwise let `cut` truncate real code after it, with no signal — the ORIGINAL
+  # file carried a `stripPremiseBreaches` diagnostic reporting exactly that gap, "reported and
+  # not gated"; composing this strip ahead of `cut` makes the gap's own premise provably true
+  # rather than merely asserted, so that diagnostic is now vacuous by construction and has been
+  # removed rather than kept as dead weight).
+  #
+  # A string's own text is not evaluated code, so it is blanked from matching for the same reason
+  # a comment is — EXCEPT a `${ ... }` interpolation inside a string IS evaluated code, and
   # blanking it would be exactly the MISS this file's opening section warns against: a construct
   # reached only through a string interpolation must still be caught. Blanking replaces a
   # character with a space and NEVER a newline, so line numbers and line COUNT stay identical to
@@ -342,9 +348,9 @@ let
       lines = lib.splitString "\n" text;
 
       # Per-CHARACTER decision, unchanged from the flat design and unit-verified there: given the
-      # current frame stack / comment state and the three lookahead characters, decide this
-      # character's classification and the next state. Only the SCOPE changed — one line's
-      # characters, not the whole file's — because that scope is what the reach fix below needs.
+      # current frame stack and the three lookahead characters, decide this character's
+      # classification and the next state. Only the SCOPE changed — one line's characters, not
+      # the whole file's — because that scope is what the reach fix below needs.
       decideAt =
         s: chars: n: i:
         let
@@ -354,61 +360,41 @@ let
           c1 = at (i + 1);
           c2 = at (i + 2);
         in
-        if s.inComment then
-          {
-            kind = "blank";
-            stack = s.stack;
-            inComment = true;
-            skip = 0;
-          }
-        else if top.t == "top" || top.t == "interp" then
-          if c == "#" then
-            {
-              kind = "blank";
-              stack = s.stack;
-              inComment = true;
-              skip = 0;
-            }
-          else if c == "\"" then
+        if top.t == "top" || top.t == "interp" then
+          if c == "\"" then
             {
               kind = "blank";
               stack = [ { t = "dstr"; } ] ++ s.stack;
-              inComment = false;
               skip = 0;
             }
           else if c == "'" && c1 == "'" then
             {
               kind = "blank";
               stack = [ { t = "istr"; } ] ++ s.stack;
-              inComment = false;
               skip = 1;
             }
           else if top.t == "interp" && c == "{" then
             {
               kind = "keep";
               stack = [ (top // { depth = top.depth + 1; }) ] ++ (lib.tail s.stack);
-              inComment = false;
               skip = 0;
             }
           else if top.t == "interp" && c == "}" && top.depth == 0 then
             {
               kind = "blank";
               stack = lib.tail s.stack;
-              inComment = false;
               skip = 0;
             }
           else if top.t == "interp" && c == "}" then
             {
               kind = "keep";
               stack = [ (top // { depth = top.depth - 1; }) ] ++ (lib.tail s.stack);
-              inComment = false;
               skip = 0;
             }
           else
             {
               kind = "keep";
               stack = s.stack;
-              inComment = false;
               skip = 0;
             }
         else if top.t == "dstr" then
@@ -416,14 +402,12 @@ let
             {
               kind = "blank";
               stack = s.stack;
-              inComment = false;
               skip = 1;
             }
           else if c == "\"" then
             {
               kind = "blank";
               stack = lib.tail s.stack;
-              inComment = false;
               skip = 0;
             }
           else if c == "$" && c1 == "{" then
@@ -436,14 +420,12 @@ let
                 }
               ]
               ++ s.stack;
-              inComment = false;
               skip = 1;
             }
           else
             {
               kind = "blank";
               stack = s.stack;
-              inComment = false;
               skip = 0;
             }
         else
@@ -452,21 +434,18 @@ let
           {
             kind = "blank";
             stack = s.stack;
-            inComment = false;
             skip = 2;
           }
         else if c == "'" && c1 == "'" && c2 == "\\" then
           {
             kind = "blank";
             stack = s.stack;
-            inComment = false;
             skip = 3;
           }
         else if c == "'" && c1 == "'" then
           {
             kind = "blank";
             stack = lib.tail s.stack;
-            inComment = false;
             skip = 1;
           }
         else if c == "$" && c1 == "{" then
@@ -479,31 +458,29 @@ let
               }
             ]
             ++ s.stack;
-            inComment = false;
             skip = 1;
           }
         else
           {
             kind = "blank";
             stack = s.stack;
-            inComment = false;
             skip = 0;
           };
 
       # ★ THE REACH FIX — one `lib.foldl'` per FILE CHARACTER overflows the evaluator's own C
       # stack on a real corpus file: gen-merge's `lib/modules.nix` is 98,901 bytes, well past the
-      # ~60,000-element depth this project measured safe for a trivial accumulator (a `foldl'` over
-      # a plain number). `lib.foldl'` forces its ACCUMULATOR to WHNF each step, which is a genuine
-      # per-element C stack frame regardless of accumulator shape — it is not stack-safe without
-      # bound the way the earlier probe's arithmetic case suggested; that probe measured a smaller
-      # `n` than the corpus's largest file, not a different property. Splitting into an OUTER fold
-      # over LINES (≈1,700 for that file, comfortably inside the measured-safe range) and an INNER
-      # fold over one line's characters (≈58 on average, trivially safe even for a much longer
-      # single line) keeps BOTH folds' depth far under the ceiling, for any file this scan reads.
-      # A `#` comment cannot span a line by Nix's own grammar, so `inComment` is reset at every
-      # line boundary by construction — no line carries it forward. `stack` (open string/
-      # interpolation frames) and `skip` (a multi-character escape landing on the line's own
-      # trailing newline) DO cross line boundaries, and are threaded through the outer fold.
+      # ~60,000-element depth this project measured safe for a trivial accumulator (a `foldl'`
+      # over a plain number). `lib.foldl'` forces its ACCUMULATOR to WHNF each step, which is a
+      # genuine per-element C stack frame regardless of accumulator shape — it is not stack-safe
+      # without bound the way the earlier probe's arithmetic case suggested; that probe measured a
+      # smaller `n` than the corpus's largest file, not a different property. Splitting into an
+      # OUTER fold over LINES (≈1,700 for that file, comfortably inside the measured-safe range)
+      # and an INNER fold over one line's characters (≈58 on average, trivially safe even for a
+      # much longer single line) keeps BOTH folds' depth far under the ceiling, for any file this
+      # scan reads. `stack` (open string/interpolation frames) and `skip` (a multi-character
+      # escape landing on the line's own trailing newline) cross line boundaries, and are threaded
+      # through the outer fold; nothing else needs to survive a line boundary once comment state
+      # is not this function's concern.
       processLine =
         carry: lineText:
         let
@@ -536,7 +513,6 @@ let
               in
               {
                 stack = builtins.seq nextStack nextStack;
-                inComment = decision.inComment;
                 skip = decision.skip;
                 segStart = if closesRun then i else s.segStart;
                 segKind = decision.kind;
@@ -545,7 +521,6 @@ let
 
           final = lib.foldl' step {
             stack = carry.stack;
-            inComment = false;
             skip = carry.skip;
             segStart = 0;
             segKind = "";
@@ -595,19 +570,27 @@ let
     in
     builtins.concatStringsSep "\n" finalCarry.renderedLines;
 
+  # THE COMMENT STRIP — pre-existing and unchanged: a `#` starts a comment only OUTSIDE a string,
+  # and by the time this runs every string body has already been blanked by `stripText` above, so
+  # no `#` this cuts at can stand inside one. The premise this line's ORIGINAL author could only
+  # assert (and separately reported breaches of, never gated) is now true by construction.
+  cut = line: lib.head (lib.splitString "#" line);
+
   # ★ THE READ AND THE STRIP ARE ONE STAGE PER FILE, AND EVERY WORLD BELOW SHARES IT. `raw` is kept
   # beside `kept` because a second read of the same tree is a second population that can disagree
   # with the first, and because the arming below compares stripped text against the original.
+  # String-stripping runs FIRST, over the whole file (interpolation-aware, cross-line for
+  # `''...''` blocks); comment-cutting runs SECOND, per resulting line — the original design,
+  # unchanged, now fed sound input.
   prep =
     name: text:
     let
       raw = lib.splitString "\n" text;
-      strippedText = stripText text;
-      kept = lib.splitString "\n" strippedText;
+      kept = map cut (lib.splitString "\n" (stripText text));
     in
     {
       inherit name raw kept;
-      code = strippedText;
+      code = builtins.concatStringsSep "\n" kept;
     };
 
   # THE SOURCE READER, the parameter every seeded world below substitutes for.
@@ -874,15 +857,20 @@ let
   seedRegisterShort = builtins.filter (e: e.resolved != "gen-harness") ruledRegister;
   seedResolvedWidened = resolved ++ [ "gen-widget" ];
 
-  # Axis 7 — THE STRIP ITSELF. Comments and string bodies must stop matching, and — the arm that
-  # makes this a repair rather than a preference — a construct reached only through a string
-  # INTERPOLATION must still match: a stripper that blanked interpolations too would trade one
-  # miss for another, exactly the direction this file's header calls unsound. `prep`/`hitsIn` are
-  # the real functions the scan uses on every file; this text is not rescanned by any tree, so it
-  # cannot be confused with a planted evaluator (axis 1).
+  # Axis 7 — THE STRING STRIP. Both string forms (`"…"` and `''…''`, the latter spanning lines)
+  # must stop matching — comments are the PRE-EXISTING `cut`'s job, untouched here, so this arm
+  # does not re-test them — and, the arm that makes this a repair rather than a preference, a
+  # construct reached only through a string INTERPOLATION must still match: a stripper that
+  # blanked interpolations too would trade one miss for another, exactly the direction this
+  # file's header calls unsound. `prep`/`hitsIn` are the real functions the scan uses on every
+  # file; this text is not rescanned by any tree, so it cannot be confused with a planted
+  # evaluator (axis 1).
   stripSoundnessText = ''
-    # a line comment naming genericClosure must not count
     dstr = "a string literal naming genericClosure must not count";
+    istr = '''
+      an indented-string body naming genericClosure must not count either, even
+      on its own line
+    ''';
     interp = "value: ''${toString (genericClosure { startSet = [ ]; operator = x: [ ]; })}";
     live = genericClosure { startSet = [ ]; operator = x: [ ]; };
   '';
@@ -1008,8 +996,8 @@ let
     seededStripSoundness = {
       sites = stripSoundnessSites;
       expected = [
-        "stripSoundness.nix:3"
-        "stripSoundness.nix:4"
+        "stripSoundness.nix:6"
+        "stripSoundness.nix:7"
       ];
     };
   };
@@ -1080,9 +1068,10 @@ let
       && arming.seededDomain.lockWidened == [ "gen-widget" ]
       && arming.seededDomain.rejectedOneObjectBuild == [ ];
 
-    # O8 — THE STRIP IS SOUND: a comment and a plain string body must stop matching, and a
-    # construct reached only through a string interpolation must still match. Either half failing
-    # is red — a strip that also blanked interpolations would be quieter, not safer.
+    # O8 — THE STRING STRIP IS SOUND: both string forms (plain and indented, the latter
+    # spanning lines) must stop matching, and a construct reached only through a string
+    # interpolation must still match. Either half failing is red — a strip that also blanked
+    # interpolations would be quieter, not safer.
     strip-sound = arming.seededStripSoundness.sites == arming.seededStripSoundness.expected;
   };
 in
