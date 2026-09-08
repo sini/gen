@@ -24,6 +24,7 @@
 # driven through a PINNED `github:nix-community/nixpkgs.lib` (NOT impure `getFlake "nixpkgs"`).
 {
   gen-prelude,
+  gen-identity,
   gen-types,
   gen-merge,
   gen-algebra,
@@ -33,7 +34,15 @@
 }:
 let
   prelude = import "${gen-prelude}/lib";
-  genTypes = import "${gen-types}/lib" { inherit prelude; };
+  # gen-identity is the dependency-free minting leaf (gen-identity/flake.nix:12 is `lib = import
+  # ./lib;`, so this is the value the flake publishes). gen-types and gen-schema both took it into
+  # their lib signatures; the argument is threaded from the input set that already carries it rather
+  # than the calls being loosened. The hub wires it the same way at lib/mkGenLibs.nix's `identity`.
+  genIdentity = import "${gen-identity}/lib";
+  genTypes = import "${gen-types}/lib" {
+    inherit prelude;
+    identity = genIdentity;
+  };
   genMerge = import "${gen-merge}/lib" {
     inherit prelude;
     types = genTypes;
@@ -44,6 +53,7 @@ let
     inherit prelude;
     merge = genMerge;
     algebra = genAlgebra;
+    identity = genIdentity;
   };
   genSchemaOld = import "${gen-schema-orig}/lib" {
     inherit lib;

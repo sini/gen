@@ -107,6 +107,7 @@
       denParity = import ./rehost-den-parity.nix {
         inherit (genInputs)
           gen-prelude
+          gen-identity
           gen-types
           gen-merge
           gen-algebra
@@ -297,6 +298,8 @@
                   bucketOverlap
                   resolveFailed
                   agreeFailed
+                  retirementFailed
+                  retirementRegister
                   surfaceHash
                   surfaceDrift
                   surfaceDriftNames
