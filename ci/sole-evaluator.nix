@@ -155,7 +155,8 @@ let
   #     not open INSIDE a tree it does scan.
   #
   # ★ THE THREE WIDTHS ARE PINNED TO DIFFERENT AUTHORITIES. The exception set's is pinned to a RULING
-  # (it opens empty) and the exclusion's to a RULING. THE REGISTER'S IS PINNED TO A MEASUREMENT — it
+  # (opened empty; 8 as of the 2026-09-08 graph ruling, den-hoag-1n3tw) and the exclusion's to a
+  # RULING. THE REGISTER'S IS PINNED TO A MEASUREMENT — it
   # is 2 because 2 is what the lock resolves outside the roster today, and `domain-total` exists
   # precisely so that number can move when the lock moves. A register entry appearing or leaving is a
   # LOCK event, not a ruling event, and the width assertion on it is a NOTIFICATION rather than a
@@ -189,11 +190,41 @@ let
     else
       throw "sole-evaluator: the ${label} holds ${toString (builtins.length checked)} entries; its ruled width is ${toString width}. A further entry is a NEW RULING and takes this line with it.";
 
-  # OPENS EMPTY, by ruling. Any tree the criterion refuses enters HERE, carrying a cause and a
-  # carrier — never by quietly narrowing the criterion until the tree passes. Narrowing is invisible
-  # in a report; an entry is printed on every run.
-  exceptionEntries = [ ];
-  exceptionWidth = 0;
+  # Opened empty; any tree the criterion refuses enters HERE, carrying a cause and a carrier —
+  # never by quietly narrowing the criterion until the tree passes. Narrowing is invisible in a
+  # report; an entry is printed on every run.
+  #
+  # ★ POPULATED 2026-09-08 (owner-ruled, den-hoag-1n3tw): gen-graph's 8 `genericClosure` sites are
+  # `genericClosure` calls over an ALREADY-MATERIALIZED id/edge graph (ancestors/descendants/query
+  # traversals), not Nix-expression evaluation to a semantic fixpoint — ADR-0008 §3 separately
+  # licenses graph-native analysis queries over the graph the engine already exposes. The set's
+  # own key is TREE, not site (that is the shape this constructor supports — see the "THE RULED
+  # ENTRY SETS" note above), so all 8 entries carry `tree = "graph"`; each still names its exact
+  # site so a NEW construct appearing anywhere else in gen-graph is not silently swept in by the
+  # same ruling — a reader auditing this list against a future refusal compares by `site`, not by
+  # tree membership alone.
+  exceptionEntries =
+    let
+      graphCause = "ADR-0008 §3 graph-native analysis query over a materialized graph; owner-ruled 2026-09-08 (den-hoag-1n3tw)";
+      graphCarrier = "den-hoag-1n3tw";
+      graphSite = site: {
+        tree = "graph";
+        inherit site;
+        cause = graphCause;
+        carrier = graphCarrier;
+      };
+    in
+    map graphSite [
+      "lib/global.nix:161"
+      "lib/query.nix:274"
+      "lib/query.nix:359"
+      "lib/query.nix:466"
+      "lib/traverse.nix:47"
+      "lib/traverse.nix:88"
+      "lib/traverse.nix:100"
+      "lib/traverse.nix:267"
+    ];
+  exceptionWidth = 8;
   mkExceptionSet = mkRuledSet {
     label = "exception set";
     keyField = "tree";
@@ -281,23 +312,302 @@ let
       builtins.filter (e: e.type == "directory" && builtins.elem e.entry excludedDirs) (topEntries t.src)
     );
 
-  # Drop everything from the first `#` on each line. The premise — that the `#` it cuts at stands
-  # OUTSIDE a string literal — is ASSERTED rather than assumed, below: where it fails, live code is
-  # truncated to the end of that line and the scan goes blind on what was removed, with no signal.
-  cut = line: lib.head (lib.splitString "#" line);
+  # ── THE STRIP: `#` LINE COMMENTS AND STRING-LITERAL BODIES, INTERPOLATION-AWARE ──
+  # A `#` starts a comment only OUTSIDE any string — Nix gives it no meaning inside one, so a
+  # stripper that cuts on a bare `#` regardless of context truncates live code whenever a string
+  # contains one (`"aspect(${a.name}#${h})"` was a real, measured instance: the naive cut read
+  # that line as ending at the `#`, discarding everything after with no signal). A string's own
+  # text is not evaluated code either, so it is blanked from matching for the same reason a
+  # comment is — EXCEPT a `${ ... }` interpolation inside a string IS evaluated code, and
+  # blanking it would be exactly the MISS this file's opening section warns against: a construct
+  # reached only through a string interpolation must still be caught. Blanking replaces a
+  # character with a space and NEVER a newline, so line numbers and line COUNT stay identical to
+  # the raw text — the downstream `imap1` over `kept` depends on that count matching `raw`'s.
+  #
+  # A small stack, not one flat mode, because an interpolation nests inside a string and can
+  # itself hold a nested string (`"${builtins.toString "x"}"`) or nested braces
+  # (`"${f { a = 1; }}"`) — a flat mode cannot tell a nested string's closing quote from the
+  # enclosing one, or an interpolation's own closing `}` from a nested attrset's. Each `interp`
+  # frame therefore carries its own brace depth, and only a `}` at depth zero closes it.
+  # Indented-string (`''...''`) escapes are recognised (`'''` for a literal `''`, `''$` for a
+  # literal `$`, `''\<c>` for an escaped character) so none of them is misread as the terminator
+  # or as an interpolation opener.
+  #
+  # Output is built as SEGMENTS (runs of one classification), not character-by-character, so a
+  # file of ordinary size does not pay for `n` list appends: one append per MODE CHANGE, not per
+  # character.
+  stripText =
+    text:
+    let
+      lines = lib.splitString "\n" text;
+
+      # Per-CHARACTER decision, unchanged from the flat design and unit-verified there: given the
+      # current frame stack / comment state and the three lookahead characters, decide this
+      # character's classification and the next state. Only the SCOPE changed — one line's
+      # characters, not the whole file's — because that scope is what the reach fix below needs.
+      decideAt =
+        s: chars: n: i:
+        let
+          at = j: if j >= 0 && j < n then builtins.elemAt chars j else "";
+          top = lib.head s.stack;
+          c = at i;
+          c1 = at (i + 1);
+          c2 = at (i + 2);
+        in
+        if s.inComment then
+          {
+            kind = "blank";
+            stack = s.stack;
+            inComment = true;
+            skip = 0;
+          }
+        else if top.t == "top" || top.t == "interp" then
+          if c == "#" then
+            {
+              kind = "blank";
+              stack = s.stack;
+              inComment = true;
+              skip = 0;
+            }
+          else if c == "\"" then
+            {
+              kind = "blank";
+              stack = [ { t = "dstr"; } ] ++ s.stack;
+              inComment = false;
+              skip = 0;
+            }
+          else if c == "'" && c1 == "'" then
+            {
+              kind = "blank";
+              stack = [ { t = "istr"; } ] ++ s.stack;
+              inComment = false;
+              skip = 1;
+            }
+          else if top.t == "interp" && c == "{" then
+            {
+              kind = "keep";
+              stack = [ (top // { depth = top.depth + 1; }) ] ++ (lib.tail s.stack);
+              inComment = false;
+              skip = 0;
+            }
+          else if top.t == "interp" && c == "}" && top.depth == 0 then
+            {
+              kind = "blank";
+              stack = lib.tail s.stack;
+              inComment = false;
+              skip = 0;
+            }
+          else if top.t == "interp" && c == "}" then
+            {
+              kind = "keep";
+              stack = [ (top // { depth = top.depth - 1; }) ] ++ (lib.tail s.stack);
+              inComment = false;
+              skip = 0;
+            }
+          else
+            {
+              kind = "keep";
+              stack = s.stack;
+              inComment = false;
+              skip = 0;
+            }
+        else if top.t == "dstr" then
+          if c == "\\" then
+            {
+              kind = "blank";
+              stack = s.stack;
+              inComment = false;
+              skip = 1;
+            }
+          else if c == "\"" then
+            {
+              kind = "blank";
+              stack = lib.tail s.stack;
+              inComment = false;
+              skip = 0;
+            }
+          else if c == "$" && c1 == "{" then
+            {
+              kind = "blank";
+              stack = [
+                {
+                  t = "interp";
+                  depth = 0;
+                }
+              ]
+              ++ s.stack;
+              inComment = false;
+              skip = 1;
+            }
+          else
+            {
+              kind = "blank";
+              stack = s.stack;
+              inComment = false;
+              skip = 0;
+            }
+        else
+        # top.t == "istr"
+        if c == "'" && c1 == "'" && (c2 == "'" || c2 == "$") then
+          {
+            kind = "blank";
+            stack = s.stack;
+            inComment = false;
+            skip = 2;
+          }
+        else if c == "'" && c1 == "'" && c2 == "\\" then
+          {
+            kind = "blank";
+            stack = s.stack;
+            inComment = false;
+            skip = 3;
+          }
+        else if c == "'" && c1 == "'" then
+          {
+            kind = "blank";
+            stack = lib.tail s.stack;
+            inComment = false;
+            skip = 1;
+          }
+        else if c == "$" && c1 == "{" then
+          {
+            kind = "blank";
+            stack = [
+              {
+                t = "interp";
+                depth = 0;
+              }
+            ]
+            ++ s.stack;
+            inComment = false;
+            skip = 1;
+          }
+        else
+          {
+            kind = "blank";
+            stack = s.stack;
+            inComment = false;
+            skip = 0;
+          };
+
+      # ★ THE REACH FIX — one `lib.foldl'` per FILE CHARACTER overflows the evaluator's own C
+      # stack on a real corpus file: gen-merge's `lib/modules.nix` is 98,901 bytes, well past the
+      # ~60,000-element depth this project measured safe for a trivial accumulator (a `foldl'` over
+      # a plain number). `lib.foldl'` forces its ACCUMULATOR to WHNF each step, which is a genuine
+      # per-element C stack frame regardless of accumulator shape — it is not stack-safe without
+      # bound the way the earlier probe's arithmetic case suggested; that probe measured a smaller
+      # `n` than the corpus's largest file, not a different property. Splitting into an OUTER fold
+      # over LINES (≈1,700 for that file, comfortably inside the measured-safe range) and an INNER
+      # fold over one line's characters (≈58 on average, trivially safe even for a much longer
+      # single line) keeps BOTH folds' depth far under the ceiling, for any file this scan reads.
+      # A `#` comment cannot span a line by Nix's own grammar, so `inComment` is reset at every
+      # line boundary by construction — no line carries it forward. `stack` (open string/
+      # interpolation frames) and `skip` (a multi-character escape landing on the line's own
+      # trailing newline) DO cross line boundaries, and are threaded through the outer fold.
+      processLine =
+        carry: lineText:
+        let
+          chars = lib.stringToCharacters lineText;
+          n = builtins.length chars;
+
+          step =
+            s: i:
+            if s.skip > 0 then
+              s // { skip = s.skip - 1; }
+            else
+              let
+                decision = decideAt s chars n i;
+                closesRun = decision.kind != s.segKind;
+                # Same reasoning as the file-level fold this replaces: force `stack`/`segments` to
+                # WHNF HERE, one line's worth of chain at most, never deferred to the outer join.
+                nextStack = decision.stack;
+                nextSegments =
+                  if closesRun then
+                    s.segments
+                    ++ [
+                      {
+                        start = s.segStart;
+                        end = i;
+                        kind = s.segKind;
+                      }
+                    ]
+                  else
+                    s.segments;
+              in
+              {
+                stack = builtins.seq nextStack nextStack;
+                inComment = decision.inComment;
+                skip = decision.skip;
+                segStart = if closesRun then i else s.segStart;
+                segKind = decision.kind;
+                segments = builtins.seq nextSegments nextSegments;
+              };
+
+          final = lib.foldl' step {
+            stack = carry.stack;
+            inComment = false;
+            skip = carry.skip;
+            segStart = 0;
+            segKind = "";
+            segments = [ ];
+          } (if n == 0 then [ ] else lib.range 0 (n - 1));
+
+          allSegments = final.segments ++ [
+            {
+              start = final.segStart;
+              end = n;
+              kind = final.segKind;
+            }
+          ];
+          renderSeg =
+            seg:
+            let
+              sub = builtins.substring seg.start (seg.end - seg.start) lineText;
+            in
+            if seg.kind == "keep" then
+              sub
+            else
+              builtins.concatStringsSep "" (map (c: " ") (lib.stringToCharacters sub));
+          rendered = builtins.concatStringsSep "" (map renderSeg allSegments);
+
+          # The newline this line ends on is one of the ORIGINAL character stream's positions
+          # (removed by `splitString`, not by the scan): if a multi-character escape's `skip` is
+          # still counting when the line's own characters run out, that newline is the next
+          # position it consumes.
+          skipAfterNewline = if final.skip > 0 then final.skip - 1 else 0;
+          nextRenderedLines = carry.renderedLines ++ [ rendered ];
+        in
+        {
+          stack = final.stack;
+          skip = skipAfterNewline;
+          # Same amortizing force as the inner fold's `stack`/`segments`, cheap insurance at the
+          # OUTER scope: this list's length is the file's LINE count, already far under the
+          # measured-safe fold depth for the largest file in the corpus, but the deferred-force
+          # shape that overflowed the character-level fold is exactly this shape too.
+          renderedLines = builtins.seq nextRenderedLines nextRenderedLines;
+        };
+
+      finalCarry = lib.foldl' processLine {
+        stack = [ { t = "top"; } ];
+        skip = 0;
+        renderedLines = [ ];
+      } lines;
+    in
+    builtins.concatStringsSep "\n" finalCarry.renderedLines;
 
   # ★ THE READ AND THE STRIP ARE ONE STAGE PER FILE, AND EVERY WORLD BELOW SHARES IT. `raw` is kept
-  # beside `kept` because the strip's own premise cell has to speak about the raw line, and because a
-  # second read of the same tree is a second population that can disagree with the first.
+  # beside `kept` because a second read of the same tree is a second population that can disagree
+  # with the first, and because the arming below compares stripped text against the original.
   prep =
     name: text:
     let
       raw = lib.splitString "\n" text;
-      kept = map cut raw;
+      strippedText = stripText text;
+      kept = lib.splitString "\n" strippedText;
     in
     {
       inherit name raw kept;
-      code = builtins.concatStringsSep "\n" kept;
+      code = strippedText;
     };
 
   # THE SOURCE READER, the parameter every seeded world below substitutes for.
@@ -308,9 +618,11 @@ let
   # why the arming is not a second implementation.
   #
   # ★ A REFUSED TREE IS NAMED WITH THE FILE AND LINE OF EVERY MATCH, not with a count. The reader
-  # does not strip string literals, so a criterion CAN match a library's own prose about itself;
-  # printing the site is what lets such a reading be dismissed AT THE REPORT, by a person, rather
-  # than by narrowing the criterion until the tree passes.
+  # strips comments and string-literal bodies (interpolations still scanned as code — see
+  # `stripText`), but it is still a blunt substring match against real code, so a criterion CAN
+  # match a library's own re-export or definition of a construct's NAME without that construct
+  # being invoked there; printing the site is what lets such a reading be dismissed AT THE
+  # REPORT, by a person, rather than by narrowing the criterion until the tree passes.
   #
   # The whole-file test gates the per-line one: the file-level pass is one linear comparison per
   # token per file, and only a file that hits pays for line positions.
@@ -510,12 +822,10 @@ let
   #
   # ★ THE MALFORMED SEEDS MUTATE THE HEAD AND KEEP THE TAIL, so they carry the ruled width at any
   # width: a seed that also changed the count would be refused by the WIDTH line and the arm would
-  # pass for the wrong cause — a control firing on the wrong cause is not a control. ⇒ THE EXCEPTION
-  # SET, WHICH OPENS EMPTY, HAS NO HEAD TO MUTATE, so at width 0 every malformed seed would be
-  # refused by the width line instead. Its field arms are therefore NOT CLAIMED: what is armed on it
-  # is acceptance-when-empty and refusal-on-widening, and the field validation — a property of the
-  # shared constructor — is armed on the two non-empty sets. Saying which arms cover which set is the
-  # point; a conjunction that quietly counted the exception set's field arms as fired would be
+  # pass for the wrong cause — a control firing on the wrong cause is not a control. The exception
+  # set opened empty and had no head to mutate; since the 2026-09-08 graph ruling (den-hoag-1n3tw)
+  # gave it 8, all three ruled sets are non-empty and all three claim the shared constructor's
+  # field arms — a conjunction that quietly skipped one set's field arms as unclaimed would be
   # reporting an arm that never ran.
   accepts = mk: entries: (builtins.tryEval (builtins.deepSeq (mk entries) true)).success;
   withoutField =
@@ -536,7 +846,9 @@ let
   entrySetArms = {
     exception = {
       ruledSetAccepted = accepts mkExceptionSet exceptionEntries;
-      fieldArmsClaimed = false; # width 0: no head to mutate — see the block above
+      fieldArmsClaimed = true;
+      uncausedAccepted = accepts mkExceptionSet (withoutField exceptionEntries "cause");
+      uncarriedAccepted = accepts mkExceptionSet (withoutField exceptionEntries "carrier");
       widenedAccepted = accepts mkExceptionSet (widenedWith exceptionEntries { tree = "select"; });
     };
     register = {
@@ -561,6 +873,20 @@ let
   # `resolved := scanned ∪ registered`, which reads `domain-total=true` on the same seeded lock.
   seedRegisterShort = builtins.filter (e: e.resolved != "gen-harness") ruledRegister;
   seedResolvedWidened = resolved ++ [ "gen-widget" ];
+
+  # Axis 7 — THE STRIP ITSELF. Comments and string bodies must stop matching, and — the arm that
+  # makes this a repair rather than a preference — a construct reached only through a string
+  # INTERPOLATION must still match: a stripper that blanked interpolations too would trade one
+  # miss for another, exactly the direction this file's header calls unsound. `prep`/`hitsIn` are
+  # the real functions the scan uses on every file; this text is not rescanned by any tree, so it
+  # cannot be confused with a planted evaluator (axis 1).
+  stripSoundnessText = ''
+    # a line comment naming genericClosure must not count
+    dstr = "a string literal naming genericClosure must not count";
+    interp = "value: ''${toString (genericClosure { startSet = [ ]; operator = x: [ ]; })}";
+    live = genericClosure { startSet = [ ]; operator = x: [ ]; };
+  '';
+  stripSoundnessSites = hitsIn criterion (prep "stripSoundness.nix" stripSoundnessText);
 
   # ── THE WORLDS ──
   # The live one is scanned; the three seeded ones are DERIVED from it by the same algebra the scan
@@ -643,33 +969,6 @@ let
   liveUnaccounted = unaccountedIn scanned ruledRegister resolved;
   liveUnresolved = unresolvedIn scanned ruledRegister resolved;
 
-  # ── THE STRIP'S PREMISE, asserted rather than assumed ──
-  # `cut` is sound only while the `#` it cuts at stands OUTSIDE a string literal. The predicate asks
-  # the strip ITSELF where it cut, then asks whether that text closed every double quote it opened —
-  # an odd count meaning the cut stands inside a string. It is LINE-LOCAL, so it cannot conclude
-  # about an indented multi-line string block.
-  #
-  # ★ REPORTED AND NOT GATED, with its cause. A breach is a line this scan did not read, which is a
-  # MISS in the coarse direction this file's header already owns, and every breach is printed with
-  # its file and line so a reader can open it. Gating it would let an unrelated library's string
-  # literal red the hub's CI on a property that string says nothing about — and there ARE live
-  # breaches at these pins, so the difference is not hypothetical.
-  countQuotes = s: (builtins.length (lib.splitString "\"" s)) - 1;
-  stripPremiseBreaches = lib.concatMap (
-    t:
-    lib.concatMap (
-      f:
-      lib.concatLists (
-        lib.imap1 (
-          i: kept:
-          lib.optional (
-            kept != builtins.elemAt f.raw (i - 1) && lib.mod (countQuotes kept) 2 == 1
-          ) "${t.key}/${f.name}:${toString i}"
-        ) f.kept
-      )
-    ) liveWorld.${t.key}.files
-  ) scanned;
-
   arming = {
     # The live control on every arm below: the identical predicate on the true trees.
     liveControl = liveRefusedKeys;
@@ -705,6 +1004,13 @@ let
       registerShort = unaccountedIn scanned seedRegisterShort resolved;
       lockWidened = unaccountedIn scanned ruledRegister seedResolvedWidened;
       rejectedOneObjectBuild = unaccountedIn scanned ruledRegister (coveredBy scanned ruledRegister);
+    };
+    seededStripSoundness = {
+      sites = stripSoundnessSites;
+      expected = [
+        "stripSoundness.nix:3"
+        "stripSoundness.nix:4"
+      ];
     };
   };
 
@@ -746,24 +1052,23 @@ let
       && arming.seededDeadCriterion.refused == [ ];
 
     # O6 — the three ruled entry sets are accepted; an uncaused, an uncarried and an appended entry
-    # are each refused. The field arms are claimed on the two non-empty sets only (axis 5).
+    # are each refused. All three sets are non-empty (axis 5), so field arms are claimed on all
+    # three.
     exception-arms =
-      entrySetArms.exception.ruledSetAccepted
-      && !entrySetArms.exception.widenedAccepted
-      &&
-        builtins.all
-          (
-            s:
-            s.fieldArmsClaimed
-            && s.ruledSetAccepted
-            && !s.uncausedAccepted
-            && !s.uncarriedAccepted
-            && !s.widenedAccepted
-          )
-          [
-            entrySetArms.register
-            entrySetArms.exclusion
-          ];
+      builtins.all
+        (
+          s:
+          s.fieldArmsClaimed
+          && s.ruledSetAccepted
+          && !s.uncausedAccepted
+          && !s.uncarriedAccepted
+          && !s.widenedAccepted
+        )
+        [
+          entrySetArms.exception
+          entrySetArms.register
+          entrySetArms.exclusion
+        ];
 
     # O7 — SCANNED ∪ REGISTERED == RESOLVED, the roster enumerating and the lock notifying. Armed on
     # BOTH objects, plus the rejected one-object build's return, because an arm that moved only the
@@ -774,6 +1079,11 @@ let
       && arming.seededDomain.registerShort == [ "gen-harness" ]
       && arming.seededDomain.lockWidened == [ "gen-widget" ]
       && arming.seededDomain.rejectedOneObjectBuild == [ ];
+
+    # O8 — THE STRIP IS SOUND: a comment and a plain string body must stop matching, and a
+    # construct reached only through a string interpolation must still match. Either half failing
+    # is red — a strip that also blanked interpolations would be quieter, not safer.
+    strip-sound = arming.seededStripSoundness.sites == arming.seededStripSoundness.expected;
   };
 in
 {
@@ -787,7 +1097,7 @@ in
     governs = "the hub's pinned library revisions, plus the hub itself at the tree this CI flake sits in — which has no pin, by construction";
     property = "RULED DOMAIN: anything that evaluates, wherever hosted (owner, 2026-09-05). This instrument APPROXIMATES it";
     direction = "UNDER-APPROXIMATES: it MISSES. A green is a statement about the instrument's reach and never about the property";
-    observable = "the ruled criterion over comment-stripped published `.nix` source, every match named with its file and line";
+    observable = "the ruled criterion over comment- and string-literal-stripped published `.nix` source (a string's own text is blanked; a `\${...}` interpolation inside one is still scanned as code), every match named with its file and line";
     inherit criterion;
     criterionCause = "the three constructs by which a Nix expression drives an evaluation to a fixpoint. A UNION because the single-token refusal sets are pairwise disjoint at these pins, so every one-token criterion reads green on trees another refuses. Widening it is a RULING, never a tuning";
     evaluator = evaluatorKey;
@@ -828,9 +1138,6 @@ in
     }) scanned;
     readCount = lib.foldl' (a: t: a + builtins.length liveWorld.${t.key}.files) 0 scanned;
     excludedCount = lib.foldl' (a: t: a + builtins.length (excludedNamesIn t)) 0 scanned;
-
-    stripPremiseBreachCount = builtins.length stripPremiseBreaches;
-    inherit stripPremiseBreaches;
 
     excludedAxis = "everything under a ruled `ci` or `examples` directory of a scanned tree; every gen-shaped tree the lock resolves that carries a register entry; every gen* repository NO lock this check resolves names, which cannot even be registered; any evaluator assembled from primitives the criterion does not name, or reached through an injected formal the caller fills. All but the last two are counted and named above";
 
