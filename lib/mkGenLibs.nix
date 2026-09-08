@@ -6,6 +6,13 @@
 # so the hub just re-exports `genInputs.gen-X.lib`. The `lib` arg is now vestigial
 # (real consumers read `inputs.gen-X.lib` directly); kept as `_` for call-compat.
 #
+# ★ SELF-WIRED IS ABOUT WHO EVALUATES, NEVER ABOUT WHICH REVISION, and the two were once one
+# sentence here. The hub's `flake.nix` binds every sibling's `gen-*` input with `follows`, so
+# gen-schema still owns and resolves its gen-algebra input — against the HUB's gen-algebra, which it
+# no longer chooses. Each member stays authoritative over its wiring and the hub is authoritative
+# over the closure. Before those edges this re-export returned a DIFFERENT BUILD per path while
+# reading as one value: 11 of the 21 libraries stood at more than one revision, gen-prelude at 9.
+#
 # The roster is bound ONCE, at stage 1, and every stage-2 application yields that same value.
 # Every member but `class` is already shared across applications by input memoization; `class` is not,
 # because it is an `import` the hub applies itself — bound per application it re-allocates, and two
