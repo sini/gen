@@ -103,9 +103,12 @@ let
     #               R§1.2 sequences OUT — so it is not authority for placing them anywhere. The
     #               owner ruled their home on 2026-08-11 (den-hoag-ui5c OPEN 4(a), normative at
     #               engine-spec R§5.2) and that ruling REJECTED `scope`, which was arm 4(b); an
-    #               earlier form of this row asserted `scope` anyway, on 8skr's authority. WHICH
-    #               MEMBER instantiates the ruled home is an OPEN owner reading, so this row names
-    #               none — den-hoag-roster-wrong-schedule-destination-cbpfc. gen-scope's own
+    #               earlier form of this row asserted `scope` anyway, on 8skr's authority. THE
+    #               MEMBER THAT INSTANTIATES THE RULED HOME IS `view`, owner-ruled 2026-09-09: the
+    #               static Knuth gate landed in gen-view as `boundedWellDefinedSchedule`, a query
+    #               over gen-graph's contracted declared relation —
+    #               den-hoag-roster-wrong-schedule-destination-cbpfc, whose residue (b) carries the
+    #               ruling and the landing. gen-scope's own
     #               lib/fold-equations.nix agrees it is not the builder: the schedule arrives
     #               there validated.
     #

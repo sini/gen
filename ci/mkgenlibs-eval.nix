@@ -332,7 +332,7 @@ let
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     types = "41ddedce3dcf0628fd06dd634ca0c2a4a3b14319e0c422590e64841ccdfc7438";
-    view = "eb8fb97a732d7b8741e39761f34c45d40781f86d0a5d741cfe96e3df93010817";
+    view = "b4de6a4f7fd1b99852c9822f4620b5ca437d5cf0d32c3f716fc80780b72c197d";
   };
 
   # EXPORTED below, and that export is the only route that regenerates what this arm compares. It is
