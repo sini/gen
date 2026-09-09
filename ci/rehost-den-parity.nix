@@ -27,6 +27,7 @@
   gen-identity,
   gen-types,
   gen-merge,
+  gen-memo, # the incremental plane gen-merge's warm decision now consults (den-hoag-stmv6)
   gen-algebra,
   gen-schema, # PURE re-host (published main)
   gen-schema-orig, # ORIGINAL nixpkgs-signature { lib, algebra } (pre-re-host pin)
@@ -46,6 +47,7 @@ let
   genMerge = import "${gen-merge}/lib" {
     inherit prelude;
     types = genTypes;
+    memo = gen-memo.lib; # the flake input's published lib; the plane decides reuse, gen-merge computes the fact
   };
   genAlgebra = import "${gen-algebra}/lib";
 

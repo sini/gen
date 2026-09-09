@@ -110,6 +110,7 @@
           gen-identity
           gen-types
           gen-merge
+          gen-memo
           gen-algebra
           gen-schema
           ;
@@ -489,6 +490,7 @@
               "gen-prelude" = "${genInputs.gen-prelude}";
               "gen-types" = "${genInputs.gen-types}";
               "gen-merge" = "${genInputs.gen-merge}";
+              "gen-memo" = "${genInputs.gen-memo}";
               "gen-algebra" = "${genInputs.gen-algebra}";
               "gen-identity" = "${genInputs.gen-identity}";
               "gen-schema" = "${genInputs.gen-schema}";
