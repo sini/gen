@@ -327,7 +327,10 @@ let
     prelude = "b70720c17dc31dc59889bcd30aa2e1bd4e9abc1eb397c018fb4038c04c387271";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
-    schema = "2823239d89aec5e2358f0edca0090bd5f80a11273c187ba6ba4634e38af21c32";
+    # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
+    # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
+    # other member moved.
+    schema = "8704df36435835c714e346da0931b9a090df867d5c661098dfbd1c5b507ba933";
     scope = "e49df31e4ba4113bc773ba190c719357e9f70907fdd8db4e713f1c0495a89488";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
