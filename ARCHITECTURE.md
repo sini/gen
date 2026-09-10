@@ -63,7 +63,8 @@ builds NixOS systems. Historically the sole boundary here was `gen-flake`; it di
 orphans as reference (ADR-0031 F3; see Terminal Layer, below). The invariant across the crossing: **gen
 TYPES never leave the pure eval; only VALUES cross** (value-injection, not type-driving). This holds
 under ADR-0023's declared interim (checking off by default; unstated crossings become declared
-opt-outs with their price recorded) until the by-construction target (`den-hoag-zgps`) lands.
+opt-outs with their price recorded) until every crossing site meets ADR-0023 (c), i.e. no declared
+opt-out remains (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`).
 
 ### The CI harness is not a library, and it does not live here
 
@@ -232,7 +233,8 @@ surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` fr
 the option surface `gen.tree` / `gen.extraModules`. It consumes no gen-flake surface. The **invariant**
 gen-flake proved end-to-end (gen TYPES never leave the pure eval; only VALUES cross) carries forward
 architecturally at the new boundary under ADR-0023's declared interim (b) — target-invoked checking off
-by default until the by-construction target (`den-hoag-zgps`) lands; the hub's `ci/inject-payload.nix`
+by default until every crossing site meets ADR-0023 (c), i.e. no declared opt-out remains
+(`den-hoag-i546n`, successor to the closed `den-hoag-zgps`); the hub's `ci/inject-payload.nix`
 (ADR-0023 (b), the crossing Adapter side) is the live check that keeps that declared opt-out's price
 measured rather than assumed.
 
@@ -400,4 +402,4 @@ The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies onl
 5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
 6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either) works without nixpkgs. Libraries that only need search or the intensional constructors import it directly; identity minting is `gen-identity`'s (ADR-0016 ruling 5), taken injected. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
 7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one plane — the terminal plane — plus the CI runners; historically that terminal was the `gen-flake` repository (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`), which dissolved (ADR-0031 F3) into this hub's interim `flakeModules.default` and gen-delivery's `realize`. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
-8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving). Today this holds under ADR-0023's declared interim — checking off by default, unstated crossings recorded as declared opt-outs with their price — until the by-construction target (`den-hoag-zgps`) lands.
+8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving). Today this holds under ADR-0023's declared interim — checking off by default, unstated crossings recorded as declared opt-outs with their price — until every crossing site meets ADR-0023 (c), i.e. no declared opt-out remains (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`).

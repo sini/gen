@@ -243,8 +243,8 @@ tree, so nixpkgs never type-walks it. This is value-injection rather than type-d
 one-way trade [adios](https://github.com/adisbladis/adios) takes: a pure engine cannot be driven by
 foreign nixpkgs-module libraries. Today the invariant holds under ADR-0023's declared interim —
 target-invoked checking off by default, unstated crossings recorded as declared opt-outs with their
-price (`gen-bind`'s `injectAdapter`) — until the by-construction target (`den-hoag-zgps`) lands as the
-checked form.
+price (`gen-bind`'s `injectAdapter`) — until every crossing site meets ADR-0023 (c), i.e. no declared
+opt-out remains (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`).
 
 ### Two-stage instantiation, self-wired members
 

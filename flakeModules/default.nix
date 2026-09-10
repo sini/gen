@@ -305,8 +305,9 @@ in
         the payload lands in `_module.args`, which nixpkgs does NOT type-walk today, so the failure
         this design avoids — a gen type embedded in an OPTIONS tree via
         `substSubModules`/`getSubOptions` — does not occur for a plain `_module.args` value, but that
-        is a DECLARED opt-out with its price recorded, not a by-construction guarantee, and it lifts
-        when the by-construction target (`den-hoag-zgps`) lands. `renderDocs` legitimately reads
+        is a DECLARED opt-out with its price recorded, not a by-construction guarantee, and it is
+        self-lifting: it lifts when this payload becomes function-free, as `gen/ci/inject-payload.nix`
+        measures it (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`). `renderDocs` legitimately reads
         `values.schema.<kind>.options.*.type.name` (a string). A consumer that instead uses
         `values.schema.<kind>` AS AN OPTION `type` is doing the explicitly out-of-scope thing
         (non-goal §11) and owns that hazard.
