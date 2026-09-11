@@ -20,7 +20,8 @@ Then the [invariants](#5-invariants) every part is subject to, and the
 
 Two companions: `TERMINOLOGY.md` fixes the vocabulary and its literature provenance; `gen-demo`
 (`github:sini/gen-demo`) is the acceptance corpus, a framework declared in invented words that
-exercises the substrate end to end. Its constructs are named `C1`…`C17` and cited throughout — each
+exercises the substrate end to end. Its constructs are named `C1`…`C17`, its incremental-plane
+byte-parity cell `T2b`, and both are cited throughout — each
 citation below is a pointer into that corpus, so every claim this document makes about the pipeline
 has a declaration a reader can run.
 
@@ -124,7 +125,8 @@ flowchart TD
 
 <!-- gen-library-graph:end -->
 
-An arrow is a **declared root-flake input**, which is the observable ADR-0015 rules the direction lint
+An arrow is a **declared root-flake input whose attribute name carries the `gen-` prefix**, which is
+the observable ADR-0015 rules the direction lint
 on: a pin bump that changes no declared name changes nothing here, and the lock graph is deliberately
 not the source. Re-derive the whole relation in one command:
 
@@ -294,7 +296,7 @@ the roster, and every stage names the corpus declaration that exercises it.
 flowchart TD
   decl["<b>declarations</b><br/>a framework's modules, kinds and aspects"]
   assembly["<b>assembly</b> — gen-assemble<br/>contributions union commutatively;<br/>shape merges, content folds.<br/><i>The toolkit never evaluates.</i>"]
-  graph["<b>the one graph</b><br/>gen-schema kinds · gen-scope scope graph ·<br/>gen-graph accessors · gen-identity mint"]
+  onegraph["<b>the one graph</b><br/>gen-schema kinds · gen-scope scope graph ·<br/>gen-graph accessors · gen-identity mint"]
   program["<b>program</b> — gen-program<br/>policy declarations become a logic program:<br/>heads, positive and negative bodies, relata"]
   solve["<b>solve</b> — gen-scope, the sole evaluator<br/>stratify · least model · well-founded partial model<br/>contested atoms are UNDEFINED, a named third value"]
   dynamic["<b>dynamic edges</b><br/>an admitted atom's predicate is the label<br/>and its relata are the endpoints —<br/>joining the SAME graph, never a second structure"]
@@ -304,13 +306,13 @@ flowchart TD
   terminal["<b>terminal</b> — the framework's<br/>a target-owned function gen calls.<br/>Only VALUES cross; no gen TYPE leaves the pure plane."]
   memo["<b>the incremental plane</b> — gen-memo<br/>decides reuse, never evaluates.<br/>Defined by byte-parity against a cold evaluation."]
 
-  decl --> assembly --> graph
-  graph --> program --> solve --> dynamic
-  dynamic --> graph
-  graph --> gate
-  graph --> movement --> delivery --> terminal
+  decl --> assembly --> onegraph
+  onegraph --> program --> solve --> dynamic
+  dynamic --> onegraph
+  onegraph --> gate
+  onegraph --> movement --> delivery --> terminal
   memo -. "reuse decisions over" .-> solve
-  memo -. "reuse decisions over" .-> graph
+  memo -. "reuse decisions over" .-> onegraph
 
   classDef ext fill:#f6f6f6,stroke:#888,stroke-dasharray: 4 3
   class terminal,decl ext
@@ -443,7 +445,7 @@ through is ADR-0027's three parts.
 ```mermaid
 flowchart TD
   subgraph fw["a framework — den v2, quiver"]
-    vocab["<b>1 · vocabulary map</b><br/>⟨frameworkName → substrate construct⟩<br/>entity kinds are ordinary kinds;<br/>a registry is a kind whose contents are named queries.<br/><i>Anything not in the map is not framework surface.</i>"]
+    vocab["<b>1 · vocabulary map</b><br/>⟨frameworkName → S3 construct⟩ — S3 is the aspect layer<br/>entity kinds are ordinary kinds;<br/>a registry is a kind whose contents are named queries.<br/><i>Anything not in the map is not framework surface.</i>"]
     lens["<b>2 · adapter / lens</b><br/>for gen-link exchange.<br/>Correct iff it preserves the equivalences."]
     witness["<b>3 · two witness declarations</b><br/>the collection target<br/>and the evaluator's LOCATION"]
     terminals["<b>terminals</b><br/>target-owned functions gen calls"]
@@ -479,7 +481,8 @@ flowchart TD
 ```
 
 **A framework is a vocabulary map, an adapter, and two witness declarations.** The map is
-⟨frameworkName → substrate construct⟩ — Landin's frame of reference, mechanically — plus an
+⟨frameworkName → **S3 construct**⟩ — S3 being the aspect layer, `aspects` in §1's strata —
+Landin's frame of reference, mechanically, plus an
 adapter/lens for gen-link exchange, plus two witness-pattern declarations: the collection target, and
 the evaluator's location. Anything not in the map is not framework surface.
 
@@ -536,7 +539,8 @@ whether the equivalences survive it, not by how little of it there is.
 11. **The library level is nixpkgs-lib-free.** No library's `lib/` imports nixpkgs. Full nixpkgs enters
     at the terminal plane and the CI runners, nowhere else.
 12. **Compose purely, inject values — never types.**
-13. **The substrate prescribes no terminology.** A framework's names never enter it.
+13. **The substrate prescribes no terminology.** A framework's names never enter it — with one
+    live violation recorded at §4, the hub's own delivery projection.
 
 ## 6. Provenance
 

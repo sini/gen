@@ -402,8 +402,10 @@
           # Build the architecture-library-graph check: prints the full report — the roster, the
           # nodes the diagram declares live and retired, and every name or edge a reader must act on
           # — and FAILS the build if any gate arm is not `true`. A failing arm names the offending
-          # member or edge in `missing`/`extra`/`mismarked`/`edgesMissing`/`edgesExtra`, so the
-          # remedy is the diagram line to add or delete rather than a denial.
+          # member or edge in `missing`/`extra`/`mismarked`/`edgesMissing`/`edgesExtra`/`unclassified`,
+          # so the remedy is the diagram line to add or delete rather than a denial. The oracle's
+          # cardinality travels with it — `classifiedLineCount` short of `expectedLineCount` is how an
+          # unparsed line would otherwise read as a clean absence.
           mkArchitectureGraphCheck =
             name: a:
             let
@@ -421,7 +423,7 @@
                 cat "$reportPath"
                 echo
                 ${lib.optionalString (!allOk) ''
-                  echo "ARCHITECTURE.md LIBRARY GRAPH DRIFT — the diagram no longer matches the roster of record or the members' declared inputs" >&2
+                  echo "ARCHITECTURE.md LIBRARY GRAPH DRIFT — the diagram carries a line the check cannot classify, or no longer matches the roster of record or the members' declared inputs" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"

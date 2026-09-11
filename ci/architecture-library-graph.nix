@@ -81,6 +81,28 @@ let
     to = nameOfId.${builtins.elemAt m 1} or (builtins.elemAt m 1);
   }) edgeMatches;
 
+  # ── TOTALITY: every non-blank line in the region is classified, or the check reds ──
+  #
+  # Without this the arms above see only what they can parse, so an unrecognised spelling is
+  # INVISIBLE rather than refused — it reads as clean. Measured: mermaid's long form
+  # `class gen_select retired` marks a live roster member retired in the rendered SVG while the
+  # derivation stays byte-identical to the clean one, and `gen_harness("gen-harness")` declares a node
+  # the `[…]` pattern cannot see. An alternation over the two spellings that happen to be known today
+  # is the same defect one layer out, so the arm is stated positively: these forms, and nothing else.
+  knownForms = [
+    " *```.*" # the fence, either end
+    " *flowchart .*"
+    " *subgraph [A-Za-z0-9_]+[[]\"[^\"]*\"[]] *"
+    " *end *"
+    nodePattern
+    edgePattern
+    " *classDef [A-Za-z0-9_]+ .*"
+  ];
+  regionContent = builtins.filter (l: builtins.match " *" l == null) regionLines;
+  unclassified = builtins.filter (
+    l: !(builtins.any (p: builtins.match p l != null) knownForms)
+  ) regionContent;
+
   # ── the roster of record, and the members' own declarations ──
 
   genLibs = gen.lib.mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)
@@ -124,6 +146,7 @@ in
 {
   gate = {
     region-present = regionPresent;
+    region-total = unclassified == [ ]; # every line in the region is one the arms below can read
     graph-total = missing == [ ]; # every roster member is drawn as a live node
     graph-exact = extra == [ ]; # nothing is drawn as live that the roster does not carry
     graph-retired-marked = mismarked == [ ]; # no live member is excused by a retired marking
@@ -132,6 +155,7 @@ in
   };
   gateKeys = [
     "region-present"
+    "region-total"
     "graph-total"
     "graph-exact"
     "graph-retired-marked"
@@ -149,9 +173,14 @@ in
       mismarked
       edgesMissing
       edgesExtra
+      unclassified
       ;
     beginMarker = beginMarker;
     memberCount = builtins.length roster;
+    # The oracle's cardinality, published beside its result: `classified` short of `expected` is the
+    # shape in which an unparsed line reads as a clean absence, so both numbers travel with the gate.
+    expectedLineCount = builtins.length regionContent;
+    classifiedLineCount = builtins.length regionContent - builtins.length unclassified;
     declaredNodeCount = builtins.length declaredNodes;
     actualEdgeCount = builtins.length actualEdges;
     declaredEdgeCount = builtins.length declaredEdges;
