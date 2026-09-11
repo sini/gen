@@ -1,405 +1,563 @@
-# gen Ecosystem Architecture
+# gen — the architecture
 
-How the gen libraries compose to form a framework-building toolkit for Nix.
+gen is a substrate for building configuration frameworks in Nix. It is not itself a configuration
+framework: it declares no domain entity and fixes no vocabulary. What it provides is one graph, one
+evaluator, one incremental plane over that evaluator, and an algebra of queries over the graph — plus
+the interface through which a framework supplies the names.
 
-## Table of Contents
+This document is for someone who knows Nix and will build a framework on gen. It answers four
+questions, one per diagram:
 
-- [Overview](#overview)
-- [Dependency Graph](#dependency-graph)
-- [Library Roles](#library-roles)
-- [Composition Patterns](#composition-patterns)
-- [Performance Architecture](#performance-architecture)
-- [Design Constraints](#design-constraints)
+1. [**The library graph**](#1-the-library-graph) — what the libraries are and who consumes whom.
+2. [**The model**](#2-the-model) — what a node, a kind, an edge, a relation, a binding and a query are.
+3. [**The evaluation pipeline**](#3-the-evaluation-pipeline) — the path from a declaration to a
+   delivered target.
+4. [**The framework interface**](#4-the-framework-interface) — what a framework declares, and what the
+   substrate refuses to name.
 
-## Overview
+Then the [invariants](#5-invariants) every part is subject to, and the
+[provenance](#6-provenance) of the theory each construction is taken from.
 
-The gen ecosystem is a set of decoupled Nix libraries that together provide the infrastructure for building demand-driven, graph-structured configuration frameworks. Each library owns one concern. The coupling point is the **consumer** (e.g., den), not the libraries themselves.
+Two companions: `TERMINOLOGY.md` fixes the vocabulary and its literature provenance; `gen-demo`
+(`github:sini/gen-demo`) is the acceptance corpus, a framework declared in invented words that
+exercises the substrate end to end. Its constructs are named `C1`…`C17` and cited throughout — each
+citation below is a pointer into that corpus, so every claim this document makes about the pipeline
+has a declaration a reader can run.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Consumer (den v2)                        │
-│  Wires libraries with domain semantics: entities, aspects,     │
-│  policies, pipes, output assembly                               │
-└─────────────────────────────────────────────────────────────────┘
-     │
-     ▼
-  mkGenLibs keys (the roster of record is lib/mkGenLibs.nix, never a count — ADR-0015):
-    gen-prelude · gen-algebra · gen-types · gen-merge · gen-schema
-    gen-aspects · gen-scope · gen-memo · gen-graph · gen-select · gen-bind
-    gen-dispatch · gen-class · gen-link
-    gen-product · gen-settings · gen-assemble · gen-view · gen-identity · gen-program · gen-delivery
-  standalone pure libs:
-    gen-vars
-  retired, archived for reference (off-roster, not a hub input):
-    gen-demand   → re-expressed into gen-scope (ADR-0008 §4)
-    gen-rebuild  → content moved onto the gen-memo plane (ADR-0008 §4, ADR-0005)
-    gen-edge     → movement vocabulary, gen-view the fourth destination (ADR-0010 §3)
-    gen-pipe     → movement vocabulary: gen-view, and gen-select for `sel` (ADR-0010 §3)
-    gen-flake    → dissolved to per-surface successors: compose → this hub's `lib.compose` /
-                   interim flakeModule; warm/override/trace → gen-memo; projection + realize →
-                   gen-delivery; inject/terminals → the crossing's Adapter set (ADR-0031 F3)
-    gen-resolve  → left on the 2026-09-02 transfer ruling with its eleven exports dispositioned
-                   ROW BY ROW rather than moved as one content block: materialization vocabulary
-                   and the reference construct → gen-view; crossing terminal → gen-bind; the
-                   seal-level queries → gen-scope; the reuse key → gen-memo; `attr` and
-                   `cascade` dissolved by ruling (ADR-0008 §4; map at den-hoag-p3y9)
-                   ★ STRUCK 2026-09-03 — this row read "schedule and the seal-level queries →
-                   gen-scope", and the static SCHEDULE's destination is NOT gen-scope. The owner
-                   RULED it "THE QUERY-GATE HOME" (2026-08-11, den-hoag-ui5c; engine-spec R§5.2).
-                   That referent has NEVER been resolved to a named library — ADR-0008 §3's "no
-                   standalone analysis library" constrains the answer without supplying it — and
-                   the struck destination is unexecuted at the substrate (gen-scope.lib ⇒ 89
-                   exports, 0 matching [Ss]chedul, at a73bb80). Carrier resolving the referent:
-                   den-hoag-query-gate-home-static-schedule-6poeg
-```
+## 1. The library graph
 
-The ecosystem now spans **two evaluation planes**. The *composition plane* is pure and
-nixpkgs-lib-free: a module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`)
-composes gen module trees to resolved VALUES without ever touching `lib.evalModules`. The *terminal
-plane* is nixpkgs: gen-delivery's `realize` folds the composed projection through per-class terminals,
-with this hub's interim `flakeModules.default` supplying the default `nixos` terminal (a consumer may
-override or suppress it) — the boundary that injects those values into a consumer's nixpkgs eval and
-builds NixOS systems. Historically the sole boundary here was `gen-flake`; it dissolved and its repo
-orphans as reference (ADR-0031 F3; see Terminal Layer, below). The invariant across the crossing: **gen
-TYPES never leave the pure eval; only VALUES cross** (value-injection, not type-driving). This holds
-under ADR-0023's declared interim (checking off by default; unstated crossings become declared
-opt-outs with their price recorded) until every crossing site meets ADR-0023 (c), i.e. no declared
-opt-out remains (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`).
+gen is one hub flake (`github:sini/gen`) over a roster of single-concern libraries, each its own
+repository and its own flake. The hub pins them, wires them, and re-exports them as one value.
 
-### The CI harness is not a library, and it does not live here
+**The roster of record is `lib/mkGenLibs.nix`, never a count and never a list in prose.** The diagram
+below is bound to that file by `ci/checks.architecture-library-graph`, in both directions and for
+nodes and edges alike: a library that joins or leaves the roster, or an input a member starts or stops
+declaring, reddens this check and names itself. The figure cannot fall behind the code without saying
+so.
 
-`gen-harness` (`github:sini/gen-harness`) owns **`mkCi`**, the flake wrapper each gen repo's `ci/` is
-built from. It is not on the roster, not a hub input, and exports no gen concern — it is CI packaging,
-not a library. What makes it a separate repository is that **it pins no gen library**: a library's
-`ci/` lock would otherwise drag in the aggregator that pins that same library, which is the
-hub → lib → lib's `ci` → hub cycle the extraction exists to cut. The cut is a property of the pins,
-so it is read off them rather than remembered: in `gen-harness`,
-`grep -oE '"gen-[a-z]+"' flake.lock` returns nothing, while the same command in any library's
-`ci/flake.lock` returns that library's gen inputs.
+<!-- gen-library-graph:begin -->
 
-**Who consumes it.** Every gen repo's `ci/flake.nix` calls `gen-harness.lib.mkCi` — the one exception
-is `gen-vars`, excluded from the inventory by ADR-0003 and knowingly left at an older pin. gen-flake
-called it too, migrating onto the harness in its own commit before its later dissolution (ADR-0031 F3),
-so no repository was left holding a pin it could not move. From any library root,
-`grep -c 'gen-harness\.lib\.mkCi' ci/flake.nix` says whether that repo is on the harness, so the fact is
-re-derived rather than remembered.
+```mermaid
+flowchart TD
+  subgraph substrate["substrate"]
+    gen_algebra["gen-algebra"]
+    gen_bind["gen-bind"]
+    gen_dispatch["gen-dispatch"]
+    gen_graph["gen-graph"]
+    gen_identity["gen-identity"]
+    gen_memo["gen-memo"]
+    gen_prelude["gen-prelude"]
+    gen_product["gen-product"]
+    gen_schema["gen-schema"]
+    gen_scope["gen-scope"]
+    gen_select["gen-select"]
+    gen_view["gen-view"]
+  end
+  subgraph modules["modules"]
+    gen_merge["gen-merge"]
+    gen_types["gen-types"]
+  end
+  subgraph aspects["aspects"]
+    gen_aspects["gen-aspects"]
+    gen_class["gen-class"]
+    gen_link["gen-link"]
+  end
+  subgraph framework["framework"]
+    gen_assemble["gen-assemble"]
+    gen_delivery["gen-delivery"]
+    gen_program["gen-program"]
+    gen_settings["gen-settings"]
+  end
+  subgraph off_roster["off the roster"]
+    gen_demand["gen-demand"]:::retired
+    gen_edge["gen-edge"]:::retired
+    gen_flake["gen-flake"]:::retired
+    gen_pipe["gen-pipe"]:::retired
+    gen_rebuild["gen-rebuild"]:::retired
+    gen_resolve["gen-resolve"]:::retired
+  end
 
-**The hub itself is not an `mkCi` consumer.** `ci/mkCi.nix` and `ci/flakeModule.nix` — the copies the
-harness was extracted from — retired at `a19685b` (2026-08-17, five files); the hub's own gate now
-consumes `gen-harness`'s declared check builders (`lib.checks.treefmtTreeRoot`,
-`lib.checks.mdformatPlugins`, `lib.mdformatBasePlugins`) directly, and the root no longer publishes
-`lib.mkCi` at all — the hub's own `ci/` was always a parity/perf harness exposing flake `checks` and a
-perf `app`, never a `mkCi`-shaped `tests` output. The extraction this section once described as
-"specified but NOT landed" landed the same day it was specified — see
-`specs/2026-08-17-gen-hub-ci-extraction-completion-spec.md` in den-ag-design, stamped LANDED. A reader
-meeting `gen-harness.lib.mkCi` everywhere but the hub itself is meeting the current, single-copy
-topology, not a defect.
+  gen_aspects --> gen_identity
+  gen_aspects --> gen_merge
+  gen_aspects --> gen_prelude
+  gen_aspects --> gen_schema
+  gen_bind --> gen_prelude
+  gen_class --> gen_prelude
+  gen_dispatch --> gen_prelude
+  gen_graph --> gen_prelude
+  gen_link --> gen_algebra
+  gen_link --> gen_aspects
+  gen_link --> gen_identity
+  gen_link --> gen_prelude
+  gen_link --> gen_schema
+  gen_link --> gen_scope
+  gen_link --> gen_view
+  gen_memo --> gen_graph
+  gen_memo --> gen_prelude
+  gen_merge --> gen_memo
+  gen_merge --> gen_prelude
+  gen_merge --> gen_types
+  gen_product --> gen_prelude
+  gen_schema --> gen_algebra
+  gen_schema --> gen_identity
+  gen_schema --> gen_merge
+  gen_schema --> gen_prelude
+  gen_scope --> gen_graph
+  gen_scope --> gen_identity
+  gen_scope --> gen_prelude
+  gen_scope --> gen_schema
+  gen_select --> gen_algebra
+  gen_settings --> gen_algebra
+  gen_settings --> gen_bind
+  gen_settings --> gen_graph
+  gen_settings --> gen_identity
+  gen_settings --> gen_prelude
+  gen_settings --> gen_schema
+  gen_settings --> gen_types
+  gen_types --> gen_identity
+  gen_types --> gen_prelude
+  gen_view --> gen_graph
+  gen_view --> gen_prelude
 
-## Dependency Graph
-
-Libraries have minimal inter-dependencies. Most are independent.
-
-```
-gen-prelude (pure nixpkgs-lib-free utility base — zero deps)
-gen-algebra (pure primitives — zero deps)
-
-  # module-system substrate (all nixpkgs-lib-free, built on gen-prelude)
-  gen-types  (structural checker; imports gen-prelude)
-  gen-merge  (byte-mode evalModuleTree; imports gen-prelude, injects gen-types)
-  ├── gen-schema (imports gen-prelude + gen-merge + gen-algebra)
-  │   └── gen-aspects (imports gen-prelude + gen-merge + gen-schema)
-  │
-gen-scope    (gen-prelude)
-gen-graph    (gen-prelude)
-gen-select   (zero deps — Class A, builtins only)
-gen-bind     (gen-prelude)
-gen-dispatch (gen-prelude only)
-gen-memo     (gen-prelude + gen-graph)
-gen-assemble (ZERO inputs by design — substrate injected by the consumer, ADR-0014)
-gen-resolve  (gen-scope + gen-graph + gen-algebra + gen-bind)
-gen-vars     (standalone pure)
-
-  # L2 concern libraries (hub-wired via mkGenLibs; all Class B, nixpkgs-lib-free)
-  gen-product  (gen-prelude; consumes gen-graph accessor + gen-schema id_hash shape structurally)
-  gen-settings (gen-prelude + gen-algebra + gen-bind; gen-schema interface-only)
-
-  # historically gen-flake sat here as the one nixpkgs boundary (import-tree + gen-merge +
-  # gen-schema + gen-aspects + gen-bind + nixpkgs); it dissolved (ADR-0031 F3) — see Overview
-  # and Terminal Layer for where full nixpkgs enters today
+  classDef retired fill:#f6f6f6,stroke:#bbb,color:#777,stroke-dasharray: 4 3
 ```
 
-Each library exposes a single `.lib` value output — the obsolete functor-call form `gen-graph { inherit lib; }` is gone (`__functor` is banned ecosystem-wide). Dependency classes are declared honestly: **A** pure `{}`, **B** gen-prelude, **C** nixpkgs-lib, **D** nixpkgs-lib + gen-dep.
+<!-- gen-library-graph:end -->
 
-The ecosystem is now **entirely nixpkgs-lib-free** at the library level. The module-system substrate landed the re-host: **gen-types** is the verify-only structural checker (the checking half); **gen-merge** is the byte-mode `evalModuleTree` (the merge half — a pure `lib.evalModules` + `lib.types`-merge reproduction over a priority subset, byte-identical on den's surface). **gen-schema** and **gen-aspects** were re-hosted onto that substrate — their `lib/` no longer imports `lib.evalModules`/`lib.types` (byte-identical to the old nixpkgs-driven versions over every non-identity field; the re-minted `id_hash` is the ADR-0016 excluded axis, held by a teeth arm on the pure engine rather than against the frozen witness); gen-schema now takes `{ prelude, merge, algebra }`, gen-aspects `{ prelude, merge, schema }`. Class C/D are therefore empty among the pure libs. gen-dispatch depends only on gen-prelude (its gen-select bridge is a structural adapter, not an import). gen-resolve is Class B with four gen siblings — it hosts the convergence loop that ties the dispatch step and scope evaluation together. No library on today's roster consumes full nixpkgs at all — historically **gen-flake** was the sole one that did, and only in its terminals (`realize` driven by `terminals.nixosSystem`); its pure core (`compose`/`injectArgs`) was itself nixpkgs-lib-free. gen-flake dissolved (ADR-0031 F3): its pure core lives on at this hub's `lib.compose`, still nixpkgs-lib-free, and its terminal now sits at this hub's interim `flakeModules.default` and gen-delivery's `realize` — see Overview and Terminal Layer.
+An arrow is a **declared root-flake input**, which is the observable ADR-0015 rules the direction lint
+on: a pin bump that changes no declared name changes nothing here, and the lock graph is deliberately
+not the source. Re-derive the whole relation in one command:
 
-Above the L1 substrate sit two **L2 concern libraries** — gen-product and gen-settings — each a Class B (nixpkgs-lib-free) library that pins one algebra a configuration framework assembles with: graph products and layered settings. They depend only on L1 siblings and import nothing upward. Each flake `.lib` self-resolves its own deps, so they are **hub-wired via `mkGenLibs`** (keys `product`, `settings`) like the self-wiring libraries above. Three more stood here and have retired, each archived for reference rather than deleted: **gen-demand** (typed demand), whose cascade ADR-0008 §4 re-expresses over gen-scope, the sole engine; and **gen-edge** (content movement) and **gen-pipe** (scoped-channel dataflow), which ADR-0010 §3 retires together into the movement vocabulary — the substrate constructs of gen-view, gen-select, gen-graph and gen-scope. The L2 tier shrinking is the point of that ruling rather than an accident of it: a concern expressible in substrate vocabulary did not need a library of its own.
-
-### The nixpkgs.lib policy
-
-Anywhere the gen ecosystem needs nixpkgs *lib* only, it uses a pinned `github:nix-community/nixpkgs.lib` — not full nixpkgs. Full nixpkgs is pulled ONLY where `pkgs`/`nixosSystem` are genuinely needed: the nix-unit/treefmt CI runners and, at the library level, nowhere else — historically the gen-flake terminal, now this hub's interim `flakeModules.default` and gen-delivery's `realize` (ADR-0031 F3; see Terminal Layer). Those are the terminal-plane's single legitimate points of entry for full nixpkgs.
-
-## Library Roles
-
-### Foundation Layer
-
-**gen-prelude** — Pure nixpkgs-lib-free utility base.
-
-Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. It is the substrate that lets gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-memo be nixpkgs-lib-free.
-
-**gen-algebra** — Pure primitives shared across the ecosystem.
-
-- Search monad (indexed state threading with convergence)
-- Intensional functions (program-point identity, conservative equality — the mint itself is injected, not owned)
-- Record algebra (scoped labels, mixin composition, `foldLayers` for per-field-strategy fold)
-- Either combinators
-
-gen-algebra is now **fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. Its old module tier (strict modules, ref types, validators — the constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema; identity minting split further, into `gen-identity` — the substrate's one minting authority (ADR-0016 ruling 5) — which gen-schema now takes injected rather than owning (`gen-schema/lib/id-hash.nix`). Every other gen-\* library that needs search imports gen-algebra; one that needs identity minting imports gen-identity.
-
-### Module System Layer
-
-The pure-Nix module system that replaces nixpkgs' `lib.evalModules` + `lib.types` on the gen surface. A clean split: gen-types **checks**, gen-merge **merges**; they meet only at leaves, post-merge.
-
-**gen-types** — Pure structural type checker.
-
-The *checking half*. A type is a predicate boundary (Findler & Felleisen 2002): `verify` a value and get back `null` (it inhabits the type) or an error string (it does not). Nothing else — no merging, no priority, no fixpoint. Primitives, polymorphic combinators (`option`/`listOf`/`attrsOf`/`union`/`tuple`/…), `struct` with closed-world `.override`, refinement contracts (Rondon 2008), validators, and name-only intensional identity (`__id` = sha256 of the type name — the same discipline as gen-schema's `id_hash`). A successful `verify` is a single pass; failure re-scans only to locate the first offender. It is a self-contained **leaf** library (its own flake) so it imports *below* a registry without a flake cycle.
-
-**gen-merge** — Byte-mode module merge engine.
-
-The *merge half*. `evalModuleTree` collects a tree of modules, ties the self-referential `config` fixpoint (one local `fix` per call), resolves per-option definitions by priority, recurses into structural types, routes unknown keys through a freeform type, and verifies leaves via the injected gen-types checkers — reproducing nixpkgs' merge **output**, byte-for-byte, on the surface a real configuration uses, with zero nixpkgs. It implements **one** priority rule (lowest-number wins, ties merge, over `mkForce`/`mkDefault`/`mkOverride`/`mkOptionDefault`) plus `mkMerge`/`mkIf` — the entire nixpkgs ORDER pass (`mkOrder`/`mkBefore`/`mkAfter`) is dropped (zero uses on the surface). A byte-identity oracle with mutation-teeth (`ci/tests/oracle.nix`) gates it against `lib.evalModules`. Structural merge strategies (`submodule`/`listOf`/`attrsOf`/`lazyAttrsOf`/`deferredModule`/`either`/…) live here; leaf checkers come from gen-types. The unified `genMerge.types` namespace (gen-types leaves ⊎ gen-merge strategies) is the `lib.types` drop-in the re-host points at.
-
-### Type System Layer
-
-Re-hosted onto the module-system substrate above — nixpkgs-lib-free, byte-identical to the old nixpkgs-driven versions.
-
-**gen-schema** — Typed record registries.
-
-Declares **kinds** (record types), creates **instance registries**, handles strict validation, identity hashing, cross-instance references, collections, computed fields, refinement contracts, mixins, methods, and introspection. The apply pipeline is: validate → derive → apply. The `mkType` parameter on `mkSchemaEntryType` supports pluggable entry types, allowing downstream libraries (e.g., gen-aspects) to define their own schema-backed types.
-
-Consumers use gen-schema to define their entity model (hosts, users, services, etc.) with typed, validated, extensible registries.
-
-**gen-aspects** — Aspect type system.
-
-Defines the **aspectType**: one type, dispatch in merge (Palmer flat typing). Classifies aspect keys into classes (output targets), collections (data aggregation), and nested aspects (recursive). Provides guard function detection (`canTake`), program-point identity, and configuration hooks (`cnf`). Uses gen-schema's `mkType` for `mkAspectSchema` (schema-backed aspect registries) and provides `flatten` for recursive tree-to-flat-registry conversion by path identity.
-
-Consumers use gen-aspects to define their composition units — the aspects that cut across entity boundaries and output dimensions.
-
-### Evaluation Layer
-
-**gen-scope** — HOAG evaluator.
-
-Demand-driven evaluation over scope graphs. Provides `eval` which takes roots + attributes + parseParent and returns `{ node, get, allNodes }`. The `_eval` memoization cache co-located on every node ensures O(1) amortized attribute access. Supports inherited attributes (parent chain), synthesized attributes (children), circular attributes (fixpoint), collection attributes (traversal aggregation with traverse modes including `"neron"` for D > I > P ordered collection), and Neron resolution (D < I < P specificity).
-
-This is the evaluation substrate — it computes values over the graph that other libraries query.
-
-### Query Layer
-
-**gen-graph** — Graph query combinators.
-
-Accessor-based: takes `{ edges, parent, nodes, nodeData }` functions, answers structural questions. Lazy traversal (reachableFrom, canReach, pathsBetween) and global analysis (cycles, dependents, transpose). C-level BFS via `builtins.genericClosure`. It also owns the ordering front-door (`order.nix`): `phaseOrder` — a forward producers-first order over the condensation (a cycle or self-loop throws) — plus `entryAnywhere`/`entryAfter`/`entryBefore`/`entryBetween`. This is where gen-derive's group ordering moved; gen-dispatch consumes the result as its `groupOrder`.
-
-**gen-select** — Selector algebra.
-
-Pattern matching over attributed graph positions. Selectors are `{ __sel = tag; ... }` attrsets. Constructors (star, attrs, entity, kind, and, any, not, has, within, parentMatches, when) compose into predicates evaluated by `matches selector id ctx`. **Identity-bearing selectors** (`sel.entity`, `sel.kind`) match by gen-schema `id_hash` / kind rather than attribute values, taking registry entries or kind values (never `"kind:name"` strings). Adapters bridge to gen-scope, gen-graph, a flat registry, and gen-product cells without importing them.
-
-### Binding Layer
-
-**gen-bind** — Module binding.
-
-Injects external values into NixOS module functions. Handles three module shapes, merge strategy control (bind-wins/system-wins/error), lazy contracts, config thunks, provenance tracking, batch wrapping, and identity stamping. The bridge between scope-computed values and the NixOS module system.
-
-### Dispatch Layer
-
-**gen-dispatch** — Relational rule dispatch STEP.
-
-Production rule system: rules (condition + action producer + identity) dispatched across stratified groups. It owns **rule evaluation only** — a pure function of `(rules, context)`. It does **not** own the convergence loop and does **not** sort groups. `dispatch` takes a pre-ordered `groupOrder :: [groupName]` (computed elsewhere) and returns `orderedGroups`, the present-only subsequence. Conflict resolution: override → priority → specificity → additive. A caller iterates by threading plain domain state through repeated one-shot dispatch and reading actions off the fixpoint (recompute-at-fixpoint = confluence, so no cross-pass `fired` bookkeeping); a gen-select bridge (`adapters.select`) supplies selectors as conditions. Removed vs the old gen-derive: `fixpoint` (the loop, now gen-resolve), `topoSort`/`entry*` (the ordering, now gen-graph), and the `dispatchStep`/`dispatchInit` migration seam (retired once the recompute-at-fixpoint pattern was blessed).
-
-### Evaluation / Convergence Layer
-
-**gen-resolve** — Demand-driven RAG evaluator over scope graphs.
-
-A pure-Nix RAG schedule-conductor (Knuth 1968 attribute schedule + Vogt 1989 HOAG gate + two-stratum partition, cold/warm fold into `gen-scope.eval`). It **owns the convergence loop**: `gen-scope.circular` iterates a step over the domain state to a fixpoint (Kleene ascent, Sloane 2010 §2.2); a relational-dispatch fixpoint is expressed by making that step a one-shot `gen-dispatch.dispatch` whose output context is the next iterate, then reading the actions off the converged context. Class B — four gen siblings (gen-scope, gen-graph, gen-algebra, gen-bind).
-
-### Terminal Layer
-
-The nixpkgs-facing crossing. **gen-flake was the sole boundary here; ADR-0031 F2 dissolved it into
-per-surface successors** — the compose S2 core at this hub's `lib.compose` / interim
-`flakeModules.default`; warm/override/trace in gen-memo; the projection + `realize` in gen-delivery;
-inject/terminals at the crossing's Adapter set. gen-flake's own section below is kept as the retired
-surface's record, in the same pattern as gen-edge and gen-demand above.
-
-This hub's OWN `flakeModules.default` — rehomed from gen-flake under ADR-0031 F1, marked INTERIM (not
-yet ADR-0027) — is the current flake-parts ergonomics: one `imports` gives both the injected query
-surface (into top-level and `perSystem` args) and `flake.nixosConfigurations` from one compose, over
-the option surface `gen.tree` / `gen.extraModules`. It consumes no gen-flake surface. The **invariant**
-gen-flake proved end-to-end (gen TYPES never leave the pure eval; only VALUES cross) carries forward
-architecturally at the new boundary under ADR-0023's declared interim (b) — target-invoked checking off
-by default until every crossing site meets ADR-0023 (c), i.e. no declared opt-out remains
-(`den-hoag-i546n`, successor to the closed `den-hoag-zgps`); the hub's `ci/inject-payload.nix`
-(ADR-0023 (b), the crossing Adapter side) is the live check that keeps that declared opt-out's price
-measured rather than assumed.
-
-**gen-flake** — The value-injection boundary. **ORPHANED AS REFERENCE (ADR-0031 F3) — dissolution
-complete; off the roster, not a hub input. Take no new dependency on it.**
-
-It was the single sanctioned crossing from the pure composition plane into nixpkgs. Three ops:
-
-- **`compose { tree ? null, modules ? [], specialArgs ? {} } -> { values; classContent; hostContent }`** — loaded a gen module tree (as a bare path list via the import-tree fork) and resolved it PURELY via gen-merge's `evalModuleTree`. Threaded the gen constructors (`genMerge`/`genSchema`/`genAspects`/`genTypes`/`genPrelude`) to every module so definition modules declared their typed surfaces without nixpkgs. `values` = the resolved config; `classContent` = the flat aspect registry (query surface); `hostContent` = the per-host `(class, host)` projection (build surface). Successor: this hub's `lib.compose`.
-- **`injectArgs composed -> { _module.args.genValues = composed.values; }`** — packaged the resolved VALUES as a plain query module so a consumer's nixpkgs modules read `{ genValues, ... }: … genValues.hosts.<h>.addr …`. Pure — no gen TYPE crosses. Successor: the crossing's Adapter set.
-- **`realize { composed, terminals, bindings ? {}, extraModules ? {} } -> { <class> = { <host> = <built> } }`** — the terminal **driver**, and the split mattered: `realize` was the class-major fold. Per class and host it selected `composed.hosts.<h>.classes.<c>`, merged the three binding layers (`hc.bindings // bindings // bindings.<host>`), knot-tied the colmena-style `nodes` accessor to the class's own lazily-built result set, and called the terminal. It never partial-applied anything itself. Output keys were exactly the `terminals` keys. The **binding** happened one level down, in `terminals.mkSystemTerminal { evaluator }`: that is where `gen-bind.wrapAll { modules; bindings; }` ran, and where `nodes` reached the modules as `specialArgs`. `mkSystemTerminal` named no system class and touched no nixpkgs; `terminals.nixosSystem { nixpkgs; }` was that generic terminal instantiated with `nixpkgs.lib.nixosSystem`, and was the ONE place that touched nixpkgs. `terminals.mkFlakeTerminal` was the flake-parts crossing beside it. Successor: gen-delivery's projection + `realize`.
-  - The v0 terminal `mkSystems { hostContent; nixpkgs; extraModules; }` was **retired**, not renamed, before the dissolution: it was absent from `gen-flake/lib/` entirely. Its replacement, per gen-flake's own migration table, was `realize { composed; terminals.nixos = terminals.nixosSystem { nixpkgs; }; extraModules; }`, and `composed.hostContent` became `composed.hosts`.
-
-`diff.nix` stays in the orphaned repo as reference — a named input to gen-memo's failure-attribution
-spec, not code to copy. This was the same one-way `compose → value → nixpkgs` trade adios (adisbladis)
-takes; a pure engine cannot be driven by foreign nixpkgs-module libraries.
-
-### L2 Concern Libraries
-
-These libraries build on the L1 substrate as nixpkgs-lib-free (Class B) concern libraries. Each fixes one algebra a configuration framework needs but the substrate deliberately leaves to the consumer. Two remain — gen-product and gen-settings — and each flake `.lib` self-resolves its own deps, so both are hub-wired via `mkGenLibs` (keys `product`, `settings`). Three retired and are off the roster and no longer hub inputs: **gen-demand** (ADR-0008 §4, re-expressed over gen-scope, the sole engine), **gen-edge** and **gen-pipe** (ADR-0010 §3, retired together into the movement vocabulary). Their sections below are kept as the retired surfaces' record — each states where its content went, because a section deleted outright leaves a reader who meets the name in old code with nowhere to go.
-
-**gen-edge** — Content-movement contract. **RETIRED (ADR-0010 §3) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
-
-Everything that moved content between graph positions was an edge `(S, T, P, M)` — source, target, attrpath, mode. gen-edge owned the edge record and its constructors, edge-set derivation for a root (`edgesFor`), toposorted materialization (Kahn's algorithm over the accumulator dependency relation) into a per-root/per-channel content map, and a frozen, hashable **edge trace** that rendered edge identities without forcing resolved content — a cross-repo parity oracle. Positions, channels, and content were all opaque; it depended on gen-prelude and gen-graph. Twelve of its eighteen exports name destination constructs in **gen-view**, the fourth destination ADR-0010 §3 gained on 2026-08-20, with the Kahn arm reached through `accumulatorOrder` over the relation `accumulatorRelation` builds. The edge trace was the instrument that validated the very spec retiring it, so the oracle cluster retired last, after movement AC-7 ran; that run demoted the trace from acceptance authority to topology evidence, because two runs with different answers can share a byte-equal fingerprint.
-
-**gen-product** — Graph products over accessor-graphs.
-
-Builds the four standard graph products — Cartesian, tensor, strong, lexicographic — over the gen-graph accessor-record convention. A product *is* an accessor-graph (gen-graph queries apply unchanged) extended with product metadata. Provides cells (full coordinates), slices, fibers, projections, quotients, sparse `restrict` (the real, non-dense fleet), and specificity `containmentChain`s. Lazy in, lazy out; coordinates are registry entries, never `"kind:name"` strings. Depends only on gen-prelude.
-
-**gen-settings** — Stratified settings resolution.
-
-Resolves an aspect's static `{ default; merge }` settings schema against an ordered layer list (least → most specific) as a pure layered fold — byte-identical to gen-algebra's `foldLayers` over the same strategies. Adds identity-bearing cross-aspect **refs** as inert data (statically computable dependency graph, definition-time cycle detection), structured per-field provenance, and graduated injection (`injectAspectSettings` / `assembleHost`) via gen-bind. Lattice-blind by design: the layer order arrives precomputed. Depends on gen-prelude, gen-algebra, and gen-bind; consumes gen-schema interface-only (`id_hash`).
-
-**gen-demand** — Typed demand cascade. **RETIRED (ADR-0008 §4) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
-
-Graph nodes emitted typed **demands**; registered **kinds** resolved each into resources, wiring, and sub-demands over a downward-only kind DAG. A stratified fold resolved the growing demand multiset in ≤ DAG-depth rounds (termination a theorem, not a convergence loop), with pinned-order dedup and a full provenance trace. Emission independent of consumption by signature. It depended on gen-prelude and gen-graph, with gen-select optional (subject-matching adapter). All of that now lives in **gen-scope** as `lib/cascade.nix` + `lib/folds.nix`, under claim vocabulary — the request value is a `mkClaim`, named for what it is rather than for the evaluation strategy. The one export that did not move is `adapters`: it retires with its construct, and gen-scope takes no gen-select edge.
-
-**gen-pipe** — Scoped-channel dataflow algebra. **RETIRED (ADR-0010 §3) — off the roster, not a hub input, archived for reference. Take no new dependency on it.**
-
-A channel was a typed, named accumulation lane whose value at a scope position was a deterministic fold (pinned traversal, associative-only combine) over the contributions visible there. Operators (`map`, `filter`, `fold`, `scan`, `route`, `join`, `tee`) connected channels into a dataflow DAG, validated at composition time and evaluated demand-driven. Contributions carried structured provenance and a class tag; a `classInvariant` flag recorded config-dependence statically. It depended on gen-prelude, gen-select, and gen-scope. Twelve of its seventeen exports name destination constructs in **gen-view**; `sel` was a gen-select re-export and consumers bind gen-select directly; `join` has no single successor construct and is a caller-side composition. The B5 laws survive as properties of the query construction rather than of a library — first-appearance walk order, a whitelist of declared associative combines, and a record for every drop or reorder.
-
-## Composition Patterns
-
-### How Libraries Wire Together in a Consumer
-
-```
-1. Schema defines entity model
-   gen-schema: kinds (host, user, home), registries, refs, validation
-
-2. Aspects define composition units
-   gen-aspects: aspectType classifies content into classes/collections/nested
-
-3. Scope graph evaluates the tree
-   gen-scope: eval builds nodes, computes attributes demand-driven
-
-4. Rules dispatch policies
-   gen-dispatch: rules fire on context, produce effects (one pure step);
-   gen-graph phaseOrder orders the groups; gen-resolve loops to convergence
-
-5. Selectors match positions
-   gen-select: neededBy, pipe.gather, policy guards use selectors as predicates
-
-6. Graphs answer structural queries
-   gen-graph: reachability, cycles, impact analysis over accessor records
-
-7. Bindings wire values into modules
-   gen-bind: scope-computed values → NixOS module functions via partial application
+```bash
+nix eval --json ./ci#lib.architectureLibraryGraph.report | jq
 ```
 
-### Data Flow
+### The four strata
+
+The subgraph a library sits in is its **stratum**, declared in `lib/mkGenLibs.nix` beside the member
+itself. The declaration is total and explicit — a member with no stratum is a build error, never a
+silent default — and the four published strata are the consumer paths the hub's `lib` output carries
+(`lib.substrate.*`, `lib.modules.*`, `lib.aspects.*`, `lib.framework.*`).
+
+| stratum     | what it is                                                                                                                              | members                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `substrate` | the base layer: values, graphs, selection, evaluation                                                                                   | gen-algebra · gen-bind · gen-dispatch · gen-graph · gen-identity · gen-memo · gen-prelude · gen-product · gen-schema · gen-scope · gen-select · gen-view |
+| `modules`   | the module system: the checking half and the merging half                                                                               | gen-merge · gen-types                                                                                                                                    |
+| `aspects`   | the aspect layer, built on the module system                                                                                            | gen-aspects · gen-class · gen-link                                                                                                                       |
+| `framework` | above the stack rather than a layer of it — a framework assembles with these, and no substrate vocabulary may be defined in their terms | gen-assemble · gen-delivery · gen-program · gen-settings                                                                                                 |
+
+**The direction of dependence is the law** (ADR-0015): no member may declare an input above its own
+stratum, under `substrate < modules < aspects < framework`. `ci/checks.direction-of-dependence` is the
+lint. Exactly one upward edge is ruled through as an exception — `gen-schema (substrate) → gen-merge (modules)`, because gen-schema declares kinds whose fields are options and so is written in the module
+system's language while being substrate by role; its retirement carrier is `den-hoag-b91m`, and the
+check prints the exception entry by entry on every run rather than hiding it in a pass.
+
+### The role of each library
+
+| library      | stratum   | role                                                                                                                                                                                                                                                                                                                                           | exercised by                                 |
+| ------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| gen-prelude  | substrate | the nixpkgs-lib-free utility base: `builtins` re-exports plus a vendored `lib` subset. It is what lets every library below be nixpkgs-lib-free.                                                                                                                                                                                                | reached as the base; no construct of its own |
+| gen-identity | substrate | the **one minting authority** (ADR-0016 ruling 5): `hashIdentity` over a canonical, self-delimiting preimage. Dependency-free by necessity — libraries upstream of gen-schema reach it without closing a flake cycle.                                                                                                                          | C3, C17, through the mint                    |
+| gen-algebra  | substrate | pure primitives: the search monad, intensional function equality, the record algebra (`foldLayers`), Either combinators.                                                                                                                                                                                                                       | C13                                          |
+| gen-schema   | substrate | typed record registries: declares **kinds**, creates instance registries, derives identity, resolves cross-instance references, computes fields.                                                                                                                                                                                               | C17                                          |
+| gen-scope    | substrate | **the sole evaluator** (ADR-0006). Demand-driven attribute evaluation over a scope graph: inherited, synthesized, circular and collection attributes, with a memo cache co-located on each node.                                                                                                                                               | C1, C3, C15, C16                             |
+| gen-memo     | substrate | **the one incremental plane** over the evaluator (ADR-0008 §2): a decision layer that never evaluates, only decides reuse. Its definition is byte-parity against a cold evaluation.                                                                                                                                                            | C15, T2b                                     |
+| gen-graph    | substrate | accessor-based graph queries: reachability, cycles, transpose, condensation, the labelled-walk regex query, and the ordering front door.                                                                                                                                                                                                       | C2, C12                                      |
+| gen-select   | substrate | the selector algebra: `{ __sel = tag; … }` predicates over attributed graph positions, with adapters onto scope, graph, a flat registry and product cells. Every derived view is expressed through it.                                                                                                                                         | C2                                           |
+| gen-view     | substrate | the derived-view constructor: it **builds and holds** a materialized query result, where gen-select only answers. Movement, the label algebra and the static well-definedness gate live here. ★ The name is **provisional** — the constructs later descend into a consolidated domain library; take it as a live home, not a stable container. | C4, C7                                       |
+| gen-bind     | substrate | binds resolved values into module functions, and owns the crossing's first-order term algebra.                                                                                                                                                                                                                                                 | C14                                          |
+| gen-dispatch | substrate | the relational rule-dispatch **step**: a pure function of `(rules, context)` over stratified groups. It owns neither the loop nor the group order.                                                                                                                                                                                             | C10                                          |
+| gen-product  | substrate | graph products over the accessor convention — Cartesian, tensor, strong, lexicographic — with cells, slices, fibers, projections, quotients and sparse `restrict`. A product *is* an accessor-graph.                                                                                                                                           | C12                                          |
+| gen-types    | modules   | the **checking half**: a type is a predicate boundary — `verify` a value, get `null` or an error string. Primitives, combinators, `struct` with closed-world override, refinement contracts. No merging, no priority, no fixpoint.                                                                                                             | T2b                                          |
+| gen-merge    | modules   | the **merging half**: `evalModuleTree` ties the `config` fixpoint, resolves definitions by priority, recurses into structural types and verifies leaves through the injected checkers — reproducing nixpkgs' merge output byte-for-byte with zero nixpkgs.                                                                                     | T2b                                          |
+| gen-aspects  | aspects   | the aspect type system: one `aspectType`, dispatch in merge; classifies keys into the `class`, `channel` and `facet` categories, detects guard functions, and flattens a nested tree to a registry by path identity.                                                                                                                           | C11                                          |
+| gen-class    | aspects   | the **share class** — an equivalence over members under a caller-supplied `keyOf`, an optimization over sharing. Deliberately **not** the delivery class (ADR-0028).                                                                                                                                                                           | C9                                           |
+| gen-link     | aspects   | cross-flake federation: a subgraph packaged and exchanged, with the adapter/lens that ADR-0027 makes the correctness unit of a framework boundary.                                                                                                                                                                                             | C11                                          |
+| gen-assemble | framework | the shared framework toolkit: contribution assembly, commutative shape union, structural declarations. **It never evaluates** — it constructs inside the consumer's own evaluation and declares no flake input at all.                                                                                                                         | C8, C16                                      |
+| gen-program  | framework | turns a framework's policy declarations into a **program** and reaches the solver. Adjacent to assembly, never inside it.                                                                                                                                                                                                                      | C5                                           |
+| gen-delivery | framework | the delivery-class realization surface (ADR-0028): the projection that discovers which declared keys are delivery classes, and the fold that hands each class's collected content to a target-owned terminal.                                                                                                                                  | C6                                           |
+| gen-settings | framework | stratified settings resolution: a static `{ default; merge }` schema folded over an ordered layer list, with identity-bearing cross-references as inert data and per-field provenance. Lattice-blind by design — the layer order arrives precomputed.                                                                                          | — none                                       |
+
+Three entries in that last column are honest gaps rather than omissions. gen-prelude is reached as
+everyone's base and gen-identity through the mint, so neither has a construct of its own; **gen-settings
+has no declaration in the acceptance corpus at all**, and a framework-stratum library with no corpus
+declaration is not exercised by the exit.
+
+### What is off the roster
+
+| name        | why it is not a roster member                                                                                                                                                                                                                                                                            |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gen-demand  | retired (ADR-0008 §4): the typed demand cascade re-expresses over gen-scope as claim vocabulary — `mkClaim`, `resolveClaims`.                                                                                                                                                                            |
+| gen-rebuild | retired (ADR-0008 §4): its dirty-cone propagation moved onto the gen-memo plane; the library shell and the name retire with the content.                                                                                                                                                                 |
+| gen-edge    | retired (ADR-0010 §3): the `(S,T,P,M)` movement contract, its edge-set derivation and its Kahn-ordered materialization land in gen-view, with the ordering arm in gen-graph.                                                                                                                             |
+| gen-pipe    | retired (ADR-0010 §3): scoped channels re-express as gen-view constructs; `sel` binds gen-select directly; the determinism and provenance laws are restated as properties of the query construction.                                                                                                     |
+| gen-flake   | dissolved (ADR-0031 F2): `compose` to this hub's `lib.compose`, warm/override/trace to gen-memo, projection and `realize` to gen-delivery, inject and terminals to the crossing's adapter set.                                                                                                           |
+| gen-resolve | retired (ADR-0008 §4), dispositioned export by export rather than moved as a block: the materialization vocabulary and the reference construct to gen-view, the crossing terminal to gen-bind, the seal-level queries to gen-scope, the reuse key to gen-memo, `attr` and `cascade` dissolved by ruling. |
+| gen-harness | **not a library.** It owns `mkCi`, the flake wrapper every gen repo's `ci/` is built from. It pins no gen library — that is what makes it a separate repository, since a library's `ci/` lock would otherwise drag in the aggregator pinning that same library.                                          |
+| gen-vars    | experimental, excluded from the inventory by ADR-0003.                                                                                                                                                                                                                                                   |
+
+Removal is not deletion: every retired repository stays readable and keeps its surface, orphaned for
+reference (ADR-0031 F3). What leaves with a member is its **obligations**, and those go to a named
+destination or are dissolved with a stated reason — the rulings are recorded in `lib/mkGenLibs.nix`
+itself, beside the roster, because that is where a reader asks why there is no `edge` key.
+
+## 2. The model
+
+There is **one graph and one node notion** (ADR-0012). Everything else is declared data over it or a
+named query result derived from it.
+
+```mermaid
+flowchart TD
+  subgraph model["the one graph"]
+    node["<b>node</b><br/>an identity · attributes, declared and computed · its incident labelled edges"]
+    labelled["<b>labelled edge</b><br/>carries a label and no interpreted payload"]
+    node -- "incident to" --> labelled
+    labelled -- "endpoints are" --> node
+  end
+
+  kind["<b>kind</b> — declared data<br/>a schema-level datum a node carries.<br/>gen declares kinds like any framework does;<br/>nothing in the substrate reads a kind<br/>to decide what a node <i>is</i>."]
+  kind -- "carried by" --> node
+
+  mint["<b>hashIdentity</b> — the one minting authority<br/>kind-tagged canonical hash over the kind's<br/>distinguishing key/value pairs.<br/>Identifier ≠ identity. The substrate refuses<br/>rather than inventing an identity."]
+  mint -- "mints the identity of" --> node
+
+  relation["<b>relation that must carry content</b>"]
+  binding["<b>binding node</b> — a reified relation<br/>identity = hashIdentity ⟨relation-kind⟩ ⟨labelled relata⟩<br/>n-ary · composable · may itself be a relatum<br/>minting is <b>staged</b>: relata come from strictly earlier passes"]
+  relation -- "an edge carries no payload,<br/>so it cannot be an edge" --> binding
+  binding -- "is a node of" --> node
+  mint -- "mints" --> binding
+
+  query["<b>selector algebra</b><br/>gen-select predicates over attributed positions"]
+  view["<b>derived view</b><br/>a <i>named materialized query result</i>.<br/>Registry, topology, channel, role and the<br/>aspect/entity classification are <b>one</b><br/>construction under different names."]
+  node --> query
+  labelled --> query
+  query -- "materialized by gen-view" --> view
+  view -. "a projection, never a source" .-> node
+
+  classDef emph fill:#f6f6f6,stroke:#888
+  class mint,binding emph
+```
+
+Read the diagram through five commitments.
+
+**A node is a position with attributes and incident labelled edges** — an identity, a set of
+attributes (some declared, some computed), and its incident labelled edges. That is the whole of the
+node notion, and there is no second one anywhere in the substrate (ADR-0012, quoting R§2.1).
+
+**Kinds are data.** A kind is a schema-level declared datum, declared by gen or by a framework, carried
+by a node. It is never a partition of the substrate: `aspect` and `entity` are gen-declared kinds like
+any other, and nothing in the substrate reads a kind to decide what a node *is*. The consequence for a
+framework is direct — your entity kinds are ordinary kinds, and a registry is a kind whose contents are
+named queries (ADR-0027, as amended).
+
+**An edge carries a label and no interpreted payload.** This is what forces reification: any relation
+that must carry content cannot be an edge, so it must be a node (ADR-0016 ruling 3). A **binding node**
+is exactly that — a reified relation, identified by *what it relates* and *which relation it is*:
 
 ```
-Entity declarations (user input)
-  → gen-schema registries (typed, validated, referenced)
-  → gen-scope graph nodes (minimal descriptors with decls)
-  → gen-scope eval (demand-driven attribute computation)
-       ├─ gen-dispatch dispatch (policy rules fire, produce effects)
-       ├─ gen-select matches (selectors filter graph positions)
-       └─ gen-graph queries (reachability, cycles, impact)
-  → gen-bind wrapping (computed values → NixOS module args)
-  → Class output (NixOS, darwin, homeManager evalModules)
+identity = hashIdentity <relation-kind> { <relatum label> = <that relatum's identity>; … }
 ```
 
-### Accessor Chain
+The relatum's value is its derived **identity**, never its identifier, so identity is not a function of
+declared names. The relation kind is required and total, and an empty kind is refused **by name** —
+otherwise two distinct relations over the same relata would collapse to one node silently.
+Order-insensitivity holds by construction: the pairs are an attrset, attrsets carry no order, and the
+canonical preimage emits their keys sorted, so no caller owes a sort. Minting is **staged**: a binding
+may relate only nodes minted in a strictly earlier pass, which is why the identity recursion cannot
+arise and why a same-pass reference does not resolve rather than diverging (ADR-0016 ruling 7).
 
-The accessor pattern is the zero-cost bridge between libraries:
+**One minting authority, and it refuses rather than invents.** Every node carries an *identifier* or it
+cannot be an edge endpoint; identity-bearing kinds additionally carry a *derived* identity, minted by
+`hashIdentity` and by nothing else. An ordinary kind derives it from its identity keys **reflected from
+its options** — not from a declaration, since a kind's options may be merged from several sources and a
+declared key list would duplicate a fact no single author owns. Identity follows Nix `==` in both
+directions, which is why the admissible float domain is strictly `|v| < 2^53`: above it Nix's `==` is
+not an equivalence relation. `id_hash` is internal addressing only — consistent within an evaluation,
+and nothing durable may depend on it across evaluations.
 
-```nix
-# gen-scope provides memoized evaluation
-result = engine.eval { roots; attributes; parseParent; };
+**Every derived view is a named materialized query result** over the selector algebra. A projection is
+not merely disqualified as a source — it has a name and a defining query, or it is not a view. The
+aspect registry, a topology, a channel, a role: one construction under different names. This is also
+why function-resolvers-as-interface is rejected — a fact sealed inside an opaque closure is not
+derivable, and the query gates are properties of a query language, which a per-consumer function is not.
 
-# gen-graph queries through gen-scope's accessors — O(1) per cached attr
-genGraph.reachableFrom {
-  edges = id: result.get id "imports";   # hits _eval cache
-} "host:igloo"
+In the corpus: **C1** declares the kinds and nodes, **C2** is the one edge set queried from both ends,
+**C3** mints a binding node from labelled relata, **C12** promotes a product coordinate into a node of
+the one graph by giving it edges, and **C17** closes a kind's identity-key set at the kind boundary.
 
-# gen-select matches through gen-scope's accessors
-ctx = genSelect.adapters.scope.mkContext {
-  node = result.node;
-  get = result.get;
-};
-genSelect.matches (sel.attrs { type = "host"; }) "host:igloo" ctx
+## 3. The evaluation pipeline
 
-# gen-dispatch uses gen-select adapter for rule conditions;
-# groupOrder comes from gen-graph, the loop from gen-resolve
-genDispatch.dispatch {
-  match = genDispatch.adapters.select.mkMatch genSelect;
-  groupOrder = genGraph.phaseOrder { /* groups + entry* constraints */ };
-  # ...
-};
+One path runs from a framework's declarations to a realized target. Every stage below is a library on
+the roster, and every stage names the corpus declaration that exercises it.
+
+```mermaid
+flowchart TD
+  decl["<b>declarations</b><br/>a framework's modules, kinds and aspects"]
+  assembly["<b>assembly</b> — gen-assemble<br/>contributions union commutatively;<br/>shape merges, content folds.<br/><i>The toolkit never evaluates.</i>"]
+  graph["<b>the one graph</b><br/>gen-schema kinds · gen-scope scope graph ·<br/>gen-graph accessors · gen-identity mint"]
+  program["<b>program</b> — gen-program<br/>policy declarations become a logic program:<br/>heads, positive and negative bodies, relata"]
+  solve["<b>solve</b> — gen-scope, the sole evaluator<br/>stratify · least model · well-founded partial model<br/>contested atoms are UNDEFINED, a named third value"]
+  dynamic["<b>dynamic edges</b><br/>an admitted atom's predicate is the label<br/>and its relata are the endpoints —<br/>joining the SAME graph, never a second structure"]
+  gate["<b>the well-definedness gate</b> — gen-view<br/>Vogt's <i>bounded well-defined</i> over the<br/>CONTRACTED DECLARED edge relation"]
+  movement["<b>movement</b> — gen-view<br/>content movement is a scoped query plus its dual:<br/>collector = receiver-rooted query,<br/>broadcaster = producer declaration + standing query"]
+  delivery["<b>delivery</b> — gen-delivery<br/>project the declared delivery classes,<br/>fold each class's collected content"]
+  terminal["<b>terminal</b> — the framework's<br/>a target-owned function gen calls.<br/>Only VALUES cross; no gen TYPE leaves the pure plane."]
+  memo["<b>the incremental plane</b> — gen-memo<br/>decides reuse, never evaluates.<br/>Defined by byte-parity against a cold evaluation."]
+
+  decl --> assembly --> graph
+  graph --> program --> solve --> dynamic
+  dynamic --> graph
+  graph --> gate
+  graph --> movement --> delivery --> terminal
+  memo -. "reuse decisions over" .-> solve
+  memo -. "reuse decisions over" .-> graph
+
+  classDef ext fill:#f6f6f6,stroke:#888,stroke-dasharray: 4 3
+  class terminal,decl ext
 ```
 
-Each call hits memoized values. No redundant computation between libraries.
+| stage         | library           | what happens                                                                                                                    | corpus declaration             |
+| ------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| declarations  | — the framework's | kinds, nodes and aspect content are declared in the framework's own words                                                       | C1 · C16                       |
+| assembly      | gen-assemble      | contributions are unioned commutatively and structural declarations derived, inside the consumer's own evaluation               | C8 · C16                       |
+| program       | gen-program       | policy declarations become a program: each rule a head, a positive body, a negative body, and the relata the head relates       | C5                             |
+| solve         | gen-scope         | the program is stratified and solved to its model; a negative cycle yields the well-founded partial model                       | C5 · C10 · C15                 |
+| dynamic edges | —                 | an admitted atom is materialized as an edge of the one graph, keeping its own label so it is never mistakable for a declaration | C5 → C2                        |
+| gate          | gen-view          | the static well-definedness gate runs over the contracted declared edge relation                                                | C7                             |
+| movement      | gen-view          | a scoped query over the graph, with its carrier, label order and tie handling, materialized as a view                           | C4                             |
+| delivery      | gen-delivery      | the projection discovers the declared delivery classes and collects each class's content                                        | C6                             |
+| terminal      | — the framework's | the fold hands each class's collected content to a target-owned terminal                                                        | C6 (the projection; see below) |
 
-### Fixpoint Coordination
+### The one evaluator
 
-Three fixpoint loops, each at a different level:
+**gen-scope is the sole evaluator** (ADR-0006), kept thin: Nix's laziness schedules, and nothing else
+evaluates. That is a load-bearing constraint rather than a preference — it is what makes a single
+incremental plane definable at all, and `ci/checks.sole-evaluator` scans the roster for
+evaluation-driving constructs outside gen-scope. The check states its own reach on every run: the ruled
+domain is a property ("anything that evaluates, wherever hosted"), which is not statically decidable, so
+the criterion under-approximates it and a green is a statement about the instrument, never about the
+property.
 
-| Level     | Library                              | What converges              | Triggered by                             |
-| --------- | ------------------------------------ | --------------------------- | ---------------------------------------- |
-| Value     | gen-algebra (search.converge)        | Index state + continuations | Search monad operations                  |
-| Structure | gen-scope (circular attr)            | Attribute values on nodes   | Circular dependencies between attributes |
-| Dispatch  | gen-resolve (via gen-scope.circular) | Rule context (domain state) | Enrichment actions that widen context    |
+**gen-memo is the one incremental plane over it** (ADR-0008 §2): a decision layer that never evaluates,
+only decides reuse. Its *definition* is the byte-parity oracle against the cold engine — a plane output
+must be byte-identical to a cold evaluation, and a plane that accumulates its own evaluation state has
+failed by construction. Its theory is Mokhov's build-systems-à-la-carte rebuilder/scheduler split.
 
-The dispatch loop is **not** owned by gen-dispatch — gen-dispatch supplies only the pure step (`dispatch`, a function of `(rules, context)`), and gen-resolve drives it to convergence with `gen-scope.circular` (Kleene ascent) by threading the plain domain state and reading actions off the fixpoint. The consumer (den) coordinates these: gen-resolve's loop runs the dispatch step, which may trigger gen-scope attribute recomputation, which in turn may trigger gen-algebra search convergence. Nix's lazy evaluation ensures only demanded values are computed.
+### Stratification, and why there is no cycle check
 
-## Performance Architecture
+A policy program produces edges. A query over those edges could, in principle, decide whether an edge
+exists — and then `includes → ¬holds → includes` becomes writable. gen closes that **by construction**
+rather than by detection (ADR-0019):
 
-### Memoization Strategy
+> **A consumed query observes reached declarations only. Ordering may not observe conditional edges,
+> and the restriction is enforced by construction: the ordering entry point takes the materialized
+> projection as its input type — never the raw edge relation.**
 
-| Library      | Mechanism                                                       | Scope                                                    |
-| ------------ | --------------------------------------------------------------- | -------------------------------------------------------- |
-| gen-scope    | `_eval` attrset co-located on each node                         | Per-node, per-attribute                                  |
-| gen-graph    | Accessor functions (caller's responsibility)                    | Delegates to source (gen-scope `_eval` when wired)       |
-| gen-dispatch | `fired` set across loop iterations (loop driven by gen-resolve) | Per-dispatch-session                                     |
-| gen-select   | None (stateless predicate evaluation)                           | Each match is fresh but data access hits gen-scope cache |
+Stratum 0 resolves the predicates and materializes; stratum 1 queries the projection. That is Apt, Blair
+& Walker's stratification clause obtained structurally rather than checked, so there is nothing for an
+analysis to detect. The boundary is falsifiable and its failure is silent: relax the input-type
+discipline and the cycle becomes writable, and an unstratified program does not throw — it quietly has
+no total model.
 
-### Cost Model
+The same law generalizes across an evaluation boundary (ADR-0033): **nothing consumes its own stratum's
+in-flight output; an eval boundary is a closed stratum; cycles across it are inexpressible, never
+detected.** Inexpressibility holds where the *substrate* constructs the closure — ADR-0016 ruling 7's
+staged minting is that case. Where a *foreign* evaluator ties the knot it does not, and two target
+evaluations each demanding the other's fixpoint diverge as that evaluator's own uncatchable infinite
+recursion. That is a recorded price, not an oversight.
 
-| Operation                             | Cost                      | Bottleneck                                           |
-| ------------------------------------- | ------------------------- | ---------------------------------------------------- |
-| Attribute access (cached)             | O(1)                      | Nix attrset lookup                                   |
-| Attribute access (first, root)        | O(1)                      | Lazy thunk evaluation                                |
-| Attribute access (first, synthesized) | O(depth)                  | Parent chain walk via parseParent                    |
-| Graph traversal (lazy)                | O(reachable)              | C-level BFS                                          |
-| Graph traversal (global)              | O(n)                      | Full node enumeration                                |
-| Selector match                        | O(selector complexity)    | Short-circuit on first false/true                    |
-| Rule dispatch (one step)              | O(rules × context checks) | fromFunctionMatch is O(1) per rule                   |
-| Convergence loop iteration            | O(iterations × dispatch)  | gen-resolve loop; identified rules fire at most once |
+Negation among the predicates themselves is the one place a cycle can still live, and it is handled
+semantically (ADR-0020): **the semantics of a negative cycle is the well-founded partial model, with
+contested atoms UNDEFINED — a named third value, never silence — and stable-model existence is the
+refusal oracle.** The well-founded model is computed at the atom level, not the relation-symbol level.
+Deciding stable-model existence is NP-complete where the well-founded model is polynomial, so the check
+runs within a derived budget and past it the result carries `NOT-EVALUATED` in a required adjudication
+field — a named value, never silence and never an admission.
 
-### Fleet Scale Guidance
+### The well-definedness gate
 
-- **Use parseParent** in gen-scope — O(depth) vs O(n) node resolution
-- **Use Tier 1 operations** (node, get) for per-entity work; Tier 2 (allNodes) for diagrams/fleet queries
-- **Use point queries** (canReach, dependentsOf) over global analysis (dependents, transitiveClosure)
-- **Partition large graphs** before global operations — cross-partition edges are rare
-- **Accessor pattern** ensures zero redundant evaluation between gen-scope and gen-graph
+The static gate (ADR-0008 §3) is **Vogt's Definition 3.14, `bounded well-defined`** — completeness and
+no cycles under EDDP, with the finiteness conjunct of Theorem 3.2 deliberately omitted, at Vogt's own
+stated price that finite expansion of the structure tree is no longer guaranteed. Theorem 3.2 is an
+"if", not an "iff": the gate is sufficient, never necessary.
 
-## Design Constraints
+Its ruled precondition is the half easy to omit. **The gate must run over a declared edge set complete
+at registration, plus a codomain contract preventing bodies from introducing undeclared edges.** A gate
+over the computed or spawned graph inherits the circularity it is meant to decide; a gate over the
+declared graph does not. Without the codomain contract the gate silently under-approximates, because an
+edge a body introduces at firing time is an edge the decision never saw.
 
-1. **No circular library dependencies.** The dependency DAG is strictly acyclic.
-2. **Libraries don't import each other's flake inputs.** gen-select doesn't import gen-scope; it provides adapters that accept gen-scope's result shape.
-3. **Actions are opaque.** gen-dispatch doesn't interpret actions — consumers define the vocabulary via `mkActions` and `classify`.
-4. **Conditions are opaque (in core).** gen-dispatch's core tier takes a `match` function; the adapter tier bridges gen-select as one possible condition language.
-5. **Nix IS the evaluator.** gen-scope doesn't build an AG evaluator — it leverages Nix's native lazy evaluation, `lib.fix` for memoization, and attrset lookup for O(1) access.
-6. **gen-algebra is fully pure.** Its single `lib` tier (search, intensional, record, either) works without nixpkgs. Libraries that only need search or the intensional constructors import it directly; identity minting is `gen-identity`'s (ADR-0016 ruling 5), taken injected. The nixpkgs-lib-free base for the rest of the ecosystem is `gen-prelude`.
-7. **The library level is nixpkgs-lib-free.** The module-system substrate (`gen-types → gen-merge → { gen-schema, gen-aspects }`) replaced nixpkgs' `lib.evalModules`/`lib.types` on the gen surface, so no library `lib/` imports nixpkgs. Full nixpkgs enters at exactly one plane — the terminal plane — plus the CI runners; historically that terminal was the `gen-flake` repository (`terminals.nixosSystem`, the generic `mkSystemTerminal` instantiated with `nixpkgs.lib.nixosSystem`), which dissolved (ADR-0031 F3) into this hub's interim `flakeModules.default` and gen-delivery's `realize`. Where only nixpkgs *lib* is needed, use a pinned `nixpkgs.lib`, not full nixpkgs.
-8. **Compose purely, inject VALUES — never TYPES.** Composition happens in the pure plane; only resolved values cross into a consumer's nixpkgs eval (via `_module.args`), never gen type objects. A gen type may ride along as inert data but must never enter a consumer's options tree, so nixpkgs never type-walks it (value-injection, not type-driving). Today this holds under ADR-0023's declared interim — checking off by default, unstated crossings recorded as declared opt-outs with their price — until every crossing site meets ADR-0023 (c), i.e. no declared opt-out remains (`den-hoag-i546n`, successor to the closed `den-hoag-zgps`).
+Two relations, therefore, at different codomains: **the gate reads the contracted DECLARED relation;
+the plane reads the derived STRUCTURAL relation.** The split is theory-forced, not an implementation
+convenience — Knuth's dependency relation and the structure tree are different objects, and remote
+attribute-grammar circularity is undecidable, so per-production declaration plus a derived instance
+relation cannot carry the gate. A **declared edge is not a declared read**: reads stay derived from the
+graph, never declared.
+
+The corpus keeps the two apart deliberately. **C7** gates `declaredEdges`, contracted — not C2's full
+edge set, which carries the policy stratum's admitted edges. **C15** is a cyclic stratum solved by the
+plane, held deliberately outside the gated relation for exactly that reason.
+
+### Movement and delivery
+
+**Content movement is one shape** (ADR-0010): a query scoped at a root over the graph, with entity nodes
+as boundaries, plus its dual. A collector is a receiver-rooted query; a broadcaster is a producer
+declaration plus a standing receiver query; the inverse read is the same edge set queried from the other
+end. A **channel** is a named, materialized query result — not a stateful object with an operator
+pipeline. Filtering is gen-select predicates, routing is the query root and boundary choice, folding is
+the receiver's fold under the evaluator, and provenance is the graph's rather than bookkeeping.
+
+**Delivery is two class concepts kept apart** (ADR-0028). The **delivery class** is a declared target a
+terminal realizes — the key category is its addressing surface, gen-delivery's projection its
+realization. The **share class** is an equivalence over members under a caller-supplied `keyOf`, an
+optimization over sharing, and it is *not* the delivery class. The Rider ruled with it: **a delivery
+class realizes only on declared content, never on structural shape**, so an unset class option's shape
+no longer projects members.
+
+The pipeline's last stage belongs to the framework. `realize` takes `terminals`, and a terminal is a
+target-owned function gen calls — which is why the corpus exercises the projection (**C6**) and reaches
+realization only through the hub's own bridge, rather than reimplementing the surface it is testing.
+**A framework supplies the terminal; gen supplies everything up to it.**
+
+### The crossing
+
+Composition happens in a pure plane that never touches full nixpkgs: the module-system substrate
+(`gen-types → gen-merge → { gen-schema, gen-aspects }`) resolves module trees to values without
+`lib.evalModules`. Full nixpkgs enters at exactly one plane — the terminal plane, where the hub's
+interim `flakeModules.default` supplies a default terminal over `nixpkgs.lib.nixosSystem` that a
+consumer may override or suppress — plus the CI runners. Where only nixpkgs *lib* is needed, a pinned
+`nixpkgs.lib` is used, never full nixpkgs.
+
+The invariant across the crossing: **gen types never leave the pure evaluation; only values cross**
+(value injection, not type driving). A gen type may ride along as inert data but must never enter a
+consumer's options tree, so nixpkgs never type-walks it. This holds today under ADR-0023's declared
+interim — target-invoked checking off by default, every unstated crossing recorded as a declared opt-out
+with its price measured rather than assumed — until no declared opt-out remains (`den-hoag-i546n`).
+`ci/checks.inject-payload` is what keeps that price measured.
+
+## 4. The framework interface
+
+gen declares no domain entity. A framework supplies the names, and the interface it supplies them
+through is ADR-0027's three parts.
+
+```mermaid
+flowchart TD
+  subgraph fw["a framework — den v2, quiver"]
+    vocab["<b>1 · vocabulary map</b><br/>⟨frameworkName → substrate construct⟩<br/>entity kinds are ordinary kinds;<br/>a registry is a kind whose contents are named queries.<br/><i>Anything not in the map is not framework surface.</i>"]
+    lens["<b>2 · adapter / lens</b><br/>for gen-link exchange.<br/>Correct iff it preserves the equivalences."]
+    witness["<b>3 · two witness declarations</b><br/>the collection target<br/>and the evaluator's LOCATION"]
+    terminals["<b>terminals</b><br/>target-owned functions gen calls"]
+  end
+
+  subgraph sub["the substrate — gen"]
+    toolkit["<b>gen-assemble</b> — assembly toolkit<br/>declares no input; never evaluates"]
+    policy["<b>gen-program</b> — declarations → program"]
+    realize["<b>gen-delivery</b> — projection + fold"]
+    exchange["<b>gen-link</b> — federation across flakes"]
+    core["<b>one graph · one evaluator · one plane</b>"]
+  end
+
+  vocab --> toolkit
+  vocab --> policy
+  witness --> core
+  lens --> exchange
+  realize --> terminals
+
+  toolkit --> core
+  policy --> core
+  core --> realize
+
+  check["<b>acceptance = equivalence survival</b><br/>not map membership, not line counts:<br/>a surface is validated by checking that<br/>the core equivalences SURVIVE it"]
+  check -. "validates" .-> vocab
+  check -. "validates" .-> lens
+
+  refuse["<b>what gen never names</b><br/>no domain entity, no framework concept,<br/>no fleet object — in types, kinds, labels,<br/>options, error text or documentation,<br/>except as an example a framework might declare"]
+  refuse -. "binds" .-> sub
+
+  classDef ext fill:#f6f6f6,stroke:#888,stroke-dasharray: 4 3
+  class fw,terminals ext
+```
+
+**A framework is a vocabulary map, an adapter, and two witness declarations.** The map is
+⟨frameworkName → substrate construct⟩ — Landin's frame of reference, mechanically — plus an
+adapter/lens for gen-link exchange, plus two witness-pattern declarations: the collection target, and
+the evaluator's location. Anything not in the map is not framework surface.
+
+**Acceptance is equivalence survival, not map membership.** A construct with no map entry is still a
+gen requirement; a construct *with* a map entry is a framework member only if the equivalence set holds
+through it; and a gen-link adapter is correct iff it preserves the equivalences. Thinness is checked
+that way too — not by line counts, and no longer by map membership either.
+
+**Key semantics are `class | channel | facet`, extensible by owner ruling and never by accretion.** A
+framework needing a fourth category raises it as a gen requirement. Open categories would let two
+frameworks disagree about what a key *is*, forcing gen-link's exchange to reconcile semantics nobody
+declared.
+
+**The substrate names nothing** (ADR-0035). No domain entity, framework concept or fleet object appears
+in gen's types, kinds, labels, options, error text or documentation as anything but an example a
+framework might declare. gen's own vocabulary is the theory's — nodes, kinds, edges, relations, queries,
+programs, bindings, movement, delivery, identity — fixed by `TERMINOLOGY.md` with its literature
+provenance. A library needing a worked example uses an invented kind, and `gen-demo` is invented by
+construction: `thimble`, `bobbin`, `stitch`, `tacks`, `piping`, `weave`.
+
+★ One measured exception is live rather than settled: the hub's delivery projection hardcodes the name
+of the registry it selects, so a framework naming its registry anything else projects empty with no
+error. The corpus pins the working route by calling `project` with an explicit selector
+(`den-hoag-hub-hardcodes-hosts-mxpd5`). Until that is closed, a framework's registry name is not yet
+fully its own.
+
+**Where a framework sits.** A framework declares its kinds through gen-schema, its composition units
+through gen-aspects, its policies as declarations gen-program turns into a program, and its delivery
+classes as declared keys gen-delivery projects. It supplies the terminals. It never defines substrate
+vocabulary in its own terms — that is exactly what the `framework` stratum means in §1: above the stack
+rather than a layer of it. A framework that is doing this correctly is **thin**, and thin is measured by
+whether the equivalences survive it, not by how little of it there is.
+
+## 5. Invariants
+
+01. **One graph, one node notion.** A node is a position with attributes and incident labelled edges.
+    There is no second node notion anywhere in the substrate.
+02. **Kinds are declared data.** Nothing in the substrate reads a kind to decide what a node is.
+03. **An edge carries no interpreted payload.** A relation that must carry content is a node, not an
+    edge.
+04. **One minting authority.** `hashIdentity` in gen-identity, and nothing else. The substrate refuses
+    rather than inventing an identity.
+05. **One evaluator.** gen-scope. Nix's laziness schedules; nothing else evaluates.
+06. **One incremental plane**, defined by byte-parity against a cold evaluation, which never evaluates.
+07. **Every derived view is a named materialized query result.** A projection has a name and a defining
+    query, or it is not a view.
+08. **Nothing consumes its own stratum's in-flight output.** Where the substrate constructs the closure,
+    a same-stratum reference cannot be named.
+09. **The direction of dependence is one way**, `substrate < modules < aspects < framework`, with every
+    exception ruled, named and printed on each run.
+10. **Only plain data crosses a gen-to-gen boundary**, and the boundary is the evaluation, not the
+    repository (ADR-0014). Packaging separation was tried at maximal granularity and did not enforce
+    it.
+11. **The library level is nixpkgs-lib-free.** No library's `lib/` imports nixpkgs. Full nixpkgs enters
+    at the terminal plane and the CI runners, nowhere else.
+12. **Compose purely, inject values — never types.**
+13. **The substrate prescribes no terminology.** A framework's names never enter it.
+
+## 6. Provenance
+
+Every construction below is taken from a primary, and the citation is kept because it is what makes the
+construction checkable against something other than itself.
+
+| construction                                                                          | primary                                                                         |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| a type is a predicate boundary                                                        | Findler & Felleisen (2002), contracts for higher-order functions                |
+| refinement contracts                                                                  | Rondon, Kawaguchi & Jhala (2008), liquid types                                  |
+| one type, dispatch in merge (flat typing)                                             | Palmer et al., flat typing                                                      |
+| attribute grammars; the semantic rule and its condition                               | Knuth (1968)                                                                    |
+| higher-order attribute grammars; `bounded well-defined` (Def. 3.14, Thm 3.2)          | Vogt, Swierstra & Kuiper (1989)                                                 |
+| Kleene ascent to a fixpoint over the domain state                                     | Sloane (2010) §2.2                                                              |
+| circularity of remote attribute grammars is undecidable                               | Boyland (2005), Thm 3.3                                                         |
+| reference attribute grammars; the mechanism for the two relations                     | Hedin (2000) §3.2                                                               |
+| two relations at different codomains                                                  | van Antwerpen et al. (2018), Fig. 1                                             |
+| stratification: the negated predicate's definition lies in a strictly earlier stratum | Apt, Blair & Walker (1988), Def. 3 clause (2); Lemma 1, p. 97                   |
+| well-founded semantics; the third value                                               | Van Gelder, Ross & Schlipf — Def. 3.3, Thm 6.1, Cor. 5.7, §5.1 Ex. 5.4          |
+| the read set is the body                                                              | Sagiv, p. 664; Van Gelder §8; Vogt Def. 3.5, p. 139                             |
+| rebuilder / scheduler split; the incremental plane's theory                           | Mokhov, Mitchell & Peyton Jones (2018), build systems à la carte                |
+| a framework is a frame of reference                                                   | Landin — the vocabulary map's shape, and the four groups of equivalences        |
+| toposorted materialization of an accumulator relation                                 | Kahn (1962)                                                                     |
+| the one-way `compose → value → nixpkgs` trade                                         | adisbladis — a pure engine cannot be driven by foreign nixpkgs-module libraries |

@@ -177,6 +177,20 @@
       # run.
       directionOfDependence = import ./direction-of-dependence.nix { inherit (inputs) gen; };
 
+      # ── architecture-library-graph — ARCHITECTURE.md's library graph, CI-bound ──
+      # The document's figures are hand-written and the failure is silent: prose does not evaluate,
+      # so a member joining or leaving the roster leaves the picture exactly as it was, and that is
+      # how a retired library came to stand as live in it and a roster enumeration came to run one
+      # member short. This reads the marker-delimited mermaid block back out of the committed file
+      # and compares it, both directions, against the roster of record (`gen.lib.mkGenLibs`, the same
+      # value `mkgenlibs-eval.nix` gates) for the NODES and against each member's own declared
+      # root-flake input names for the EDGES — the same observable `direction-of-dependence.nix`
+      # reads, so no revision is read here either. `.gate`/`.gateKeys` follow the shape above.
+      architectureLibraryGraph = import ./architecture-library-graph.nix {
+        inherit (inputs) gen;
+        inherit lib;
+      };
+
       # ── sole-evaluator scan ──
       # ADR-0006's enforcement half, and readiness-bar term T2(a)'s instrument: gen-scope is the
       # sole evaluator, so no other tree in the scanned domain — the roster read by evaluation,
@@ -235,6 +249,8 @@
       flake.lib.direction = directionOfDependence;
       #   nix eval ./ci#lib.soleEvaluator.report --json | jq
       flake.lib.soleEvaluator = soleEvaluator;
+      #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
+      flake.lib.architectureLibraryGraph = architectureLibraryGraph;
 
       perSystem =
         {
@@ -379,6 +395,33 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "DIRECTION OF DEPENDENCE — a roster member declares an input above its own stratum, or the guard's own arming stopped firing" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the architecture-library-graph check: prints the full report — the roster, the
+          # nodes the diagram declares live and retired, and every name or edge a reader must act on
+          # — and FAILS the build if any gate arm is not `true`. A failing arm names the offending
+          # member or edge in `missing`/`extra`/`mismarked`/`edgesMissing`/`edgesExtra`, so the
+          # remedy is the diagram line to add or delete rather than a denial.
+          mkArchitectureGraphCheck =
+            name: a:
+            let
+              allOk = builtins.all (k: a.gate.${k} == true) a.gateKeys;
+              failed = builtins.filter (k: a.gate.${k} != true) a.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // a.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "ARCHITECTURE.md LIBRARY GRAPH DRIFT — the diagram no longer matches the roster of record or the members' declared inputs" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -584,6 +627,7 @@
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
+            architecture-library-graph = mkArchitectureGraphCheck "architecture-library-graph" architectureLibraryGraph;
             sole-evaluator = mkSoleEvaluatorCheck "sole-evaluator" soleEvaluator;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
