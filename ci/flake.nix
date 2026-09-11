@@ -664,6 +664,87 @@
               name = "gen";
               root = self.sourceInfo.outPath;
             };
+
+            # readme-audience — a public README carries no internal decision-record reference.
+            # A README addresses a reader who does not have the specs, so a ruling is restated as
+            # a fact about the design, or replaced by the literature citation underneath it, or
+            # the id drops and the sentence carries the content; an `ADR-NNNN` or a tracker id
+            # leaves that reader with a pointer they cannot follow. AGENTS.md is deliberately NOT
+            # scanned — it addresses readers WITH repo access, where those pointers are the point.
+            #
+            # This is a gate rather than a convention because the surface was corrected once and
+            # re-accreted over six commits in eight days with nobody noticing.
+            #
+            # The population is the hub plus every roster member, reached through `genInputs` (the
+            # same route every other check here uses), so a new roster library is scanned the
+            # moment it becomes a hub input and there is no registration step. An archived or
+            # orphaned repository is out by construction: it is off the roster, so it is not a hub
+            # input, and a frozen record is not a maintenance target.
+            #
+            # `sourceInfo.outPath` for the hub's own README, for the reason given just above.
+            readme-audience =
+              let
+                entries = [
+                  {
+                    name = "gen";
+                    src = self.sourceInfo.outPath;
+                  }
+                ]
+                ++ map (n: {
+                  name = n;
+                  src = "${genInputs.${n}}";
+                }) (builtins.filter (n: lib.hasPrefix "gen-" n) (builtins.attrNames genInputs));
+              in
+              pkgs.runCommand "readme-audience"
+                {
+                  # Every row TRAILS its newline. `concatMapStringsSep` would leave the last row
+                  # without one, and `read` drops an unterminated final line — so the last member
+                  # of the population would go unscanned and the run would read clean for it.
+                  manifest = lib.concatMapStrings (e: "${e.name} ${e.src}/README.md\n") entries;
+                  expected = toString (builtins.length entries);
+                  passAsFile = [ "manifest" ];
+                }
+                ''
+                  echo "── readme-audience ──"
+                  hits=0
+                  scanned=0
+                  while read -r name file; do
+                    # A missing file makes every predicate below return 0 — live and dead alike —
+                    # so absence is a failure here and never a clean row.
+                    if [ ! -f "$file" ]; then
+                      echo "$name: no README.md at $file" >&2
+                      exit 1
+                    fi
+                    scanned=$((scanned + 1))
+                    # ARMING. A real gen README says "gen"; if this stops firing the scan has gone
+                    # blind and every zero below is uninterpretable rather than clean.
+                    if ! grep -q 'gen' "$file"; then
+                      echo "$name: README.md read produced nothing — the scan's own arming stopped firing" >&2
+                      exit 1
+                    fi
+                    # NOT `out`: that name is the derivation's own output path, and shadowing it
+                    # leaves the success path redirecting to an empty filename — a failure only
+                    # the green arm can reach, which is why this guard was driven green.
+                    if found=$(grep -nE 'ADR-[0-9]|den-hoag-' "$file"); then
+                      hits=$((hits + 1))
+                      echo "$name/README.md" >&2
+                      echo "$found" >&2
+                    fi
+                  done < "$manifestPath"
+                  echo "scanned $scanned README.md of $expected, $hits carrying internal references"
+                  # TOTALITY. Without this a row lost between the manifest and the loop reads as a
+                  # clean member rather than an unscanned one, which is the failure this guard
+                  # exists to prevent, one level up.
+                  if [ "$scanned" -ne "$expected" ]; then
+                    echo "README AUDIENCE SCAN INCOMPLETE — $scanned of $expected READMEs reached the predicate. A zero over a population that was not read is not a clean result" >&2
+                    exit 1
+                  fi
+                  if [ "$hits" -ne 0 ]; then
+                    echo "README AUDIENCE REGRESSION — a public README cites an ADR or a tracker id, named with its line above. A reader without the specs cannot resolve either: restate the ruling as a fact about the design, cite the literature underneath it, or drop the id and let the sentence carry the content. AGENTS.md is the surface that keeps its pointers" >&2
+                    exit 1
+                  fi
+                  echo "$scanned" > "$out"
+                '';
           };
 
           apps.perf-bench = {
