@@ -59,6 +59,12 @@ let
     # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
     # self-wiring libs above.
     #
+    # ★ THE DELETION-GROUND RULE, RESTATED AT THE POINT REMOVAL EXECUTES (P7, owner-ruled
+    # 2026-08-17): for any reference-grade member still on this roster, a usage count is
+    # inadmissible as a deletion ground — dropping a binding here needs a domain argument (wrong
+    # abstraction, subsumed, theory-unsound), exactly as the five removals below needed a named
+    # ruling rather than a citation count.
+    #
     # FIVE MEMBERS OF THIS BLOCK ARE OFF THE ROSTER, each by a ruling. The bindings are gone rather
     # than commented out — a `retiring` member is still reachable and this is the state past that,
     # where the hub no longer pins the input at all — but the rulings are recorded here because the

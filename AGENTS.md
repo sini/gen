@@ -1,5 +1,7 @@
 # gen (hub) — agent capability sheet
 
+> **Library class: reference-grade.** Deletion requires a domain argument — wrong abstraction, subsumption by another construct, or theory-unsoundness; a usage count is inadmissible as a deletion ground (P7, 2026-08-17).
+
 ## Scope
 
 The ecosystem hub: it owns no concern of its own. It publishes `mkGenLibs` — two-stage instantiation
