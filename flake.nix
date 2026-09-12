@@ -166,6 +166,19 @@
 
       flakeModules.genLibs = ./flakeModules/genLibs.nix;
 
+      # `nix flake check` forces the WHNF of every top-level output and nothing deeper — measured: a
+      # throwing `lib.mkGenLibs` passes it, a throwing `lib` SPINE fails it. This root declares no
+      # `checks`, so without an output whose WHNF is the roster itself, `all checks passed!` quantifies
+      # over the empty set. Forcing is to NAMES depth and not `deepSeq`: a retirement tombstone is a
+      # published `throw` by design (gen-scope's `buildNodes`), so a deep force is red on a healthy tree.
+      #
+      # INTERIM, the same standing as `lib.compose` and `flakeModules.default` below: it does NOT
+      # satisfy ADR-0027, and joins the pending surface rather than outliving it — ADR-0027 disposes of
+      # all three together when it arrives (den-hoag-z5wsg).
+      roster = builtins.deepSeq (builtins.mapAttrs (_: builtins.attrNames) (
+        builtins.removeAttrs roster [ "strata" ]
+      )) roster.strata;
+
       # The flake-parts entry surface, rehomed from gen-flake under ADR-0031 F1 — the hub is the
       # single input a consumer takes, so the ergonomics module belongs beside the roster it binds
       # against. `default` is flake-parts' own convention and the name the source exported under, so
