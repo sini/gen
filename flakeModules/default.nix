@@ -165,8 +165,11 @@ let
   # No shape test can fix that, because the two are the SAME SHAPE and differ only in what was
   # DECLARED. So the projection is gen-delivery's `project` (`deliveryClassesOf`: declared
   # `category = "class"` AND content present, shape never consulted) rather than a second predicate
-  # here that can drift from it. `bindings.node` is the resolved instance and `selectHosts` keeps
-  # gen-delivery's default (`values.hosts or { }`) — the shape this module always shipped.
+  # here that can drift from it. `bindings.node` is the resolved instance and `selectHosts` is built
+  # from `gen.nodeRegistryPath` — the CONSUMER'S word for its own registry. It used to take
+  # gen-delivery's `values.hosts or { }` default, which baked the den word `hosts` into this
+  # framework's published surface (ADR-0035: gen names no domain entity) and projected `{ }` with no
+  # diagnostic for every consumer that spelled its registry anything else.
   #
   # THE DECLARATION IS AN INPUT, NOT A DERIVATION, and that is measured rather than assumed: the
   # aspect `keySemantics` reaches the compose result at `values.schema.<kind>.keySemantics` ONLY
@@ -178,9 +181,46 @@ let
   #
   # One shape delta, stated: `gen.composed`'s `override` handle returns the SUCCESSOR projection (no
   # aspects/hosts re-attach on a re-compose); this module reads only the base compose.
+  showKeys = v: lib.concatStringsSep ", " (builtins.attrNames v);
+  showPath = p: "[ " + lib.concatStringsSep " " (map (x: "\"${x}\"") p) + " ]";
+
+  # `lib.attrByPath` is NOT used here, and that is the whole point of the option: it takes a default
+  # and RETURNS IT ON A MISS, which is the silent empty being removed.
+  nodeRegistryPath =
+    if cfg.nodeRegistryPath == null then
+      throw "gen: flakeModule: `gen.nodeRegistryPath` is required and has no default — it is the attribute path, in this flake's resolved gen values, of the registry holding the delivery targets (e.g. [ \"fleet\" \"hosts\" ]). Name the REGISTRY ITSELF, never a CONTAINER of registries: a path stopping at a container projects that container's KEYS AS NODE NAMES. Declared top-level keys: ${showKeys composedCore.values}."
+    else if cfg.nodeRegistryPath == [ ] then
+      throw "gen: flakeModule: `gen.nodeRegistryPath` is `[ ]`, which names no registry. Give the attribute path of the registry holding the delivery targets — the REGISTRY ITSELF, never a CONTAINER of registries: a path stopping at a container projects that container's KEYS AS NODE NAMES. Declared top-level keys: ${showKeys composedCore.values}."
+    else
+      cfg.nodeRegistryPath;
+
+  # Walks one segment at a time so a refusal names the FAILING SEGMENT and what is present beside it.
+  # A scalar LEAF is deliberately not checked here — gen-delivery's own `_nodesCheck` already refuses
+  # a non-attrset selector result by name, and a second guard would be a duplicate contract.
+  selectNodeRegistry =
+    values:
+    let
+      step =
+        acc: seg:
+        if !(builtins.isAttrs acc.here) then
+          throw "gen: flakeModule: `gen.nodeRegistryPath = ${showPath nodeRegistryPath}`: `${acc.shown}` is a ${builtins.typeOf acc.here}, not an attrset, so `${seg}` cannot be read under it."
+        else if acc.here ? ${seg} then
+          {
+            here = acc.here.${seg};
+            shown = if acc.shown == "<root>" then seg else "${acc.shown}.${seg}";
+          }
+        else
+          throw "gen: flakeModule: `gen.nodeRegistryPath = ${showPath nodeRegistryPath}`: `${seg}` is absent under `${acc.shown}`. Present there: ${showKeys acc.here}.";
+    in
+    (lib.foldl' step {
+      here = values;
+      shown = "<root>";
+    } nodeRegistryPath).here;
+
   projected = genDelivery.project {
     values = composedCore.values;
     cnf = cfg.aspectCnf;
+    selectHosts = selectNodeRegistry;
   };
 
   composed = composedCore // {
@@ -275,6 +315,21 @@ in
         tree's `mkAspectSchema` call takes — factor that argument into a file both sides import,
         since the declaration cannot be read back out of the compose result: `keySemantics` only
         reaches `values.schema.<kind>` when the tree also DEFINES a schema kind entry.
+      '';
+    };
+
+    nodeRegistryPath = mkOption {
+      type = types.nullOr (types.listOf types.str);
+      default = null;
+      description = ''
+        THE NODE REGISTRY: the attribute path, in this flake's resolved gen values, of the instance
+        registry whose members are the delivery targets — e.g. `[ "fleet" "hosts" ]` for a registry
+        declared at `options.fleet.hosts`, or `[ "spindles" ]` for a top-level one.
+
+        `null` is the ABSENT state, not a default. gen declares no domain entity (ADR-0035), so the
+        substrate cannot pick this word: with no path the projection has no registry to read and
+        REFUSES BY NAME rather than projecting an empty target set. A wrong path refuses at the
+        FAILING SEGMENT, naming what is present beside it.
       '';
     };
 

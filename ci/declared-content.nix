@@ -86,9 +86,14 @@ let
     };
   };
 
-  # THE HUB'S OWN WIRING — `flakeModules/default.nix` calls `project` with exactly these two
-  # arguments and takes gen-delivery's default `selectHosts`.
-  projected = genDelivery.project { inherit values cnf; };
+  # THE HUB'S OWN WIRING — `flakeModules/default.nix` calls `project` with exactly these three
+  # arguments. `selectHosts` has no default in gen-delivery any more (a default there baked the den
+  # word `hosts` into the substrate and projected `{ }` for every other spelling); the hub builds it
+  # from `gen.nodeRegistryPath`, and this fixture's registry is spelled `hosts`.
+  projected = genDelivery.project {
+    inherit values cnf;
+    selectHosts = v: v.hosts;
+  };
   entry = projected.aspects.web;
 
   # The RETIRED predicate, restated so the wrong-category arm is a discrimination rather than a
@@ -164,14 +169,33 @@ let
     # ── THE DECLARATION'S ABSENCE IS A REFUSAL, not a degradation ──
     # Constructed with no category source, `project` has nothing left to classify by but the shape
     # test that was removed, so it refuses by name rather than falling back.
-    absent-declaration-refuses = !(forces (genDelivery.project { inherit values; }));
+    # `selectHosts` is given explicitly so `cnf` is the ONLY absence this refusal can be reporting —
+    # since gen-delivery lost the `selectHosts` default there are two reachable refusals here, and
+    # without this the cell would assert *a* refusal without asserting which.
+    absent-declaration-refuses =
+      !(forces (
+        genDelivery.project {
+          inherit values;
+          selectHosts = v: v.hosts;
+        }
+      ));
     # CONTROL, same call, same run — with the declaration it evaluates, so the refusal above is the
     # missing `cnf` and not a broken fixture.
-    present-declaration-evaluates = forces (genDelivery.project { inherit values cnf; }).nodes;
+    present-declaration-evaluates =
+      forces
+        (genDelivery.project {
+          inherit values cnf;
+          selectHosts = v: v.hosts;
+        }).nodes;
 
     # ── THE HUB'S CALL SITE ──
     hub-calls-gen-delivery-project = occurs "genDelivery\\.project";
     hub-passes-the-declaration = occurs "cnf = cfg\\.aspectCnf;";
+    # ADR-0035 — the hub takes the node registry from the CONSUMER instead of spelling it `hosts`.
+    # Lexical because `flakeModules.default` is a PATH this repository exports and only a consumer's
+    # flake-parts eval runs its module (the file's header), so no value here can witness the call.
+    hub-passes-the-registry-selector = occurs "selectHosts =";
+    hub-declares-the-registry-option = occurs "nodeRegistryPath = mkOption";
     hub-carries-no-local-class-predicate = !(occurs "isList v\\.imports");
     # CONTROL, same instrument, same run — a token that IS in the file, so the absence above is a
     # predicate that is gone and not a `readFile`/`split` that reads everything as empty.
