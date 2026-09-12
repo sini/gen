@@ -576,17 +576,187 @@ let
   # assert (and separately reported breaches of, never gated) is now true by construction.
   cut = line: lib.head (lib.splitString "#" line);
 
+  # ── THE BINDING-POSITION MASK: A NAME BEING BOUND IS NOT A CONSTRUCT BEING DRIVEN ──
+  # The criterion's own cause names "the three constructs by which a Nix expression drives an
+  # evaluation to a fixpoint". An `inherit` clause drives nothing: between the keyword and its `;`
+  # every bare identifier is a NAME BEING RE-BOUND, and a re-export of an engine's name is not an
+  # invocation of it. Measured 2026-09-12 at the revisions this flake's lock resolves: THREE of the
+  # twelve refused sites were exactly that — `merge/lib/default.nix:149`, `merge/lib/modules.nix:1858`
+  # and `merge/lib/types.nix:42`, each a continuation line of a multi-line `inherit (core) … ;`.
+  #
+  # ★ THIS IS NOT A NARROWING OF THE CRITERION, and the distinction is the whole of it. The
+  # criterion's three tokens are untouched; what moves is the OBSERVABLE's notion of an OCCURRENCE —
+  # code position, not token set. Widening or narrowing the criterion stays a RULING (see
+  # `criterionCause`); this is the observable being made to read what the criterion already says.
+  #
+  # WHAT IS DELIBERATELY STILL MATCHED, so no reader takes the reach for narrower than it is:
+  #   · a DEFINITION (`evalModuleTree = …`) — the token there names what the tree hosting it IS,
+  #     which is the ruled property at its strongest, not a mention of someone else's engine;
+  #   · the SOURCE EXPRESSION of `inherit (expr) …` — that half is an ordinary expression and can
+  #     hold a call, so it is kept BY PAREN DEPTH rather than blanked with the names beside it.
+  #     Blanking it would trade three false positives for an unbounded false negative, the direction
+  #     this file's header calls unsound. It also makes termination right for free: a `;` inside the
+  #     source expression is at non-zero depth and does not close the clause.
+  #
+  # Blanking replaces a character with a space and NEVER a newline, so line numbers and line COUNT
+  # stay identical — the `imap1` over `kept` depends on that, exactly as it does for `stripText`.
+  inheritKeyword = "inherit";
+  inheritKeywordLen = builtins.stringLength inheritKeyword;
+  identChar =
+    lib.genAttrs
+      (lib.stringToCharacters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'-")
+      (_: true);
+
+  # One line, carrying the state an unterminated clause leaves behind. Output is SEGMENTS for the
+  # same reason `stripText`'s is: one append per classification change, never one per character.
+  maskInheritLine =
+    carry: lineText:
+    let
+      n = builtins.stringLength lineText;
+      at = i: builtins.substring i 1 lineText;
+      isIdent = c: builtins.hasAttr c identChar;
+      # The keyword as a WORD: `inherited` and `xinherit` are identifiers that happen to contain it.
+      # `inherit` cannot be an unquoted attribute name in Nix (it is reserved), and a quoted one is
+      # already blanked by `stripText`, so a word-boundary match is the whole test.
+      opensClause =
+        i:
+        builtins.substring i inheritKeywordLen lineText == inheritKeyword
+        && !(isIdent (if i == 0 then "" else at (i - 1)))
+        && !(isIdent (at (i + inheritKeywordLen)));
+
+      step =
+        s: i:
+        let
+          c = at i;
+          kw = !s.inClause && s.skip == 0 && opensClause i;
+          depthAfter =
+            if !s.inClause || kw then
+              0
+            else if c == "(" then
+              s.depth + 1
+            else if c == ")" then
+              s.depth - 1
+            else
+              s.depth;
+          # A character is BLANKED exactly when it sits in a clause at paren depth zero — name
+          # territory. The `(` and `)` of a source expression are kept with it: one side of each
+          # transition is non-zero.
+          kind =
+            if s.skip > 0 || kw then
+              "blank"
+            else if !s.inClause then
+              "keep"
+            else if s.depth > 0 || depthAfter > 0 then
+              "keep"
+            else
+              "blank";
+          closesClause = s.inClause && !kw && s.skip == 0 && c == ";" && depthAfter == 0;
+          closesRun = kind != s.segKind;
+          nextSegments =
+            if closesRun then
+              s.segments
+              ++ [
+                {
+                  start = s.segStart;
+                  end = i;
+                  kind = s.segKind;
+                }
+              ]
+            else
+              s.segments;
+        in
+        {
+          inClause =
+            if kw then
+              true
+            else if closesClause then
+              false
+            else
+              s.inClause;
+          depth = if closesClause then 0 else depthAfter;
+          skip =
+            if s.skip > 0 then
+              s.skip - 1
+            else if kw then
+              inheritKeywordLen - 1
+            else
+              0;
+          segStart = if closesRun then i else s.segStart;
+          segKind = kind;
+          segments = builtins.seq nextSegments nextSegments;
+        };
+
+      final = lib.foldl' step {
+        inherit (carry) inClause depth;
+        skip = 0;
+        segStart = 0;
+        segKind = "";
+        segments = [ ];
+      } (if n == 0 then [ ] else lib.range 0 (n - 1));
+
+      allSegments = final.segments ++ [
+        {
+          start = final.segStart;
+          end = n;
+          kind = final.segKind;
+        }
+      ];
+      renderSeg =
+        seg:
+        let
+          sub = builtins.substring seg.start (seg.end - seg.start) lineText;
+        in
+        if seg.kind == "blank" then
+          builtins.concatStringsSep "" (map (_: " ") (lib.stringToCharacters sub))
+        else
+          sub;
+    in
+    {
+      inherit (final) inClause depth;
+      text = builtins.concatStringsSep "" (map renderSeg allSegments);
+    };
+
+  # A line that neither continues an open clause nor carries the keyword is returned UNTOUCHED
+  # without a character walk, so the per-character cost is proportional to `inherit` text and not to
+  # the corpus. The carry is what makes the multi-line form — the one all three measured false
+  # positives take — visible at all.
+  maskInheritNames =
+    lines:
+    (lib.foldl'
+      (
+        acc: lineText:
+        let
+          fast = !acc.inClause && !(hasInfix inheritKeyword lineText);
+          r = if fast then null else maskInheritLine { inherit (acc) inClause depth; } lineText;
+          nextOut = acc.out ++ [ (if fast then lineText else r.text) ];
+        in
+        {
+          inClause = if fast then acc.inClause else r.inClause;
+          depth = if fast then acc.depth else r.depth;
+          # Same amortizing force `stripText` applies to its line list, for the same reason.
+          out = builtins.seq nextOut nextOut;
+        }
+      )
+      {
+        inClause = false;
+        depth = 0;
+        out = [ ];
+      }
+      lines
+    ).out;
+
   # ★ THE READ AND THE STRIP ARE ONE STAGE PER FILE, AND EVERY WORLD BELOW SHARES IT. `raw` is kept
   # beside `kept` because a second read of the same tree is a second population that can disagree
   # with the first, and because the arming below compares stripped text against the original.
   # String-stripping runs FIRST, over the whole file (interpolation-aware, cross-line for
   # `''...''` blocks); comment-cutting runs SECOND, per resulting line — the original design,
-  # unchanged, now fed sound input.
+  # unchanged, now fed sound input; the binding-position mask runs THIRD, over the resulting lines,
+  # because an `inherit` clause is only recognisable once strings and comments are gone.
   prep =
     name: text:
     let
       raw = lib.splitString "\n" text;
-      kept = map cut (lib.splitString "\n" (stripText text));
+      kept = maskInheritNames (map cut (lib.splitString "\n" (stripText text)));
     in
     {
       inherit name raw kept;
@@ -602,10 +772,11 @@ let
   #
   # ★ A REFUSED TREE IS NAMED WITH THE FILE AND LINE OF EVERY MATCH, not with a count. The reader
   # strips comments and string-literal bodies (interpolations still scanned as code — see
-  # `stripText`), but it is still a blunt substring match against real code, so a criterion CAN
-  # match a library's own re-export or definition of a construct's NAME without that construct
-  # being invoked there; printing the site is what lets such a reading be dismissed AT THE
-  # REPORT, by a person, rather than by narrowing the criterion until the tree passes.
+  # `stripText`) and blanks the NAMES of an `inherit` clause (see `maskInheritNames` — a re-export
+  # is not an invocation), but within what survives it is still a blunt substring match against real
+  # code, so a criterion CAN still match a library's own DEFINITION of a construct's name without
+  # that construct being invoked there; printing the site is what lets such a reading be dismissed AT
+  # THE REPORT, by a person, rather than by narrowing the criterion until the tree passes.
   #
   # The whole-file test gates the per-line one: the file-level pass is one linear comparison per
   # token per file, and only a file that hits pays for line positions.
@@ -876,6 +1047,31 @@ let
   '';
   stripSoundnessSites = hitsIn criterion (prep "stripSoundness.nix" stripSoundnessText);
 
+  # Axis 8 — THE BINDING-POSITION MASK, BOTH ARMS IN ONE RUN over the same text and the same
+  # `prep`/`hitsIn` the scan uses on every file. A criterion token carried ONLY by an `inherit`
+  # clause must stop matching, in each of the clause's three surface forms — one-line, multi-line
+  # (the form all three measured false positives took), and keyword-only with no source expression.
+  # And the arms that make this a repair rather than a preference: a plain CALL, a DEFINITION, and a
+  # call standing in an `inherit ( … )` SOURCE EXPRESSION must each still match. A mask that
+  # blanked those too would be quieter, not safer — it would buy the three false positives back with
+  # an unbounded miss, and the three positive arms are what says it did not.
+  bindingPositionText = ''
+    one = { inherit (core) evalModuleTree; };
+    many = {
+      inherit (core)
+        evalModuleTree
+        mergeDefs
+        ;
+    };
+    bare = rec {
+      evalModuleTree = 1;
+      re = { inherit evalModuleTree; };
+    };
+    fromCall = { inherit (evalModuleTree { modules = [ ]; }) config; };
+    live = evalModuleTree { modules = [ ]; };
+  '';
+  bindingPositionSites = hitsIn criterion (prep "bindingPosition.nix" bindingPositionText);
+
   # ── THE WORLDS ──
   # The live one is scanned; the three seeded ones are DERIVED from it by the same algebra the scan
   # itself obeys, so no tree is read or scanned twice. `concatMap` distributes over `++`, so the
@@ -1000,6 +1196,18 @@ let
         "stripSoundness.nix:7"
       ];
     };
+    # Line 9 is the DEFINITION, 12 the `inherit ( … )` SOURCE EXPRESSION, 13 the plain CALL. The
+    # clause names on lines 1, 4 and 10 are the absence this arm claims, and the three lines above
+    # are its live control in the same run — an over-blanking mask loses them and reads red here
+    # rather than green everywhere.
+    seededBindingPosition = {
+      sites = bindingPositionSites;
+      expected = [
+        "bindingPosition.nix:9"
+        "bindingPosition.nix:12"
+        "bindingPosition.nix:13"
+      ];
+    };
   };
 
   # Every key MUST be true. The check builder is handed `builtins.attrNames` of this rather than a
@@ -1073,6 +1281,13 @@ let
     # interpolation must still match. Either half failing is red — a strip that also blanked
     # interpolations would be quieter, not safer.
     strip-sound = arming.seededStripSoundness.sites == arming.seededStripSoundness.expected;
+
+    # O9 — A NAME BEING BOUND IS NOT AN EVALUATION. An `inherit` clause's names must stop matching
+    # in all three of its surface forms, and a DEFINITION, an `inherit ( … )` source expression and
+    # a plain CALL must each still match. Either half failing is red: the first half going green for
+    # free would mean the mask never ran, and the second half failing would mean it ate real code.
+    binding-position-sound =
+      arming.seededBindingPosition.sites == arming.seededBindingPosition.expected;
   };
 in
 {
@@ -1086,7 +1301,7 @@ in
     governs = "the hub's pinned library revisions, plus the hub itself at the tree this CI flake sits in — which has no pin, by construction";
     property = "RULED DOMAIN: anything that evaluates, wherever hosted (owner, 2026-09-05). This instrument APPROXIMATES it";
     direction = "UNDER-APPROXIMATES: it MISSES. A green is a statement about the instrument's reach and never about the property";
-    observable = "the ruled criterion over comment- and string-literal-stripped published `.nix` source (a string's own text is blanked; a `\${...}` interpolation inside one is still scanned as code), every match named with its file and line";
+    observable = "the ruled criterion over comment- and string-literal-stripped published `.nix` source, matched IN CODE POSITION ONLY (a string's own text is blanked; a `\${...}` interpolation inside one is still scanned as code; the NAMES of an `inherit` clause are blanked, because a name being bound drives no evaluation — while that clause's `( ... )` source expression, and every definition and every call, are still scanned), every match named with its file and line";
     inherit criterion;
     criterionCause = "the three constructs by which a Nix expression drives an evaluation to a fixpoint. A UNION because the single-token refusal sets are pairwise disjoint at these pins, so every one-token criterion reads green on trees another refuses. Widening it is a RULING, never a tuning";
     evaluator = evaluatorKey;
