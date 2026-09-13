@@ -29,18 +29,22 @@
 }:
 let
   prelude = import "${srcs.gen-prelude}/lib";
-  genTypes = import "${srcs.gen-types}/lib" { inherit prelude; };
+  genIdentity = import "${srcs.gen-identity}/lib";
+  genTypes = import "${srcs.gen-types}/lib" {
+    inherit prelude;
+    identity = genIdentity;
+  };
   genMerge = import "${srcs.gen-merge}/lib" {
     inherit prelude;
     types = genTypes;
     memo = import "${srcs.gen-memo}" { inherit prelude; }; # gen-memo's standalone entry defaults graph from its own lock
   };
   genAlgebra = import "${srcs.gen-algebra}/lib";
-  genIdentity = import "${srcs.gen-identity}/lib";
   genSchemaNew = import "${srcs.gen-schema}/lib" {
     inherit prelude;
     merge = genMerge;
     algebra = genAlgebra;
+    identity = genIdentity;
   };
   genAspectsNew = import "${srcs.gen-aspects}/lib" {
     inherit prelude;
