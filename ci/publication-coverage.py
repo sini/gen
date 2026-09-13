@@ -115,7 +115,18 @@ def mermaid_units(fence_lines, start_line):
         env = dict(os.environ, PUPPETEER_SKIP_DOWNLOAD="1")
         r = subprocess.run(["timeout", "180", MMDC, "-i", mmd, "-o", svg], capture_output=True, text=True, env=env)
         if r.returncode != 0 or not os.path.exists(svg):
-            return [{"kind": "RESIDUE:mermaid-unrendered", "line": start_line, "text": flat(" ".join(fence_lines))[:200]}]
+            # The row carries the CAUSE, as `RESIDUE:cmark-failed` below already does: a row naming only the
+            # fence says an environment could not render it and never why, so a runner failure (chromium in a
+            # nested sandbox) is undiagnosable from the log by construction. mmdc puts its reason in the FIRST
+            # stderr lines and node_modules stack frames after it, so frames are dropped and the head kept; the
+            # verbatim output goes to the log too, since the row excerpt is truncated at print.
+            raw = (r.stderr or "").strip() or (r.stdout or "").strip()
+            why = flat(" ".join(l for l in raw.splitlines() if not l.lstrip().startswith("at "))) or "(no output)"
+            print(f"MMDC FAILED rc={r.returncode} svg={int(os.path.exists(svg))} {MMDC} -- verbatim output follows\n"
+                  f"{raw}\n-- end mmdc output", file=sys.stderr)
+            return [{"kind": "RESIDUE:mermaid-unrendered", "line": start_line,
+                     "text": f"mmdc rc={r.returncode} svg={int(os.path.exists(svg))}: {why[:150]}"
+                             f" | fence: {flat(' '.join(fence_lines))[:60]}"}]
         labels = re.findall(r'class="nodeLabel"[^>]*>(.*?)</span>', open(svg).read(), re.S)
     stripped = [strip_tags(l) for l in fence_lines]
     out, witnessed = [], set()
