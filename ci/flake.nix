@@ -778,6 +778,26 @@
               root = self.sourceInfo.outPath;
             };
 
+            # The CI-plane coverage oracle, wired for the same reason as the sheet check above: the
+            # hub reaches the harness gates through `lib.checks` rather than the flake module, and
+            # until this line existed the hub was the one tree the ecosystem-wide invariant could
+            # not see. Being a NAMED MEMBER of the checked set with a verdict is the whole value —
+            # the verdict itself is `no-plane`, and that is correct, not a gap to close.
+            #
+            # `testsError = { }` is the hub's error plane, and it is empty BY CONSTRUCTION: the hub
+            # exposes flake `checks` and a perf `app`, not nix-unit `tests`/`testsError` outputs
+            # (see the pre-commit block above), so there is no sibling output to read. The check
+            # classifies that state `no-plane`. Do not answer this with a `ci/tests-error.nix` —
+            # declaring a plane the hub does not run is the exact defect the oracle exists to catch.
+            #
+            # `sourceInfo.outPath` and NOT `outPath`, for the reason given above the sheet check.
+            ci-plane-coverage = inputs.gen-harness.lib.checks.ciPlaneCoverage {
+              inherit pkgs;
+              name = "gen";
+              root = self.sourceInfo.outPath;
+              testsError = { };
+            };
+
             # readme-audience — a public README carries no internal decision-record reference.
             # A README addresses a reader who does not have the specs, so a ruling is restated as
             # a fact about the design, or replaced by the literature citation underneath it, or
