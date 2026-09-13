@@ -20,7 +20,8 @@
   #      the other two variants).
   #
   # This is value-injection, not type-driving: the resolved VALUES cross into nixpkgs, gen TYPES
-  # never do. The derivation-constructing calls are byte-identical to the flake-parts/ and adios/
+  # never do — held under ADR-0023's declared interim until no declared opt-out remains.
+  # The derivation-constructing calls are byte-identical to the flake-parts/ and adios/
   # variants, so the drvPath equivalence check holds. The hub pins the whole pure gen stack
   # (gen-merge / gen-schema / gen-aspects / ...) as transitive inputs; its own nixpkgs
   # (never evaluated by the hub) follows ours.

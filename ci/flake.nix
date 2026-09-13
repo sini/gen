@@ -835,6 +835,50 @@
                   fi
                   echo "$scanned" > "$out"
                 '';
+
+            # publication-coverage — every publication of the value-injection invariant carries its
+            # ADR-0023 interim condition IN THE SAME STATEMENT (the rendered block element, one
+            # mermaid node label, or one contiguous comment block). The predicate is
+            # `publication-coverage.py`, which scores an in-file arming pair before it reads a file
+            # and reds on any claim it cannot place in a unit; its spec is den-ag-design
+            # `specs/2026-09-13-gen-invariant-publication-coverage-spec.md`.
+            #
+            # This is a gate rather than a convention because the condition was dropped twice by
+            # rewrites that ran this CI, and the count-vs-fixture probe that preceded it could
+            # neither see a new unconditioned statement arrive nor accept a correct repair.
+            #
+            # The population is EVERY tracked file of the hub, enumerated here by command over the
+            # fetched tree — a roster would exclude exactly the file nobody thought published the
+            # invariant (the flake-compare header was that file). `sourceInfo.outPath`, not
+            # `outPath`, for the reason given above `agents-md-citations`. `expected` is the
+            # manifest's own length, and the scan reds when it reaches fewer files than that.
+            publication-coverage =
+              let
+                src = self.sourceInfo.outPath;
+                files = map (f: lib.removePrefix "${src}/" (toString f)) (lib.filesystem.listFilesRecursive src);
+              in
+              pkgs.runCommand "publication-coverage"
+                {
+                  nativeBuildInputs = [
+                    pkgs.python3
+                    pkgs.cmark-gfm
+                    pkgs.mermaid-cli
+                  ];
+                  # Every row TRAILS its newline, as in `readme-audience` above.
+                  manifest = lib.concatMapStrings (f: f + "\n") files;
+                  expected = toString (builtins.length files);
+                  passAsFile = [ "manifest" ];
+                }
+                ''
+                  echo "── publication-coverage ──"
+                  # mermaid-cli's chromium needs a writable HOME; the sandbox gives it none.
+                  export HOME="$TMPDIR"
+                  rc=0
+                  python3 ${./publication-coverage.py} ${src} "$manifestPath" "$expected" > report.txt || rc=$?
+                  cat report.txt
+                  [ "$rc" -eq 0 ] || exit "$rc"
+                  cp report.txt "$out"
+                '';
           };
 
           apps.perf-bench = {
