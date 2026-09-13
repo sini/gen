@@ -26,6 +26,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
+      # The ROOT flake, spelled bare as every member repository spells it. Its `roster` output is
+      # what carries the check — forcing the roster to names depth reds on an unhealthy member —
+      # and without this step that oracle is landed and never run (den-hoag-z5wsg).
+      - run: nix flake check
       - run: nix flake check ./ci
 
   # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
