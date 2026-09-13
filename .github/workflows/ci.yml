@@ -30,7 +30,7 @@ jobs:
       # what carries the check — forcing the roster to names depth reds on an unhealthy member —
       # and without this step that oracle is landed and never run (den-hoag-z5wsg).
       - run: nix flake check
-      - run: nix flake check ./ci
+      - run: nix flake check ./ci --keep-going
 
   # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
   # thunk/alloc ratios + linearity). cpu is reported but gated by nothing — see ci/README.md.
