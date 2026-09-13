@@ -119,11 +119,15 @@ def mermaid_units(fence_lines, start_line):
             # fence says an environment could not render it and never why, so a runner failure (chromium in a
             # nested sandbox) is undiagnosable from the log by construction. mmdc puts its reason in the FIRST
             # stderr lines and node_modules stack frames after it, so frames are dropped and the head kept; the
-            # verbatim output goes to the log too, since the row excerpt is truncated at print.
+            # verbatim output goes to the log too, since the row excerpt is truncated at print. The flattened
+            # cause is printed LAST, adjacent to the row: a failing `nix flake check` shows only the drv log's
+            # LAST 25 lines, and mmdc's reason sits above twenty lines of stack frames, so a cause printed
+            # first is eaten by that tail exactly when it is needed (measured, run 34788539056).
             raw = (r.stderr or "").strip() or (r.stdout or "").strip()
             why = flat(" ".join(l for l in raw.splitlines() if not l.lstrip().startswith("at "))) or "(no output)"
-            print(f"MMDC FAILED rc={r.returncode} svg={int(os.path.exists(svg))} {MMDC} -- verbatim output follows\n"
-                  f"{raw}\n-- end mmdc output", file=sys.stderr)
+            print(f"-- mmdc verbatim output follows\n{raw}\n-- end mmdc output\n"
+                  f"MMDC FAILED rc={r.returncode} svg={int(os.path.exists(svg))} {MMDC} -- cause: {why[:600]}",
+                  file=sys.stderr)
             return [{"kind": "RESIDUE:mermaid-unrendered", "line": start_line,
                      "text": f"mmdc rc={r.returncode} svg={int(os.path.exists(svg))}: {why[:150]}"
                              f" | fence: {flat(' '.join(fence_lines))[:60]}"}]
