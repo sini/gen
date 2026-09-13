@@ -19,6 +19,8 @@ it, there is no second route back to that edge.
 The hub owns nothing; every concern belongs to a member library. Quoted text is that member's own
 `flake.nix` `description` field, verbatim. Left column is the roster key under `mkGenLibs`.
 
+<!-- gen-roster:begin -->
+
 | Concern (roster key) | Owner                                                                                                                                                                                                                                        |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `prelude`            | `gen-prelude` — "gen-prelude: vendored, nixpkgs-lib-free pure utilities for the gen ecosystem"                                                                                                                                               |
@@ -36,25 +38,35 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `product`            | `gen-product` — "gen-product — graph products as first-class operations over accessor-graphs (Cartesian / tensor / strong / lexicographic; cells, slices, fibers, projections, quotients, restriction, containment chains), lazy in and out" |
 | `settings`           | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct"                                                                     |
 | `link`               | `gen-link` — "gen-link: cross-flake aspect federation over origin-labeled subgraphs"                                                                                                                                                         |
+| `assemble`           | `gen-assemble` — "gen-assemble — the shared framework toolkit: the contribution protocol, its union, the id convention and the structural boilerplate that every framework assembling a node set otherwise writes for itself"                |
+| `delivery`           | `gen-delivery` — "gen-delivery — the delivery-class realization surface: the projection that discovers declared delivery classes per node and the fold that hands each class's collected content to its target-owned terminal"               |
+| `identity`           | `gen-identity` — "gen-identity: the substrate's one identity mint — a bounded canonical encoding of inert values and the kind-tagged digest over it"                                                                                         |
+| `memo`               | `gen-memo` — "gen-memo — the incremental plane: a decision layer over the evaluator that never evaluates, only decides reuse"                                                                                                                |
+| `program`            | `gen-program` — "gen-program — the consumer that turns a framework's declarations into a logic program, drives gen-scope's well-founded engine over it, and carries the third value out under its own name"                                  |
+| `view`               | `gen-view` — "gen-view: the substrate's derived-view constructor — the (L, E, \<, k) carrier with van Antwerpen's relation sort published as a raw calculus, and the named compositions over it"                                             |
 
 **Repos that WERE roster members and have left.** Each is off the roster, is no longer a hub flake
 input, and is archived for reference under ADR-0031 F3 — no content is deleted. They are recorded
 here because the roster is where a reader asks "why is there no `edge` key?", and an unexplained
 absence reads as a drop rather than as a ruling. **Bind the destination, never these.**
 
-| Former key | Repo         | Ruling      | Where the content went                                                                                                                                                                                                                                                                                                  |
-| ---------- | ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `demand`   | `gen-demand` | ADR-0008 §4 | `scope` — the demand/kind folds re-express over the sole evaluator (ADR-0006); `adapters` retired without moving rather than give the evaluator a selector-algebra dependency                                                                                                                                           |
-| `edge`     | `gen-edge`   | ADR-0010 §3 | `view` — the fourth destination §3 gained on 2026-08-20, beside `select`, `graph` and `scope`. The (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization each name their destination construct per export                                                                                             |
-| `pipe`     | `gen-pipe`   | ADR-0010 §3 | `view` for the channel and dataflow constructs, `select` for `sel`. B5's determinism and provenance laws are restated as properties of the query construction rather than dropped                                                                                                                                       |
-| `flake`    | `gen-flake`  | ADR-0031    | The hub's `lib.compose` / interim `flakeModules.default` for the compose S2 core; `memo` for warm/override/trace; `delivery` for the projection + `realize`; the crossing's Adapter set for inject/terminals. `diff.nix` stays in the orphaned repo as reference (a named input to gen-memo's failure-attribution spec) |
+| Former key | Repo          | Ruling      | Where the content went                                                                                                                                                                                                                                                                                                  |
+| ---------- | ------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demand`   | `gen-demand`  | ADR-0008 §4 | `scope` — the demand/kind folds re-express over the sole evaluator (ADR-0006); `adapters` retired without moving rather than give the evaluator a selector-algebra dependency                                                                                                                                           |
+| `edge`     | `gen-edge`    | ADR-0010 §3 | `view` — the fourth destination §3 gained on 2026-08-20, beside `select`, `graph` and `scope`. The (S,T,P,M) algebra, edge-set derivation and Kahn-ordered materialization each name their destination construct per export                                                                                             |
+| `pipe`     | `gen-pipe`    | ADR-0010 §3 | `view` for the channel and dataflow constructs, `select` for `sel`. B5's determinism and provenance laws are restated as properties of the query construction rather than dropped                                                                                                                                       |
+| `flake`    | `gen-flake`   | ADR-0031    | The hub's `lib.compose` / interim `flakeModules.default` for the compose S2 core; `memo` for warm/override/trace; `delivery` for the projection + `realize`; the crossing's Adapter set for inject/terminals. `diff.nix` stays in the orphaned repo as reference (a named input to gen-memo's failure-attribution spec) |
+| `resolve`  | `gen-resolve` | ADR-0008 §4 | obligations transferred, not content moved (gen `4dab564`, 2026-09-02): nine of its eleven exports transfer to a named member — `view`, `bind`, `scope`, `memo` — and two dissolve by ruling (`attr`, `cascade`); the export-by-export map is den-hoag-p3y9                                                             |
 
 **Sibling repos that exist but are NOT in the roster and NOT hub flake inputs.** Consumers reach these
 directly, not through `mkGenLibs`.
 
-| Repo       | Description (verbatim `flake.nix`)                         |
-| ---------- | ---------------------------------------------------------- |
-| `gen-vars` | "gen-vars: scope-driven, multi-target variable generation" |
+| Repo          | Description (verbatim `flake.nix`)                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `gen-vars`    | "gen-vars: scope-driven, multi-target variable generation"                                                                          |
+| `gen-harness` | "gen-harness — the CI harness the gen ecosystem's test flakes are built from (mkCi + its flake module), with no gen library inputs" |
+
+<!-- gen-roster:end -->
 
 Enumeration command (from the hub repo root) and its output:
 
@@ -74,11 +86,11 @@ CI-bound (den-hoag-bzcb4): `ci/agents-md-hub-inputs.nix` reads this block back o
 committed file between the two markers above and compares it, both directions, against the
 flake's own `gen-*` inputs (`gen.inputs`, filtered by prefix) — so the next hub input reddens
 `nix flake check ./ci` instead of leaving this block to rot silently the way it did once
-(den-hoag-8j5b, 19-vs-21).
+(den-hoag-8j5b, 19-vs-21). The same check binds the roster region above (`<!-- gen-roster:begin/end -->`: concern rows total over and exact against the live inputs, each description verbatim from that input's `flake.nix`; retired and sibling rows disjoint from the live set), the stratum assignment (`<!-- gen-strata:begin/end -->`, re-derived from `strata`) and the Drift-check output (`<!-- gen-drift:begin/end -->`). Outside those windows every `gen-*` name must be a live input or a registered row — the sibling table is the register of every off-roster repo this sheet may name — and no BACKTICKED retired key may appear: a historical sentence writes `gen-pipe`, never the bare key. What the check cannot see, stated: unbackticked words, and bare words inside a plain fence outside a window. Its live set and descriptions are read at `ci/flake.lock`'s pins (den-hoag-y21zz; the trap row on `path:..` below), so a root-input removal is silent until the ci relock that the same trap row already requires (den-hoag-0mjo7).
 
 ## Exports
 
-Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flakeModules`. There are no
+Entry: `inputs.gen`. Root outputs are `lib`, `flakeModules` and `roster` — the Drift check output at the end of this sheet is the bound record. There are no
 `packages`, `devShells`, `checks`, or `formatter` at the root.
 
 **`lib`**
@@ -86,10 +98,10 @@ Entry: `inputs.gen`. Root outputs are exactly two attributes — `lib` and `flak
 | Export          | Signature                                                                       |
 | --------------- | ------------------------------------------------------------------------------- |
 | `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`lib/mkGenLibs.nix` binds it as `_`) |
-| `lib.substrate` | the S1 stratum bucket — 10 members, selected from the flat roster               |
-| `lib.modules`   | the S2 (module-system) stratum bucket — 2 members                               |
-| `lib.aspects`   | the S3 (aspect-layer) stratum bucket — 3 members                                |
-| `lib.framework` | the framework bucket — 1 member                                                 |
+| `lib.substrate` | the S1 stratum bucket, selected from the flat roster                            |
+| `lib.modules`   | the S2 (module-system) stratum bucket                                           |
+| `lib.aspects`   | the S3 (aspect-layer) stratum bucket                                            |
+| `lib.framework` | the framework bucket                                                            |
 
 **There is no `lib.mkCi` here.** It lives at `gen-harness.lib.mkCi`, on the signature
 `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs`, already
@@ -100,10 +112,7 @@ revision; it is excluded from the inventory by ADR-0003 and is knowingly left th
 **`lib.mkGenLibs` roster** — the `roster` binding in `lib/mkGenLibs.nix`, which is the roster of
 record and never a count (ADR-0015): the members are all unprefixed, plus the **`strata` declaration**
 (below), which is total over them. Each member value is `genInputs.gen-<key>.lib` verbatim except
-`class`. Enumerate by evaluation — `nix eval ./ci#… .#lib --apply 'x: builtins.attrNames (x.mkGenLibs {})'`.
-
-`algebra` `aspects` `bind` `class` `dispatch` `edge` `flake` `graph` `link` `memo` `merge` `pipe`
-`prelude` `product` `resolve` `schema` `scope` `select` `settings` `types` — plus `strata`
+`class`. Enumerate by evaluation — the Drift check command at the end of this sheet prints it as `roster`; the flake-input form is the bound block above.
 
 `class` is the one exception: the `class` binding re-imports `"${genInputs.gen-class}/lib"` with
 `{ prelude; merge; }` rather than re-exporting `gen-class.lib`, because gen-class's own flake leaves
@@ -129,13 +138,16 @@ the flat roster, unchanged.
 
 Current assignment (derive it from `strata`, never from this heading):
 
+<!-- gen-strata:begin -->
+
 ```
-substrate  algebra bind dispatch graph memo prelude product schema scope select
-modules    merge types
-aspects    aspects class link
-framework  assemble settings
-retiring   edge flake pipe resolve
+aspects  aspects class link
+framework  assemble delivery program settings
+modules  merge types
+substrate  algebra bind dispatch graph identity memo prelude product schema scope select view
 ```
+
+<!-- gen-strata:end -->
 
 **`lib.substrate` / `lib.modules` / `lib.aspects` / `lib.framework`** — the four stratum buckets,
 each a **selection from the flat roster**, never a re-import: `lib.substrate.prelude` and the flat `prelude` are one
@@ -155,37 +167,36 @@ such overload.
 | ---------------------- | -------------------------------------------------------------------------------------------- |
 | `flakeModules.genLibs` | a **path** (`builtins.typeOf` ⇒ `"path"`), not a module value — `./flakeModules/genLibs.nix` |
 
-Imported into a flake-parts consumer it sets `_module.args` to **eight** of the twenty roster keys,
+Imported into a flake-parts consumer it sets `_module.args` to these **eight** roster keys,
 under camelCase `gen*` names (`flakeModules/genLibs.nix:13-22`):
 
 ```
 genAlgebra genAspects genBind genDispatch genGraph genSchema genScope genSelect
 ```
 
-The other eleven (`class` `edge` `flake` `link` `merge` `pipe` `prelude` `product` `resolve`
-`settings` `types`) are reachable via `inputs.gen.lib.mkGenLibs { }`, the sibling flake input
-directly, or — for the six that declare a published stratum (`class` `link` `merge` `prelude`
-`product` `types`) — the matching bucket. The other five publish no bucket path: `edge`,
-`flake`, `pipe`, `resolve` (`retiring`) and `settings` (`framework`).
+Every other roster member is reachable via `inputs.gen.lib.mkGenLibs { }`, the sibling flake input
+directly, or — where `strata` declares a published bucket for it — the matching bucket. The bound block
+above is the enumeration and `strata` the partition; neither is restated here (ADR-0015: a roster of
+record, never a count).
 
 **Three names per library.** Flake input `gen-schema` · roster key `schema` · `_module.args` name
 `genSchema`.
 
 ## Entry points by task
 
-| Task                                                 | Reach for                                                                                                                                                                                                            |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Get the whole roster in a consumer                   | `inputs.gen.lib.mkGenLibs { }`                                                                                                                                                                                       |
-| Get one stratum                                      | `inputs.gen.lib.substrate` / `.modules` / `.aspects` / `.framework` — the members of that layer, selected from the flat roster                                                                                       |
-| Find out which layer a library is in                 | `(inputs.gen.lib.mkGenLibs { }).strata.<key>` — total, and forceable with no `genInputs` at all                                                                                                                      |
-| Get one library                                      | `inputs.gen-<name>.lib` directly — the roster adds nothing over the flake input, except for `class`                                                                                                                  |
-| Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib`                                                                                                                                              |
-| Inject libs as flake-parts module args               | `imports = [ inputs.gen.flakeModules.genLibs ];` (eight keys only)                                                                                                                                                   |
-| Stand up a sibling library's CI flake                | `gen-harness.lib.mkCi { inherit inputs; name = "gen-x"; testModules = ./tests; }` — from `github:sini/gen-harness`, **not** this hub: pinning the hub for a harness pins every library, including the one under test |
-| Use `gen-vars`                                       | their flake inputs directly — not in the roster, not hub inputs                                                                                                                                                      |
-| Run the hub's real gate                              | `nix flake check ./ci` (see Drift check)                                                                                                                                                                             |
-| Look up a term or a citation                         | `TERMINOLOGY.md` (§Core Terms, §Per-Library Vocabulary, §Academic References)                                                                                                                                        |
-| Look up layering / dependency DAG / constraints      | `ARCHITECTURE.md` (§Dependency Graph, §Library Roles, §Design Constraints)                                                                                                                                           |
+| Task                                                 | Reach for                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Get the whole roster in a consumer                   | `inputs.gen.lib.mkGenLibs { }`                                                                                                                                                                                            |
+| Get one stratum                                      | `inputs.gen.lib.substrate` / `.modules` / `.aspects` / `.framework` — the members of that layer, selected from the flat roster                                                                                            |
+| Find out which layer a library is in                 | `(inputs.gen.lib.mkGenLibs { }).strata.<key>` — total, and forceable with no `genInputs` at all                                                                                                                           |
+| Get one library                                      | `inputs.gen-<name>.lib` directly — the roster adds nothing over the flake input, except for `class`                                                                                                                       |
+| Get gen-class with tier-2 (`applyCoreFixed`) working | `(inputs.gen.lib.mkGenLibs { }).class` — **not** `inputs.gen-class.lib`                                                                                                                                                   |
+| Inject libs as flake-parts module args               | `imports = [ inputs.gen.flakeModules.genLibs ];` (eight keys only)                                                                                                                                                        |
+| Stand up a sibling library's CI flake                | `gen-harness.lib.mkCi { inherit inputs; name = "gen-<name>"; testModules = ./tests; }` — from `github:sini/gen-harness`, **not** this hub: pinning the hub for a harness pins every library, including the one under test |
+| Use `gen-vars`                                       | their flake inputs directly — not in the roster, not hub inputs                                                                                                                                                           |
+| Run the hub's real gate                              | `nix flake check ./ci` (see Drift check)                                                                                                                                                                                  |
+| Look up a term or a citation                         | `TERMINOLOGY.md` (§Core Terms, §Per-Library Vocabulary, §Academic References)                                                                                                                                             |
+| Look up layering / dependency DAG / constraints      | `ARCHITECTURE.md` (§Dependency Graph, §Library Roles, §Design Constraints)                                                                                                                                                |
 
 ## Measured traps
 
@@ -243,9 +254,13 @@ nix eval --impure --json --expr 'let f = builtins.getFlake (toString ./.); in { 
 
 Current output (verbatim):
 
+<!-- gen-drift:begin -->
+
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
 ```
+
+<!-- gen-drift:end -->
 
 `--impure` is required: the root flake exposes no system-scoped attribute, so there is no `.#<attr>`
 path that reaches `outputs`/`flakeModules` and the roster in one command.

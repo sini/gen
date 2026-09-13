@@ -150,13 +150,21 @@
       # record + the roster, stratum and surface tripwires; `.gateKeys` the keys that MUST be `true`.
       mkGenLibsEval = import ./mkgenlibs-eval.nix { inherit (inputs) gen; };
 
-      # ── agents-md-hub-inputs — the AGENTS.md hub-input sheet, CI-bound (den-hoag-bzcb4) ──
-      # Reads AGENTS.md's fenced gen-input enumeration block back out of the committed file and
-      # compares it, both directions, against the flake's own gen-* inputs (`genInputs`, filtered
-      # by prefix) — so a new hub input reddens this instead of leaving the sheet to rot silently
-      # the way it did once (den-hoag-8j5b, 19-vs-21). `.gate`/`.gateKeys` follow the same shape as
-      # every other check below.
-      hubInputSheet = import ./agents-md-hub-inputs.nix { inherit genInputs lib; };
+      # ── agents-md-hub-inputs — the AGENTS.md hub sheet, CI-bound (den-hoag-bzcb4, den-hoag-0mjo7) ──
+      # Reads every roster projection AGENTS.md carries back out of the committed file — the fenced
+      # gen-input enumeration, the roster region (concern rows, retired and sibling registers), the
+      # stratum assignment and the Drift-check record, each a marker-declared window — and compares
+      # each against the flake: the input set (`genInputs`, filtered by prefix, both directions), each
+      # member's `flake.nix` description, `(gen.lib.mkGenLibs { }).strata` and the root flake's own
+      # shape; outside the windows every `gen-*` name must be live or registered. So a new hub input,
+      # a retirement or a stale record reddens this instead of leaving the sheet to rot silently the
+      # way it did once (den-hoag-8j5b, 19-vs-21; six unbound copies at den-hoag-0mjo7). Takes `gen`
+      # for the roster of record and the root shape, as `mkgenlibs-eval.nix` does. `.gate`/`.gateKeys`
+      # follow the same shape as every other check below.
+      hubInputSheet = import ./agents-md-hub-inputs.nix {
+        inherit genInputs lib;
+        inherit (inputs) gen;
+      };
 
       # ── inject-payload — the permanent O-INJ-2 cell ──
       # Asserts the MEASURED ADR-0023 (b) ground the crossing's `injectAdapter` declares: a real
@@ -370,9 +378,12 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
-          # Build the agents-md-hub-inputs check: prints the documented/actual roster + the
-          # missing/extra diffs and FAILS the build if the sheet and the flake's own gen-*
-          # inputs disagree in either direction, or on order (byte-for-byte).
+          # Build the agents-md-hub-inputs check: prints the documented/actual roster, every
+          # window's diff against the flake (missing/extra inputs; concern rows missing, extra, with
+          # a drifted repo or description; retired or sibling rows that are live; unregistered
+          # `gen-*` names and backticked retired keys in live context; unknown table rows; the
+          # recorded and actual Drift-check JSON and stratum assignment) and FAILS the build if any
+          # gate key is not `true`.
           mkHubInputSheetCheck =
             name: h:
             let
@@ -385,6 +396,19 @@
                   actual
                   missing
                   extra
+                  concernMissing
+                  concernExtra
+                  concernRepoDrift
+                  concernDescDrift
+                  retiredStillLive
+                  siblingStillLive
+                  unregistered
+                  retiredInLiveContext
+                  unknownRows
+                  driftDocumented
+                  driftActual
+                  strataDocumented
+                  strataActual
                   ;
               };
             in
@@ -398,7 +422,7 @@
                 cat "$reportPath"
                 echo
                 ${lib.optionalString (!allOk) ''
-                  echo "AGENTS.md HUB-INPUT SHEET DRIFT — the fenced enumeration block no longer matches the flake's own gen-* inputs" >&2
+                  echo "AGENTS.md HUB SHEET DRIFT — a bound window (inputs block, roster region, stratum assignment, Drift-check record) or the live context no longer agrees with the flake; the failed keys and the offending names are in the report above" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
