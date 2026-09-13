@@ -6,13 +6,18 @@
     # self-reference points at a repository like any other input, and an input's name matches the
     # repository it points at.
     #
-    # The ci subflake can't `import ../lib` (that escapes its flake root), so it reaches the root
-    # lib through this input, exactly like den-hoag's ci reaches den-hoag — and through
-    # `gen.inputs.gen-X` it reaches every sibling AT THE ROOT flake.lock's pin. So the PURE side of
-    # the byte-parity oracle (the published re-host mains), the perf bench's src set, and the
-    # published `gen.lib.mkGenLibs` surface consumers get are one build of each library per
-    # evaluation — by construction, rather than by two pin sets kept in agreement. Declaring the
-    # siblings a second time here is exactly what let 12 of 13 of them diverge from the root.
+    # A subflake that is its own store root can't `import ../lib`, so it reaches the root lib
+    # through this input, exactly like den-hoag's ci reaches den-hoag. (The unscoped form of that
+    # sentence is false — 28 sibling `ci/` flakes read their parent directly, and two checks here
+    # read `../AGENTS.md` and `../flake.lock` — but it is the reason this route exists.)
+    #
+    # ★ AND THROUGH `gen.inputs.gen-X` IT REACHES EVERY SIBLING AT **`ci/flake.lock`'s** PIN, NOT AT
+    # THE ROOT'S. This is one pin set per evaluation — so the PURE side of the byte-parity oracle,
+    # the perf bench's src set and the published `gen.lib.mkGenLibs` surface are one build of each
+    # library, which is what declaring the siblings a second time here destroyed (12 of 13 diverged
+    # from the root). But it is still TWO PIN SETS IN THE REPOSITORY: this lock holds a COPY of the
+    # root's, snapshotted at ci lock time, and nothing about `path:..` keeps the copy current. That
+    # is `ci/lock-agreement.nix`'s subject, and it is the only check here that reads both locks.
     # Only the heavy nixpkgs is deduped.
     gen.url = "path:..";
     gen.inputs.nixpkgs.follows = "nixpkgs";
@@ -92,10 +97,15 @@
     let
       inherit (nixpkgs) lib;
 
-      # The root flake's own inputs — the sibling route. `gen.inputs.gen-X` is the root's pin BY
-      # REFERENCE, so no sibling revision is written in this file and none can be written stale:
-      # `nix flake update gen-X` here reports that no such input exists. `gen-harness`'s `mkCi.nix`
-      # gives the same value the same name, for the same reason.
+      # The root flake's own inputs — the sibling route. No sibling revision is written in THIS FILE,
+      # and `nix flake update gen-X` here reports that no such input exists.
+      #
+      # ★ BUT THE VALUE IS THE ROOT'S PIN BY **COPY**, NOT BY REFERENCE — snapshotted into
+      # `ci/flake.lock` at ci lock time. Every one of these revisions CAN go stale: a root pin bump
+      # moves the root lock and leaves this one where it was, and every check below then computes at
+      # a pin no consumer gets. Relocking is `nix flake lock ./ci --update-input gen` (the per-sibling
+      # form is a silent no-op — the siblings are transitive through `gen`, so it exits 0 and changes
+      # nothing). `ci/lock-agreement.nix` is the cell that makes the drift visible instead of silent.
       genInputs = inputs.gen.inputs;
 
       # ── re-host byte-parity oracle (permanent regression) ──
@@ -212,6 +222,21 @@
         hubSource = self.sourceInfo.outPath;
       };
 
+      # ── lock-agreement — the ONE check here that reads the ROOT lock (den-hoag-0moiy) ──
+      # Every other check on this list computes at `ci/flake.lock`'s copy of the `gen` node, because
+      # that is what `inputs.gen.inputs.gen-X` resolves to. The two locks agree today and nothing
+      # kept them agreeing: a root pin bump that BREAKS the wiring passed this gate GREEN. This cell
+      # compares the two EDGES — `rootLock.nodes[root].inputs.<name>` against
+      # `ciLock.nodes[ciLock.nodes[root].inputs.gen].inputs.<name>`, both resolved through `follows`
+      # and compared on `locked.rev` — over the roster of record mapped into the input namespace.
+      # `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that MUST be
+      # `true`. It takes `gen` for the ROSTER only: both lock reads are direct file reads, which is
+      # the whole point of it.
+      lockAgreement = import ./lock-agreement.nix {
+        inherit (inputs) gen;
+        inherit lib;
+      };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -249,6 +274,8 @@
       flake.lib.direction = directionOfDependence;
       #   nix eval ./ci#lib.soleEvaluator.report --json | jq
       flake.lib.soleEvaluator = soleEvaluator;
+      #   nix eval ./ci#lib.lockAgreement.report --json | jq   (rows / differs / missing / arming)
+      flake.lib.lockAgreement = lockAgreement;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
       flake.lib.architectureLibraryGraph = architectureLibraryGraph;
 
@@ -457,6 +484,60 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the lock-agreement check (den-hoag-0moiy): prints the two-edge report and the
+          # in-cell arming, and names every disagreeing edge with BOTH revisions and BOTH lock paths.
+          #
+          # ★★★ `gating` IS THE ONE LINE THAT IS THE OWNER'S, AND IT IS THE ONLY ARM-DEPENDENT OBJECT
+          # IN THIS CELL. Whether pin coherence between the root lock and ci's is a GATING red or an
+          # OBSERVATION was routed to the owner by `specs/2026-09-01-gen-ci-lock-observation-spec.md`
+          # §4.1.1 and is UNANSWERED at this write. The predicate, the domain, the traversal, the
+          # `follows` limb, the floor and this message are IDENTICAL under both arms; only the exit
+          # status of a pin disagreement differs, and only here.
+          #   OBSERVE-ONLY, shipped:  a pin disagreement PRINTS and the build passes.
+          #   GATING, one edit:       gating = failed != [ ];
+          # ★ An ARMING failure exits 1 under BOTH arms. A guard that can no longer fire is not a
+          # passing guard in either disposition, and that is not the question the owner was asked.
+          mkLockAgreementCheck =
+            name: s:
+            let
+              allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              armingFailed = builtins.filter (k: k != "locks-agree") failed;
+              gating = armingFailed != [ ];
+
+              report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+              disagreeing = s.report.differs ++ s.report.missing ++ s.report.unlocked;
+              edgeLine =
+                n:
+                let
+                  row = lib.findFirst (r: r.name == n) null s.report.rows;
+                in
+                "    ${n}: flake.lock => ${row.root}  |  ci/flake.lock => ${row.ci}";
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (disagreeing != [ ]) ''
+                  echo "LOCK AGREEMENT — the hub's ROOT flake.lock and ci/flake.lock resolve DIFFERENT revisions for a roster member, so every check under ci/ computes at a pin no consumer gets:" >&2
+                  ${lib.concatMapStringsSep "\n" (n: "echo ${lib.escapeShellArg (edgeLine n)} >&2") disagreeing}
+                  echo "Disposed of by relocking ci onto the root — 'nix flake lock ./ci --update-input gen', then read ci/flake.lock's revisions back, because that command exits 0 and prints nothing when it no-ops. NEVER by widening this cell's exclusion." >&2
+                ''}
+                ${lib.optionalString (s.report.refusals != [ ]) ''
+                  echo "LOCK AGREEMENT — this check cannot reach the edges it compares, which is a broken instrument and not an agreement:" >&2
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"} >&2") s.report.refusals}
+                ''}
+                ${lib.optionalString (armingFailed != [ ]) ''
+                  echo "LOCK AGREEMENT ARMING — a seeded divergence this cell exists to name went unnamed, or the domain floor stopped discriminating: ${lib.concatStringsSep " " armingFailed}. Read report.arming above: every arm is a DELTA against the live reading, printed beside it" >&2
+                ''}
+                ${lib.optionalString gating "exit 1"}
+                cp "$reportPath" "$out"
+              '';
           # Build the inject-payload check (the permanent O-INJ-2 cell): prints the per-key gate
           # and FAILS the build if any key is not `true`. A failing key is either the measured
           # ADR-0023 (b) ground moving (the payload no longer reaches a function — the declared
@@ -529,7 +610,9 @@
           #
           # `gen-class` is the class-share mechanism lib: perf-bench drives its tier-2
           # `applyCoreFixed` against gen-merge's fixed-input kernel (the `classShare` workload —
-          # spec §2.5). Like every sibling here it comes from the root's pin, never a local one.
+          # spec §2.5). Like every sibling here it comes through `genInputs` — `ci/flake.lock`'s copy
+          # of the root's pin, never a local checkout — so the bench measures the pinned revisions
+          # and not a developer's working tree.
           perfSrcs = pkgs.writeText "perf-srcs.nix" ''
             {
               "gen-prelude" = "${genInputs.gen-prelude}";
@@ -631,6 +714,7 @@
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             architecture-library-graph = mkArchitectureGraphCheck "architecture-library-graph" architectureLibraryGraph;
             sole-evaluator = mkSoleEvaluatorCheck "sole-evaluator" soleEvaluator;
+            lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.
@@ -676,8 +760,9 @@
             # re-accreted over six commits in eight days with nobody noticing.
             #
             # The population is the hub plus every roster member, reached through `genInputs` (the
-            # same route every other check here uses), so a new roster library is scanned the
-            # moment it becomes a hub input and there is no registration step. An archived or
+            # route every check here uses except `lock-agreement`, whose subject is the two lock
+            # files themselves), so a new roster library is scanned the moment it becomes a hub
+            # input and there is no registration step. An archived or
             # orphaned repository is out by construction: it is off the roster, so it is not a hub
             # input, and a frozen record is not a maintenance target.
             #

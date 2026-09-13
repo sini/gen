@@ -10,8 +10,10 @@
 # document carries a SECOND ```json fence later — the root Drift-check section — so an
 # unmarked/first-fence extraction would only be accidentally correct), and compares it, both
 # directions, against the flake's actual gen-* inputs — reached through `genInputs` (the root
-# flake's pinned `inputs`, the same route every other check in this file uses), never by
-# re-shelling the sheet's own `nix eval --impure` command from inside a pure eval.
+# flake's own input SET, resolved at `ci/flake.lock`'s copy of its pins; the route every check in
+# ci/flake.nix uses except `lock-agreement`, which reads both lock files directly because comparing
+# them is its subject), never by re-shelling the sheet's own `nix eval --impure` command from
+# inside a pure eval.
 {
   genInputs,
   lib,

@@ -30,10 +30,13 @@
 # is ADR-0014's half of the enforcement, not this one's.
 #
 # ── THE TREE IT GOVERNS ──
-# The HUB'S PINNED REVISIONS, not the working clones — the surface consumers actually get, which is
-# the principle ci/mkgenlibs-eval.nix already states for the roster itself. A library whose working
-# tree has drifted from its pin is governed at the pin, and the drift becomes visible when the pin
-# moves.
+# The HUB'S PINNED REVISIONS, not the working clones. A library whose working tree has drifted from
+# its pin is governed at the pin, and the drift becomes visible when the pin moves.
+#
+# ★ AND THE PINS ARE `ci/flake.lock`'s, NOT the root `flake.lock`'s: `inputs.gen.inputs.gen-X`
+# resolves through this subflake's own lock, which holds a COPY of the root's taken at ci lock time.
+# So "the surface consumers actually get" holds only while the two locks agree — which is what
+# ci/lock-agreement.nix gates, and it is the one check here that reads both.
 #
 # ── THE DOMAIN ──
 # The roster of record, `gen/lib/mkGenLibs.nix`, never a count. Two consequences follow by
