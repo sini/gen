@@ -317,9 +317,12 @@
                 cp "$reportPath" "$out"
               '';
           # Build the mkGenLibs wiring check: prints the per-key gate (+ the roster and stratum
-          # diffs) and FAILS the build if any key failed to evaluate, the roster drifted, or the
-          # stratum partition is not total and in agreement with the flat roster
-          # (mkgenlibs-eval.nix). The roster of record is that file, never a count.
+          # diffs, and the arming) and FAILS the build if any key failed to evaluate, the roster
+          # drifted, the stratum partition is not total and in agreement with the flat roster, or an
+          # `arming-*` arm stopped firing (mkgenlibs-eval.nix). The roster of record is that file,
+          # never a count. A failing arm is either the surface pin refusing or the comparison behind
+          # it having gone blind; both are red, because a guard that can no longer refuse is not a
+          # passing guard.
           mkGenLibsCheck =
             name: g:
             let
@@ -347,6 +350,8 @@
                   surfaceHash
                   surfaceDrift
                   surfaceDriftNames
+                  arming
+                  pinDomain
                   ;
               };
             in

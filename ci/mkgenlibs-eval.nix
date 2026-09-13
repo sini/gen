@@ -354,9 +354,24 @@ let
       value = builtins.hashString "sha256" (builtins.toJSON surface.${k});
     }) memberKeys
   );
+  # ── THE PREDICATE ──
+  #
+  # Lifted to a function of its two inputs so a SEEDED world runs THIS code and not a copy of it.
+  # That is the arming construction `direction-of-dependence.nix` states and `sole-evaluator.nix`
+  # repeats, and this file was named by both as the one that lacked it.
+  #
   # Reported as a LIST, so a failure names the member instead of only denying — the same shape
-  # `resolveFailed` and `strataMissing` already take.
-  surfaceDrift = builtins.filter (k: (expectedSurface.${k} or null) != surfaceHashes.${k}) memberKeys;
+  # `resolveFailed` and `strataMissing` already take. `builtins.attrNames surf` is `memberKeys` on
+  # the live call (`surface` is built from them) and the recomputed hash is `surfaceHashes.${k}`, so
+  # the live reading is unchanged; the `or null` branch is preserved verbatim, because it is the arm
+  # that keeps a new roster member from defaulting into agreement.
+  driftOf =
+    expected: surf:
+    builtins.filter (
+      k: (expected.${k} or null) != builtins.hashString "sha256" (builtins.toJSON surf.${k})
+    ) (builtins.attrNames surf);
+
+  surfaceDrift = driftOf expectedSurface surface;
   surfaceDriftNames = builtins.listToAttrs (
     map (k: {
       name = k;
@@ -368,6 +383,73 @@ let
   # is empty again and the rest of the report is unchanged, so without this field the derivation
   # would be byte-identical across the very bump it just observed.
   surfaceHash = builtins.hashString "sha256" (builtins.toJSON surface);
+
+  # ── the arming ──
+  #
+  # A FULLY SYNTHETIC fixture, built in the file that consumes it. No repository outside this file can
+  # move it, and the arming is a GATE CELL, so the only way to disarm it is to edit the fixture and
+  # editing the fixture reds the gate.
+  #
+  # It replaces a shell recipe in AGENTS.md that overrode `gen/gen-view` onto a fixed foreign rev.
+  # That construction has two death modes, both observed: an override naming an input that has LEFT
+  # the roster warns on stderr and returns a CLEAN GREEN (how the predecessor died when `gen-resolve`
+  # was retired), and an override onto a rev the lock has REACHED is a no-op, so the control expires
+  # the moment upstream stops diverging past it.
+  #
+  # ★ EACH ROW READS ITS OWN SEED AND NOTHING LIVE. Seeding the live `surface` instead was authored
+  # and driven red: under a genuine drift the seeded list carries the live member too, so every
+  # arming row goes false at once — spurious reds masking the one true red. The fixture is therefore
+  # disjoint from `surface`, and a correct build that moves a real export surface cannot break these
+  # greens; the only cell such a build moves is `surface-pinned`, which is the one that should move.
+  armSurface = {
+    alpha = [
+      "one"
+      "two"
+    ];
+    beta = [ "three" ];
+  };
+  armPin = builtins.mapAttrs (_: v: builtins.hashString "sha256" (builtins.toJSON v)) armSurface;
+  arming = {
+    # The positive control on the five refusals below: without it a `driftOf` that named EVERY
+    # member would satisfy all five and the arming would certify a predicate that never agrees.
+    clean = driftOf armPin armSurface;
+    added = driftOf armPin (armSurface // { alpha = armSurface.alpha ++ [ "four" ]; });
+    removed = driftOf armPin (armSurface // { alpha = [ "one" ]; });
+    renamed = driftOf armPin (
+      armSurface
+      // {
+        alpha = [
+          "one"
+          "TWO"
+        ];
+      }
+    );
+    reordered = driftOf armPin (
+      armSurface
+      // {
+        alpha = [
+          "two"
+          "one"
+        ];
+      }
+    );
+    unpinned = driftOf (builtins.removeAttrs armPin [ "alpha" ]) armSurface;
+  };
+
+  # The one LIVE-COUPLED arm, and the predecessor's OTHER death mode expressed as a cell: a pin entry
+  # left behind for a member that has LEFT the roster keeps `surfaceDrift` empty — the filter ranges
+  # over the live members — while the pin and the roster have stopped talking about the same thing.
+  pinDomain = builtins.attrNames expectedSurface;
+
+  # ★ WHAT THE ARMING DOES NOT REACH, stated here rather than left to be discovered. It proves
+  # `driftOf` DISCRIMINATES. It does not prove that `surface` reads the published exports of the
+  # PINNED libraries: the `genLibs` → `surfaceOf` → `surface` half runs on every live evaluation but
+  # has no falsifier, and `arming-pin-covers-roster` closes only its domain — a `surfaceOf` whose
+  # `tryEval` started swallowing would still be silent. Closing the rest means parameterising this
+  # check over its `genLibs` the way `direction-of-dependence.nix` is parameterised over its
+  # strata/rank/exception/edge set, which restructures the entry and gives every sibling arm a seeded
+  # twin. That is an OPEN FORK (OQ-1 of
+  # specs/2026-09-12-gen-arming-control-headroom-spec.md, den-hoag-l2yh0), not a decision taken here.
 in
 {
   # Flat gate record for the check helper: each actual key → wiring-ok, plus the roster tripwire and
@@ -381,6 +463,16 @@ in
     buckets-resolve = resolveFailed == [ ];
     buckets-agree = agreeFailed == [ ];
     surface-pinned = surfaceDrift == [ ];
+    # ARMING — the comparison itself, over the synthetic fixture. A failing key here is the arming
+    # having stopped firing, and it is RED: a guard that can no longer refuse is not a passing guard.
+    arming-drift-silent-on-agreement = arming.clean == [ ];
+    arming-drift-names-added = arming.added == [ "alpha" ];
+    arming-drift-names-removed = arming.removed == [ "alpha" ];
+    arming-drift-names-renamed = arming.renamed == [ "alpha" ];
+    arming-drift-names-reordered = arming.reordered == [ "alpha" ];
+    arming-drift-names-unpinned = arming.unpinned == [ "alpha" ];
+    # ARMING — the pin's DOMAIN, the half `surfaceDrift` cannot see.
+    arming-pin-covers-roster = pinDomain == memberKeys;
     retired-refusing = retirementFailed == [ ];
   };
   gateKeys = actualKeys ++ [
@@ -392,6 +484,13 @@ in
     "buckets-resolve"
     "buckets-agree"
     "surface-pinned"
+    "arming-drift-silent-on-agreement"
+    "arming-drift-names-added"
+    "arming-drift-names-removed"
+    "arming-drift-names-renamed"
+    "arming-drift-names-reordered"
+    "arming-drift-names-unpinned"
+    "arming-pin-covers-roster"
     "retired-refusing"
   ];
   # Raw, for `nix eval ./ci#lib.mkGenLibsEval --json | jq`.
@@ -399,6 +498,9 @@ in
   memberCount = builtins.length memberKeys;
   keys = actualKeys;
   inherit expectedKeys missing extra;
+  # The arming's own readings, so a red names WHICH half failed in one look — the live comparison or
+  # the fixture that proves it can refuse.
+  inherit arming pinDomain;
   inherit
     strata
     strataMissing
