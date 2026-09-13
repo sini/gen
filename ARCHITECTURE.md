@@ -303,7 +303,7 @@ flowchart TD
   gate["<b>the well-definedness gate</b> — gen-view<br/>Vogt's <i>bounded well-defined</i> over the<br/>CONTRACTED DECLARED edge relation"]
   movement["<b>movement</b> — gen-view<br/>content movement is a scoped query plus its dual:<br/>collector = receiver-rooted query,<br/>broadcaster = producer declaration + standing query"]
   delivery["<b>delivery</b> — gen-delivery<br/>project the declared delivery classes,<br/>fold each class's collected content"]
-  terminal["<b>terminal</b> — the framework's<br/>a target-owned function gen calls.<br/>Only VALUES cross; no gen TYPE leaves the pure plane."]
+  terminal["<b>terminal</b> — the framework's<br/>a target-owned function gen calls.<br/>Only VALUES cross; no gen TYPE leaves the pure plane —<br/>under ADR-0023's declared interim, until no<br/>declared opt-out remains."]
   memo["<b>the incremental plane</b> — gen-memo<br/>decides reuse, never evaluates.<br/>Defined by byte-parity against a cold evaluation."]
 
   decl --> assembly --> onegraph
@@ -538,7 +538,9 @@ whether the equivalences survive it, not by how little of it there is.
     it.
 11. **The library level is nixpkgs-lib-free.** No library's `lib/` imports nixpkgs. Full nixpkgs enters
     at the terminal plane and the CI runners, nowhere else.
-12. **Compose purely, inject values — never types.**
+12. **Compose purely, inject values — never types.** Held today under ADR-0023's declared interim —
+    target-invoked checking off by default, every unstated crossing a declared opt-out with its price
+    measured — until no declared opt-out remains (`den-hoag-i546n`).
 13. **The substrate prescribes no terminology.** A framework's names never enter it — with one
     live violation recorded at §4, the hub's own delivery projection.
 
