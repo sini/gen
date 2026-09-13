@@ -210,7 +210,12 @@ let
             shown = if acc.shown == "<root>" then seg else "${acc.shown}.${seg}";
           }
         else
-          throw "gen: flakeModule: `gen.nodeRegistryPath = ${showPath nodeRegistryPath}`: `${seg}` is absent under `${acc.shown}`. Present there: ${showKeys acc.here}.";
+          throw (
+            "gen: flakeModule: `gen.nodeRegistryPath = ${showPath nodeRegistryPath}`: `${seg}` is absent under `${acc.shown}`. Present there: ${showKeys acc.here}."
+            +
+              lib.optionalString (values ? ${seg})
+                " `${seg}` is itself a top-level key here, and this option cannot tell which you meant: if THAT registry is the delivery target, name it as the whole path; if you meant both registries, this option is ONE attribute path naming ONE registry view, never a list of registries — to deliver over several, declare their union as its own option in your own tree and name THAT path here."
+          );
     in
     (lib.foldl' step {
       here = values;
@@ -330,6 +335,16 @@ in
         substrate cannot pick this word: with no path the projection has no registry to read and
         REFUSES BY NAME rather than projecting an empty target set. A wrong path refuses at the
         FAILING SEGMENT, naming what is present beside it.
+
+        It names a VIEW, not a registry, and that cardinality is deliberate. A consumer has as many
+        registries as it declares kinds (`mkInstanceRegistry` takes one kind); the delivery target
+        set is one. A consumer delivering over several registries declares their union as its own
+        option — with a type that REFUSES conflicting definitions, e.g. `attrsOf raw` fed by
+        `mkMerge`, never `//`, whose right-wins silently drops a node declared in both — and names
+        that path here. The union is then a named value in `composed.values`, reachable by every
+        query, which an in-substrate union would not be (ADR-0012 rule 2, ADR-0019). Where the
+        selection is not a plain path, `gen-delivery.project`'s `selectHosts` is the direct-call
+        door.
       '';
     };
 
