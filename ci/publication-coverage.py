@@ -35,8 +35,9 @@ BLOCK = {"p", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "pre"}
 # The arming pair: scored by the same predicates, outside the population, every run.
 ARM = [("gen TYPES never leave the pure eval; only VALUES cross.", "FAIL"),
        ("gen TYPES never leave the pure eval; only VALUES cross — under ADR-0023's declared interim.", "PASS")]
-# comment syntax BY FILE TYPE ('//' in nix is the update operator, '--' in sh a flag: neither is a marker)
-HASH = (".nix", ".sh", ".py", ".yml", ".yaml", ".toml", ".envrc", ".gitignore")
+# comment syntax: `#` is the marker in EVERY non-rendered file, plus `/* */` in nix. No suffix whitelist: one
+# re-admitted the wrapped-claim class silently for Makefile/.gitattributes/.editorconfig. '//' in nix is the
+# update operator and '--' in sh a flag, so neither is a marker.
 
 
 def flat(s):
@@ -185,11 +186,9 @@ def md_units(path, src_lines):
 
 
 def comment_text(rel, src_lines):
-    """Per line: the comment text with its marker stripped, or None for a non-comment line. By file type."""
+    """Per line: the comment text with its marker stripped, or None for a non-comment line."""
     n = len(src_lines)
     ct = [None] * n
-    if not rel.endswith(HASH):
-        return ct
     nix, in_block = rel.endswith(".nix"), False
     for i, l in enumerate(src_lines):
         s = l.strip()
