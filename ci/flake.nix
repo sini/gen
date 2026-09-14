@@ -484,35 +484,52 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
-          # Build the sole-evaluator check: prints the full report — the class tallies, every tree a
+          # Build the sole-evaluator REPORT: prints the full report — the class tallies, every tree a
           # reader must act on named with the FILE AND LINE of each match, the three ruled entry
           # sets entry by entry with their causes and carriers, the per-tree read/excluded counts
-          # and the arming — and FAILS the build if any gate arm is not `true`. Same shape as
-          # `mkDirectionCheck`, and a failing arm is read the same way: either the lint firing (a
-          # tree outside gen-scope exhibits the criterion) or an arming arm that stopped firing (the
-          # scan gone blind), and both are red.
-          mkSoleEvaluatorCheck =
+          # and the arming — and names every gate arm that is not `true`. The scan, its criterion,
+          # its exception sets and its arming are untouched; only the DISPOSITION of a refusal is.
+          #
+          # ★★★ AN APP, AND NOT A `checks` DERIVATION (den-hoag-6fmmb, owner-ruled 2026-09-13):
+          # **a check whose red is cleared by a RULING must not gate; one cleared by a FIX should.**
+          # A refusal here is the ruled property being TRUE of a tree — it is disposed of by an
+          # exception entry or by the reading standing, both of them owner acts, so nothing a
+          # builder can do clears it. Wired as a gate it took this hub to thirty-three consecutive
+          # red runs over six days and destroyed the signal of the fourteen cells beside it; a tree
+          # that is always red gates nothing. The property survives and is verified by audit at the
+          # consolidation milestones (`den-hoag-0pk67`).
+          #
+          # ★ AN APP RATHER THAN A NON-FAILING CHECK, because nix HIDES A BUILDER'S LOG AT EXIT 0
+          # (the hub's standing Q6): a `runCommand` that stopped exiting 1 would stop being read at
+          # all, trading a false red for a silence. `nix run` executes a PROGRAM, whose stdout
+          # reaches the job log on every run — the same shape `perf-bench`, `flake-compare` and
+          # `fleet-consistency` already use, and CI runs it as its own workflow job.
+          #
+          # ★ An EVALUATION failure of this app still reds its job, and that is correct under the
+          # same rule: a scan that cannot run is an instrument defect, cleared by a fix.
+          mkSoleEvaluatorReport =
             name: s:
             let
               allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
               failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
               report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+              reportFile = pkgs.writeText "${name}-report.json" report;
             in
-            pkgs.runCommand name
-              {
-                inherit report;
-                passAsFile = [ "report" ];
-              }
-              ''
+            pkgs.writeShellApplication {
+              name = "gen-${name}-report";
+              runtimeInputs = [ pkgs.coreutils ];
+              # Everything on stdout: the refusal sentence is a continuation of the report a reader
+              # meets, and a stderr limb would be free to interleave ahead of it in the job log.
+              text = ''
                 echo "── ${name} ──"
-                cat "$reportPath"
+                cat ${reportFile}
                 echo
                 ${lib.optionalString (!allOk) ''
-                  echo "SOLE EVALUATOR — a tree in the scanned domain exhibits an evaluation construct outside gen-scope, or the scan's own arming stopped firing. A refusal is the RULED PROPERTY being true of that tree: it is disposed of by an exception entry carrying a cause and a carrier, or by the reading standing — NEVER by narrowing the criterion until the tree passes" >&2
-                  exit 1
+                  echo "SOLE EVALUATOR — a tree in the scanned domain exhibits an evaluation construct outside gen-scope, or the scan's own arming stopped firing. A refusal is the RULED PROPERTY being true of that tree: it is disposed of by an exception entry carrying a cause and a carrier, or by the reading standing — NEVER by narrowing the criterion until the tree passes"
+                  echo "REPORTED, GATED BY NOTHING (den-hoag-6fmmb): the arms above are cleared by a RULING, not by a fix, so this does not fail CI. Read it, do not ignore it."
                 ''}
-                cp "$reportPath" "$out"
               '';
+            };
           # Build the lock-agreement check (den-hoag-0moiy): prints the two-edge report and the
           # in-cell arming, and names every disagreeing edge with BOTH revisions and BOTH lock paths.
           #
@@ -714,6 +731,8 @@
             ''
             + builtins.readFile ./fleet-consistency.sh;
           };
+
+          soleEvaluatorReport = mkSoleEvaluatorReport "sole-evaluator" soleEvaluator;
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -742,7 +761,8 @@
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             architecture-library-graph = mkArchitectureGraphCheck "architecture-library-graph" architectureLibraryGraph;
-            sole-evaluator = mkSoleEvaluatorCheck "sole-evaluator" soleEvaluator;
+            # `sole-evaluator` is NOT here, and its absence is the point: it is reported by
+            # `apps.sole-evaluator-report` below. See `mkSoleEvaluatorReport` for the rule.
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
@@ -938,6 +958,14 @@
           apps.fleet-consistency = {
             type = "app";
             program = "${fleetConsistency}/bin/gen-fleet-consistency";
+          };
+
+          # `nix run ./ci#sole-evaluator-report` — the ADR-0006 / T2(a) scan, REPORTED and gated by
+          # nothing. Same criterion, same exception sets, same arming, same tally as when it was a
+          # `checks` derivation; only the disposition of a refusal moved. See `mkSoleEvaluatorReport`.
+          apps.sole-evaluator-report = {
+            type = "app";
+            program = "${soleEvaluatorReport}/bin/gen-sole-evaluator-report";
           };
 
           treefmt = {

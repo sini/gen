@@ -42,6 +42,20 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix run ./ci#perf-bench
 
+  # Reported, gated by nothing (den-hoag-6fmmb): the ADR-0006 sole-evaluator scan. A refusal is the
+  # ruled property being TRUE of a tree, disposed of by an owner act — an exception entry or the
+  # reading standing — so its red is cleared by a RULING and not by a fix, and a check of that kind
+  # must not gate. It ran as a `checks` cell until 2026-09-13 and held this hub red for six days,
+  # taking the signal of every cell beside it with it. It is an app rather than a passing check
+  # because nix hides a builder's log at exit 0: the report must still be READ on every run.
+  sole-evaluator-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix run ./ci#sole-evaluator-report
+
   # Trust surface: the cited fleet numbers still agree with their own arithmetic (pure jq over the
   # committed baselines — pin agreement + re-derivations + digest ties + floors; no fleet eval).
   fleet-consistency:
