@@ -926,7 +926,6 @@
                   nativeBuildInputs = [
                     pkgs.python3
                     pkgs.cmark-gfm
-                    pkgs.mermaid-cli
                   ];
                   # Every row TRAILS its newline, as in `readme-audience` above.
                   manifest = lib.concatMapStrings (f: f + "\n") files;
@@ -935,8 +934,6 @@
                 }
                 ''
                   echo "── publication-coverage ──"
-                  # mermaid-cli's chromium needs a writable HOME; the sandbox gives it none.
-                  export HOME="$TMPDIR"
                   rc=0
                   python3 ${./publication-coverage.py} ${src} "$manifestPath" "$expected" > report.txt || rc=$?
                   cat report.txt

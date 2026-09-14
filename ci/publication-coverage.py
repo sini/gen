@@ -8,12 +8,13 @@ den-ag-design's O-5 count-vs-fixture probe, whose spec is den-ag-design
 For every file in FILELIST (the hub's tracked tree, enumerated by command in ci/flake.nix), enumerate every
 PUBLICATION of the value-injection invariant (CLAIM) and require the interim CONDITION inside the SAME unit (§2.2):
   unit, rendered surface (*.md)   : the innermost block element of the cmark-gfm render (p, li, tr, h*),
-                                    or ONE mermaid node label (mmdc SVG) for a claim inside a mermaid fence
+                                    or ONE mermaid node label, recovered by a SOURCE PARSE of the fence
+                                    grammar (§2.2) -- no renderer, so no host can move the denominator
   unit, source surface (all else) : the maximal CONTIGUOUS COMMENT BLOCK, markers stripped, flattened as one
                                     text; a non-comment line is its own unit. No window, no line join.
   TOTALITY (§2.4)                 : a claim the predicate cannot place in a unit is RESIDUE (red, named):
                                     a renderer drop (survival arm, md), fence text that is no node label,
-                                    a code block, an unrenderable fence, unblocked text.
+                                    a code block, unblocked text.
   ARMING (§2.4)                   : one literal unconditioned claim must score FAIL and one conditioned PASS,
                                     outside the population, before any file is read -- a COND over-match or a
                                     dead CLAIM is INVALID (exit 2), never green. This file carries that pair,
@@ -23,11 +24,10 @@ PUBLICATION of the value-injection invariant (CLAIM) and require the interim CON
 No count fixture anywhere. Exit 0 = every publication conditioned; 1 = a FAIL or RESIDUE (rows on stderr,
 file:line [kind]); 2 = invalid run (arming mis-scored, dead predicate, or an instrument missing).
 """
-import html, os, re, shutil, subprocess, sys, tempfile, uuid
+import html, os, re, shutil, subprocess, sys, uuid
 from html.parser import HTMLParser
 
 CMARK = shutil.which("cmark-gfm")
-MMDC = shutil.which("mmdc")
 CLAIM = re.compile(r"types? never (leave|leaves|do|cross|crosses|enter)|only values cross|no gen type (crosses|leaves)"
                    r"|never (gen )?types|values cross|values,? (not|never) (gen )?types", re.I)
 COND = re.compile(r"declared interim|declared opt-out", re.I)  # a bare ADR-0023 citation is not a condition
@@ -38,6 +38,20 @@ ARM = [("gen TYPES never leave the pure eval; only VALUES cross.", "FAIL"),
 # comment syntax: `#` is the marker in EVERY non-rendered file, plus `/* */` in nix. No suffix whitelist: one
 # re-admitted the wrapped-claim class silently for Makefile/.gitattributes/.editorconfig. '//' in nix is the
 # update operator and '--' in sh a flag, so neither is a marker.
+# The mermaid flowchart node shapes admitted by §2.2, named exhaustively and ordered LONGEST OPENER FIRST so
+# `[[x]]` is not read as `[` + `[x` + `]`. mermaid 11's `@{ shape: …, label: … }` form is outside, by design.
+SHAPES = [("(((", ")))"), ("([", "])"), ("[[", "]]"), ("[(", ")]"), ("((", "))"), ("{{", "}}"),
+          ("[/", "/]"), ("[/", "\\]"), ("[\\", "/]"), ("[\\", "\\]"), (">", "]"),
+          ("[", "]"), ("(", ")"), ("{", "}")]
+# A node definition: `id` · a shape opener · the label · the matching closer, opened and closed on ONE line,
+# an optional `:::class` after it. It may begin ANYWHERE on the line, NOT only at line-open -- that is what
+# admits `subgraph sg["…"]`, whose title the renderer emits as a node label and a reader meets as one;
+# anchored to line-open the tree's 8 subgraph titles vanish and the render agreement reads 57, not 65.
+# `subgraph` is NOT excluded at id position; the head keywords below are. An id never ENDS in `-`, so the
+# `>…]` shape cannot swallow an arrow (`A-->B[x]` would otherwise parse as id `A--`, shape `>…]`).
+NODE = re.compile(r"(?<![\w.-])(?!(?:class|classDef|style|linkStyle|click|direction)(?![\w.-]))"
+                  r"([\w.]+(?:-[\w.]+)*)\s*(?:"
+                  + "|".join(re.escape(o) + r"(.*?)" + re.escape(c) for o, c in SHAPES) + r")")
 
 
 def flat(s):
@@ -106,47 +120,44 @@ def span(pos):
     return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
 
+def unquote(label):
+    """A label's enclosing `"`…`"` and ``` `…` ``` are DELIMITERS -- syntax, not label text -- and a reader
+    never meets them. Stripped, the parse's text is byte-identical to the rendered node label (§2.2)."""
+    s = label.strip()
+    while len(s) >= 2 and s[0] == s[-1] and s[0] in '"`':
+        s = s[1:-1].strip()
+    return s
+
+
 def mermaid_units(fence_lines, start_line):
-    """Render the fence with mmdc; each node label is a unit. Unrenderable => one RESIDUE unit.
-    Survival: a fence-source line carrying the claim that no CLAIM-matching label witnesses => RESIDUE."""
-    with tempfile.TemporaryDirectory() as d:  # no fixed temp path
-        mmd, svg = os.path.join(d, "f.mmd"), os.path.join(d, "f.svg")
-        open(mmd, "w").write("\n".join(fence_lines) + "\n")
-        env = dict(os.environ, PUPPETEER_SKIP_DOWNLOAD="1")
-        r = subprocess.run(["timeout", "180", MMDC, "-i", mmd, "-o", svg], capture_output=True, text=True, env=env)
-        if r.returncode != 0 or not os.path.exists(svg):
-            # The row carries the CAUSE, as `RESIDUE:cmark-failed` below already does: a row naming only the
-            # fence says an environment could not render it and never why, so a runner failure (chromium in a
-            # nested sandbox) is undiagnosable from the log by construction. mmdc puts its reason in the FIRST
-            # stderr lines and node_modules stack frames after it, so frames are dropped and the head kept; the
-            # verbatim output goes to the log too, since the row excerpt is truncated at print. The flattened
-            # cause is printed LAST, adjacent to the row: a failing `nix flake check` shows only the drv log's
-            # LAST 25 lines, and mmdc's reason sits above twenty lines of stack frames, so a cause printed
-            # first is eaten by that tail exactly when it is needed (measured, run 34788539056).
-            raw = (r.stderr or "").strip() or (r.stdout or "").strip()
-            why = flat(" ".join(l for l in raw.splitlines() if not l.lstrip().startswith("at "))) or "(no output)"
-            print(f"-- mmdc verbatim output follows\n{raw}\n-- end mmdc output\n"
-                  f"MMDC FAILED rc={r.returncode} svg={int(os.path.exists(svg))} {MMDC} -- cause: {why[:600]}",
-                  file=sys.stderr)
-            return [{"kind": "RESIDUE:mermaid-unrendered", "line": start_line,
-                     "text": f"mmdc rc={r.returncode} svg={int(os.path.exists(svg))}: {why[:150]}"
-                             f" | fence: {flat(' '.join(fence_lines))[:60]}"}]
-        labels = re.findall(r'class="nodeLabel"[^>]*>(.*?)</span>', open(svg).read(), re.S)
-    stripped = [strip_tags(l) for l in fence_lines]
-    out, witnessed = [], set()
-    for lab in labels:
-        t = strip_tags(lab)
-        line = None
-        for i, sl in enumerate(stripped):
-            if t[:20] and t[:20] in sl:
-                line = start_line + i
-                break
-        if line is not None and CLAIM.search(t):
-            witnessed.add(line)
-        out.append({"kind": "mermaid-node", "line": line if line is not None else start_line, "text": t})
-    for i, sl in enumerate(stripped):
-        if CLAIM.search(sl) and start_line + i not in witnessed:
-            out.append({"kind": "RESIDUE:mermaid-claim-not-in-label", "line": start_line + i, "text": sl[:200]})
+    """§2.2's SOURCE PARSE of the fence -- no renderer. Each recovered node label is a unit.
+
+    §2.4's totality arm is FLATTENED, not per-line: each SCORED label's whole id-to-closer span is blanked
+    out of its source line, the remainder is space-flattened with joined()/line_of() as the source arm
+    already does, and every surviving CLAIM match is one RESIDUE row at line_of(match.start()) -- ONE row per
+    distinct START line, never the match's end line. Per-line was measured SILENT on a label whose claim has
+    no single-line footprint (a markdown-string label breaking mid-phrase). Masking only what was SCORED
+    masks only what was ACCOUNTED FOR: masking every RECOVERED label would remove text the oracle never
+    scored, which is silence by construction -- the thing `residue, never silence` forbids."""
+    masked, out = list(fence_lines), []
+    for i, line in enumerate(fence_lines):
+        if line.lstrip().startswith("%%"):  # a `%%` line is never a node; its text still reaches the arm below
+            continue
+        for m in NODE.finditer(line):
+            text = strip_tags(unquote(next(g for g in m.groups()[1:] if g is not None)))
+            out.append({"kind": "mermaid-node", "line": start_line + i, "text": text})
+            if CLAIM.search(text):  # SCORED => accounted for => masked (equal-length blanks keep the offsets)
+                a, b = m.span()
+                masked[i] = masked[i][:a] + " " * (b - a) + masked[i][b:]
+    text, offs = joined(masked, start_line)
+    seen = set()
+    for m in CLAIM.finditer(text):
+        ln = line_of(offs, m.start())
+        if ln in seen:
+            continue
+        seen.add(ln)
+        out.append({"kind": "RESIDUE:mermaid-claim-not-in-label", "line": ln,
+                    "text": flat(text[max(0, m.start() - 60):m.end() + 60])[:200]})
     return out
 
 
@@ -250,9 +261,8 @@ def invalid(msg):
 def main():
     root, filelist = sys.argv[1], sys.argv[2]
     expected = int(sys.argv[3]) if len(sys.argv) > 3 else None
-    for tool, name in ((CMARK, "cmark-gfm"), (MMDC, "mmdc")):
-        if not tool:  # a missing instrument is never an absence finding
-            invalid(f"{name} not on PATH -- instrument missing, no file read")
+    if not CMARK:  # a missing instrument is never an absence finding
+        invalid("cmark-gfm not on PATH -- instrument missing, no file read")
     for text, want in ARM:  # the arming pair, before the population
         got = verdict(text)
         if got != want:
