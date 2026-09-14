@@ -338,7 +338,7 @@ let
     # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
     # other member moved.
     schema = "8704df36435835c714e346da0931b9a090df867d5c661098dfbd1c5b507ba933";
-    scope = "e49df31e4ba4113bc773ba190c719357e9f70907fdd8db4e713f1c0495a89488";
+    scope = "9d6068bc37de178d392d08194572b3122814e0635b8419710e46241d23e2bfce";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     types = "41ddedce3dcf0628fd06dd634ca0c2a4a3b14319e0c422590e64841ccdfc7438";
