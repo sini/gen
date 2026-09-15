@@ -28,6 +28,7 @@
     gen-types.inputs.gen-prelude.follows = "gen-prelude";
 
     gen-merge.url = "github:sini/gen-merge";
+    gen-merge.inputs.gen-memo.follows = "gen-memo";
     gen-merge.inputs.gen-prelude.follows = "gen-prelude";
     gen-merge.inputs.gen-types.follows = "gen-types";
 

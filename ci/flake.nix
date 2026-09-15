@@ -260,6 +260,20 @@
         inherit lib;
       };
 
+      # ── pin-coherence — L7, and it SITS BESIDE `lock-agreement` rather than over it ──
+      # `lock-agreement` compares two locks of ONE repository at the hub's direct edges; this
+      # compares ONE edge class across TWENTY-ONE repositories — every roster member's
+      # `ci/flake.lock`, reached at the revision this hub pins. Under the module-layout pattern's L1
+      # a library defaults each dependency out of its own ci lock, so incoherent pins split one
+      # dependency into several store paths on the flakeless path and `import` stops memoising.
+      # Neither check subsumes the other and neither domain contains the other's.
+      # `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that MUST be
+      # `true`. It takes `gen` for the ROSTER and for the 21 member trees.
+      pinCoherence = import ./pin-coherence.nix {
+        inherit (inputs) gen;
+        inherit lib;
+      };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -299,6 +313,8 @@
       flake.lib.soleEvaluator = soleEvaluator;
       #   nix eval ./ci#lib.lockAgreement.report --json | jq   (rows / differs / missing / arming)
       flake.lib.lockAgreement = lockAgreement;
+      #   nix eval ./ci#lib.pinCoherence.report --json | jq   (rows / incoherent / arming)
+      flake.lib.pinCoherence = pinCoherence;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
       flake.lib.architectureLibraryGraph = architectureLibraryGraph;
 
@@ -627,6 +643,70 @@
                 ${lib.optionalString gating "exit 1"}
                 cp "$reportPath" "$out"
               '';
+          # Build the pin-coherence check (L7): prints the per-node census across the 21 members'
+          # ci locks and names every node pinned at more than one revision, with the members behind
+          # each revision.
+          #
+          # ★★★ THE TWO READINGS ARE OBSERVE-ONLY AND THE REASON IS IN `ci/pin-coherence.nix`'s
+          # HEADER, NOT HERE. In one line each: cross-member coherence is FALSE of the ecosystem
+          # today (9 of the 10 nodes that can disagree), and hub-root agreement is NOT SATISFIABLE
+          # while the member→member ci edge graph holds a cycle — `gen-merge/ci` pins `gen-memo` and
+          # `gen-memo/ci` pins `gen-merge`, so each would have to name a commit of the other that
+          # names it back. This is `mkLockAgreementCheck`'s shipped disposition verbatim and for the
+          # same reason: the predicate, the domain, the traversal and this message are IDENTICAL
+          # under both arms, and only the exit status of a reading differs.
+          #   OBSERVE-ONLY, shipped:  an incoherent pin PRINTS and the build passes.
+          #   GATING, one edit:       gating = failed != [ ];
+          # ★ An ARMING failure exits 1 under BOTH arms. A guard that can no longer fire is not a
+          # passing guard in either disposition.
+          mkPinCoherenceCheck =
+            name: s:
+            let
+              readings = [
+                "pins-cross-member-coherent"
+                "pins-match-hub-root"
+              ];
+              allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              armingFailed = builtins.filter (k: !(builtins.elem k readings)) failed;
+              gating = armingFailed != [ ];
+
+              report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+              nodeLine =
+                r:
+                "    ${r.node}: ${toString r.sites} sites, ${toString r.distinct} revisions"
+                + lib.concatMapStrings (
+                  p:
+                  "\n        ${p.rev}  x${toString (builtins.length p.members)}  ${lib.concatStringsSep "," p.members}"
+                ) r.pins;
+              incoherentRows = builtins.filter (r: builtins.elem r.node s.report.incoherent) s.report.rows;
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                echo "POPULATION: ${toString s.report.memberCount} roster members read of ${toString s.report.memberCount} enumerated, ${toString s.report.nodeCount} shared nodes over ${toString s.report.siteCount} pin sites; ${toString (builtins.length s.report.canDisagree)} nodes pinned by more than one member, ${toString (builtins.length s.report.singlePinned)} single-pinned and therefore unable to disagree."
+                echo "HUB-ROOT AXIS: ${toString s.report.agreeingCount} of ${toString s.report.siteCount} sites equal the hub root's resolved revision (${toString (builtins.length s.report.noHubReference)} nodes have no hub root edge at all: ${lib.concatStringsSep " " s.report.noHubReference})."
+                ${lib.optionalString (incoherentRows != [ ]) ''
+                  echo "PIN COHERENCE — a shared node is pinned at MORE THAN ONE revision across the roster, so a flakeless construction reaching it through two members resolves two store paths and import yields two values (spec S2, L7):" >&2
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg (nodeLine r)} >&2") incoherentRows}
+                  echo "Disposed of by converging the members' ci locks onto ONE revision per node — NEVER by narrowing this cell's domain, and NEVER by removing a member's flake input (den-hoag-mehb8 fences that)." >&2
+                ''}
+                ${lib.optionalString (s.report.refusals != [ ]) ''
+                  echo "PIN COHERENCE — this check cannot reach a member lock it enumerates, which is a broken instrument and not a coherence:" >&2
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"} >&2") s.report.refusals}
+                ''}
+                ${lib.optionalString (armingFailed != [ ]) ''
+                  echo "PIN COHERENCE ARMING — a seeded incoherence this cell exists to name went unnamed, or the domain floor stopped discriminating: ${lib.concatStringsSep " " armingFailed}. Read report.arming above: every arm reads its seed AT THE ROW, carrying a revision no live lock can produce" >&2
+                ''}
+                ${lib.optionalString gating "exit 1"}
+                cp "$reportPath" "$out"
+              '';
           # Build the inject-payload check (the permanent O-INJ-2 cell): prints the per-key gate
           # and FAILS the build if any key is not `true`. A failing key is either the measured
           # ADR-0023 (b) ground moving (the payload no longer reaches a function — the declared
@@ -808,6 +888,7 @@
             # `sole-evaluator` is NOT here, and its absence is the point: it is reported by
             # `apps.sole-evaluator-report` below. See `mkSoleEvaluatorReport` for the rule.
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
+            pin-coherence = mkPinCoherenceCheck "pin-coherence" pinCoherence;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.
