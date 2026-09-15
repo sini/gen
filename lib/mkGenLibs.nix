@@ -1,10 +1,31 @@
-# mkGenLibs: two-stage instantiation of the gen library ecosystem.
+# mkGenLibs: the hub's `lib/` — the roster, built from resolved member VALUES.
 #
-# Stage 1 (definition time): captures genInputs (the gen-* flake inputs).
-# Stage 2: each lib is self-wired — every gen flake exposes a `.lib` value that
-# resolves its own deps internally (gen-schema owns its gen-algebra input, etc.),
-# so the hub just re-exports `genInputs.gen-X.lib`. The `lib` arg is now vestigial
-# (real consumers read `inputs.gen-X.lib` directly); kept as `_` for call-compat.
+# ★★★ THIS FILE IS A CONSUMER OF THE PATTERN, NOT AN EXCEPTION TO IT (owner-ruled 2026-09-14):
+# "`mkGenLibs` stops being a fixed point and becomes a CONSUMER of the same pattern every member
+# follows: L3 applies to the hub." It takes named, REQUIRED dependency values keyed by the roster's
+# own names — the module-layout pattern's L2 shape, identical to every member's `lib/default.nix` —
+# and `../default.nix` is the L1 shim that defaults them, exactly as a member's root defaults its own.
+#
+# WHAT THAT REPLACED, AND WHY THE OLD SHAPE COULD NOT SURVIVE THE MIGRATION. This file used to take
+# the gen-* flake inputs and reach each member as `<input>.gen-X.lib`. After the migration a
+# plain-re-export member and an unapplied-arm member have the SAME root shape, a function of
+# defaulted formals, so arity cannot tell them apart; yet this file demanded opposite things from
+# them, an applied SET at its re-export sites and an unapplied FUNCTION at the two it applied.
+# Neither single form is total over both, and the two failures are
+# `attempt to call something which is not a function but a set` and
+# `expected a set but found a function`. Taking VALUES dissolves it: whoever supplies a member
+# resolves it, and ONE construction then serves both suppliers — `flake.nix` from the hub's own
+# inputs under `follows`, `../default.nix` from `ci/flake.lock`.
+#
+# A MISSING MEMBER IS LOUD BY CONSTRUCTION, which is what retired the old `input` helper. That
+# helper existed to turn an uncatchable missing-attribute abort into a named, catchable `throw`. A
+# formal needs no such conversion and is stronger: there is no `...` here, so a supplier that omits
+# a member fails with `called without required argument`, NAMING it, and one that passes a name this
+# file does not declare fails with `called with unexpected argument` instead of dropping it silently.
+#
+# THE TWO-STAGE PUBLISHED SURFACE LIVES IN `flake.nix`, NOT HERE. `gen.lib.mkGenLibs` keeps its
+# vestigial argument for its consumers; this file is the roster's construction and returns the
+# roster itself, so `import <gen> { }` yields it directly.
 #
 # ★ SELF-WIRED IS ABOUT WHO EVALUATES, NEVER ABOUT WHICH REVISION, and the two were once one
 # sentence here. The hub's `flake.nix` binds every sibling's `gen-*` input with `follows`, so
@@ -13,48 +34,55 @@
 # over the closure. Before those edges this re-export returned a DIFFERENT BUILD per path while
 # reading as one value: 11 of the 21 libraries stood at more than one revision, gen-prelude at 9.
 #
-# The roster is bound ONCE, at stage 1, and every stage-2 application yields that same value.
-# Every member but `class` is already shared across applications by input memoization; `class` is not,
-# because it is an `import` the hub applies itself — bound per application it re-allocates, and two
-# routes to "the roster" then hold two evaluations of the same source rather than one value. The
-# stratum buckets select on that identity, so the roster has to be a value and not a recipe.
-{ genInputs }:
+# The roster is a VALUE and not a recipe, and the stratum buckets select on that identity. Every
+# member now arrives already resolved, so the two sites that used to re-import a member's `./lib`
+# here — and therefore re-allocated it per application — are gone with the hand-written dep lists
+# they carried.
+{
+  algebra,
+  aspects,
+  assemble,
+  bind,
+  class,
+  delivery,
+  dispatch,
+  graph,
+  identity,
+  link,
+  memo,
+  merge,
+  prelude,
+  product,
+  program,
+  schema,
+  scope,
+  select,
+  settings,
+  types,
+  view,
+}:
 let
-  # Every roster entry below reaches its own `gen-*` flake input through `genInputs.gen-X` — and if
-  # that key is entirely missing from `genInputs` (e.g. a `flake.nix` inputs edit landed without the
-  # matching roster edit, or vice versa), the bare selection aborts with a missing-attribute error.
-  # `tryEval` cannot catch that class on Nix 2.34.8 (measured: `tryEval (deepSeq (throw ...))` is
-  # caught; `tryEval (deepSeq ({ }.nope))` aborts uncaught) — so the ci roster tripwire's per-key
-  # `tryEval` wrapper (`ci/mkgenlibs-eval.nix:51`) aborted the whole eval unnamed instead of naming
-  # the broken key. `input` converts that uncatchable abort into a catchable, named `throw` at the
-  # one place every roster entry reaches an input, so the per-key wrapper downstream can isolate it.
-  input =
-    name:
-    if builtins.hasAttr name genInputs then
-      genInputs.${name}
-    else
-      throw "mkGenLibs: missing flake input \"${name}\"";
   roster = {
-    prelude = (input "gen-prelude").lib;
+    inherit prelude;
     # Self-contained: no inputs, so nothing to wire. The one minting authority
     # (ADR-0016 ruling 5) as a dependency-free leaf — which is what lets libraries UPSTREAM of
     # gen-schema reach it without closing a flake cycle, the whole reason it is its own library.
-    identity = (input "gen-identity").lib;
-    algebra = (input "gen-algebra").lib;
-    types = (input "gen-types").lib;
-    merge = (input "gen-merge").lib;
-    scope = (input "gen-scope").lib;
+    inherit identity;
+    inherit algebra;
+    inherit types;
+    inherit merge;
+    inherit scope;
     # gen-memo is the INCREMENTAL PLANE over the evaluator above it (ADR-0008 §2): a decision layer
     # that never evaluates, defined by byte-parity against a cold evaluation. It sits beside `scope`
     # here because that is what it is a plane over, and it is self-wiring like the rest of this
     # block — its flake `.lib` resolves its own gen-prelude and gen-graph.
-    memo = (input "gen-memo").lib;
-    graph = (input "gen-graph").lib;
-    bind = (input "gen-bind").lib;
-    schema = (input "gen-schema").lib;
-    aspects = (input "gen-aspects").lib;
-    select = (input "gen-select").lib;
-    dispatch = (input "gen-dispatch").lib;
+    inherit memo;
+    inherit graph;
+    inherit bind;
+    inherit schema;
+    inherit aspects;
+    inherit select;
+    inherit dispatch;
     # L2 concern libraries — each flake `.lib` self-resolves its own deps (product: prelude;
     # settings: prelude+algebra+bind+graph), so the hub re-exports them plainly like the
     # self-wiring libs above.
@@ -120,11 +148,11 @@ let
     #
     # All five repositories stay readable, orphaned for reference under ADR-0031 F3 — no content
     # is deleted — and none of them gains a new consumer.
-    product = (input "gen-product").lib;
-    settings = (input "gen-settings").lib;
+    inherit product;
+    inherit settings;
     # gen-link is Class B: its flake `.lib` self-resolves its own gen siblings, so the hub re-exports it
     # plainly like the other self-wiring libs.
-    link = (input "gen-link").lib;
+    inherit link;
     # ★★ TEMPORARY / WAY-STATION, and the marking is load-bearing rather than a note. The owner ruled
     # the name PROVISIONAL: "keep gen-view for now; we're going to fold its constructs into a
     # consolidated library later; gen-view is a temporary name." The CONSTRUCTS migrate at the
@@ -140,45 +168,32 @@ let
     # exist yet, and it is the live home in the meantime.
     #
     # Self-wiring like the block above: its flake `.lib` resolves its own gen-prelude and gen-graph.
-    view = (input "gen-view").lib;
+    inherit view;
 
     # gen-program turns a framework's policy declarations into a PROGRAM and reaches the solver
     # (gen-scope engine.solve). ADJACENT to the assembly layer, never inside it: gen-assemble's own
     # published principle is "The toolkit never evaluates", and this library's ruled purpose is to
     # evaluate through the sole evaluator (owner-ruled; policy spec R§2.11, O8). Entry landed when
     # content existed, per the ruled roster timing.
-    program = (input "gen-program").lib {
-      prelude = (input "gen-prelude").lib;
-      scope = (input "gen-scope").lib;
-    };
+    inherit program;
     # gen-delivery is the DELIVERY-CLASS REALIZATION SURFACE (ADR-0028): the projection that
     # discovers which aspect keys are declared delivery classes and the fold that hands each
     # class's collected content to its target-owned terminal. Like gen-assemble and gen-program it
     # declares no inputs and takes its substrate injected, so the hub wires it rather than
     # re-exporting a self-resolved `.lib` — and a consumer taking this input gains no transitive
     # pin from it. Entry landed when content existed, per the ruled roster timing.
-    delivery = (input "gen-delivery").lib {
-      algebra = (input "gen-algebra").lib;
-      aspects = (input "gen-aspects").lib;
-    };
+    inherit delivery;
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
-    class = import "${(input "gen-class")}/lib" {
-      prelude = (input "gen-prelude").lib;
-      merge = (input "gen-merge").lib;
-    };
+    inherit class;
 
     # gen-assemble declares NO inputs at all: the shared framework toolkit takes its whole substrate
     # as injected values and constructs inside the consumer's own evaluation, which is what the
     # gen↔gen boundary rule asks of a library that composes another's constructor. So the hub wires
     # it the way it wires gen-class rather than re-exporting a self-resolved `.lib` — and a consumer
     # taking this input gains no transitive pin from it.
-    assemble = import "${(input "gen-assemble")}/lib" {
-      prelude = (input "gen-prelude").lib;
-      scope = (input "gen-scope").lib;
-      algebra = (input "gen-algebra").lib;
-    };
+    inherit assemble;
 
     # The stratum declaration — which layer of the stack each member belongs to. It is TOTAL and
     # EXPLICIT: a member with no entry here is a build error, never a member of an implicit residue
@@ -251,4 +266,4 @@ let
     };
   };
 in
-_: roster
+roster

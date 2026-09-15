@@ -109,8 +109,54 @@
   outputs =
     inputs:
     let
-      mkGenLibs = import ./lib/mkGenLibs.nix { genInputs = inputs; };
-      roster = mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)
+      # ★★★ L3 APPLIED TO THE HUB — the flake output IS the root, applied to what this flake's own
+      # inputs supply (owner-ruled 2026-09-14: "`mkGenLibs` stops being a fixed point and becomes a
+      # CONSUMER of the same pattern every member follows"). There is ONE construction of the roster
+      # and `./default.nix` is it; the two entry paths differ only in WHO supplies the members. Here
+      # the flake supplies them, so `follows` governs every one; the standalone path falls back to
+      # `ci/flake.lock`. Before this, `./default.nix` did not exist and the hub was flake-only.
+      #
+      # ★★ THE THREE `{ }` APPLICATIONS ARE L3's SECOND ARM ARRIVING, NOT AN EXCEPTION LIST.
+      # gen-program, gen-delivery and gen-assemble declare NO gen input, so their flakes have nothing
+      # to pass and publish `lib = import ./.` UNAPPLIED; the other 18 publish an applied set. What
+      # is written here is therefore the member's own L3 arm read off its published surface, and it
+      # is LOUD if that arm ever changes — applying `{ }` to a set is
+      # `attempt to call something which is not a function but a set`, and a member that went the
+      # other way arrives as a function and reds the `roster` output's own force below. The rejected
+      # alternative was to arity-dispatch here (`if builtins.isFunction v then v { } else v`), which
+      # makes the hub TOLERANT of either shape and so accepts a member that landed the wrong arm in
+      # silence — the failure L3 exists to make loud.
+      roster = import ./. {
+        algebra = inputs.gen-algebra.lib;
+        aspects = inputs.gen-aspects.lib;
+        assemble = inputs.gen-assemble.lib { };
+        bind = inputs.gen-bind.lib;
+        class = inputs.gen-class.lib;
+        delivery = inputs.gen-delivery.lib { };
+        dispatch = inputs.gen-dispatch.lib;
+        graph = inputs.gen-graph.lib;
+        identity = inputs.gen-identity.lib;
+        link = inputs.gen-link.lib;
+        memo = inputs.gen-memo.lib;
+        merge = inputs.gen-merge.lib;
+        prelude = inputs.gen-prelude.lib;
+        product = inputs.gen-product.lib;
+        program = inputs.gen-program.lib { };
+        schema = inputs.gen-schema.lib;
+        scope = inputs.gen-scope.lib;
+        select = inputs.gen-select.lib;
+        settings = inputs.gen-settings.lib;
+        types = inputs.gen-types.lib;
+        view = inputs.gen-view.lib;
+      };
+
+      # The PUBLISHED two-stage surface, kept exactly as its consumers call it. Stage 2's argument
+      # was always vestigial — every caller passes `{ }`, `{ inherit lib; }` or `{ lib = null; }` and
+      # the roster ignores it — so the compat wrapper belongs here, at the publication site, while
+      # `lib/mkGenLibs.nix` is the construction and returns the roster itself. That is what lets
+      # `import <gen> { }` yield the roster directly while `gen.lib.mkGenLibs { … }` still answers
+      # for its thirteen call sites across this hub and gen-demo.
+      mkGenLibs = _: roster;
 
       # A stratum bucket is a SELECTION from the flat roster, never a re-import: `substrate.prelude`
       # and the flat `prelude` are one value rather than two evaluations of the same source. That

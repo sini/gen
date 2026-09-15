@@ -274,6 +274,17 @@
         inherit lib;
       };
 
+      # ── hub-entry — L4, and it is the only check here that reads `../default.nix` at all ──
+      # `lock-agreement` and `pin-coherence` are about PINS; this is about WIRING — which members
+      # the hub's standalone entry declares, and which repository each default points at. It takes
+      # `gen` for the roster of record and for the entry itself, and reads `./flake.lock` as data.
+      # `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that MUST be
+      # `true`.
+      hubEntry = import ./hub-entry.nix {
+        inherit (inputs) gen;
+        inherit lib;
+      };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -315,6 +326,8 @@
       flake.lib.lockAgreement = lockAgreement;
       #   nix eval ./ci#lib.pinCoherence.report --json | jq   (rows / incoherent / arming)
       flake.lib.pinCoherence = pinCoherence;
+      #   nix eval ./ci#lib.hubEntry.report --json | jq   (rows / misdirected / arming)
+      flake.lib.hubEntry = hubEntry;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
       flake.lib.architectureLibraryGraph = architectureLibraryGraph;
 
@@ -643,6 +656,50 @@
                 ${lib.optionalString gating "exit 1"}
                 cp "$reportPath" "$out"
               '';
+          # Build the hub-entry check (L4): prints the entry's own member-to-path map with the node
+          # and repository each path resolves to, and names any member wired to another repository.
+          #
+          # GATING, unlike its two lock-reading neighbours. Their readings are observe-only because
+          # the states they describe are TRUE of the ecosystem today and not satisfiable by this
+          # repository alone. This one is a property of a file in THIS repository, it holds now, and
+          # nothing outside the hub has to move for it to keep holding.
+          mkHubEntryCheck =
+            name: s:
+            let
+              allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+              rowLine =
+                r:
+                "    ${r.member}: ${builtins.concatStringsSep "/" r.segs}"
+                + " => node ${if r.node == null then "<unresolvable>" else r.node}"
+                + " => repo ${if r.repo == null then "<none>" else r.repo}"
+                + " (expected ${r.expected})";
+              badRows = builtins.filter (
+                r: builtins.elem r.member (s.report.misdirected ++ s.report.unresolvable)
+              ) s.report.rows;
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "-- ${name} --"
+                cat "$reportPath"
+                echo
+                echo "POPULATION: ${toString s.report.memberCount} members wired by the hub entry, ${toString s.report.resolvedCount} resolvable, ${toString s.report.correctCount} resolving to a node of their own repository."
+                ${lib.optionalString (badRows != [ ]) ''
+                  echo "HUB ENTRY WIRING -- a member's default resolves to a node of the WRONG repository, or to no node at all. import memoises by store path, so a mis-pointed default yields a real, resolvable, wrong library rather than an error (spec S2, L4):" >&2
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg (rowLine r)} >&2") badRows}
+                  echo "Disposed of by correcting the path in ../default.nix -- NEVER by narrowing this cell's domain, which is the roster of record." >&2
+                ''}
+                ${lib.optionalString (failed != [ ]) ''
+                  echo "HUB ENTRY -- readings that did not hold: ${lib.concatStringsSep " " failed}. Read report.arming above: every arm is a DELTA against the live reading, printed beside it" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # Build the pin-coherence check (L7): prints the per-node census across the 21 members'
           # ci locks and names every node pinned at more than one revision, with the members behind
           # each revision.
@@ -889,6 +946,7 @@
             # `apps.sole-evaluator-report` below. See `mkSoleEvaluatorReport` for the rule.
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
             pin-coherence = mkPinCoherenceCheck "pin-coherence" pinCoherence;
+            hub-entry = mkHubEntryCheck "hub-entry" hubEntry;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.
