@@ -201,7 +201,7 @@ two tiers: exact on the baseline CppNix 2.34.7, and a **±0.1% relative band** c
 because a version *string* does not identify an evaluator *build* (CI's Determinate Nix and the
 baselines' CppNix both print `nix (Nix) 2.34.7`, yet Determinate measured `nrPrimOpCalls` −8 on
 the deep evals, ~4e-7 relative). `gc.totalBytes` and `cpuTime` are never gated. Floors update
-in-PR, never delete. Re-run all gates: `nix run ~/Documents/repos/hola/ci#fleet-gates`.
+in-PR, never delete. Re-run all gates from the hola lab linked above: `nix run ./ci#fleet-gates`.
 
 The numbers cited in this section are also arithmetic-gated **in this repo**: the three baselines
 are committed under [`ci/bench/baselines/`](ci/bench/baselines/) and `nix run ./ci#fleet-consistency`
