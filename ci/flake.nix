@@ -876,7 +876,7 @@
           # code moves independently of the hub). The variant flakes carry their own committed locks;
           # `${./flake-compare}` copies the tree (incl locks) to the store for a hermetic run.
           flakeCompare = pkgs.writeShellApplication {
-            name = "gen-flake-compare";
+            name = "gen-lib-compare";
             runtimeInputs = [
               pkgs.nix
               pkgs.jq
@@ -1132,7 +1132,7 @@
 
           apps.flake-compare = {
             type = "app";
-            program = "${flakeCompare}/bin/gen-flake-compare";
+            program = "${flakeCompare}/bin/gen-lib-compare";
           };
 
           apps.fleet-consistency = {
