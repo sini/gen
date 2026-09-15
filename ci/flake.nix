@@ -209,6 +209,21 @@
         inherit lib;
       };
 
+      # ── readme-figures — README.md's spelled-out roster-count figures, CI-bound ──
+      # Five prose sentences state "N of the M roster libraries/members/flakes/repos" against the
+      # roster, and every one drifted the same way the architecture diagram above did — silently,
+      # because prose does not evaluate — while sitting in the one form (spelled-out words) every
+      # digit-anchored figure oracle in this ecosystem is blind to (den-hoag-hub-readme-roster-count-
+      # words-k4ufw). This reads each sentence's now-digit figure back out of the committed file and
+      # compares it against the roster of record and against each member's own tree (a purity
+      # scanner under `ci/tests/`, a declared `.lib` output, `gen-harness.lib.mkCi` plus a GitHub
+      # Actions workflow, an `AGENTS.md` sheet) at CI's pin. `.gate`/`.gateKeys` follow the shape
+      # above.
+      readmeFigures = import ./readme-figures.nix {
+        inherit (inputs) gen;
+        inherit genInputs lib;
+      };
+
       # ── sole-evaluator scan ──
       # ADR-0006's enforcement half, and readiness-bar term T2(a)'s instrument: gen-scope is the
       # sole evaluator, so no other tree in the scanned domain — the roster read by evaluation,
@@ -480,6 +495,34 @@
                 echo
                 ${lib.optionalString (!allOk) ''
                   echo "ARCHITECTURE.md LIBRARY GRAPH DRIFT — the diagram carries a line the check cannot classify, or no longer matches the roster of record or the members' declared inputs" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the readme-figures check: prints the full report — the roster size, the members
+          # missing each carried property, and every sentence whose digits disagree with the live
+          # count or whose pattern no longer matches the shipped file — and FAILS the build if any
+          # gate arm is not `true`. A failing arm names the offending sentence in `disagreeing`, the
+          # offending pattern in `unreached`, or the offending member in one of the `*Missing` lists,
+          # so the remedy is the number or the member to fix rather than a denial.
+          mkReadmeFiguresCheck =
+            name: r:
+            let
+              allOk = builtins.all (k: r.gate.${k} == true) r.gateKeys;
+              failed = builtins.filter (k: r.gate.${k} != true) r.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // r.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "README.md ROSTER-COUNT FIGURE DRIFT — a sentence's digits no longer match the live roster or a member's own tree, or the scan itself stopped reaching a sentence" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -761,6 +804,7 @@
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             architecture-library-graph = mkArchitectureGraphCheck "architecture-library-graph" architectureLibraryGraph;
+            readme-figures = mkReadmeFiguresCheck "readme-figures" readmeFigures;
             # `sole-evaluator` is NOT here, and its absence is the point: it is reported by
             # `apps.sole-evaluator-report` below. See `mkSoleEvaluatorReport` for the rule.
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;

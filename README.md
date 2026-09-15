@@ -158,9 +158,9 @@ it fails — is [TRUST.md](TRUST.md).
 
 **Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. Twenty-one of the twenty-two roster
-libraries carry it. gen-prelude needs none — it declares no flake inputs at all, so nothing transitive can enter
-its lock, and the flake structure is the proof.
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. All 21 roster libraries carry it, including
+gen-prelude — it declares no flake inputs at all, so nothing transitive can enter its lock, and its own
+scanner still checks the source directly.
 
 **Full nixpkgs enters at the terminals alone.** No roster library consumes it: the nixpkgs contact
 lives in the terminals a realization is handed, and the sanctioned default (`nixpkgs.lib.nixosSystem`)
@@ -172,12 +172,12 @@ ecosystem needs `lib.*` alone it pulls the pinned `github:nix-community/nixpkgs.
 nixpkgs — policy stated in `ci/flake.nix` and visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for twenty of the twenty-two roster members — gen-class and gen-assemble are the exceptions (both
+for 19 of the 21 roster members — gen-class and gen-assemble are the exceptions (both
 hub-injected via `import "${genInputs.gen-<name>}/lib" { … }` rather than a direct `.lib` read), and
 their flakes export `.lib` too — so a library that renames, wraps or drops that output fails hub
-evaluation at its first consumer. All twenty-two library flakes declare it today.
+evaluation at its first consumer. All 21 library flakes declare it today.
 
-**Every library gates on its own CI.** All twenty-two library repos build their `ci/flake.nix` on
+**Every library gates on its own CI.** All 21 library repos build their `ci/flake.nix` on
 `gen-harness.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes
 a gate the moment it lands, with no registration step. `nix flake check ./ci` from any repo root runs
 the suite, and every roster library carries a GitHub Actions workflow that runs it on push and pull
@@ -202,7 +202,7 @@ fast-but-wrong change cannot pass — over 12 of the 14 matrix rows; the 2 `aspe
 for the reason above and keep linearity and absolute counters only. Wired as its own CI job, alongside
 `fleet-consistency`, which re-derives every cited fleet number from committed baselines.
 
-**Every library states what it does not own.** All twenty-three repositories (the hub included) carry
+**Every library states what it does not own.** All 22 repositories (the hub included) carry
 an `AGENTS.md` capability sheet whose "Not this library's job" table names the owning sibling for each
 adjacent concern and quotes that sibling's own `flake.nix` description verbatim, most rows backed by a
 grep that localizes the seam. This is a convention with a uniform artifact, not a CI gate.
