@@ -69,15 +69,6 @@ flowchart TD
     gen_program["gen-program"]
     gen_settings["gen-settings"]
   end
-  subgraph off_roster["off the roster"]
-    gen_demand["gen-demand"]:::retired
-    gen_edge["gen-edge"]:::retired
-    gen_flake["gen-flake"]:::retired
-    gen_pipe["gen-pipe"]:::retired
-    gen_rebuild["gen-rebuild"]:::retired
-    gen_resolve["gen-resolve"]:::retired
-  end
-
   gen_aspects --> gen_identity
   gen_aspects --> gen_merge
   gen_aspects --> gen_prelude
@@ -119,8 +110,6 @@ flowchart TD
   gen_types --> gen_prelude
   gen_view --> gen_graph
   gen_view --> gen_prelude
-
-  classDef retired fill:#f6f6f6,stroke:#bbb,color:#777,stroke-dasharray: 4 3
 ```
 
 <!-- gen-library-graph:end -->
@@ -184,19 +173,6 @@ Three entries in that last column are honest gaps rather than omissions. gen-pre
 everyone's base and gen-identity through the mint, so neither has a construct of its own; **gen-settings
 has no declaration in the acceptance corpus at all**, and a framework-stratum library with no corpus
 declaration is not exercised by the exit.
-
-### What is off the roster
-
-| name        | why it is not a roster member                                                                                                                                                                                                                                                                            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| gen-demand  | retired (ADR-0008 §4): the typed demand cascade re-expresses over gen-scope as claim vocabulary — `mkClaim`, `resolveClaims`.                                                                                                                                                                            |
-| gen-rebuild | retired (ADR-0008 §4): its dirty-cone propagation moved onto the gen-memo plane; the library shell and the name retire with the content.                                                                                                                                                                 |
-| gen-edge    | retired (ADR-0010 §3): the `(S,T,P,M)` movement contract, its edge-set derivation and its Kahn-ordered materialization land in gen-view, with the ordering arm in gen-graph.                                                                                                                             |
-| gen-pipe    | retired (ADR-0010 §3): scoped channels re-express as gen-view constructs; `sel` binds gen-select directly; the determinism and provenance laws are restated as properties of the query construction.                                                                                                     |
-| gen-flake   | dissolved (ADR-0031 F2): `compose` to this hub's `lib.compose`, warm/override/trace to gen-memo, projection and `realize` to gen-delivery, inject and terminals to the crossing's adapter set.                                                                                                           |
-| gen-resolve | retired (ADR-0008 §4), dispositioned export by export rather than moved as a block: the materialization vocabulary and the reference construct to gen-view, the crossing terminal to gen-bind, the seal-level queries to gen-scope, the reuse key to gen-memo, `attr` and `cascade` dissolved by ruling. |
-| gen-harness | **not a library.** It owns `mkCi`, the flake wrapper every gen repo's `ci/` is built from. It pins no gen library — that is what makes it a separate repository, since a library's `ci/` lock would otherwise drag in the aggregator pinning that same library.                                          |
-| gen-vars    | experimental, excluded from the inventory by ADR-0003.                                                                                                                                                                                                                                                   |
 
 Removal is not deletion: every retired repository stays readable and keeps its surface, orphaned for
 reference (ADR-0031 F3). What leaves with a member is its **obligations**, and those go to a named
