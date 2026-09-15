@@ -36,6 +36,16 @@
   # internal tree/constructor handling → gen.lib.compose as a bare caller) moved.
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
+
+    # ── THIS LOCK IS NESTED, AND NOTHING SWEEPS IT ──
+    # `ci/flake-compare/gen-lib/flake.lock` is a NESTED lock (den-hoag-w1tr4 OQ-4/§2.2's census: not
+    # this repository's root lock and not its `ci/` lock — a lock no relock of gen's own inputs
+    # reaches). It is deliberately left off the hub's relock rather than forgotten: this bench
+    # declares only an APP (`flake-compare`) and no `checks.` entry consumes it (den-hoag-6fmmb, the
+    # named precedent for "an app that gates nothing"), so branch (b) of OQ-4's rule applies — no
+    # gate consumes it, so it is not swept, and the fact is recorded here instead. This `gen` pin
+    # therefore drifts on no schedule; bump it by hand (`nix flake update gen` in this directory)
+    # whenever the bench's number is next wanted.
     gen.url = "github:sini/gen";
     gen.inputs.nixpkgs.follows = "nixpkgs";
   };

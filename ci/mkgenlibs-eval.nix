@@ -318,6 +318,32 @@ let
   # different lock:
   #   nix eval ./ci#lib.mkGenLibsEval.surfaceHashes --raw --apply \
   #     'h: builtins.concatStringsSep "\n" (map (k: "    ${k} = \"${h.${k}}\";") (builtins.attrNames h))'
+  #
+  # ★ THE PRE-FLIGHT, ANSWERABLE BEFORE THE BUMP (den-hoag-w1tr4 OQ-5): whether a candidate member
+  # revision moves that member's published name set AS THE HUB COMPOSES IT — a property of the two
+  # revisions and the revs the hub injects around them, not of the commits between them and not of
+  # the member's flake alone. 17 of the 21 members are plain re-exports (`x = (input "gen-X").lib`)
+  # and for those a bare `#lib` eval agrees; FOUR are hub-wired (`program`, `delivery`, `class`,
+  # `assemble` above) and a bare `#lib` eval is WRONG for all four: it throws on three ("expected a
+  # set but found a function", their `.lib` IS the function the hub applies) and on `class` it
+  # AGREES ON HASH WHILE READING A DIFFERENT OBJECT — the flake `.lib` leaves `merge = null`, the hub
+  # re-imports with the tier-2 kernel injected, and the two name sets merely happen to agree today.
+  # The form below reuses `lib/mkGenLibs.nix` itself rather than restating its wiring, so it is total
+  # over all 21 and cannot drift from the wiring it tests:
+  #
+  #   nix eval --impure --raw --expr '
+  #     let
+  #       hub  = (builtins.getFlake "git+file://<clone>/gen?dir=ci").inputs.gen;
+  #       cand = builtins.getFlake "git+file://<clone>/gen-<member>?rev=<newRev>";
+  #       roster = import "${hub}/lib/mkGenLibs.nix" {
+  #         genInputs = hub.inputs // { gen-<member> = cand; };
+  #       } { };
+  #     in builtins.hashString "sha256" (builtins.toJSON (builtins.attrNames roster.<key>))'
+  #
+  # Compare the result against `expectedSurface.<key>` below. Equal ⇒ free rider, no regeneration
+  # owed. Differ ⇒ the bump carries the regenerated line in the SAME commit as the pin move — the
+  # intermediate state (pin moved, line stale) must not exist in history, exactly like the
+  # regeneration route above.
   expectedSurface = {
     algebra = "3a484271b71a218419181bc5ce55cf593ab814e9abeab0914c5658532995bf86";
     aspects = "a51fb019bf402c246739f034649e1d09e890757f01cc8f6a12857753b2a2f107";
