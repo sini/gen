@@ -369,11 +369,16 @@ let
     # name against the frozen output of a strictly earlier pass). Nothing was removed and no other
     # member moved.
     schema = "9b63cf6bf2d3e7655868bd35a30452ffa26a3fd34b751e56535e62a2e5a753db";
-    scope = "9d6068bc37de178d392d08194572b3122814e0635b8419710e46241d23e2bfce";
+    # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
+    # declaration-bearing members moved this member's published surface.
+    scope = "9784f1f1148c623fa04a6d1ee4191f3d43bbab322825894ded52f0ce2dad63ca";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     types = "41ddedce3dcf0628fd06dd634ca0c2a4a3b14319e0c422590e64841ccdfc7438";
-    view = "b4de6a4f7fd1b99852c9822f4620b5ca437d5cf0d32c3f716fc80780b72c197d";
+    # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
+    # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
+    # riders here — their hashes are unchanged, so no line for them was touched.
+    view = "8096b4aa7fe96047a1ab49783c3cb90aaccb60742b6318fd00c740d61546d348";
   };
 
   # EXPORTED below, and that export is the only route that regenerates what this arm compares. It is

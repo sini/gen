@@ -62,6 +62,7 @@
 
     gen-bind.url = "github:sini/gen-bind";
     gen-bind.inputs.gen-prelude.follows = "gen-prelude";
+    gen-bind.inputs.gen-graph.follows = "gen-graph";
 
     gen-dispatch.url = "github:sini/gen-dispatch";
     gen-dispatch.inputs.gen-prelude.follows = "gen-prelude";
