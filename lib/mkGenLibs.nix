@@ -179,20 +179,24 @@ let
     # gen-delivery is the DELIVERY-CLASS REALIZATION SURFACE (ADR-0028): the projection that
     # discovers which aspect keys are declared delivery classes and the fold that hands each
     # class's collected content to its target-owned terminal. Like gen-assemble and gen-program it
-    # declares no inputs and takes its substrate injected, so the hub wires it rather than
-    # re-exporting a self-resolved `.lib` — and a consumer taking this input gains no transitive
-    # pin from it. Entry landed when content existed, per the ruled roster timing.
+    # publishes its `.lib` UNAPPLIED and takes its substrate injected, so the hub wires it rather
+    # than re-exporting a self-resolved `.lib` — see `./hubSubstrate.nix`, which names exactly these
+    # three. It DOES declare flake inputs (owner-ruled Arm A, 2026-09-16: `den-hoag-4dfsv` §4.2), so
+    # a consumer taking this input DOES gain a transitive pin; what it does not gain is an APPLIED
+    # substrate, which is the distinction the unapplied root exists to hold. Entry landed when
+    # content existed, per the ruled roster timing.
     inherit delivery;
     # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
     # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
     # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
     inherit class;
 
-    # gen-assemble declares NO inputs at all: the shared framework toolkit takes its whole substrate
-    # as injected values and constructs inside the consumer's own evaluation, which is what the
-    # gen↔gen boundary rule asks of a library that composes another's constructor. So the hub wires
-    # it the way it wires gen-class rather than re-exporting a self-resolved `.lib` — and a consumer
-    # taking this input gains no transitive pin from it.
+    # gen-assemble publishes its root UNAPPLIED: the shared framework toolkit takes its whole
+    # substrate as injected values and constructs inside the consumer's own evaluation, which is what
+    # the gen↔gen boundary rule asks of a library that composes another's constructor. So the hub
+    # wires it the way it wires gen-class rather than re-exporting a self-resolved `.lib`. It DOES
+    # declare flake inputs (owner-ruled Arm A, 2026-09-16: `den-hoag-4dfsv` §4.2) — the unapplied root
+    # withholds an APPLIED substrate from a consumer, never the transitive pin.
     inherit assemble;
 
     # The stratum declaration — which layer of the stack each member belongs to. It is TOTAL and
