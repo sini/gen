@@ -73,7 +73,6 @@ flowchart TD
   gen_aspects --> gen_merge
   gen_aspects --> gen_prelude
   gen_aspects --> gen_schema
-  gen_bind --> gen_graph
   gen_bind --> gen_prelude
   gen_class --> gen_prelude
   gen_dispatch --> gen_prelude
