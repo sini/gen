@@ -117,23 +117,29 @@
       # the flake supplies them, so `follows` governs every one; the standalone path falls back to
       # `ci/flake.lock`. Before this, `./default.nix` did not exist and the hub was flake-only.
       #
-      # ★★ THE THREE `{ }` APPLICATIONS ARE L3's SECOND ARM ARRIVING, NOT AN EXCEPTION LIST.
-      # gen-program, gen-delivery and gen-assemble declare NO gen input, so their flakes have nothing
-      # to pass and publish `lib = import ./.` UNAPPLIED; the other 18 publish an applied set. What
-      # is written here is therefore the member's own L3 arm read off its published surface, and it
-      # is LOUD if that arm ever changes — applying `{ }` to a set is
+      # ★★ THE THREE UNAPPLIED `.lib`s ARE L3's SECOND ARM ARRIVING, NOT AN EXCEPTION LIST.
+      # gen-program, gen-delivery and gen-assemble declare NO gen input, so their OWN flakes have
+      # nothing to pass and publish `lib = import ./.` UNAPPLIED; the other 18 publish an applied
+      # set. What is written here is therefore the member's own L3 arm read off its published
+      # surface, and it is LOUD if that arm ever changes — applying an already-applied set is
       # `attempt to call something which is not a function but a set`, and a member that went the
       # other way arrives as a function and reds the `roster` output's own force below. The rejected
       # alternative was to arity-dispatch here (`if builtins.isFunction v then v { } else v`), which
       # makes the hub TOLERANT of either shape and so accepts a member that landed the wrong arm in
       # silence — the failure L3 exists to make loud.
-      roster = import ./. {
+      #
+      # AN UNAPPLIED ARM IS PRECISELY THE ONE WHOSE ARGUMENTS THE CONSUMER OWES (ADR-0008 §1).
+      # Until this fold, the three were applied to `{ }`, so each self-fetched its own substrate
+      # instance out of its own `ci/flake.lock` instead of receiving the hub's — the defect
+      # `./lib/hubSubstrate.nix` closes. That file is a pure function of `members` below (never of
+      # `inputs`), naming exactly the substrate each of the three needs; the `mapAttrs` fold applies
+      # every member's `.lib` — applied set or unapplied function alike — at this ONE site, so there
+      # is nowhere else in this file a mis-keyed application could be written.
+      members = {
         algebra = inputs.gen-algebra.lib;
         aspects = inputs.gen-aspects.lib;
-        assemble = inputs.gen-assemble.lib { };
         bind = inputs.gen-bind.lib;
         class = inputs.gen-class.lib;
-        delivery = inputs.gen-delivery.lib { };
         dispatch = inputs.gen-dispatch.lib;
         graph = inputs.gen-graph.lib;
         identity = inputs.gen-identity.lib;
@@ -142,7 +148,6 @@
         merge = inputs.gen-merge.lib;
         prelude = inputs.gen-prelude.lib;
         product = inputs.gen-product.lib;
-        program = inputs.gen-program.lib { };
         schema = inputs.gen-schema.lib;
         scope = inputs.gen-scope.lib;
         select = inputs.gen-select.lib;
@@ -150,6 +155,12 @@
         types = inputs.gen-types.lib;
         view = inputs.gen-view.lib;
       };
+
+      substrateArgs = import ./lib/hubSubstrate.nix members;
+
+      roster = import ./. (
+        members // builtins.mapAttrs (k: args: inputs."gen-${k}".lib args) substrateArgs
+      );
 
       # The PUBLISHED two-stage surface, kept exactly as its consumers call it. Stage 2's argument
       # was always vestigial — every caller passes `{ }`, `{ inherit lib; }` or `{ lib = null; }` and

@@ -285,6 +285,14 @@
         inherit lib;
       };
 
+      # L3: the substrate the hub hands the three roster members whose flake `.lib` is published
+      # unapplied. `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that
+      # MUST be `true`.
+      hubSubstrate = import ./hub-substrate.nix {
+        inherit (inputs) gen;
+        inherit genInputs lib;
+      };
+
       # The same value `gen-harness`'s own flake module installs for its twenty-two consumers. The
       # comment above this treefmt block says the set here may not be trimmed below the one
       # consumers receive; reading it from the harness makes that hold by construction, across the
@@ -328,6 +336,8 @@
       flake.lib.pinCoherence = pinCoherence;
       #   nix eval ./ci#lib.hubEntry.report --json | jq   (rows / misdirected / arming)
       flake.lib.hubEntry = hubEntry;
+      #   nix eval ./ci#lib.hubSubstrate.report --json | jq   (rows / underSupplied / text / arming)
+      flake.lib.hubSubstrate = hubSubstrate;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
       flake.lib.architectureLibraryGraph = architectureLibraryGraph;
 
@@ -700,6 +710,40 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the hub-substrate check (L3): prints the substrate `./lib/hubSubstrate.nix` supplies
+          # against the live demand of the three unapplied members, and the flake.nix text-arm's C/B/L
+          # reading, GATING for the same reason `mkHubEntryCheck` does — this is a property of files in
+          # THIS repository, true now, with nothing outside the hub to move for it to keep holding.
+          mkHubSubstrateCheck =
+            name: s:
+            let
+              allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              report = builtins.toJSON ({ inherit allOk failed; } // s.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "-- ${name} --"
+                cat "$reportPath"
+                echo
+                echo "TEXT ARM: C=${toString s.report.text.c} B=${toString s.report.text.b} L=${toString s.report.text.l} (need C==1, B==1, L>=18)"
+                ${lib.optionalString (s.report.underSupplied != [ ]) ''
+                  echo "HUB SUBSTRATE -- a member demands a substrate key ./lib/hubSubstrate.nix does not supply:" >&2
+                  ${lib.concatMapStringsSep "\n" (
+                    r:
+                    "echo ${lib.escapeShellArg "    ${r.member}: missing ${builtins.concatStringsSep ", " r.underSupplied}"} >&2"
+                  ) s.report.underSupplied}
+                ''}
+                ${lib.optionalString (failed != [ ]) ''
+                  echo "HUB SUBSTRATE -- readings that did not hold: ${lib.concatStringsSep " " failed}. Read report.arming above: every arm is a DELTA against the live reading, printed beside it" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # Build the pin-coherence check (L7): prints the per-node census across the 21 members'
           # ci locks and names every node pinned at more than one revision, with the members behind
           # each revision.
@@ -947,6 +991,7 @@
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
             pin-coherence = mkPinCoherenceCheck "pin-coherence" pinCoherence;
             hub-entry = mkHubEntryCheck "hub-entry" hubEntry;
+            hub-substrate = mkHubSubstrateCheck "hub-substrate" hubSubstrate;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.
