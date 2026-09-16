@@ -363,7 +363,12 @@ let
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
     # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
     # other member moved.
-    schema = "8704df36435835c714e346da0931b9a090df867d5c661098dfbd1c5b507ba933";
+    #
+    # gen-schema f8e0e17 → 056ee9b (the inheritance relocation, step 4): the surface gained ONE
+    # name, `evalSchema` (lib/eval-schema.nix, the staged pass that resolves kind `inherits` by
+    # name against the frozen output of a strictly earlier pass). Nothing was removed and no other
+    # member moved.
+    schema = "9b63cf6bf2d3e7655868bd35a30452ffa26a3fd34b751e56535e62a2e5a753db";
     scope = "9d6068bc37de178d392d08194572b3122814e0635b8419710e46241d23e2bfce";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";

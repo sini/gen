@@ -115,35 +115,52 @@ let
   };
 
   # den's kind topology + imports (options.nix:112-149), with real host/user/home entity options.
+  #
+  # `conf` composes into host/user/home and carries no options of its own — den's real shape, and
+  # independent of every kind that draws on it. §2.6 retires the idiom this composition used to
+  # spell, a kind's own `imports` list reading a sibling kind straight off the same-pass `config`,
+  # onto `inherits`, resolved by `evalSchema`'s staged pass — but `evalSchema` exists only on the
+  # pure engine (it is gen-schema `056ee9b`'s own export, and `refP` is a permanently frozen
+  # pre-relocation pin, ADR-0002, that will never gain it). Rewriting only `pureP` onto `inherits`
+  # was DRIVEN and measured to regress `parity-schema` for real, not merely asymmetrically:
+  # `inherits` joins `_edges` (gen-schema `056ee9b`), so the pure side gains an edge `refSchema`
+  # can never carry. The fix below removes the same-pass read the idiom is retired for — `conf` is
+  # frozen in its own prior pass and the later pass imports that frozen value — without
+  # `inherits`/`evalSchema`, so it is available identically on both engines and produces no edge on
+  # either, matching today's behaviour exactly (measured, same run).
   driveSchema =
     P:
     let
+      confPass = P.eval {
+        modules = [
+          { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
+          { config.schema.conf = { }; }
+        ];
+      };
+      frozenConf = confPass.config.schema.conf;
       eval = P.eval {
         modules = [
           { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
-          (
-            { config, ... }:
-            {
-              config.schema.conf = { };
-              config.schema.fleet = { };
-              config.schema.host = {
-                options.addr = P.mkOption { type = P.types.str; };
-                imports = [ config.schema.conf ];
+          {
+            config.schema.conf = { };
+            config.schema.fleet = { };
+            config.schema.host = {
+              options.addr = P.mkOption { type = P.types.str; };
+              imports = [ frozenConf ];
+            };
+            config.schema.user = {
+              parent = "host";
+              options.uid = P.mkOption {
+                type = P.types.int;
+                default = 1000;
               };
-              config.schema.user = {
-                parent = "host";
-                options.uid = P.mkOption {
-                  type = P.types.int;
-                  default = 1000;
-                };
-                imports = [ config.schema.conf ];
-              };
-              config.schema.home = {
-                parent = "host";
-                imports = [ config.schema.conf ];
-              };
-            }
-          )
+              imports = [ frozenConf ];
+            };
+            config.schema.home = {
+              parent = "host";
+              imports = [ frozenConf ];
+            };
+          }
         ];
       };
       s = eval.config.schema;
@@ -168,23 +185,31 @@ let
   refSchema = driveSchema refP;
 
   # ── real-den INSTANCE registry (id_hash + strict) — host instances with addr, as den entities are ──
+  #
+  # §2.6 retires the crossing spelling `mkInstanceRegistry <binding>.config.<path>.schema.<k>` (a
+  # same-pass live-`config` read) onto `mkInstanceRegistry <frozen>.<k>`, `<frozen> = evalSchema {…}`
+  # — unavailable on `refP` for the same reason `driveSchema` states above. The kind has no
+  # dependency on the registry it seeds, so it is frozen in its own prior pass instead, on plain
+  # `P.eval`, identically on both engines.
   driveInstances =
     P: addr2:
     let
-      eval = P.eval {
+      hostSchema = P.eval {
         modules = [
           {
             options.schema = P.schema.mkSchemaOption denSchemaArgs;
             config.schema.host.options.addr = P.mkOption { type = P.types.str; };
           }
-          (
-            { config, ... }:
-            {
-              options.hosts = P.schema.mkInstanceRegistry config.schema.host { };
-              config.hosts.blade.addr = "10.0.0.1";
-              config.hosts.uplink.addr = addr2;
-            }
-          )
+        ];
+      };
+      frozenHost = hostSchema.config.schema.host;
+      eval = P.eval {
+        modules = [
+          {
+            options.hosts = P.schema.mkInstanceRegistry frozenHost { };
+            config.hosts.blade.addr = "10.0.0.1";
+            config.hosts.uplink.addr = addr2;
+          }
         ];
       };
     in
@@ -198,24 +223,26 @@ let
   driveNested =
     P:
     let
-      eval = P.eval {
+      hostSchema = P.eval {
         modules = [
           {
             options.den.schema = P.schema.mkSchemaOption denSchemaArgs;
             config.den.schema.host.options.addr = P.mkOption { type = P.types.str; };
           }
-          (
-            { config, ... }:
-            {
-              options.den.hosts = P.schema.mkInstanceRegistry config.den.schema.host { };
-              config.den.hosts.blade.addr = "10.0.0.1";
-            }
-          )
+        ];
+      };
+      frozenHost = hostSchema.config.den.schema.host;
+      eval = P.eval {
+        modules = [
+          {
+            options.den.hosts = P.schema.mkInstanceRegistry frozenHost { };
+            config.den.hosts.blade.addr = "10.0.0.1";
+          }
         ];
       };
     in
     {
-      kindNames = eval.config.den.schema._kindNames;
+      kindNames = hostSchema.config.den.schema._kindNames;
       blade = { inherit (eval.config.den.hosts.blade) addr id_hash; };
     };
 

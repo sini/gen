@@ -24,15 +24,16 @@ let
   # measured over the class of payload the flakeModule actually injects.
   schemaFixture =
     {
-      config,
       genSchema,
       genMerge,
       ...
     }:
-    {
-      options.schema = genSchema.mkSchemaOption { };
-      options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
-      config.schema.host = {
+    let
+      # §2.6: `mkInstanceRegistry` moves off a same-pass live-`config` read onto a frozen prior-pass
+      # binding. The kind decl is shared, not duplicated, between the frozen view `evalSchema` builds
+      # and this module's own `config.schema.host` (the latter is what makes `payload.schema.host`
+      # a genuine composed option tree — `frozen` exists only to seed the registry).
+      hostKind = {
         options.addr = genMerge.mkOption { type = genMerge.types.str; };
         options.role = genMerge.mkOption {
           type = genMerge.types.str;
@@ -43,6 +44,14 @@ let
           default = [ ];
         };
       };
+      frozen = genSchema.evalSchema {
+        modules = [ { config.schema.host = hostKind; } ];
+      };
+    in
+    {
+      options.schema = genSchema.mkSchemaOption { };
+      options.hosts = genSchema.mkInstanceRegistry frozen.host { };
+      config.schema.host = hostKind;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         role = "web";
