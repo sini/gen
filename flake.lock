@@ -61,16 +61,19 @@
     },
     "gen-bind": {
       "inputs": {
+        "gen-graph": [
+          "gen-graph"
+        ],
         "gen-prelude": [
           "gen-prelude"
         ]
       },
       "locked": {
-        "lastModified": 1789541414,
-        "narHash": "sha256-UKgYGZecy6QqyOBf69QkckrKdQhVvAtnW6cvBewQR90=",
+        "lastModified": 1789560874,
+        "narHash": "sha256-g7WXpedTei3uaTFXbnw4pAXyO8kJ13P29TV6U5pOSGU=",
         "owner": "sini",
         "repo": "gen-bind",
-        "rev": "1f06d34064e2875f07a277bde4e080185638b3f5",
+        "rev": "27860c870ccbe6a69a72b9cf3bc1f9ee9a4e6843",
         "type": "github"
       },
       "original": {

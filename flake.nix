@@ -61,6 +61,7 @@
     gen-select.inputs.gen-algebra.follows = "gen-algebra";
 
     gen-bind.url = "github:sini/gen-bind";
+    gen-bind.inputs.gen-graph.follows = "gen-graph";
     gen-bind.inputs.gen-prelude.follows = "gen-prelude";
 
     gen-dispatch.url = "github:sini/gen-dispatch";
