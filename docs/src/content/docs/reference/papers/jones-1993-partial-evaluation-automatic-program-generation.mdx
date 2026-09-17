@@ -1,0 +1,303 @@
+---
+title: "Jones, Gomard & Sestoft (1993) — Partial Evaluation and Automatic Program Generation"
+description: "Our reading of Partial evaluation and automatic program generation."
+source:
+  - den-ag-design:reference-catalog/summaries/jones-1993-partial-evaluation-automatic-program-generation.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+N. D. Jones, C. K. Gomard, and P. Sestoft, "Partial evaluation and automatic program generation," *Medical Entomology and Zoology*, ok, 1993.
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+*With chapters by Lars Ole Andersen and Torben Mogensen. Prentice Hall International, 1993;
+ISBN 0-13-020249-5. Copyright returned to the authors 1999, released free as a 425-page PDF.*
+
+**Section and page references below are the book's own** (the archived markdown is paginated
+by PDF page, which runs 10 ahead — see the conversion note at the head of
+`markdown/jones-1993-partial-evaluation-automatic-program-generation.md`).
+
+## Paper Summary
+
+This is the standard textbook of partial evaluation, and it is a *book*, not a paper: five
+parts, eighteen chapters, an appendix carrying the full source of a self-applicable Scheme0
+specializer, and a bibliography. Its subject is **program specialization** — given a program
+`p` and part of its input, mechanically produce a residual program `p_in1` that computes what
+`p` would have computed on the rest. The authors are explicit that this is old: the
+theoretical possibility was settled by **Kleene's s-m-n theorem** more than forty years
+earlier (§1.1, p.1), "an important building block of the theory of recursive functions". What
+was missing, and what the book supplies, is that Kleene's construction produced specialized
+programs *slower* than the originals; the book is about the practical realization where the
+residual program is genuinely faster, and about **full automation** — including the automatic
+generation of the program generators themselves.
+
+The formal centre is the **mix equation** (§1.1.2, p.4). Writing `[[p]]L` for the meaning of
+program `p` in language `L`, computation in one stage is `out = [[p]] [in1, in2]`; computation
+in two stages via a specializer `mix` is `p_in1 = [[mix]] [p, in1]` then `out = [[p_in1]] in2`.
+Combining these gives the definition of `mix`:
+
+> `[[p]] [in1, in2] = [[ [[mix]] [p, in1] ]] in2`
+
+"where if one side of the equation is defined, the other is also defined and has the same
+value." Everything else in the book is either a way of building a `mix` that satisfies this,
+or a consequence of applying it to itself.
+
+The consequences are the **Futamura projections** (§1.5, pp.13–14), each verified in a few
+lines from the mix equation. Specializing an interpreter `int` to a source program yields a
+target program — `target = [[mix]] [int, source]`, the **first projection**, "compiling by
+partial evaluation always yields correct target programs". Specializing `mix` to `int` yields
+a stand-alone **compiler** — `compiler = [[mix]] [mix, int]`, the **second projection**.
+Specializing `mix` to itself yields a **compiler generator** — `cogen = [[mix]] [mix, mix]`,
+the **third projection**, "a program that transforms interpreters into compilers", where the
+compilers produced are versions of `mix` specialized to various interpreters. The authors are
+candid that the second and third are "hard to understand because [they involve]
+self-application", and that answering what these equations mean in practice "form[s] the bulk
+of this book". §1.5.4 records the empirical payoff: each of compilation, compiler generation
+and cogen generation can be done either by running `mix` or by running the generated
+generator, and "the second way is about 10 times faster than the first" — self-application
+generates programs that run faster.
+
+Parts II and III build actual specializers, in increasing order of language difficulty. **Ch.4**
+does a flow chart language: `mix` is a worklist algorithm over `pending`/`marked` sets whose
+unit of work is a **specialized program point** `(pp, vs)` — a source label paired with the
+values of the static variables — and whose techniques (§4.4) are symbolic computation,
+unfolding, and program point specialization. **Ch.5** does a first-order functional language
+(Scheme0) and introduces the machinery that the rest of the book refines: a **division**
+classifying each parameter static (`S`) or dynamic (`D`), computed by **binding-time analysis
+(BTA)**. **Ch.8** does the untyped lambda calculus (Lambdamix) via an explicitly two-level
+syntax. **Ch.9** does Prolog (Logimix), **Ch.10** Scheme with higher-order values (Similix),
+**Ch.11** C (C-mix, Andersen's chapter).
+
+**BTA is the book's real technical contribution and the thing most worth reading it for.**
+§5.2 presents it as an **abstract interpretation** over the two-point domain
+`BindingTime = {S, D}` ordered `S < D` — the book's phrase for the induced relation is "is
+less dynamic than", the relation symbol itself being one of the glyphs lost in extraction —
+lifted pointwise to binding-time environments and divisions, and solved by least fixed point.
+The safety
+condition is **congruence**: "a parameter may be classified as static only if it cannot be
+bound to a residual expression. Consequently it is always safe to classify a parameter
+dynamic: `D` is a safe approximation of `S`." The analysis is therefore permitted to be
+approximate, and errs toward `D`. The dual `lift` operation embeds a static expression into a
+dynamic context.
+
+§4.9 is the granularity discussion and is unusually practical. **§4.9.1 pointwise divisions**:
+one division valid at all program points is the simple assumption, but a per-program-point
+division is strictly better and — crucially — does not break self-application, "since `pp` is
+static, the use of pointwise divisions does not destroy this property". **§4.9.2 live and dead
+static variables**: specializing with respect to *dead* static data is a real defect at any
+non-toy size — a static variable whose value is irrelevant downstream still enters `vs`, so one
+specialized point acquires two successors "even though the code pieces generated for these two
+successors are clearly identical". The fix is a live-variable analysis restricting
+specialization to *live* static variables.
+
+§5.7 and §8.6 recast binding-time correctness as **typing**. Figure 8.3's rules give a
+two-level type system over `{S, D}` — `(Const) Γ ⊢ c : S`, `(Var)`, `(Lift) Γ ⊢ te : S ⟹
+Γ ⊢ lift te : D`, `(Abstr)`, `(Apply)`, `(Fix)`, `(If)`, `(Op)`, plus a parallel family of
+`-dyn` rules where every premise and conclusion is `D`. §8.3 explains *why* this matters: a
+specializer that type-checks annotations on the fly is unsatisfactory because "`mix` is
+supposed to be a general and automatic program generation tool, and one wishes … for it to be
+impossible for an automatically generated compiler to go down with an error message". A
+static well-annotatedness discipline moves that failure earlier. §8.7 gives the
+constraint-solving formulation; §8.8 proves Lambdamix correct.
+
+**Ch.6** quantifies the payoff and its ceiling: flow chart `mix` gives **linear** speedup
+(§6.2) — never asymptotic improvement — with §6.3 giving a speedup *analysis* and §6.4 a
+notion of **optimality** of `mix` (roughly: specializing an interpreter to a program should
+remove the entire interpretive overhead). **Ch.7** draws the book's other major distinction:
+**online** specialization is one phase, consulting actual static values during specialization to
+decide what to reduce; **offline** specialization is two phases, a BTA *prephase* separating
+binding times for the whole program followed by a specializer that just obeys the annotations.
+§7.3 is titled "BTA and the taming of self-application" — the offline discipline exists
+because it is what makes `mix` self-applicable with good results.
+
+Part IV is engineering. **Ch.12 binding-time improvements** are source-level rewrites that make
+a program specialize better: §12.1 the Knuth–Morris–Pratt case study (specializing a naive
+matcher to a pattern yields the KMP automaton), §12.2 **bounded static variation** — "so popular
+among partial evaluation users that it is sometimes called *The Trick*" — where a dynamic
+variable `d` known to range over a finite statically computable set `F` is replaced by code
+that matches `d` against every element of `F` and then applies the context to the *static*
+match, §12.3 CPS conversion, §12.4 eta conversion, §12.5 improvements derived from Wadler's
+free theorems. **Ch.13** surveys applications.
+
+Part V is theory. **Ch.14** treats **termination** of partial evaluation, online and offline, and
+BTA that guarantees it. **Ch.15** collects the analyses: abstract interpretation, closure
+analysis, higher-order BTA, and **§15.4 projection-based BTA over partially static data**, due
+to Launchbury. A **projection** on a domain `X` (ordered, with least element `⊥` meaning
+"undefined" or "not available") is a function `X → X` satisfying three conditions, which the
+book numbers (1), (2) and (3): it maps a value to a *part* of that value, it is idempotent,
+and it is monotone. Read as "the static part of `x`": the static part must be a part, the
+static part of the static part is the static part, and parts of parts stay parts. (The
+projection symbol and the ordering symbol are both lost in extraction — read the conditions
+from the PDF at book p.323.) On an atomic type only two
+projections matter, `ABS x = ⊥` and `ID x = x`, and "it is clear that `ABS` and `ID` are
+precisely the binding-times `D` and `S`" — with the ordering `ABS < ID` running *opposite* to
+`S < D`, which the authors note is "purely a formality". The point of projections is that they
+scale to structures: a pair with static left and dynamic right component, or an interpreter
+environment represented as an association list of (static name, dynamic value) pairs. **Ch.16**
+returns to recursive function theory and to types for interpreters, compilers and partial
+evaluators. **Ch.17** relates partial evaluation to fold/unfold transformation,
+supercompilation and deforestation — more dramatic speedups, less automation.
+
+## Key Concepts
+
+- **The mix equation (§1.1.2, p.4).** `[[p]] [in1, in2] = [[ [[mix]] [p, in1] ]] in2`, with
+  definedness required in both directions. The specification a specializer must meet.
+
+- **Kleene's s-m-n theorem as the ancestor (§1.1 p.1; §16.1).** Specialization is a
+  recursion-theoretic given; the contribution is making the residual program *fast* and the
+  construction *automatic*.
+
+- **Futamura projections (§1.5).** `target = [[mix]] [int, source]` (first) ·
+  `compiler = [[mix]] [mix, int]` (second) · `cogen = [[mix]] [mix, mix]` (third). Each derived
+  in three lines from the mix equation. Self-application is the whole mechanism.
+
+- **Generating extension (§5.8).** The specializer-produced program generator for a fixed
+  subject program — `cogen p` — as an object one can build directly rather than by
+  self-application.
+
+- **Division, static/dynamic, congruence (§5.2).** A division classifies each parameter `S` or
+  `D`. It is *congruent* — the safety condition — iff nothing classified static can be bound
+  to a residual expression. `D` is always a safe approximation of `S`, so BTA may be
+  approximate but only in the conservative direction.
+
+- **BTA as abstract interpretation (§5.2).** Two-point domain `{S, D}` with `S < D`
+  ("less dynamic than"), lifted pointwise to environments and divisions, least fixed point.
+  Monovariant and polyvariant variants.
+
+- **`lift` (§5.2, §8.3).** The one legal coercion: a static expression embedded into a dynamic
+  context. Nothing goes the other way.
+
+- **Two-level type system for annotations (§5.7, §8.3 Fig. 8.3, §8.6, §8.7).**
+  Well-annotatedness as a typing judgement `Γ ⊢ te : t` with `t ∈ {S, D}` and paired
+  static/`-dyn` rules for every construct; BTA as *type inference*, or as constraint solving.
+  Motivation (§8.3): a generated compiler must not be able to fail at run time.
+
+- **Pointwise divisions (§4.9.1).** Per-program-point rather than whole-program binding-time
+  classification. Strictly more precise, and self-application-safe because the program point
+  is itself static.
+
+- **Dead static data (§4.9.2).** Specializing with respect to static values that no longer
+  influence anything splits one residual point into several identical ones. A live-variable
+  analysis on the *static* variables is the fix. The defect appears "at every program
+  specialization of non-toy programs".
+
+- **Online vs offline (§7).** Online: one phase, consults values, more precise. Offline: BTA
+  prephase then annotation-driven specialization, less precise, and **the reason
+  self-application works** (§7.3).
+
+- **Linear speedup and optimality (§6.2, §6.4).** Partial evaluation buys a constant factor,
+  not an asymptotic class. Optimality ≈ the specialized interpreter has no interpretive
+  overhead left.
+
+- **Bounded static variation, "The Trick" (§12.2).** A dynamic value ranging over a finite
+  statically-known set `F` is recovered as static by dispatching on `F` and continuing with the
+  matched static element.
+
+- **Binding-time improvements (§12).** Source rewrites — CPS conversion (§12.3), eta expansion
+  (§12.4), free theorems (§12.5) — that change nothing semantically but move the static/dynamic
+  frontier.
+
+- **Partially static data via projections (§15.4, after Launchbury).** A static projection is
+  below the identity, idempotent, and monotone. `ABS`/`ID` on atomic types *are* `D`/`S`
+  (with the order flipped, a formality). Projections generalize the two-point lattice to
+  structures whose components have different binding times.
+
+- **Termination (§14).** Online and offline termination are different problems; BTA can be
+  strengthened to guarantee termination of specialization.
+
+## Ecosystem Relevance
+
+### Why acquired
+
+Acquired 2026-08-05 as source material for a **gen-bind redesign spike**, alongside
+`lewis-2000-implicit-parameters`. The pairing is deliberate: JGS supplies binding-time
+analysis and staged specialization; Lewis supplies dynamically-scoped parameters with static
+types. **No gen library currently cites this book, and nothing here has been through the
+architecture-alignment gate.** Read the contact points below as *candidates for review*, not
+as validated design.
+
+### Applicable insights (candidates, not validated)
+
+- **A binding-time discipline is a lattice plus a congruence condition, not a convention.**
+  §5.2 fixes the shape: a two-point domain, a safe direction of approximation, and a stated
+  soundness condition on the classification. Any framework that distinguishes
+  "known at declaration time" from "known at resolve time" is computing a division, and the
+  question to put to it is whether its classification is congruent in JGS's sense.
+
+- **`lift` is the only legal coercion.** Static may be embedded in dynamic; the reverse is the
+  error. That asymmetry is a checkable invariant.
+
+- **Well-annotatedness as typing (§8.3, §8.6).** JGS's argument for moving the binding-time
+  check from specialization time to a static type system is exactly the argument for making a
+  staging error a declaration-time failure rather than an evaluation-time one — and §8.3
+  states the motivation in the terms a framework author would use: an automatically generated
+  artefact must not be able to die with an error message.
+
+- **Pointwise divisions (§4.9.1) vs. one global division.** The "one classification for the
+  whole program" assumption is called out by the authors themselves as too coarse for
+  anything beyond small programs, and the per-point refinement is shown to cost nothing
+  structurally.
+
+- **Dead static data (§4.9.2) is a *duplication* defect.** Carrying a static value that no
+  longer influences the result multiplies residual points that are textually identical. The
+  named remedy is liveness on the static variables.
+
+- **Partially static structures (§15.4, §10.6).** The interesting case is never "this whole
+  value is static"; it is a structure with static and dynamic parts — Launchbury's projections
+  are the theory for that, and the association-list-with-static-keys example is the shape a
+  configuration environment actually has.
+
+- **The generating-extension view (§5.8) and the third projection (§1.5.3).** A framework that
+  produces a specialized artefact per subject is in the `cogen` position; the projections say
+  what that object *is* and what equation it must satisfy.
+
+- **Honest ceiling: linear speedup (§6.2).** JGS is explicit that partial evaluation buys a
+  constant factor. Any claim of an asymptotic win from staging alone should be checked against
+  §6.2–6.4 before it is made.
+
+## Appendix: Follow-up Work
+
+### Unexploited ideas
+
+- **Congruence as a checkable predicate.** §5.2 states the safety condition precisely enough to
+  be tested rather than asserted. Extracting it as an oracle over a declaration/resolution
+  split is the most directly transferable thing in the book.
+
+- **BTA by constraint solving (§8.7) rather than by fixed-point iteration (§5.2).** Two
+  presentations of the same analysis with different implementation profiles; the constraint
+  form composes better across separately-analysed fragments.
+
+- **"The Trick" (§12.2).** Recovering staticness for a value known to range over a finite
+  enumerable set, by dispatching. A general mechanism, not a hack, and the book treats it as
+  such.
+
+- **Speedup analysis (§6.3).** A method for predicting the speedup *before* specializing.
+  Rarely reimplemented; relevant wherever a staging decision needs a cost model.
+
+### Research directions
+
+- **Does the congruence condition survive a demand-driven, lazily-evaluated host?** JGS's
+  divisions are computed by a whole-program prephase over an eagerly-scheduled specializer.
+  Whether "static" is even well-defined when the evaluator only forces what is demanded — and
+  whether congruence must then be stated per-demand rather than per-program-point — is not
+  addressed in the book and is the obvious first question to put to it.
+
+- **Offline vs online in a setting with no self-application requirement (§7.3).** JGS chooses
+  offline BTA *because* it tames self-application. A framework that does not need `mix` to
+  specialize itself does not automatically inherit that reason, and the online/offline
+  trade-off (precision vs. predictability) may land elsewhere. This is a premise worth
+  checking before importing the offline discipline wholesale.
+
+- **Projection-based binding times (§15.4) vs. a flat two-point classification.** The flat
+  `{S, D}` lattice is a simplification the book itself abandons for real data. Whether a
+  design needs the projection generalization, or can stay flat because its values are already
+  decomposed, is a design fork the book poses but does not answer for any particular language.
+
+- **Relation to the archived incremental-computation corpus.** JGS's `mix` and the
+  Mokhov 2018 / Adapton / Acar line both split a computation into a stable part and a varying
+  part, but along different axes (staging by *input availability* vs. rebuilding by *change
+  propagation*). Whether a binding-time division and a dirty/clean dependency graph are two
+  views of one structure, or genuinely orthogonal, is unexamined here.

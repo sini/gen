@@ -1,0 +1,106 @@
+---
+title: "Van Wyk et al. (2010) — Silver: An Extensible Attribute Grammar System"
+description: "Our reading of Silver: An extensible attribute grammar system."
+source:
+  - den-ag-design:used/summaries/vanwyk-2010-silver-extensible-ag.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+E. Van Wyk, D. Bodin, J. Gao, and L. Krishnan, "Silver: An extensible attribute grammar system," *Science of Computer Programming*, vol. 75, no. 1-2, ok2, pp. 39–54, 2009.
+
+[doi:10.1016/j.scico.2009.07.004](https://doi.org/10.1016/j.scico.2009.07.004) · [read the paper](https://www.sciencedirect.com/science/article/pii/S0167642309001099/pdf)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+## Paper Summary
+
+Van Wyk, Bodin, Gao, and Krishnan present Silver, an attribute grammar specification language designed to be extensible — both as a tool for specifying extensible programming languages and as an extensible language itself. The central problem is that attribute grammar systems, while offering high-level declarative specifications for language analysis and translation, suffer from a perceived lack of both domain-specific and general-purpose features needed to address the full breadth of real language engineering tasks. Users encounter an uncomfortable "split personality" when the AG system lacks pattern matching, polymorphic lists, or domain-specific constructs and must drop into an implementation language.
+
+Silver's solution is to treat the AG specification language itself as an extensible language. A minimal core AG language (core Silver) supports nonterminals, productions, synthesized and inherited attributes, higher-order attributes (Vogt et al. 1989), reference/decorated attributes (Hedin 2000), forwarding (Van Wyk et al. 2002), aspect productions, and a module system. This core is then extended through modular language extensions — themselves specified as AG fragments — to produce the full-featured Silver used in practice. Through bootstrapping, Silver is implemented as a Silver attribute grammar.
+
+The paper's primary technical contributions are:
+
+**Forwarding as an extensibility mechanism.** A production may define a `forwards to` clause specifying a semantically equivalent tree in the host language. Queries for attributes not explicitly defined on the production are delegated to this forwarded-to tree. This enables local transformations: extension constructs translate to host-language constructs, gaining default semantics for all attributes. Crucially, forwarding allows both implicit (via the forwarded-to tree) and explicit (via attribute definitions on the extension production) specification of attribute values — a capability that purely rewrite-based systems like JastAdd cannot provide simultaneously.
+
+**Collection attributes with fold operators.** Collection attributes aggregate contributions from multiple aspect productions using an associative binary operator. A collection attribute declared with `collect with op` receives an initial value via `:=` and additional contributions via `<-` from aspect productions. The final value is `v_init op v_1 op v_2 op ... op v_n`. Because the operator need not be commutative but the contribution order is unspecified, the operator must in practice be used with operations (like list concatenation) where order does not affect the final result. Collection attributes enable additive global transformations — extensions can contribute new attribute definitions, error messages, or declarations without modifying existing productions.
+
+**Composable local and additive global transformations.** Local transformations are implemented via forwarding. Global transformations use collection attributes on key productions (like `prodDcl` in the Silver grammar itself) to collect contributions from extensions. The collecting production forwards to an expanded production containing both original and contributed definitions. This two-production pattern (collector + expanded) creates extension points that independent extensions can use without knowledge of each other. The paper demonstrates this concretely with pattern matching, where `prodName` and `childList` attribute definitions are added to every production in the object grammar via aspect contributions to the `moreStmts` collection on `prodDcl`.
+
+**Composability guarantees for concrete syntax.** Silver integrates with Copper, a context-aware scanner/parser generator where the parser passes valid lookahead sets to the scanner. When extensions satisfy a set of restrictions on their concrete syntax, the composed grammar is guaranteed conflict-free (Schwerdfeger & Van Wyk 2009).
+
+The paper demonstrates these mechanisms through: (1) the SimpleC imperative language specification with forwarding for `for`-loops and logical-or; (2) the with-clause convenience extension; (3) pattern matching as a local+global transformation; (4) concise concrete syntax as Yacc-style sugar; (5) data-flow analysis via CTL model checking over control flow graphs constructed from AST attributes. The composition of core Silver and all extensions into `silver:full` via `import ... with syntax` demonstrates the modularity claim.
+
+## Key Concepts
+
+- **Forwarding** — A production defines a distinguished tree providing default values for unspecified synthesized attributes. Queries for attributes without explicit definitions are delegated to the forwarded-to tree. Enables local translation of extension constructs to host-language equivalents while retaining the ability to override specific attribute values explicitly.
+
+- **Collection attributes** — Multi-contributor attribute aggregation. Declared with `collect with <op>`, assigned initial values with `:=`, extended with contributions via `<-` in aspect productions. The fold operation combines initial value and all contributions using the specified associative operator. Enables additive (non-destructive) extension of existing productions.
+
+- **Aspect productions** — Allow new attribute definitions to be added to existing productions from separate grammar modules. The mechanism for extensions to define attribute values on host-language productions without modifying the original specification.
+
+- **Higher-order attributes** — Attributes whose values are (undecorated) syntax trees. Essential for Turing completeness and for constructing intermediate representations like type representations (`TRep`), symbol tables, or optimized program trees.
+
+- **The collector/expanded pattern** — A concrete production collects extension contributions via a collection attribute, then forwards to an abstract production that includes both original and collected definitions. This pair creates an extension point. Demonstrated with `prodDcl` (collector) and `prodDcl_expanded` (expanded) in Silver's own grammar.
+
+- **Additive global transformations** — Global transformations where extensions add new constructs (declarations, definitions) without reorganizing existing program structure. Two requirements: the transformation is strictly additive, and additions from different extensions do not conflict. Enabled by collection attributes on key productions.
+
+- **Context-aware scanning** — Parser passes valid lookahead sets to the scanner, which only returns tokens in this set. Reduces parse table conflicts when composing grammars and enables verifiable composition guarantees.
+
+- **Module system** — Grammar modules with unique Internet-domain-style names. `import ... with syntax` composes both semantic and concrete syntax specifications. `hiding` excludes specific items for type safety.
+
+- **Data-flow analysis via model checking** — Domain-specific extension adding `cfg nodes`, `cfg attributes`, and CTL formula constructs. CFGs are constructed from AST attributes (`entry`, `succ`), labeled with data-flow attributes (`def`, `uses`), and model-checked via NuSMV. Results are available as attribute values in the AG.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+**gen-scope: `collectionAttr` combinator** — Silver's collection attributes with fold operators directly inform gen-scope's `collectionAttr` attribute combinator. In Silver, `synthesized attribute errors :: [String] collect with ++` declares a collection that aggregates error lists across aspect contributions using list concatenation. In gen-scope, `collectionAttr { traverse; extract; combine; }` is the corresponding construct: `traverse` selects which nodes contribute (analogous to which aspect productions contribute), `extract` pulls the value from each contributor (analogous to the `<-` contribution), and `combine` folds contributions (analogous to Silver's `collect with` operator). The key design influence is the separation of collection declaration from contribution — the collection is defined once, contributions come from anywhere in the graph. Gen-scope's traverse modes (`"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"label:<name>"`) generalize Silver's implicit "all aspect productions on this production" contribution model to scope-graph-aware traversal patterns.
+
+**gen-scope: Forwarding concept informing attribute defaults** — Silver's forwarding — where a production delegates attribute queries to a semantically equivalent tree — informs the conceptual model for how default attribute values propagate in gen-scope. The `inherit'` combinator walks the parent chain seeking a non-null `resolve` result, which parallels forwarding's delegation mechanism: when a node does not explicitly define an attribute, the query is forwarded up the tree. While gen-scope uses parent-chain inheritance rather than forwarding-to-tree delegation, the principle is the same: implicit attribute specification via structural delegation, with explicit definitions taking priority.
+
+**gen-schema: Collections** — Gen-schema's named collections (`methods`, `validators`, and user-defined collections) implement the same aggregation pattern as Silver's collection attributes. A collection is declared once on a kind definition, and multiple sources (kind definitions, extensions, mixins) contribute values that are merged using a combine function. The INDEX.md entry for Van Wyk 2010 explicitly lists gen-schema collections as using this pattern. The fold semantics match: initial value combined with contributions via an associative operator, where contribution order is not guaranteed and must not affect the result.
+
+**gen-aspects: Key classification trifecta** — Silver's classification of productions into abstract and concrete, with forwarding enabling translation between them, parallels gen-aspects' key classification trifecta: class keys (output targets, like Silver's translation attributes), collection keys (data aggregation, like Silver's collection attributes), and nested keys (recursive sub-aspects, like Silver's nested productions). The three-branch dispatch mirrors Silver's approach of routing different kinds of content through different processing paths.
+
+### Relevance to Den v2 HOAG Pipeline
+
+**Forwarding as reroute sugar (Tier 1 forwards).** Silver's forwarding translates a production to a semantically equivalent one in the host language. In den v2, `reroute { from; to; }` serves the same purpose at the class level: content declared under one class (e.g., `nixos`) is redirected to another (e.g., `darwin`). Tier 1 forwards in the current den pipeline are exactly this — local transformations that redirect class content without changing semantics. The den v2 spec recognizes these as reroute sugar: the forward auto-detect route can classify Tier 1 forwards as routes using three field checks, zero migration. Silver's design validates this: forwarding IS syntactic sugar for "define this production's translation attribute by delegation to another tree."
+
+**Forwarding as synthesized adapter scopes (Tier 2 forwards).** Silver's more complex use of forwarding — where the forwarded-to tree is constructed using higher-order attributes that inspect the production's context — maps to den v2's Tier 2 forwards, which create synthesized adapter scopes. These are new scope graph nodes synthesized during evaluation that serve as translation intermediaries. In Silver terms: the forwarded-to tree IS a higher-order attribute that constructs new AST structure. In den v2 terms: the adapter scope IS a derived child node that synthesizes new graph structure. Both create intermediate nodes for translation purposes, and both depend on context (Silver: inherited attributes; den: scope graph context) to determine the translation.
+
+**Collection attributes as pipe data aggregation.** Silver's collection attributes — where aspect productions contribute values aggregated by a fold operator — directly model how den v2 pipes collect and merge data across scopes. `pipe.gather pred` traverses the scope graph collecting data from matching scopes, analogous to how Silver collects contributions from all aspect productions on a given production. `pipe.from "X" [stages]` declares a collection with a processing pipeline, where stages are the analogue of Silver's fold operator. The key insight from Silver is that collection contribution order must not matter (the operator should produce the same result regardless of order), which constrains den's pipe merge strategies to commutative-monoidal operations.
+
+**Aspect productions as policy effects.** Silver's aspect productions define new attributes on existing productions from separate modules. Den v2's policies fire effects (routes, includes, provides) that modify existing scopes from separate declaration sites. Both mechanisms enable non-local modification: an aspect production in Silver adds an error contribution to `func_call`'s `errors` collection without modifying `func_call` itself; a den policy adds an include edge to a host scope without modifying the host declaration. The collector/expanded pattern in Silver (where `prodDcl` collects contributions then forwards to `prodDcl_expanded`) parallels den's policy dispatch model where effects are collected during traversal then applied during evaluation.
+
+**Module composition via grammar imports.** Silver's `import ... with syntax` composes grammar modules, hiding type-unsafe constructs. Den v2's aspect composition via `includes` and `neededBy` serves the same purpose — composing independently specified configuration fragments. Silver's fully-qualified module names prevent conflicts between independently developed extensions; den's scope graph resolution with D \< I \< P specificity prevents conflicts between independently declared aspects.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+**Context-aware scanning / verifiable composition (Section 3.3, 1.1; Schwerdfeger & Van Wyk 2009).** Silver's integration with Copper enables guaranteed conflict-free composition of independently developed grammar extensions. The gen ecosystem has no analogue for verifiable composition — there is no static analysis that guarantees two independently developed aspects or policies will not conflict when composed. The closest mechanism is gen-derive's conflict resolution (override, priority, specificity), which resolves conflicts at dispatch time rather than preventing them at composition time.
+
+**Data-flow analysis via model checking (Section 3.4).** Silver's extension for specifying data-flow analyses as temporal logic formulas model-checked on control flow graphs is entirely unexploited. While gen-scope constructs scope graphs, not control flow graphs, the methodology of integrating external analysis tools via attribute grammar extensions is applicable. Configuration validation could be expressed as properties over the scope graph structure.
+
+**Autocopy inherited attributes (Section 2.2, Fig. 3).** Silver's `autocopy` attribute modifier automatically copies inherited attribute values from parent to children when no explicit definition is given. Gen-scope's `inherit'` combinator provides on-demand parent-chain walks, but there is no mechanism for declaring that an attribute should be automatically propagated downward through all child nodes without explicit per-node definitions. In large scope graphs with many inherited attributes, this could reduce boilerplate.
+
+**Production modifiers and visibility (Section 3.2, Fig. 8).** The `production attribute` modifier in Silver makes a local attribute visible on all aspect productions of a given production. Gen-scope's attribute model does not distinguish between attributes visible to aspect-like extensions and those that are purely local to a node's attribute computation.
+
+### Potential New Libraries or Features
+
+**gen-compose: Verifiable composition checker.** A static analysis library that, given two sets of gen-derive rules or gen-aspects aspect declarations, determines whether they can be safely composed without conflicts. Scope: medium. Would require formalizing what "conflict" means for each gen library (attribute collision for gen-scope, rule overlap for gen-derive, class key collision for gen-aspects). Interactions: consumes gen-derive rule metadata, gen-aspects aspect metadata, gen-select selector specificity.
+
+**Autocopy attribute combinator for gen-scope.** A new combinator `autocopy { attr; default; }` that automatically propagates an attribute value downward from parent to children, with explicit per-node definitions overriding the propagated value. Scope: small (single combinator, ~30 lines). Different from `inherit'` in that `inherit'` walks upward on demand while `autocopy` would push downward during child synthesis. Interactions: gen-scope only.
+
+**Collection attribute contribution ordering.** Silver explicitly states contribution order is unspecified and the operator must tolerate any order. Gen-scope's `collectionAttr` inherits this constraint implicitly through its `combine` function. A formal monotonicity check (inspired by Arntzenius 2016 and Silver's fold semantics) that validates combine functions are commutative or order-independent at definition time rather than silently producing order-dependent results. Scope: small. Interactions: gen-scope, gen-algebra validators.
+
+### Research Directions
+
+**Forwarding depth analysis.** Silver's forwarding can chain: production A forwards to B which forwards to C. In den, Tier 1 and Tier 2 forwards can similarly chain. Understanding the maximum forwarding depth in practice and whether deep forwarding chains indicate specification problems could inform den v2's forward detection heuristics. Silver's experience with forwarding in Java 1.4 and Lustre specifications could provide empirical data.
+
+**Extension point discovery.** Silver's collector/expanded pattern requires the host language designer to explicitly create extension points. Den v2's policy system creates implicit extension points — any scope can be extended by any policy. Investigating whether explicit extension point declaration (a la Silver) produces more predictable composition behavior than implicit extension points (a la den) is an open question with practical implications for den's policy design.
+
+**Circular attributes in collection contexts.** Silver explicitly notes that circular attributes are difficult to add as a language extension because they change the fixpoint operation of the evaluator (Section 5). Gen-scope supports both `circular` (fixpoint iteration) and `collectionAttr` (traversal aggregation) independently, but their interaction — a circular attribute whose iteration depends on collection attribute values that themselves change across iterations — is not well-characterized. Silver's observation suggests this interaction may require careful design rather than ad-hoc composition.

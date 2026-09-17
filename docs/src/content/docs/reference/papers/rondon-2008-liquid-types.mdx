@@ -1,0 +1,122 @@
+---
+title: "Rondon, Kawaguchi & Jhala (2008) — Liquid Types"
+description: "Our reading of Liquid types."
+source:
+  - den-ag-design:used/summaries/rondon-2008-liquid-types.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+P. M. Rondon, M. Kawaguci, and R. Jhala, "Liquid types," *PLDI '08: ACM SIGPLAN Conference on Programming Language Design and Implementation*, ok, pp. 159–169, 2008.
+
+[doi:10.1145/1375581.1375602](https://doi.org/10.1145/1375581.1375602)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+## Paper Summary
+
+Rondon, Kawaguchi, and Jhala address a fundamental tension in dependent type systems: dependent types can express rich safety properties (array bounds, division-by-zero absence, value range constraints), but prior systems like DML required heavy manual annotation — 31% of program text in the DML benchmarks. Liquid Types resolve this by combining Hindley-Milner type inference with predicate abstraction to automatically infer dependent types precise enough to prove safety properties, reducing manual annotation to under 1%.
+
+The core idea is the *liquid type*, a dependent type whose refinement predicates are restricted to conjunctions of *logical qualifiers* drawn from a finite, user-supplied set Q. A logical qualifier is a boolean predicate over program variables and two special variables: the value variable v (representing the refined value) and a placeholder variable * (instantiated with program variables during inference). For example, the qualifier set `{0 <= v, * <= v, v < *, v < len *}` suffices for array bounds checking. The restriction to conjunctions of qualifiers from a finite set is what makes inference decidable — the space of possible types is bounded.
+
+The system is formalized as lambda_L, a variant of the lambda calculus with ML-style polymorphism extended with liquid types. Types take the form `{v:B | e}` where B is a base type and e is a refinement predicate constraining the value variable. Function types are dependent: `x:T1 -> T2` where x may appear free in T2's refinements. The type system includes path-sensitive environments (guard predicates from if-then-else branches are added to the environment), decidable conservative subtyping (reducing implication checks to validity queries in EUFA — the decidable logic of equality, uninterpreted functions, and linear arithmetic), and a liquid type restriction forcing certain expression positions to have liquid types, which bounds the inference search space.
+
+**Theorem 1 (Liquid Type Safety)** establishes three properties: (1) *Overapproximation* — the decidable system is conservative with respect to an exact (undecidable) dependent type system; (2) *Preservation* — types are preserved under evaluation; (3) *Progress* — well-typed non-values can step. The combination guarantees that well-typed programs never get stuck at primitive operations.
+
+The inference algorithm (Infer, Figure 4) proceeds in three steps. **Step 1: HM Type Inference** invokes standard Hindley-Milner to determine ML types for all subexpressions, then generates *templates* — dependent types with the same structure as the ML types but with liquid type variables (kappa) representing unknown refinements. **Step 2: Constraint Generation** (Cons) traverses the expression syntax-directedly, generating subtyping and well-formedness constraints between templates. Expressions split into two classes: those with constructable types (variables, constants, applications, generalizations) whose types derive from the environment and subexpressions, and those requiring liquid types (lambda abstractions, if-then-else, let bindings, polymorphic instantiations) which get fresh templates. **Step 3: Constraint Solving** (Solve) first splits complex constraints into simple base-type constraints (Split), then uses iterative weakening — starting from the conjunction of all qualifiers and removing those that violate constraints — to find the unique minimum solution. Each weakening step queries an SMT solver (EUFA validity checks).
+
+**Theorem 2 (Liquid Type Inference)** proves: (1) Infer terminates; (2) if Infer returns a type, it is valid; (3) if Infer returns Failure, no liquid type derivation exists over Q. The running time is O(D x V x Q^2) where D is the ML type derivation size, V is the number of base-typed variables, and Q is the maximum qualifiers per variable after well-formedness pruning.
+
+The paper validates the approach with DSOLVE, a tool for OCaml that reduces DML's 31% annotation burden to under 1% across 11 benchmarks (simplex, FFT, Gaussian elimination, matrix multiply, binary search, dot product, insertion sort, n-queens, towers of Hanoi, byte copy, heapsort). A case study on BITV (an open-source bit vector library) verified 58 of 65 functions and discovered a real bounds-checking bug in the `blit` function.
+
+## Key Concepts
+
+- **Refinement type `{v:B | e}`** — A base type B augmented with a predicate e over the value variable v. The type denotes values of B satisfying the predicate. This is the structural pattern that gen-schema implements.
+
+- **Logical qualifiers and Q*** — User-supplied predicate templates with placeholder variable *. Q* is the finite set obtained by instantiating * with all program variables. The finiteness of Q* is what makes inference decidable.
+
+- **Liquid type restriction** — Certain expression positions (lambdas, if-then-else, let, polymorphic instantiation) must have liquid types (conjunctions of qualifiers from Q*). This bounds the search space and eliminates the need for disjunctions.
+
+- **Templates and liquid type variables (kappa)** — Dependent types with unknown refinements. Templates have the same shape as ML types but with kappa variables representing unknown qualifier conjunctions.
+
+- **Path sensitivity via guard predicates** — Branch conditions are added to the type environment (Gamma), enabling the system to use `x > y` or `not (k < 0)` when checking subexpressions. Essential for array bounds reasoning.
+
+- **Decidable conservative subtyping (DEC-\<:-BASE)** — Subtyping reduces to implication validity in EUFA. The embedding `[[Gamma]]` collects guard predicates and base-type refinements from the environment. Conservative: validity in EUFA implies semantic subtyping, but not vice versa.
+
+- **Iterative weakening with fixpoint** — Solve starts with the strongest possible assignment (all qualifiers) and iteratively removes qualifiers that violate constraints. The algorithm converges to the unique minimum (strongest) solution. This is a greatest-fixpoint computation over a finite lattice.
+
+- **Pending substitutions (theta)** — A mechanism for tracking formal-to-actual argument substitutions through liquid type variables without eagerly applying them. Needed for function application typing where the output type contains unknowns.
+
+- **Whole-program analysis** — Liquid type inference is flow-sensitive: function input types are the strongest supertype of all actual arguments. This is a design choice trading generality for tractability — no intersection types needed.
+
+- **A-normalization** — Intermediate expressions must be let-bound to temporary variables so the system can reason about their types. Without this, recursive calls like `s + sum(k-1)` cannot use the non-negativity of `sum(k-1)`.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+#### gen-schema (Major — direct implementation)
+
+**What:** `schema.types.refined` in `refined.nix` implements the `{v:B | e}` refinement pattern. A base NixOS type (the B) is augmented with predicate metadata stored in a `__schema` attribute containing `{ refinements; baseType; }`. Each refinement is a record `{ check; message; lazy?; }` where `check` is a predicate `self: <bool-expr>` (the e, with `self` binding the value variable v) and `message` is the blame string.
+
+**How it maps:**
+- `mkRefinedType baseType refinements` (refined.nix, line 8-18) directly implements the `{v:B | e}` construction from Section 2. The `baseType` is B, and `refinements` is a list of predicates (conjunctive when multiple — matching the paper's conjunction-of-qualifiers model). The `__schema` metadata attribute structurally co-locates the predicate with the type declaration, exactly as liquid types co-locate refinements with base types.
+- `checkRefinements fieldPath type value` (refined.nix, line 24-42) implements the runtime predicate check: substitute the concrete value for the value variable and evaluate each refinement. Failures produce blame records `{ field; message; value; lazy; }` rather than the paper's subtyping failure — this is the Findler contract bridge.
+- `isRefined` / `getRefinements` (refined.nix, lines 20-22) implement introspection — checking whether a type carries refinements and extracting them. This is the structural equivalent of the paper's Shape function: `isRefined` distinguishes refined types from plain types, and `getRefinements` extracts the predicate component.
+- Built-in refinements (`refinements.tcpPort`, `refinements.nonEmpty`, `refinements.positive` at lines 44-57) serve as a fixed qualifier set analogous to the paper's QBC (array bounds checking qualifiers). They are reusable predicate templates that users compose without writing custom predicates.
+- Composed refinements via list syntax (`type = schema.types.refined lib.types.int [ r1 r2 ]`) directly implement the paper's conjunction of qualifiers — multiple predicates must all pass.
+- `lazy = true` on refinements (Section 5.2 of gen-schema README) defers validation to access time via `builtins.addErrorContext`, bridging to Chitil's lazy contract semantics. This is not in the Rondon paper but extends the `{v:B | e}` model with laziness.
+
+**Files:** `nix/lib/refined.nix` (core), `nix/lib/blame.nix` (error attribution), `nix/lib/instance.nix` (applyPipeline integration).
+
+#### gen-schema blame.nix (Supporting)
+
+**What:** `schema.blame field message` produces `{ __blame = true; field; message; }` records. `collectBlame` aggregates violations.
+
+**How it maps:** The paper's subtyping failure (when `[[Gamma]] && [[rho]] => [[theta . q]]` is not valid) is a binary pass/fail. gen-schema extends this with Findler-style blame attribution — each violation identifies the specific field and predicate that failed. The blame mechanism connects Rondon's structural refinement with Findler's higher-order contract blame tracking.
+
+### Relevance to Den v2 HOAG Pipeline
+
+In den v2's demand-driven HOAG architecture, liquid types inform validation at two boundaries:
+
+1. **Registration boundary** — When entities (hosts, users, homes) are declared via gen-schema registries, their values pass through the applyPipeline: validate -> derive -> apply. Refinement predicates fire during the validate phase, ensuring that declared values satisfy their type constraints before entering the scope graph. This is analogous to the paper's typechecking phase — structural validation happens before evaluation.
+
+2. **Instantiation boundary** — When scope graph attributes are materialized (gen-scope's `_eval` demand-driven evaluation), lazy refinements (`lazy = true`) fire on access. This matches the paper's design where refinement checking occurs at the point of use (e.g., array access checks at `sub` call sites). In den v2, a `spawn`'d entity's computed attributes may carry lazy refinements that validate only when another entity demands the value via `edge` traversal.
+
+3. **Structural co-location** — The `{v:B | e}` model means NixOS option types carry their validation predicates structurally rather than as separate sidecar validators. This eliminates the "orphan validator" problem in den v1 where validators were disconnected from the types they constrained. In den v2, when an aspect declares `port = mkOption { type = schema.types.refined lib.types.int schema.refinements.tcpPort; }`, the refinement travels with the type through class emission, module binding, and final NixOS evaluation.
+
+4. **Qualifier-driven extensibility** — The paper's Q (qualifier set) maps to den v2's ability for aspects to declare domain-specific refinements. Just as the paper's QBC set handles array bounds while users can add custom qualifiers for specific programs, den v2 aspects can contribute custom refinements to shared kind definitions through gen-schema's extension mechanism. Different aspects contributing refinements to the same kind produce a conjunction — multiple predicates that all must pass.
+
+5. **Path sensitivity analogue** — The paper's guard predicates in the environment (rule LT-IF) have a structural analogue in den v2's `meta.guard` on aspects. When an aspect is conditionally active (`meta.guard = pred`), downstream refinement checks operate in a context where the guard's truth is assumed — similar to how liquid type checking strengthens the environment with branch conditions.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Automatic qualifier inference (Section 7, future work)** — The paper requires users to supply Q. The authors suggest counterexample-guided abstraction refinement (CEGAR, ref [6]) to lazily extract new qualifiers from failed verification attempts. gen-schema currently requires explicit refinement predicates; automatic derivation of predicates from usage patterns is not implemented.
+
+- **Pending substitutions for compositional type tracking (Section 4.1, theta notation)** — The paper's pending substitution mechanism tracks formal-to-actual mappings through unknown types without eagerly resolving them. gen-schema resolves refinement checks eagerly at apply time or lazily at access time, but does not track substitution chains through type composition. This could enable refinement propagation through cross-instance references (e.g., if `service.host` is refined, the refinement could propagate to `service.host.addr`).
+
+- **Polymorphic refinement instantiation (Section 3.3, LT-INST rule)** — When a polymorphic type `forall alpha. S` is instantiated, the liquid type restriction allows instantiation with any liquid type of the same shape. gen-schema's `ref` types and generic collections don't currently support parametric refinement — a `listOf (ref "host")` cannot carry a refinement that depends on the list's context (e.g., "all hosts in this list must be in the same network").
+
+- **Whole-program qualifier scoping (Section 4.4)** — The paper's well-formedness constraints ensure that qualifier free variables are bound in scope. gen-schema refinements are checked per-field without scope awareness — a refinement on field A cannot reference field B's value during the check. The paper's environment-aware checking could enable cross-field refinements within the type system rather than through separate validators.
+
+- **Recursive type refinements (Section 7)** — The paper explicitly identifies extending refinements to recursive datatypes as future work. gen-schema's nested registries (parent-child topology) don't carry refinements through the nesting structure. Recursive refinements could express invariants like "all descendants of this host must have compatible architectures."
+
+### Potential New Libraries or Features
+
+- **gen-refine: Compositional refinement propagation** — A lightweight library that tracks refinement predicates through type composition (ref chains, list wrapping, optional wrapping). Scope: ~200 lines. Would implement the paper's pending substitution mechanism for Nix types, enabling refinements to propagate through `schema.ref` chains. Interaction: consumes gen-schema's `__schema` metadata; produces enriched type metadata. Complexity: moderate — the main challenge is the Nix module system's opaque type handling.
+
+- **Cross-field refinement predicates in gen-schema** — Extend `schema.types.refined` to accept multi-field predicates: `{ check = { port, hostname }: port > 0 && hostname != ""; fields = ["port" "hostname"]; }`. This would implement the paper's environment-aware checking where the refinement predicate can reference variables bound in the surrounding environment (Gamma). Scope: extend `checkRefinements` in refined.nix to receive the full instance config, not just the field value. Moderate interaction with the applyPipeline ordering in instance.nix.
+
+- **Qualifier library for common domains** — Extend `schema.refinements.*` from the current three built-ins (tcpPort, nonEmpty, positive) to a comprehensive qualifier set organized by domain: networking (port ranges, CIDR validation, hostname format), filesystem (path existence patterns, permission masks), Nix-specific (store path format, derivation attributes). Analogous to the paper's QBC for array bounds. Scope: pure data, no architectural changes. Would be a gen-schema extension module.
+
+### Research Directions
+
+- **Inference of refinement predicates from test suites** — The paper's CEGAR direction (Section 7) could be adapted: given a set of passing/failing configurations in den's CI test suite, automatically synthesize refinement predicates that distinguish valid from invalid configurations. This would be a form of the paper's qualifier discovery applied to NixOS configuration space rather than program variables.
+
+- **Scope-graph-aware refinement checking** — The paper's environment (Gamma) accumulates type bindings along the program path. In den v2's scope graph, the resolution path (D \< I \< P) provides an analogous accumulated context. Refinement checking could be scope-aware: a refinement at a child scope inherits the parent's type bindings, enabling invariants like "this user's home directory must be under the host's base path." This would require gen-scope integration that gen-schema currently avoids by design.
+
+- **Monotonic refinement strengthening in fixpoint loops** — gen-derive's fixpoint convergence dispatches rules that may widen context monotonically. If refinement predicates could participate in the fixpoint (each iteration potentially strengthening the refinements on scope graph nodes), this would mirror the paper's iterative weakening in reverse — starting with weak refinements and converging to the strongest consistent assignment. The question is whether Nix's lazy evaluation model can support this without the explicit state threading that the paper's Solve algorithm requires.

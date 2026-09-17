@@ -272,3 +272,32 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
 }
+
+/* ── Long-form reading ────────────────────────────────────────────────── */
+
+/* The paper readings run to several thousand words of dense technical prose.
+   They consistently open a paragraph with a bold lead-in naming what it is
+   about, so promoting that to a visible entry point gives the page a scannable
+   structure it would otherwise lack — without touching the prose itself. */
+.sl-markdown-content p > strong:first-child {
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* Blocks of reasoning are quoted throughout these pages. Starlight's default
+   blockquote reads as an aside; here it is usually the evidence. */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  background: color-mix(in srgb, var(--sl-color-accent) 4%, transparent);
+  padding: 0.75rem 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Dense reference tables: let them breathe and keep the header legible when a
+   long row wraps. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: 0.9em;
+}
+
+.sl-markdown-content :is(td, th):not(:where(.not-content *)) {
+  padding: 0.4em 0.7em;
+}

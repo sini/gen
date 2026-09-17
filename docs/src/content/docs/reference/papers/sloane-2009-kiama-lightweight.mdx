@@ -1,0 +1,93 @@
+---
+title: "Sloane (2009) -- Lightweight Language Processing in Kiama"
+description: "Our reading of A Pure Object-Oriented Embedding of Attribute Grammars."
+source:
+  - den-ag-design:reference-catalog/summaries/sloane-2009-kiama-lightweight.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+A. M. Sloane, L. C. Kats, and E. Visser, "A Pure Object-Oriented Embedding of Attribute Grammars," *Electronic Notes in Theoretical Computer Science*, vol. 253, no. 7, ok, pp. 205–219, 2010.
+
+[doi:10.1016/j.entcs.2010.08.043](https://doi.org/10.1016/j.entcs.2010.08.043) · [read the paper](https://doi.org/10.1016/j.entcs.2010.08.043)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+## Paper Summary
+
+Sloane presents Kiama as a lightweight language processing library for Scala that embeds two complementary paradigms -- attribute grammars and strategy-based term rewriting -- into a general-purpose host language, eliminating the need for standalone generator tools. The paper develops both paradigms through a running example: a simply-typed lambda calculus with integer primitives, lambda abstraction, application, and binary arithmetic operations. The abstract syntax is encoded as Scala case classes, which provide algebraic-data-type-like pattern matching while retaining the full expressiveness of the host language.
+
+The attribute grammar portion (Section 3) demonstrates three progressively complex analyses. Free variable analysis introduces synthesized attributes via Kiama's `attr` combinator, which wraps a Scala pattern-matching function with memoization and cycle detection. The `attr` function caches argument-result pairs and detects when `f(t)` is demanded while still evaluating `f(t)` for the same node -- the same sentinel-based circularity detection described more formally in the 2010 companion paper. Environment-based name and type analysis introduces inherited attributes defined by pattern matching on the parent node rather than the node itself. The `env` attribute propagates variable bindings downward through the tree, with lambda expressions extending the environment and all other nodes inheriting their parent's environment. Kiama provides structural properties (`parent`, `isRoot`, `prev`, `next`, `isFirst`, `isLast`) automatically to any class inheriting the `Attributable` trait, which generically traverses case class constructor fields to establish the tree structure.
+
+The most theoretically significant attribution example is the reference-based analysis (Section 3.2), which eliminates the environment entirely by defining a `lookup` parameterized attribute that traverses the tree upward to find the lambda expression binding a given name. This directly implements Hedin's Reference Attribute Grammars (RAGs, 2000) within the embedding: the `lookup` attribute returns a reference to an existing tree node (the binding lambda) rather than a computed value. The paper notes that the parameterized attribute version shown uses a simple encoding where the parameter is not included in the cache key, with a more advanced caching variant available when needed.
+
+The rewriting portion (Section 4) is modeled on Stratego, encoding strategies as functions from terms to `Option[Term]` where `None` represents failure. The `rule` combinator lifts a Scala partial function to the `Strategy` type, mapping undefinedness to failure. The paper builds up from basic beta reduction and arithmetic evaluation through a hierarchy of evaluation strategies: simple reduce (top-down repeated application), innermost (bottom-up, more efficient), eager evaluation (arguments reduced before application), and lazy evaluation (arguments deferred until needed). Each variation is expressed by composing strategy combinators: non-deterministic choice (`+`), deterministic choice (`<+`), sequential composition (`<*`), `attempt` (try or identity), `repeat` (iterate until failure), `reduce` (repeated sub-term + top-level application), `bottomup`, and `innermost`.
+
+A particularly instructive section covers explicit substitutions (Section 4.4), where the capture-free substitution function is replaced entirely by rewriting rules. A new `Let` tree construct represents pending substitutions, and a set of strategies propagate substitutions inward through the term structure, with fresh variable generation for alpha-conversion in the lambda case. This brings the entire evaluation process within the rewriting paradigm, making each substitution step observable and controllable.
+
+Congruences (Section 4.7) provide constructor-specific traversal strategies: `App(s1, s2)` applies strategy `s1` to the first child and `s2` to the second, failing if either sub-strategy fails. The paper notes that automatic congruence generation requires abstract syntax knowledge beyond what a pure embedding can provide, so Kiama offers helper functions (`rulefs`, `congruence`) for developers to define congruences manually. With congruences, the eager and lazy evaluation strategies collapse to concise one-line definitions that differ only in which constructor positions receive the recursive strategy `s` versus the identity `id`.
+
+The paper's central observation is that the two paradigms -- attribution and rewriting -- share more structural similarity than is usually recognized. Both are embedded through the same mechanism: a functional interface (`attr` for attributes, `rule` for rewriting rules) wraps a Scala pattern-matching function, hiding the complexity of caching, cycle detection, and strategy representation behind a simple combinator. This unified embedding approach makes both paradigms accessible to mainstream developers without requiring them to learn separate specification languages or tool chains.
+
+## Key Concepts
+
+- **`attr` combinator** -- Wraps a partial function with memoization (argument-result pair caching) and circularity detection. The core abstraction for synthesized and inherited attributes alike.
+- **Inherited attributes via parent matching** -- Attributes defined by matching on `e.parent` rather than the node itself. The `env` attribute demonstrates downward propagation of binding contexts.
+- **Structural properties** -- `parent`, `isRoot`, `prev`, `next`, `isFirst`, `isLast`, `index` -- automatically derived for classes inheriting `Attributable`. Provide generic tree navigation without grammar-specific accessors.
+- **Reference attributes (RAGs)** -- Parameterized attributes that return references to existing tree nodes. `lookup(name)` traverses upward to find the binding lambda, eliminating explicit environment structures. Implements Hedin (2000).
+- **Parameterized attributes** -- `attr`-wrapped functions that take an additional parameter beyond the node. The parameter enables attribute families indexed by a value (e.g., identifier lookup keyed by name string).
+- **Strategy type** -- `Term => Option[Term]`. Success produces a rewritten term; failure produces `None`. All strategy combinators compose over this type.
+- **`rule` combinator** -- Lifts a partial function to `Strategy`, mapping undefinedness to `None` (failure). The rewriting counterpart to `attr`.
+- **Strategy combinators** -- `+` (non-deterministic choice), `<+` (deterministic choice), `<*` (sequence), `attempt`, `repeat`, `reduce`, `bottomup`, `innermost`. Compose into traversal patterns without explicit recursion over tree structure.
+- **Congruences** -- Constructor-specific traversal strategies. `C(s1, s2)` applies strategies to specific constructor positions, enabling precise control over which sub-terms are traversed or left unchanged.
+- **Explicit substitutions** -- Rewriting-only evaluation where capture-free substitution is decomposed into individual rewrite rules operating on a `Let` construct, making each substitution step an observable transformation.
+- **Unified embedding pattern** -- Both paradigms use the same mechanism: combinator function (`attr`/`rule`) wrapping a host-language pattern-matching function. This structural parallel reveals deep commonality between attribution and rewriting.
+
+## Ecosystem Relevance
+
+### Complementary to Sloane 2010
+
+The 2010 paper (Sloane, Kats, Visser) focuses exclusively on attribute grammars: the `CachedAttribute` implementation, circular fixed-point evaluation (Magnusson-Hedin algorithm), dynamic attribute extension (`+=`, `using` blocks), modular composition via Scala traits, and performance benchmarks against JastAdd on PicoJava. It does not cover rewriting at all.
+
+This 2009 paper covers territory absent from the 2010 paper:
+
+- **Strategy-based term rewriting.** The entire Stratego embedding -- `rule`, `Strategy` type, strategy combinators (`+`, `<+`, `<*`), library strategies (`attempt`, `repeat`, `reduce`, `bottomup`, `innermost`), congruences -- appears only here.
+- **Reference Attribute Grammars in practice.** The 2010 paper mentions RAGs theoretically; this paper implements a concrete `lookup` parameterized reference attribute that eliminates environment structures, showing the full workflow from environment-based to reference-based analysis.
+- **Structural properties in detail.** The `Attributable` trait with its `parent`, `prev`, `next`, `isRoot`, `isFirst`, `isLast` properties is described here as the foundation for inherited attributes and tree navigation.
+- **Evaluation strategy design space.** The progression from naive reduce through innermost, eager, and lazy evaluation -- each expressed as a different strategy composition -- provides a taxonomy of traversal patterns relevant to any tree-processing system.
+- **Explicit substitution as rewriting.** The technique of encoding substitution as first-class rewrite rules (the `Let` construct with propagation strategies) demonstrates how meta-level operations can be brought into the object-level term rewriting framework.
+- **The unified embedding thesis.** The observation that `attr` and `rule` are structurally parallel -- both wrapping pattern-matching functions behind a combinator that adds caching/failure semantics -- is stated only here.
+
+### Applicable Concepts
+
+**Strategy combinators for gen-derive rule composition.** gen-derive currently provides `restrict`, `override`, and `chain` as rule composition operators. Kiama's strategy combinators suggest a richer algebra: deterministic choice (try rule A, fall back to rule B), sequential composition (apply A then B to the result), and repeat-until-stable. The `reduce` strategy -- repeatedly apply sub-term + top-level rules until fixpoint -- is structurally similar to gen-derive's fixpoint convergence but operates at the individual-rule level rather than the whole-dispatch level.
+
+**Congruences for gen-scope tree transformation.** When den v2 needs to transform scope graph subtrees (e.g., rerouting class content, applying `meta.substitute`), congruence-like combinators would provide precise, constructor-aware traversal. A congruence for scope nodes could apply one strategy to child edges and another to import edges, without manually destructuring the node.
+
+**Explicit substitution pattern for den's `meta.substitute`.** Den's edge target replacement (`meta.substitute = { X = Y; }`) is conceptually an explicit substitution in the rewriting sense. The paper's technique of representing substitution as a first-class tree construct with propagation rules could inform a more principled implementation where substitution is a visible, composable operation in the scope graph rather than an imperative edge rewrite.
+
+**Reference attributes for cross-entity resolution.** The `lookup` parameterized attribute pattern -- traversing upward to find a binding node -- maps directly to gen-scope's `inherit'` combinator. But the paper's formulation as a true reference attribute (returning the node itself, not just its value) suggests that gen-scope could benefit from a `refAttr` combinator that returns node references with full attribute access, rather than requiring the caller to manually compose `inherit'` with `get`.
+
+**Failure-aware composition.** The `Strategy` type's explicit `Option` semantics -- combinators that branch on success/failure -- provide a model for error-aware attribute evaluation in gen-scope. Currently, gen-scope attributes are total functions that must handle all cases or throw. A partial-attribute mechanism with combinator-based fallback (try this equation, on failure try that one) would enable more modular attribute definitions.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Strategy library for scope graph transformations.** Kiama's `bottomup`, `innermost`, `reduce`, and congruences form a complete vocabulary for controlled tree transformation. gen-scope currently has no transformation layer -- it evaluates attributes over a static graph. A `gen-transform` library providing strategy combinators over scope graphs (with gen-scope's accessor pattern as the structural interface) would enable declarative graph rewriting for operations like aspect substitution, edge rerouting, and graph normalization.
+
+- **Failure-propagating attribute combinators.** Kiama's `Strategy` returns `Option[Term]`, making failure explicit and composable. gen-scope attributes are total (`id -> value`). A `tryAttr` combinator returning `null` on undefined cases, composable via `<+` (try first, fall back to second), would support modular attribute definitions where different modules contribute partial equations for the same attribute without requiring coordination.
+
+- **Congruence generation from gen-schema kinds.** Kiama notes that automatic congruence generation requires abstract syntax knowledge. gen-schema's kind declarations provide exactly this: a typed description of node structure with named fields and known child positions. A bridge from gen-schema kinds to gen-scope/gen-transform congruences could auto-generate constructor-aware traversal strategies from schema declarations.
+
+- **Explicit substitution as a den effect.** The `Let`-based explicit substitution technique could inform den's `meta.substitute` implementation. Instead of eagerly rewriting edges, substitutions could be represented as scope graph nodes with their own identity and propagation semantics, making the substitution process observable, composable, and reversible.
+
+### Research Directions
+
+- **Unifying attribution and rewriting in a lazy host language.** Kiama embeds both paradigms in Scala but keeps them largely separate (attributes for analysis, strategies for transformation). In Nix, where the host language is purely functional and lazy, the distinction may collapse further: an "attribute" that produces a modified subtree IS a higher-order attribute that IS a rewriting step. Formalizing this collapse -- when is demand-driven attribute evaluation equivalent to innermost rewriting? -- could simplify gen-scope's architecture by subsuming explicit transformation into the attribute evaluation framework.
+
+- **Typed strategies for scope graphs.** Kiama notes (Section 5/Conclusion) that its strategies are largely untyped except that Scala's type system prevents ill-typed term construction. For scope graphs with typed edges (P, I, custom labels) and typed nodes (entity kinds from gen-schema), a typed strategy system could statically guarantee that transformations preserve graph well-formedness -- e.g., that a strategy applied to I-edges cannot accidentally produce P-edges.
+
+- **Strategy-based collection attribute evaluation.** Kiama's `reduce` strategy (repeatedly apply rules until fixpoint) and gen-scope's `collectionAttr` (traverse and aggregate) solve related problems from different directions. A unified formulation where collection attribute traversal IS a strategy -- with the traverse axis as a congruence pattern and the combine function as a strategy combinator -- could simplify gen-scope's collection attribute implementation and make traversal patterns composable.

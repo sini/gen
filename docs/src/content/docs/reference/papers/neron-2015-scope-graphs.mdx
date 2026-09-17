@@ -1,0 +1,160 @@
+---
+title: "Neron et al. (2015) — A Theory of Name Resolution"
+description: "Our reading of A Theory of Name Resolution."
+source:
+  - den-ag-design:used/summaries/neron-2015-scope-graphs.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+P. Néron, A. Tolmach, E. Visser, and G. Wachsmuth, "A Theory of Name Resolution," *Lecture notes in computer science*, ok2, pp. 205–231, 2015.
+
+[doi:10.1007/978-3-662-46669-8_9](https://doi.org/10.1007/978-3-662-46669-8_9) · [read the paper](https://link.springer.com/content/pdf/10.1007/978-3-662-46669-8_9.pdf)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+## Paper Summary
+
+The paper addresses a fundamental gap in programming language theory: while context-free grammars provide a universal declarative formalism for syntax, no equivalent exists for name binding and resolution. Name resolution — associating each reference to its intended declaration — is a pervasive concern implemented ad hoc across compilers, IDEs, and formal semantics, with rules typically encoded multiple times for different purposes, risking inconsistency and duplication.
+
+Neron et al. introduce a two-stage formalism. First, a language-specific but structurally uniform **scope graph** is constructed from a program's AST via syntax-directed traversal. The scope graph abstracts away syntactic details, retaining only the information relevant to name resolution: scopes (minimal program regions uniform with respect to resolution), declarations (binding occurrences), references (applied occurrences), parent edges (lexical nesting), and import edges (module-style composition). Second, a language-independent **resolution calculus** derives resolution paths through the scope graph from references to declarations.
+
+The resolution calculus (Fig. 3) defines four key relations: direct edges between scopes (via parent P-edges and import I-edges), transitive closure of edges (reachability), reachable declarations (constrained by a well-formedness predicate), and visible declarations (filtered by a specificity ordering). The well-formedness predicate WF(p) constrains resolution paths to the regular language P*.I* — parent steps may precede import steps, but not follow them. This prevents the anomaly where importing a module would implicitly make its lexical parent's declarations visible (Section 2.4, Fig. 9). The specificity ordering D \< I \< P establishes that local declarations shadow imports, and imports shadow lexically inherited declarations. Together, WF and \< are the two configurable policy knobs of the framework.
+
+A critical technical contribution is the **seen-imports set** I (rule X), which prevents circular self-resolution: each import reference is added to I before resolving, ensuring it cannot be used in its own resolution. This is the mechanism that makes the calculus well-founded despite supporting cyclic import chains.
+
+The paper proves two central theorems. **Theorem 1** establishes that the resolution algorithm (Fig. 18) is sound and complete with respect to the calculus. The algorithm computes environments EnvV by composing atomic environments (EnvD for declarations, EnvI for imports, EnvP for parent scope) using a shadowing operator (Definition 1) that mirrors the specificity ordering. The proof proceeds via a "primed" calculus (Fig. 19) that adds a seen-scopes set S to prevent cyclic paths, shown equivalent to the original calculus by Lemma 1 (visibility derivations are cycle-free). The termination argument uses the lexicographic measure (|R(G) \ I|, |S(G) \ S|).
+
+The paper further defines language-independent **alpha-equivalence** (Definition 5) and **valid renaming** (Definition 8) based on position equivalence classes derived from the resolution relation. Two programs are alpha-equivalent when they are structurally similar (same AST up to identifiers) and have identical equivalence classes of identifier positions.
+
+Coverage is demonstrated across let bindings (sequential, recursive, parallel — Fig. 14), qualified names (Fig. 15), and Java class inheritance modeled as import edges (Fig. 16). Section 2.5 shows the framework's modularity: alternative visibility policies (non-transitive imports, textual inclusion semantics) require only changes to WF and \<, not to the calculus rules themselves.
+
+## Key Concepts
+
+- **Scope graph** (Fig. 1): Language-independent directed graph with scope nodes, declaration nodes (xD_i, optionally with associated named scope S), reference nodes (xR_i), parent edges P (partial function, well-founded), and import edges I. Well-formedness requires each reference and declaration belongs to exactly one scope.
+
+- **Resolution paths** (Fig. 2): Sequences of steps D(xD_i), I(xR_i, xD_j:S), and P, forming a record of how a resolution was derived. The path structure enables the specificity ordering and well-formedness predicate to be defined independently of the calculus rules.
+
+- **Well-formedness predicate** WF(p) in P*.I*: The key insight preventing leaking of lexical context through imports. After traversing any import edge, no parent edge may be followed. This is the configurable reachability policy.
+
+- **Specificity ordering** D \< I \< P: Lexicographic ordering on path steps establishing shadowing priority. Local declarations shadow imports; imports shadow parent-scope declarations. This is the configurable visibility policy.
+
+- **Seen-imports tracking** (rule X): Each resolution adds the resolved reference to a set I before resolving, preventing self-referential import resolution. Ensures well-foundedness of the recursive resolution relation.
+
+- **Shadowing operator** (Definition 1): E1 \<| E2 = E1 union \{xD_i in E2 | no xD_i' in E1\}. The algorithmic counterpart to the visibility relation, applied incrementally during environment construction.
+
+- **Resolution algorithm** (Fig. 18): Deterministic, terminating computation of environments via EnvV = EnvL \<| EnvP where EnvL = EnvD \<| EnvI. Sound and complete with respect to the calculus (Theorem 1).
+
+- **Anomalous resolution** (Section 2.4): Even with seen-imports, mutually recursive imports can cause a single derivation to resolve the same import two different ways. The authors acknowledge this as a limitation, noting no real language exhibits such patterns.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+#### gen-scope (MAJOR — full resolution calculus)
+
+gen-scope implements the complete Neron resolution framework as a demand-driven HOAG evaluator:
+
+- **Scope graph construction**: `buildNodes` constructs scope graphs from algebraic graph specifications. The `parentGraph` parameter defines P-edges; `importGraph` defines I-edges; `edgeGraphs` extends to custom labeled edges (van Antwerpen 2018). Edge data is stored in `decls.__edges.I`, directly corresponding to Neron's I(S) import set per scope.
+
+- **Resolution calculus**: The `query` combinator implements Neron's full resolution (Fig. 3). It searches local declarations (EnvD), then imports (EnvI), then parent scope (EnvP) with the D \< I \< P specificity ordering from Fig. 2. The `localShadowsImport` and `importShadowsParent` parameters directly expose the specificity policy knobs from Section 2.5.
+
+- **Well-formedness**: The `query` implementation enforces WF(p) in P*.I* — once import edges are followed, parent edges are not traversed for the same resolution. The `transitiveImports` parameter controls whether the I* portion permits chaining (Section 2.5 reachability policy variants).
+
+- **Seen-imports cycle prevention**: The `_seen` tracking in `query` implements rule X's seen-imports set I, preventing self-referential import resolution (Section 2.4).
+
+- **Shadowing**: The `shadow` combinator implements Definition 1's shadowing operator. The `resolve` combinator provides specificity-ordered resolution matching Fig. 2's ordering.
+
+- **queryAll**: Implements reachability without visibility filtering (rule R without rule V), corresponding to Neron's reachable declarations relation for ambiguity detection.
+
+- **collectionAttr**: Extends Neron's framework with traversal-based aggregation. Traverse modes `"imports"`, `"children"`, `"ancestors"`, `"siblings"`, and `"label:<name>"` generalize path-following beyond Neron's P and I edges.
+
+- **Algebraic graph construction**: All four Mokhov (2017) primitives (`empty`, `vertex`, `overlay`, `connect`) plus derived constructors (`star`, `path`, `clique`, `tree`, `forest`) are used to build the scope graphs that Neron's calculus operates over.
+
+#### gen-graph (MAJOR — parent-chain traversal as P-edge resolution)
+
+gen-graph implements the structural query layer over graphs that may represent scope graph topology:
+
+- **`ancestorsOf`**: Directly follows P-edge resolution (Section 2.3). Walks the `parent` partial function upward through scopes, corresponding to following P-edges in the resolution calculus. The cycle-safe termination (silent stop on revisited node) matches Neron's well-foundedness requirement on the parent relation.
+
+- **`reachableFrom`**: Generalized transitive closure over edges, corresponding to the reachability relation S -> S' in Neron's calculus. Uses C-level BFS via `builtins.genericClosure`.
+
+- **`dependentsOf` / `dependents`**: Reverse reachability — "who can resolve to this declaration?" — the inverse of Neron's resolution relation. Useful for impact analysis when declarations change.
+
+- **`pathsBetween`**: Computes all acyclic paths between two nodes, directly corresponding to Neron's resolution paths (Fig. 2) where multiple paths may exist from a reference to different declarations.
+
+- **Fixpoint iteration**: `fixpoint` with monotonicity enforcement corresponds to the well-foundedness guarantees Neron requires for termination of the resolution algorithm.
+
+#### gen-select (MAJOR — five-field accessor context models scope graph traversal)
+
+gen-select's context shape directly maps to scope graph navigation:
+
+- **Context fields**: The five accessor functions (`data`, `parent`, `children`, `ancestors`, `siblings`) model the scope graph traversal axes from Neron Sections 2.2-2.4. `data` maps to D(S) declarations; `parent` maps to P(S) parent scope; `children` and `ancestors` provide directional traversal along P-edges; `siblings` provides lateral traversal within a scope.
+
+- **`adapters.scope.mkContext`**: Bridges gen-scope's `{ node, get }` accessor pair to gen-select's context shape, creating a direct structural correspondence between scope graph nodes and selector evaluation positions.
+
+- **`sel.within`**: Matches when any ancestor satisfies a predicate — this is exactly "reachable via P-edges" in Neron's calculus.
+
+- **`sel.has`**: Matches when any child satisfies a predicate — inverse P-edge traversal.
+
+- **`sel.parentMatches`**: One-step P-edge check, corresponding to a single P step in a resolution path.
+
+- **`sel.attrs`**: Data predicate on node declarations, corresponding to matching xD_i declarations in D(S).
+
+#### gen-schema (Minor)
+
+`_edges` introspection uses P/I edge vocabulary for topology representation but does not implement the resolution calculus.
+
+### Relevance to Den v2 HOAG Pipeline
+
+Den v2 replaces the ~7000-line handler chain with a demand-driven HOAG evaluation over scope graphs, directly structured by Neron's formalism:
+
+**Parent edges for entity nesting.** Den's entity hierarchy (hosts contain users, users have homes) maps to Neron's P-edge parent relation. `spawn "kind" { bindings }` creates a scope node with a P-edge to its parent, corresponding to Neron's scope graph construction (Fig. 17, `newS` with parent). The well-foundedness of the parent relation (Fig. 1) guarantees that inherited attribute resolution terminates — a host's configuration walks up to its environment but never cycles.
+
+**Import edges for aspect composition.** Den aspects declare `includes = [...]` (forward I-edges) and `neededBy = [...]` (reverse I-edges). These correspond directly to Neron's I(S) import set and the import edge rule (I). When an aspect includes another, the included aspect's declarations become visible in the includer's scope, exactly as Neron's import mechanism makes declarations in named scopes visible.
+
+**Well-formedness P*.I* prevents leaking through provides.** Den's `provides` mechanism (delivering configuration from one entity to another) uses import edges. Neron's well-formedness predicate WF(p) in P*.I* is critical here: once a provides import is followed, the provider's lexical parent context is not leaked to the consumer. Without this constraint, importing a user's provided configuration would also implicitly import the host's configuration — the exact anomaly Neron describes in Section 2.4, Fig. 9.
+
+**Import-scoped collection replaces global pipe assembly.** Den v1 assembled pipe data globally. Den v2 uses import edges to scope collection data: `pipe.gather pred` traverses import edges to collect from matching scopes, `pipe.source pred` filters which scopes contribute, and `pipe.target [aspects]` controls delivery. This is Neron's I-edge traversal with gen-scope's `collectionAttr` (traverse mode `"imports"`) providing the evaluation substrate.
+
+**D \< I \< P specificity for resolution.** When an aspect key could resolve to a local declaration, an imported declaration, or a parent-scope declaration, den v2 uses Neron's specificity ordering. Local aspect content shadows included content, which shadows inherited content. The `drop` effect corresponds to removing declarations from resolution scope (pruning the scope graph). The `reroute` effect corresponds to redirecting import edges.
+
+**Seen-imports for cycle safety.** Den's `includes` and `neededBy` can create complex graphs. Neron's seen-imports mechanism (rule X), implemented in gen-scope's `query` combinator, prevents aspects from participating in their own resolution — a real concern when aspects use `neededBy` to inject into scopes that also include them.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Alpha-equivalence and renaming (Section 6).** Neron defines language-independent alpha-equivalence via position equivalence classes and valid renaming via capture-avoidance. Neither gen-scope nor den implements these. Position equivalence classes could power "safe rename" tooling for den aspects — renaming an aspect and having all `includes`/`neededBy` references update consistently.
+
+- **Anomalous resolution analysis (Section 2.4, Fig. 12).** The paper identifies that mutually recursive imports can cause a single derivation to resolve the same import two ways. No gen library currently detects this condition. In den, mutual `includes` between aspects could theoretically trigger anomalous resolution.
+
+- **Alternative reachability policies (Section 2.5).** The paper shows how non-transitive imports (WF in P*.I(\_,\_)?), mixed transitive/non-transitive imports, and Coq-style exports can be expressed by modifying WF alone. gen-scope currently supports `transitiveImports` as a boolean, but does not support per-edge-label reachability policies or the full regular-language WF parameterization.
+
+- **Include semantics (Section 2.5, Fig. 13).** The paper describes how dropping D \< I from the specificity ordering models textual inclusion (Standard ML's `include`), where imported declarations have equal precedence with locals. gen-scope's `localShadowsImport` parameter partially exposes this, but there is no per-import-edge policy (some imports shadow, others include).
+
+- **Scope graph construction specification language (Section 4, future work).** The paper describes scope graph construction via imperative syntax-directed traversal (Fig. 17) but notes that a declarative binding specification language (like NaBL) for constructing scope graphs from arbitrary ASTs is future work. Den v2 constructs scope graphs programmatically; a declarative specification of how entity declarations map to scope graph structure would make the construction auditable and verifiable.
+
+- **Variable capture characterization (Section 6.2).** The paper defines valid renaming but defers precise characterization of variable capture in the general setting to future work, noting that capture depends on the seen-import context. This is relevant to den's `meta.substitute` effect, which replaces edge targets and could theoretically cause capture.
+
+### Potential New Libraries or Features
+
+- **gen-rename (new library, small scope).** Implement Neron's alpha-equivalence (Definition 5) and valid renaming (Definition 7) over gen-scope's scope graphs. Input: a scope graph and a rename request (position + new name). Output: the set of positions that must change, or an error if the rename would cause capture. Depends on gen-scope only. ~200-400 lines. Enables safe refactoring tooling for den configurations.
+
+- **gen-scope: per-edge reachability policy (feature).** Extend `query` to accept a WF parameter as a regular-language specification over edge labels, rather than the current boolean `transitiveImports`. This would support the full range of policies from Section 2.5: non-transitive imports, mixed transitive/non-transitive, Coq-style exports, and include semantics. Requires extending `buildNodes`'s `importGraph` to carry per-edge labels and `query` to consult a policy function. Medium complexity — the query combinator's inner loop needs refactoring.
+
+- **gen-scope: anomaly detection (feature).** Add an `anomalies` diagnostic that detects scope graph configurations where a single resolution could resolve the same import two ways (Section 2.4). This would be a Tier 2 operation (requires `allNodes`) that checks for mutually recursive import cycles with overlapping declaration namespaces. Low priority but useful for den debugging.
+
+- **gen-scope: include-mode imports (feature).** Allow per-import-edge `mode` metadata (`"shadow"` vs `"include"`) that controls whether D \< I applies for that edge. When `mode = "include"`, imported declarations have equal specificity with local declarations, enabling Standard ML-style includes per Section 2.5. Small change to `query` — check edge metadata before applying shadowing.
+
+### Research Directions
+
+- **Interaction of resolution and types.** Neron identifies this as future work (Section 8): dependent types and name disambiguation based on types. In den, aspect guards (`meta.guard = pred`) are a form of type-directed resolution — the guard's predicate determines whether an aspect is visible in a given scope context. Formalizing this as typed resolution (where the "type" is the entity context) would connect den's guard mechanism to the scope graph formalism.
+
+- **Incremental scope graph construction.** The paper assumes single-pass AST traversal. Den v2 uses HOAG dynamic node synthesis (Vogt 1989) where the tree structure itself is attribute-dependent. This means scope graph construction and resolution are interleaved — children attributes can depend on resolution results. The interaction of incremental construction with Neron's resolution guarantees (particularly Theorem 1's completeness) is an open question: does demand-driven interleaved construction preserve soundness and completeness?
+
+- **Resolution paths as provenance.** Neron's resolution paths record the evidence for every resolution — the sequence of P-edges, I-edges, and declaration lookups that justified binding a reference to a declaration. Den v2 currently discards this evidence. Exposing resolution paths through gen-scope would enable rich diagnostics: "this aspect content reached host X because: parent(user-scope) -> import(networking-aspect) -> declaration(firewall)". This connects to gen-bind's provenance tracking (Findler 2002 blame labels) — resolution paths could serve as the provenance source for bound values.
+
+- **Scope graph equivalence as configuration equivalence.** Two den configurations that produce isomorphic scope graphs with identical resolution relations should be semantically equivalent regardless of syntactic differences (different aspect decomposition, different entity nesting). This is a direct application of Neron's alpha-equivalence (Section 6) lifted from programs to configurations.

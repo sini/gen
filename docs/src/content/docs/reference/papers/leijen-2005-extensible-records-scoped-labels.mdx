@@ -1,0 +1,125 @@
+---
+title: "Leijen (2005) -- Extensible Records with Scoped Labels"
+description: "Our reading of Extensible records with scoped labels.."
+source:
+  - den-ag-design:used/summaries/leijen-2005-extensible-records-scoped-labels.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+D. Leijen, "Extensible records with scoped labels.," ok, 2005.
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+Leijen, Daan. "Extensible Records with Scoped Labels." Draft, Revision 76, July 23, 2005. Institute of Information and Computing Sciences, Utrecht University. https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf
+
+## Paper Summary
+
+Records -- labeled products -- are fundamental building blocks for data structures, yet most programming languages severely restrict their use: labels cannot be reused at different types, records must be explicitly declared, and extensibility is absent. Prior work by Wand (1987), Remy (1993), and Gaster & Jones (1996) introduced row variables and extensible record types, but each system imposed complexity costs: Wand's system lacked principal types due to ambiguous free extension semantics; Remy's presence/absence flags produced types unintuitive to users (absent labels appearing in types with `abs` flags); Gaster & Jones required `lacks` predicates from qualified types theory, adding both conceptual weight and implementation burden.
+
+Leijen proposes a simpler alternative grounded in a single novel idea: **allow duplicate labels in records and retain them**, introducing scoped label semantics. Where all prior systems treated free extension (extending a record with a label that may already be present) as an implicit update -- overwriting the previous field -- Leijen's system preserves the previous field in both the runtime value and the static type. Selection and restriction operate on the **first matching label**, so extending a record with a duplicate label effectively shadows the previous binding. Restriction removes the first occurrence, exposing the previous value underneath. This makes records behave as stacks indexed by label, and the type system reflects this precisely: `{x :: Int, x :: Bool}` is a well-formed type distinct from `{x :: Bool, x :: Int}`.
+
+The type-theoretic contribution is minimal in surface area but deep in consequence. The entire record system requires only a new equality relation on monotypes (Figure 1, six rules) and an extended unification algorithm (Figures 2-3). Rows are sequences of labeled types, either empty `(||)` or extended `(|l :: t | r|)`. The critical rule is **(eq-swap)**: two adjacent fields in a row may be permuted if and only if their labels are **distinct**. This ensures that records are equivalent up to permutation of distinct labels (so `{x :: Int, y :: Bool}` equals `{y :: Bool, x :: Int}`) but that duplicate labels maintain their relative order (so `{x :: Int, x :: Bool}` is NOT equal to `{x :: Bool, x :: Int}`). Combined with transitivity (eq-trans) and structural equality (eq-head), this gives a complete notion of row equivalence that keeps selection and restriction well-defined even in the presence of duplicates.
+
+The unification algorithm (Section 7, Figure 2) extends Robinson unification with a row rewriting operation (Figure 3). When unifying a row `(|l :: t | r|)` with some row `s`, the algorithm rewrites `s` into the form `(|l :: t' | s'|)` using label swapping (row-swap), then unifies the field types and tails recursively. A critical side condition in rule **(uni-row)** -- `tail(r) not in dom(theta_1)` -- prevents non-termination when two rows share a common tail variable but differ in prefix (the pathological case `\r -> if True then {x = 2 | r} else {y = 2 | r}`). Leijen proves:
+
+- **Theorem 1 (Soundness)** -- if two types unify, they are equal under the resulting substitution.
+- **Theorem 2 (Completeness)** -- if two types are equal under some unifier, unification succeeds and finds a most general unifier.
+
+These results carry over directly to Hindley-Milner, qualified types, and MLF, since the record extension is purely at the level of monotype equality and unification -- no new type rules are introduced. Section 4 demonstrates this composability by using records with MLF to encode first-class modules with impredicative higher-ranked polymorphism, where fields can have universally quantified types (e.g., `{id :: forall a. a -> a}`).
+
+Section 5 extends the design to **variants** (labeled sums), which share the same row type infrastructure. Variants use injection, embedding, and decomposition operations. Scoped labels in variants arise through the embedding operation, which can introduce duplicate tags. Decomposition matches on the first occurrence of a label (nesting level zero); the embedding operation increments the nesting level for duplicate labels, enabling principled disambiguation.
+
+Section 8 surveys four implementation strategies with increasing efficiency: association lists (O(n) select), labeled vectors with binary search (O(log n)), labeled vectors with constant folding (amortized O(1) for closed types via partial evaluation), and plain vectors with extension predicates (guaranteed O(1) via evidence translation). The labeled-vectors-plus-constant-folding approach is recommended as the best practical compromise: it uses worker-wrapper transformations to float lookup operations to call sites where record types are known, achieving constant-time selection without the parameter explosion of the predicate approach.
+
+## Key Concepts
+
+- **Free extension with retention (S2)** -- extending a record with an existing label pushes a new value rather than overwriting. The previous value is preserved in both the runtime representation and the static type. This cleanly separates the concepts of extension and update, unlike all prior systems (Wand, Remy, Gaster-Jones) which conflated them.
+- **Scoped labels (S2.1, S3.2)** -- duplicate labels form a scope stack. Selection returns the topmost (most recently extended) value; restriction pops the top, exposing the previous value. The motivating use case is environment modeling: `warning env f = f {color = red | env}` temporarily shadows the color field, and `f (env - color)` restores the parent context's color.
+- **Row equality with restricted permutation (S3, Figure 1)** -- the (eq-swap) rule permits reordering adjacent fields only when their labels differ. This is the sole mechanism preventing permutation of duplicate labels, maintaining stack ordering invariants without additional type-level constructs.
+- **Orthogonal type system extension (S6)** -- the record system requires only a new equality on monotypes and extended unification. No new type rules, no predicates, no flags. This makes it embeddable in HM, qualified types, and MLF with minimal effort.
+- **Row unification with termination guard (S7, Figures 2-3)** -- the (uni-row) side condition `tail(r) not in dom(theta_1)` prevents the infinite rewriting loop that afflicts Wand's system and TREX. Soundness (Theorem 1) and completeness (Theorem 2) are proven in a companion technical report.
+- **Variants with scoped tags (S5)** -- the embedding operation `<l | v>` on variants parallels record extension. Duplicate variant tags require nesting-level tracking at runtime: injection creates level-0 variants, embedding increments the level for duplicates, and decomposition only matches level-0 tags.
+- **Worker-wrapper compilation for O(1) selection (S8)** -- for polymorphic records with open row tails, splitting functions into a wrapper (that performs label lookup at the call site where types are known) and a worker (that uses integer indices) achieves constant-time access. This is a variant of GHC's worker-wrapper transformation.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+**gen-algebra** (MAJOR -- directly implements S2-S3.2)
+
+The record algebra in `pure/rec.nix` implements Leijen's three primitive operations and the scoped label mechanism:
+
+- **Representation** -- records use `{ __entries = { label = [value-stack]; }; __order = [labels]; }`, an attrset-with-shadow-stack encoding. Each label maps to a list representing the scope stack. This directly realizes Leijen's retention semantics: extension appends to the head of the stack, restriction removes the head, selection reads the head.
+- **`record.extend r label value`** -- Leijen S2 extension `{l = e | r}`. Pushes `value` onto the label's stack. If the label already exists, the previous value is retained underneath (free extension with retention, not overwrite).
+- **`record.select r label`** -- Leijen S2 selection `r.l`. Returns the head of the label's stack (first matching label). Throws if absent, matching Leijen's type safety guarantee that selection is only valid on present labels.
+- **`record.restrict r label`** -- Leijen S2 restriction `r - l`. Pops the head of the label's stack. If the stack has depth > 1, the previous value becomes accessible via subsequent `select`, directly realizing scoped label exposure (S2.1, the `warning env f` pattern).
+- **`record.has r label`** / **`record.depth r label`** -- runtime label presence checking and scope depth introspection. `depth` returns the stack height, corresponding to the number of duplicate extensions.
+- **`record.update r label value`** -- Leijen S2 derived operation `{l := x | r}` = `{l = x | r - l}`. Replaces the head of the stack. Strict: throws if the label is absent, matching the paper's type safety for update on present fields.
+- **`record.emit r`** -- collapses the shadow stack to a plain attrset (heads only), losing scope information. `record.emitAll r keys` preserves full stacks for specified labels.
+- **`record.combine a b`** -- left-biased combination. Maps to Bracha & Cook (1990) but the per-label combine uses Leijen's shadow stack: a's values sit atop b's values for each label.
+- **`record.satisfies r fields`** / **`record.assertSatisfies r fields`** -- row compatibility checks (S3.1). Validates that a record contains all required labels, analogous to the type-level guarantee that selection and restriction are only valid on present fields.
+- **`record.mixin delta parent`** / **`record.compose m1 m2`** -- mixin composition (Bracha 1990) over Leijen's record substrate. The mixin applies `combine (delta parent) parent`, where `combine` uses shadow stack semantics for per-label merging.
+
+The O(1) select cost matches Leijen's labeled-vector approach (S8) since Nix attrset lookup is constant-time. The shadow stack (list per label) adds O(depth) for restrict but depth is typically 1-3 in practice.
+
+**gen-bind** (Minor -- informed by S2 merge semantics)
+
+gen-bind's merge strategy vocabulary maps to Leijen's distinction between free and strict extension:
+
+- **`bindWins`** -- the binding shadows the module-system arg. This parallels Leijen's first-match selection semantics: the most recently extended (bound) value is what `select` returns.
+- **`error`** -- rejects duplicate bindings. This mirrors **strict extension** (S2.1, Gaster-Jones style) where extending with an already-present label is a type error.
+- **`systemWins`** -- the module-system arg takes precedence. This inverts the shadow direction but follows the same scoped-label intuition: the "earlier" binding wins.
+
+gen-bind uses flat `//` (attrset merge) rather than row-typed shadow stacks, so the mapping is conceptual. The vocabulary (`merge-strategy.nix`) names its strategies in terms borrowed from Leijen's free-vs-strict distinction.
+
+**gen-schema** (Minor -- consumes gen-algebra's record algebra)
+
+gen-schema uses gen-algebra's record operations for two purposes:
+
+- **Mixin application** (`mixin.nix`) -- `schema.applyMixin` calls `record.select` and `record.extend` to compose mixin contributions over a kind's record representation. The `requires` field check uses `record.satisfies` for row compatibility validation before applying the mixin.
+- **Module bridging** (`bridge.nix`) -- `schema.emitModule` traverses a record-algebra record to produce a NixOS module, using `record.emitAll` to preserve full shadow stacks for collection fields (validators, methods) while collapsing other fields to heads. This is a direct consumer of Leijen's scoped label retention: collection values accumulated across multiple extensions are all preserved, not just the latest.
+
+### Relevance to Den v2 HOAG Pipeline
+
+In den v2's demand-driven HOAG architecture, Leijen's record algebra provides the **data manipulation substrate** at three levels:
+
+1. **Aspects are records.** Each aspect is an attrset whose keys are classified into class keys, collection keys, and nested keys. The record algebra structures how aspect content is composed: when two modules contribute to the same aspect, their contributions combine via `record.combine` with shadow stack semantics. Duplicate keys (e.g., two modules both setting `nixos.networking.hostName`) are handled by the scoped label mechanism -- the most local (innermost scope) definition shadows the outer one, and restriction can expose the parent's value.
+
+2. **Scope attributes are records.** Scope graph nodes carry declaration attrsets (`decls`) that accumulate as policies fire and enrichment actions widen context. When a child scope shadows a parent scope's declaration, this is precisely Leijen's scoped label pattern: the child's extension pushes a new value onto the label stack, and resolution via the D \< I \< P specificity order (Neron 2015) operates on the topmost (most specific) entry first.
+
+3. **Policy effects are records.** Effects produced by gen-derive rule dispatch (routes, includes, provides, drops, reroutes, injections) are record-valued. Multiple policies firing at the same scope produce effects that combine via left-biased record merge. When a more specific policy overrides a general one, the override semantics follow the shadow stack: the specific policy's effects sit atop the general policy's effects, and the pipeline processes them in stack order.
+
+The scoped label mechanism is particularly important for den v2's nested scope overrides. Consider a host scope declaring `level = "info"` and a user scope within it extending with `level = "debug"`. The scope graph resolution walks the parent chain (P edges), and the record algebra ensures that the user scope's value shadows the host scope's value without destroying it. If a policy needs access to the parent's value (e.g., for inheritance-based defaults), `record.restrict` exposes it -- exactly the `warning env f` pattern from S2.1.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Variant types with scoped tags (S5)** -- gen-algebra implements record algebra but not variant algebra. Leijen's variants use the same row infrastructure, adding injection, embedding, and decomposition operations. The embedding operation's nesting-level increment for duplicate tags is unimplemented. Variants would model tagged union types (e.g., policy effect kinds, entity types as labeled choices) with the same scoped label guarantees.
+
+- **Evidence translation for guaranteed O(1) selection (S8, extension predicates)** -- gen-algebra achieves O(1) select via Nix's native attrset lookup, but the evidence-translation approach (extension predicates turned into runtime offset parameters) is unexploited. In a compiled setting, this would guarantee constant-time access even for polymorphic records with open row tails. Not directly applicable in Nix (interpreted, lazy) but relevant if the ecosystem ever targets a compiled backend.
+
+- **Worker-wrapper transformation for open records (S8)** -- Leijen's technique of splitting functions into a wrapper (performs lookup at monomorphic call site) and a worker (uses integer indices) is applicable to gen-scope attribute access patterns. Currently, attribute access goes through string-keyed attrset lookup; a pre-computed index mapping could amortize lookup costs for frequently accessed attributes across large fleets.
+
+- **Row unification as a first-class operation (S7)** -- the unification algorithm could power a structural compatibility checker that goes beyond gen-algebra's `record.satisfies` (which checks label presence only). Full row unification would check type compatibility of corresponding fields, enable inference of the most general record type for a set of constraints, and detect incompatible record extensions statically. This would strengthen gen-schema's mixin compatibility validation.
+
+- **First-class modules via records + MLF (S4)** -- Leijen shows that records with impredicative higher-ranked polymorphism encode first-class modules where fields can have universally quantified types. NixOS modules are already first-class values in Nix, but they lack the static type guarantees. A future type-checking layer for Nix could use Leijen's encoding to give NixOS modules typed interfaces with polymorphic fields.
+
+### Potential New Libraries or Features
+
+- **gen-variant** -- a variant algebra library dual to gen-algebra's record algebra. Would implement Leijen S5: injection (`<l = e>`), embedding (`<l | v>`), and decomposition (`l in v ? f : g`). Scope: ~200 lines pure Nix, zero deps. Would model tagged effects in gen-derive (currently opaque attrsets), entity kind discrimination in gen-schema, and class-key routing in gen-aspects. Interaction: consumes gen-algebra's row infrastructure; gen-derive's `mkActions`/`classify` would become variant constructors/eliminators.
+
+- **Record type inference for gen-schema** -- extend gen-algebra with a row unification implementation (Figures 2-3) to infer most-general record types from sets of mixin `requires`/`provides` declarations. Currently gen-schema validates mixins structurally (label presence); row unification would catch type mismatches between a mixin's `provides` and a consumer's expected field type. Scope: ~150 lines in gen-algebra pure tier; gen-schema's `applyMixin` gains type-level checking. Complexity: moderate -- the side condition for termination (uni-row) requires careful handling of shared tail variables.
+
+- **Scoped label depth tracking for den v2 diagnostics** -- expose `record.depth` in den v2's diagnostic views to visualize shadow depth per scope attribute. A shadow depth > 2 for a configuration key indicates deep override chains that may be unintentional. The diagram library (den's `nix/lib/diag/`) could render scope attributes with depth annotations, aiding configuration debugging. Scope: small feature addition to existing diagram infrastructure.
+
+### Research Directions
+
+- **Scoped labels and monotonic scope graphs** -- Leijen's (eq-swap) rule (only distinct labels may permute) interacts interestingly with Neron (2015) scope graph resolution order (D \< I \< P). When scope graph nodes carry records with scoped labels, the combination of resolution specificity and label scope depth creates a two-dimensional override lattice. The formal properties of this combination (confluence, monotonicity under graph extension) are unexplored.
+
+- **Lazy record restriction as demand-driven scope narrowing** -- in Nix's lazy evaluation model, `record.restrict` is only evaluated when a consumer demands the restricted record. This means scope narrowing (exposing a parent's value by restricting a child's override) is demand-driven, aligning with gen-scope's demand-driven attribute evaluation. Whether this can be formalized as a lazy record calculus with demand-driven scoping -- combining Leijen's records with Chitil's (2012) lazy contracts -- is an open question.
+
+- **Mixin composition under scoped labels** -- Bracha & Cook (1990) assume records without duplicates. gen-algebra composes Bracha's mixin formula over Leijen's shadow-stack records, but the formal interaction properties (associativity, commutativity of independent mixins, idempotence) under scoped labels have not been verified. In particular, whether `compose m1 m2` over shadow-stack records satisfies the same algebraic laws as over flat records when both mixins touch the same label at different depths.

@@ -1,0 +1,126 @@
+---
+title: "Van Antwerpen et al. (2018) — Scopes as Types"
+description: "Our reading of Scopes as types."
+source:
+  - den-ag-design:used/summaries/van-antwerpen-2018-scopes-as-types.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+H. van Antwerpen, C. Bach Poulsen, A. Rouvoet, and E. Visser, "Scopes as types," *Proceedings of the ACM on Programming Languages*, vol. 2, no. OOPSLA, art. 114, 2018.
+
+[doi:10.1145/3276484](https://doi.org/10.1145/3276484)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+## Paper Summary
+
+The central problem addressed by van Antwerpen et al. is a fundamental limitation of the scope graph framework (Neron et al. 2015): while scope graphs elegantly model name binding for simple, nominal type systems, they cannot express structural types (where types are identified by structure, not name) or parametric types (where types are parameterized by other types). This restricts scope graphs to languages like Featherweight Java but excludes structural record subtyping, System F-style polymorphism, and generic classes.
+
+The key insight is that scopes themselves can serve as types. A scope already provides exactly what a type needs: a mapping from names to values (declarations). A record type `{ x : num, y : num }` is naturally represented as a scope with declarations `x : num` and `y : num`. This identification of scopes with types eliminates the need for separate type representations and enables the scope graph framework to express type compatibility through its existing resolution machinery.
+
+The paper makes four principal contributions. First, it extends the scope graph framework with **scoped relations** and **generalized queries**. In Neron et al. (2015), scope graphs had fixed edge labels (P for parent, I for import) and resolution was a fixed algorithm. Van Antwerpen et al. generalize this: edge labels are drawn from an arbitrary set L, data is associated with scopes under named relations (not just declarations), and resolution becomes a parameterized query over the graph. The resolution calculus (Fig. 1) is parameterized by four visibility parameters: data term well-formedness (WFD), label well-formedness (WFL, a regular expression over label sequences), a data order (which declarations shadow which), and a label order (which edge types are preferred). Crucially, these parameters can be specified **per query**, not globally per language. This enables namespace-specific visibility policies: field access in a record scope uses `(R|E)*` path well-formedness with `R <l E` ordering, while variable lookup uses `P*` with `$ <l P` ordering, even within the same scope graph.
+
+Second, the paper demonstrates the approach across three case studies of increasing complexity: STLC with structural records (featuring structural subtyping via scope comparison, S2.3), Featherweight Java (featuring nominal subtyping as path connectedness, S2.4), and System F / Featherweight Generic Java (featuring parametric polymorphism via explicit substitution scopes, S2.5). Record composition is modeled via edges (R for record, E for extension) that preserve substitution structure rather than eagerly merging. Parametric type instantiation is modeled via instantiation scopes with explicit substitutions that are lazily applied during resolution, avoiding scope graph duplication.
+
+Third, the paper introduces **Statix**, a constraint-based meta-language for specifying type systems. Statix rules combine term equality constraints with scope graph construction and query constraints, separating the traversal order of the AST from the solving order of constraints. The declarative semantics (Fig. 14) defines constraint satisfaction relative to a scope graph model with a separation-logic-flavored notion of scope ownership (the `nabla` freshness constraint distributes exclusive scope ownership across conjuncts). The paper provides a formal constraint satisfaction relation and discusses its execution model.
+
+Fourth, the paper addresses the critical challenge of **sound resolution in incomplete graphs** (S4.3). During constraint solving, the scope graph is built incrementally, so queries on intermediate graphs could yield unsound results. The solution tracks possible scope extensions in the constraint set and aborts resolution when it encounters a scope that may still be extended. This ensures soundness (resolved queries are never invalidated) while permitting interleaved graph construction and querying, at the cost of incompleteness (some valid programs may cause the solver to get stuck).
+
+The resolution algorithm (S4.2) implements an ordered depth-first search controlled by well-formedness predicates (for depth cutoff) and label ordering (for breadth cutoff and shadowing). Cyclic paths are rejected by the NR-Cons rule's premise that the current scope must not appear in the path so far.
+
+## Key Concepts
+
+- **Scopes as types**: Scopes provide a natural representation for structured types (records, classes, parameterized types). Copying a type means copying a scope reference, not duplicating structure.
+
+- **Custom edge labels**: Edge labels are drawn from an arbitrary set L, not fixed to P/I. Languages define their own label vocabulary: P (parent/lexical), R (record member), E (extension), S (superclass), I (instantiation). Each label carries traversal semantics.
+
+- **Per-query visibility policies**: Resolution parameters (WFD, WFL, label order, data order) are specified per query, not globally. Different name lookups in the same scope graph can follow different resolution strategies.
+
+- **Structural subtyping via scope comparison**: `REC(s1) <: REC(s2)` holds when every declaration visible in s2 has a corresponding declaration with a subtype in s1 (Fig. 4, rule \<:-Rec). This is expressed entirely through scope graph queries.
+
+- **Nominal subtyping as path connectedness**: `INST(s1) <: INST(s2)` holds when there exists a well-formed path from s1 to s2 through S edges (Fig. 8, rule \<:-Class).
+
+- **Explicit substitution scopes**: Parametric type instantiation creates a new scope with an I edge to the parameterized scope plus explicit substitutions. Substitutions are lazily applied during resolution via type normalization, avoiding scope graph duplication.
+
+- **Delayed projection**: The `pi_B(s)` type represents a delayed projection of a relation B from scope s. Strictness normalization forces projections on demand.
+
+- **Statix constraint language**: User-defined constraints with committed choice (non-overlapping guards), scope graph construction primitives (fresh scope, edge, datum), and parameterized resolution queries.
+
+- **Sound incremental resolution**: Resolution aborts on potentially incomplete scopes. Static analysis of Statix specifications determines which constraints may extend which scopes, enabling fine-grained tracking.
+
+- **Separation-logic ownership**: Scope freshness (`nabla s`) distributes exclusive ownership across conjuncts, preventing aliasing and enabling the solver to reason about completeness.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+**gen-scope** (MAJOR influence):
+
+- **Custom edge labels via `edgeGraphs`/`followEdge`**: `buildNodes` accepts `edgeGraphs = { label = graph; }` which stores custom-labeled edges in `decls.__edges.<label>`. The `followEdge label self id` combinator (S2.1 generalized edges) retrieves targets for a given label. `collectByLabel label extract self id` aggregates values along custom edges. This directly implements the paper's generalization from fixed P/I edges to arbitrary label sets L.
+
+- **Structural subtyping via `subtypeOf`**: `subtypeOf { eq? } self idA idB` implements the \<:-Rec pattern from S2.3 Fig. 4 — for every declaration visible in scope B, a matching declaration with compatible type must exist in scope A. The optional `eq` parameter customizes the compatibility check (defaulting to structural equality).
+
+- **Per-query visibility policies**: `query` and `queryAll` accept `dataFilter`, `localShadowsImport`, `importShadowsParent`, and `transitiveImports` parameters that correspond to the paper's WFD, label ordering, and WFL visibility parameters. Different attributes on the same graph can use different query configurations, matching the paper's per-query parameterization.
+
+- **Generalized resolution calculus**: `query` implements the NR-Vis visibility judgment with D \< I \< P specificity. The `_seen` tracking in query prevents import self-resolution (NR-Cons cycle prevention). `shadow inner outer` implements key-based shadowing (data order). `resolve { local?, imported?, inherited? }` provides the specificity-ordered multi-source resolution from the calculus.
+
+- **`ambiguous` combinator**: Detects when multiple declarations are visible for a query (S2.3 uniqueness checking for record fields).
+
+- **Algebraic graph construction for edge graphs**: `edgeGraphs` uses the same Mokhov (2017) primitives (`star`, `edge`, `path`, etc.) for custom edge label graphs as for parent/import graphs, providing uniform graph construction across all edge types.
+
+**gen-select** (indirect influence via gen-scope adapter):
+
+- `adapters.scope.mkContext` bridges gen-scope's evaluation result into gen-select's five-accessor context, enabling selectors to query scope graph positions. The adapter pattern parallels the paper's separation of graph structure from query parameterization.
+
+**gen-graph** (indirect influence):
+
+- `ancestorsOf` follows P-edge resolution chains, paralleling the paper's parent-chain traversal in the resolution calculus (NR-Cons path construction).
+
+### Relevance to Den v2 HOAG Pipeline
+
+Den v2 is a demand-driven HOAG over scope graphs where the paper's contributions structure three core mechanisms:
+
+**Custom edge labels for heterogeneous traversal.** Den v2 entities (hosts, users, homes) and aspects form a scope graph with multiple edge types: P edges (parent/lexical scoping), I edges (aspect includes/imports), and custom labels like `neededBy` (reverse injection edges). The paper's generalization to arbitrary label sets L enables each edge type to carry distinct traversal semantics. `followEdge "neededBy"` traverses reverse injection declarations; `followEdge "provides"` traverses delivery edges. Each uses a different visibility policy, matching the paper's per-query parameterization.
+
+**Per-query visibility policies for attribute computation.** Different den v2 attributes see different subsets of the graph. Policy dispatch traverses import edges with D \< I \< P specificity to resolve aspect content. Collection gathering may traverse custom label edges with different well-formedness constraints. The `collectionAttr` combinator's traverse modes (`"imports"`, `"children"`, `"ancestors"`, `"label:<name>"`) directly realize per-query visibility by selecting which edge types to follow.
+
+**Structural subtyping for entity kind hierarchies.** Den v2 entity kinds (host, user, home, service) form a subtype hierarchy. A policy expecting a "host" context can accept a more specific "microvm-host" context. `subtypeOf` enables this without nominal type registration — entity kind compatibility is determined by structural declaration comparison, following the \<:-Rec rule's pattern of checking that every required declaration in the supertype is present in the subtype.
+
+**Explicit substitution scopes for parametric aspects.** Den v2's parametric aspects (aspects that accept arguments like `{ host, ... }: { ... }`) parallel the paper's System F treatment. When a parametric aspect is instantiated for a specific host, an instantiation scope is created with the host binding, connected to the parametric aspect's scope via an edge. The binding is applied lazily during attribute computation, avoiding duplication of the aspect's scope graph structure.
+
+**Sound incremental resolution.** The paper's approach to sound resolution in incomplete graphs (S4.3) informs den v2's demand-driven evaluation strategy. Nix's lazy evaluation naturally provides incremental graph construction — scopes are materialized on demand via `children` and `derived-children` attributes. The gen-scope `_eval` memoization cache ensures that once a scope's attributes are computed, they are stable, paralleling the paper's guarantee that resolved queries are never invalidated.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Separation-logic scope ownership (S3, Fig. 14)**: The Statix declarative semantics uses a separation-logic-flavored ownership model where `nabla s` claims exclusive ownership of a scope, and conjunction distributes ownership disjointly. gen-scope has no ownership model — any attribute can construct or modify any part of the graph. Ownership tracking could prevent conflicting modifications in concurrent or multi-phase attribute computation.
+
+- **Committed-choice constraint solving (S4.1)**: Statix's solver uses non-overlapping guards with committed choice to avoid backtracking. gen-derive provides rule dispatch with conflict resolution (override, priority, specificity), but does not implement the committed-choice pattern where guard evaluation determines rule selection without backtracking. This could improve gen-derive's dispatch determinism guarantees.
+
+- **Regular expression path well-formedness (S2.1, Fig. 1)**: The resolution calculus parameterizes path well-formedness by a regular expression over label sequences (e.g., `P*(R|E)*`). gen-scope's `query` combinator uses boolean flags (`localShadowsImport`, `importShadowsParent`, `transitiveImports`) rather than a general regular expression language. This limits expressiveness for complex traversal policies like "follow parent edges, then record edges, but never parent after record."
+
+- **Lazy explicit substitutions for type normalization (S2.5, Fig. 10)**: The paper's System F encoding uses delayed projections (`pi_B(s)`) with a normalization procedure that applies substitutions lazily along instantiation paths. gen-scope does not implement projection types or on-demand normalization — parametric aspects in den resolve bindings eagerly during attribute computation rather than recording delayed substitutions.
+
+- **Scope graph completeness tracking (S4.3-4.4)**: The paper's solver tracks which scopes may still be extended and aborts resolution on incomplete scopes. gen-scope's demand-driven evaluation relies on Nix's laziness for ordering but has no explicit completeness tracking. This means there is no formal guarantee against querying a scope before all its declarations are present — correctness depends on the consumer (den) structuring attribute dependencies correctly.
+
+### Potential New Libraries or Features
+
+- **gen-wf (path well-formedness library)**: A small library implementing regular-expression-based path well-formedness predicates over label sequences. Would provide `mkPolicy : regex -> WFL` that compiles a regular expression into a path validator, and `checkPath : WFL -> [label] -> bool`. Scope: ~200 lines, zero deps. Would plug into gen-scope's `query` combinator as a replacement for the boolean flag approach, enabling complex traversal policies like `P*(R|E)*` or `S+` from the paper's case studies.
+
+- **gen-scope ownership extension**: Add optional ownership tracking to gen-scope nodes. Each scope gets an owner (the attribute computation or rule that created it). Writes to a scope's declarations are checked against ownership. Scope: ~300 lines added to gen-scope. Would catch bugs where two independent attributes accidentally modify the same scope's declarations, providing the separation-logic guarantees from S3 at the library level.
+
+- **gen-scope delayed projection**: Implement `pi_R(s)` delayed projection types and a normalization combinator that lazily applies substitutions along instantiation paths. Would enable gen-aspects parametric aspects to record bindings as explicit substitutions rather than eagerly resolving them. Scope: ~400 lines. Interactions: gen-scope (core), gen-aspects (parametric aspect compilation), den v2 (instantiation scope creation).
+
+### Research Directions
+
+- **Regular expression well-formedness and the gen ecosystem**: The paper proves that algorithmic resolution remains feasible when WFL is a regular expression (S4.2). Investigating whether gen-scope's query combinator can be generalized to accept regular expression path policies without sacrificing O(1) amortized attribute access via `_eval` memoization. The key question is whether regex-based path filtering can be lifted into the memoization layer or must be applied post-hoc.
+
+- **Ownership and concurrent attribute evaluation**: The paper's separation-logic ownership model (S3) distributes scope ownership disjointly across constraint conjuncts. In a setting where Nix evaluation could be parallelized (e.g., via future Nix parallel evaluation or flake-level parallelism), ownership tracking would become a correctness requirement rather than a diagnostic aid. Research question: can gen-scope's `_eval` memoization be extended with ownership annotations that are checked at evaluation time?
+
+- **Completeness guarantees for demand-driven evaluation**: The paper acknowledges incompleteness (S4.4) — some valid programs cause the solver to get stuck because the extension-tracking over-approximates. In gen-scope's demand-driven model, the analogous question is: can we statically determine that a given set of attributes will never query a scope before it is complete? This connects to Nix's lazy evaluation ordering and could potentially be analyzed via dependency analysis on attribute definitions.
+
+- **Scope graph normal forms and canonicalization**: The paper notes that scope graphs preserve substitution structure (unlike eager merging of association lists, S2.3). This means structurally equivalent graphs may have different shapes. Research question: is there a canonical normal form for scope graphs that would enable efficient structural comparison? This would benefit gen-scope's `subtypeOf` by reducing the comparison to a normal-form check rather than a per-declaration traversal.

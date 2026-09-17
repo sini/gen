@@ -1,0 +1,61 @@
+---
+title: "Söderberg & Hedin (2013) -- Circular Higher-Order Reference Attribute Grammars"
+description: "Our reading of Circular Higher-Order Reference Attribute Grammars."
+source:
+  - den-ag-design:used/summaries/soderberg-2013-circular-higher-order-reference-ag.md
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="The paper">
+E. Söderberg and G. Hedin, "Circular Higher-Order Reference Attribute Grammars," *Lecture notes in computer science*, ok2, pp. 302–321, 2013.
+
+[doi:10.1007/978-3-319-02654-1_17](https://doi.org/10.1007/978-3-319-02654-1_17)
+
+This page is our reading of it, not a substitute for it.
+</Aside>
+
+**SLE 2013, LNCS 8225, pp. 302-321. Springer. DOI 10.1007/978-3-319-02654-1_17.**
+Journal extension: *Declarative rewriting through circular nonterminal attributes*, COMLAN 44(A):3-24, 2015, DOI 10.1016/j.cl.2015.08.008.
+
+## Paper Summary
+
+The paper unifies two previously-separate RAG extensions -- circular attributes (fixed-point iteration, Farrow 1986 / Magnusson-Hedin 2007) and attribute-dependent rewrites (in-place AST transformation, Ekman-Hedin 2004) -- into a single mechanism, the **circular non-terminal attribute (circular NTA)**. Prior work evaluated circular attributes and rewrites in isolation, assuming no interdependence between them. Söderberg & Hedin show that when a rewrite's `when` clause depends on a circular attribute AND the circular attribute depends (via the tree) on the rewritten node, evaluating the two in separate cycles produces WRONG results: the rewrite reads the circular attribute's intermediate BOTTOM value, its guard is prematurely false, and the rewrite terminates too soon with a stale cached value (their Fig. 10-11: the child stabilizes at `B` when the correct final value is `C`).
+
+The fix is to co-evaluate both in ONE fixed-point cycle so each sees the other's changes. The unification: an NTA whose value is computed by fixed-point iteration over a bounded-height lattice, with a monotonic semantic function and a declared bottom value. A **rewrite is then a special case of a circular NTA** -- §5 shows the general mapping. The deep reframing (§5.1) is to stop viewing the AG as an attribution of the PARSED (initial) AST, and instead view it as an attribution of a COMPUTED AST that is itself a function of the initial AST: "both the computed AST and the attributes of the computed AST are a function of the initial AST... the initial AST remains unchanged during evaluation -- it is only the attribution that changes, including the computed AST, until it has reached its final state, where all equations are satisfied." Computed children are reference attributes; for nodes without rewrites they are copies of the initial children, and for nodes with rewrites they are defined by a circular NTA in the parent (Designs A/B/C, §5.2, progressively optimized to build NTAs only for node types that statically may-rewrite, and to skip value-comparison using a change-flag stack).
+
+Well-definedness (§4.1) rests on the classical circular-AG conditions applied to AST values: values drawn from a **lattice of bounded height**, a **monotonic** semantic function, and a **bottom value** seeding the iteration (Def. 1 gives AST-value equality: same type, tokens, and recursively-equal children; the parent reference is a computed value, not part of the value). Nested/mutually-dependent circular NTAs converge to a common fixed point regardless of iteration order. Termination of the NTA-per-iteration-step view is handled by the Krishnan & Van Wyk (SLE 2012) conservative multi-level-NTA ordering -- each generated NTA has a lower order than its host. §6 evaluates on Java name-reclassification rewrites (DemoJavaNames): the unified CIRCULAR-NTA algorithm matches or beats the specialized rewrite evaluators, with substantially better scaling on complex programs because more attributes can be cached during evaluation.
+
+## Relevance to den-hoag (the step-6 materialization bridge)
+
+This is the keystone for the **materialization bridge** -- the seam letting an off-trace resolution attribute (`provided-modules`, the who-provides-to-me reverse-read) feed on-trace materialized module content into `evalModules`. Three specific bearings:
+
+1. **The §5.1 "computed-AST-as-attribution-over-static-initial-AST" frame IS the bridge's posture.** den's materialized output (the terminal module set at `terminalModulesAt`) is a function of the resolution attribution over a STATIC base (the claim pool / ingested fleet), exactly as CHORAG's computed AST is a function of attributes over the unchanged initial AST. The bridge's `provided-modules` derived attr feeding `terminalModulesAt` is the "computed child reference defined by an attribute" pattern.
+
+2. **The interdependence failure mode (§3, Fig. 10-11) is precisely the danger the bridge's stratification avoids.** CHORAG's lesson: a generative step (rewrite) and a circular attribute that are interdependent MUST co-evaluate in one cycle, or the generation terminates prematurely on stale values. The bridge sidesteps this by being **acyclic**: `provided-modules` reads only the static EDB claim pool (`readsAttrs = []`, `edbStubSelf` throws on `self.get`, leaf claims `from = ∅`), and `terminalModulesAt` runs POST-resolution over the final `result`. There is no cycle between materialization and resolution, so the co-evaluation algorithm is NOT needed. CHORAG tells us *why* the stratified/acyclic design is the sound choice, and *what we would be forced to build* (single-cycle co-evaluation) if we ever admitted provide-of-provide cycles -- which the EDB-purity guard structurally forbids. This is the theory backing for soundness obligation S3 (resolve-before-materialize, no cycle).
+
+3. **Bounded-height lattice + monotonic + bottom = the well-definedness contract**, and the Krishnan & Van Wyk NTA-ordering = den's shipped **L5 bounded-NTA** guard. den's `provided-modules` is a degenerate (non-circular) case -- a single stratified pass, trivially a one-step fixed point -- so it satisfies the contract without iteration. Should a future design admit genuine circularity between provision and resolution, CHORAG is the algorithm to adopt.
+
+Contrast with the CURRENT compat `provides.to-*` lowering: it uses the Magnusson-Hedin circular fixpoint (`resolved-aspects.nix` joint neededBy+guard least-fixpoint), which resolves selectors at presence-resolution time. The bridge deliberately trades that circular power for a static stratified read -- reproducing delivery only for compile-time-enumerable entity targets, ledgering the dynamic-cell residual. CHORAG characterizes exactly the circular capability being traded away.
+
+## Key Concepts
+
+- **Circular NTA (§4):** a non-terminal (tree-valued) attribute computed by fixed-point iteration over a bounded-height lattice, monotonic semantic function, declared bottom value. Generalizes both circular attributes and rewrites.
+
+- **Rewrites as a special form of circular NTA (§5):** an in-place AST rewrite = a circular NTA over the computed children, where the `when` clause is the change condition and consistency (no applicable `when`) is the fixed point. Enables freely mixing rewrites and circular attributes.
+
+- **Interdependence premature-termination bug (§3):** separate evaluation cycles for a generative step and a circular attribute that depend on each other yield a stale intermediate (bottom) value read across the boundary; the generation terminates too soon. Fix = one shared cycle. (The failure mode den's stratified bridge avoids by acyclicity.)
+
+- **Computed AST as attribution over the static initial AST (§5.1):** reframe the AG as defining an attribution -- including a computed AST -- that is a pure function of the unchanged initial AST. Computed children are reference attributes; the initial AST is never mutated. (The bridge's exact posture: materialized output as a function of resolution attributes over a static claim pool.)
+
+- **Well-definedness conditions (§4.1):** bounded-height value lattice + monotonic semantic function + bottom value. Nested circular NTAs reach a common fixed point independent of iteration order.
+
+- **Bounded-NTA termination (§7, via Krishnan & Van Wyk SLE 2012):** conservative termination for multi-level NTAs by ordering node types so each generated NTA is lower-order than its host. (= den's shipped L5 bounded-NTA guard.)
+
+- **Design B may-have-rewrite gating / Design C change-flag stack (§5.2):** build NTAs only for statically rewrite-bearing node types (demand-driven), and skip value comparisons using a push/pop change-flag stack. (Inertness-when-absent precedent: a node with no rewrites returns its initial child unchanged -- mirrors the bridge's `++ []` byte-identity when no `provide` is present.)
+
+- **Forwarding contrast (§7, Van Wyk CC 2002):** forwarding constructs the transformed tree as an NTA and auto-forwards attributes to it, KEEPING all intermediate steps; rewrites REPLACE nodes. Relevant to the copy-rule/forwarding framing of the resolution-tier verbs.
+
+## Cited works already in the catalog
+
+Vogt-Swierstra-Kuiper 1989 (HOAG/NTA), Hedin 2000 (RAGs), Magnusson-Hedin 2007 (circular RAGs), Ekman-Hedin 2004 (rewritable RAGs), Knuth 1968 (AGs), Boyland 2005 (remote attributes, undecidable static circularity), Krishnan-Van Wyk 2012 (HOAG termination), Van Wyk et al. 2002 (forwarding), Demers-Reps-Teitelbaum 1981 / Reps 1982 (incremental AG evaluation), Farrow 1986 (fixed-point circular AG evaluators).
