@@ -1,0 +1,122 @@
+---
+title: Ehrig et al. (2006) — Fundamentals of Algebraic Graph Transformation
+description: Our reading of Fundamentals of Algebraic Graph Transformation.
+source:
+  - den-ag-design:used/summaries/ehrig-2006-algebraic-graph-transformation.md
+---
+
+> H. Ehrig, K. Ehrig, U. Prange, and G. Taentzer, "Fundamentals of Algebraic Graph Transformation," *Monographs in Theoretical Computer Science. An EATCS Series*, 2006. doi: [10.1007/3-540-31188-2](https://doi.org/10.1007/3-540-31188-2) · [summary](/reference/papers/ehrig-2006-algebraic-graph-transformation/).
+
+## Paper Summary
+
+This tutorial, based on the EATCS monograph of the same name (Springer, 2006), presents the algebraic approach to graph transformation — a category-theoretic framework for rule-based modification of graphs. Ehrig, Prange, and Ehrig situate graph transformation as the natural generalization of Chomsky grammars (from strings to graphs), term rewriting (from trees to graphs), and textual specification (to visual modeling). The work addresses a fundamental problem: how to define, apply, compose, and reason about graph rewriting rules with formal guarantees.
+
+The core construction is the **Double Pushout (DPO)** approach, originating from 1973. A graph production (rewriting rule) is a span `L <- K -> R`, where L is the left-hand side (pattern to match), R is the right-hand side (replacement), and K is the interface (gluing graph) — the substructure preserved by the transformation. Applying a rule requires finding a match morphism `m : L -> G` in a host graph G, then constructing two pushouts: one that removes `m(L) \ m(l(K))` from G to produce a context graph D, and one that glues `R \ r(K)` onto D to produce the result graph H. The construction is unique up to isomorphism when the **gluing condition** (identification points and dangling points must be gluing points) is satisfied.
+
+The tutorial develops several major theorems. The **Local Church-Rosser Theorem** establishes that parallel independent direct transformations (where matched regions overlap only on preserved structure) can be sequentialized in either order and both reach the same result. The **Parallelism Theorem** provides a bijective correspondence between sequentially independent transformation sequences and parallel transformations via the disjoint union production `p1 + p2`. The **Concurrency Theorem** generalizes this to dependent transformations via E-concurrent productions `p1 *_E p2`, establishing synthesis-analysis correspondence even when transformations share context.
+
+For global properties, the tutorial presents the **Critical Pair Lemma**: a graph transformation system is locally confluent if and only if all its critical pairs (minimal parallel-dependent overlaps) are strictly confluent. Combined with termination (guaranteed for layered grammars satisfying suitable layer conditions), this yields **functional behavior** — every graph has a unique normal form.
+
+The work then lifts the entire theory into **adhesive HLR categories** — a categorical abstraction defined by a class M of monomorphisms satisfying van Kampen square properties. This abstraction is the key theoretical contribution: it unifies graph transformation with hypergraph transformation, Petri net transformation, algebraic specification transformation, and typed attributed graph transformation under a single proof framework. The tutorial shows that product, slice, coslice, comma, and functor category constructions preserve the adhesive HLR property, enabling compositional construction of new suitable categories.
+
+The final sections introduce **typed attributed graphs** (E-graphs with data algebras), **application conditions** (constraints on matches), and **negative application conditions (NACs)** — morphisms `x : L -> X` that prevent a rule from firing when a larger pattern X is found. NACs are shown to be transformable into equivalent left application conditions on matches, and graph constraints on results can be lifted into equivalent application conditions on productions. The tutorial concludes with an application to visual language modeling (statechart generation) and model transformation (statecharts to Petri nets), demonstrating the framework's practical applicability via the AGG tool.
+
+## Key Concepts
+
+- **Double Pushout (DPO) construction**: Rule application via two categorical pushouts over a span `L <- K -> R`, giving deletion and addition as universal constructions with uniqueness guarantees.
+
+- **Gluing condition**: Applicability criterion for a production via a match: identification points (nodes/edges identified by the match) and dangling points (nodes with incident edges outside the match image) must all be in the gluing graph K's image. Necessary and sufficient for context graph existence.
+
+- **Typed graphs and type graphs**: A type graph TG classifies nodes and edges; typed graphs are pairs (G, type : G -> TG). All constructions lift to the typed setting via the comma category GraphsTG.
+
+- **Parallel and sequential independence**: Two direct transformations are parallel independent when their matched regions overlap only on preserved structure. Sequential independence: the comatch of the first overlaps with the match of the second only on preserved structure. The Local Church-Rosser Theorem establishes commutativity under both forms.
+
+- **Parallelism Theorem**: Bijective correspondence between sequentially independent transformation sequences and parallel transformations via disjoint union productions.
+
+- **Concurrency Theorem**: Generalizes parallelism to dependent transformations via E-concurrent productions, with synthesis-analysis bijection.
+
+- **Critical pairs and local confluence**: Minimal parallel-dependent overlaps. A GTS is locally confluent iff all critical pairs are strictly confluent (Critical Pair Lemma). With termination, yields global determinism.
+
+- **Adhesive HLR categories**: Abstract categorical framework — a category C with monomorphism class M satisfying van Kampen square properties. Unified proof substrate for Graphs, Hypergraphs, PTNets, typed attributed graphs, and algebraic specifications.
+
+- **Negative Application Conditions (NACs)**: Morphisms `x : L -> X` constraining rule applicability — a match m satisfies NAC(x) iff no injective extension of m through x exists. Prevents rules from firing when forbidden patterns are present.
+
+- **Application condition transformation**: Graph constraints on result graphs can be transformed into right application conditions on comatches, which can be further transformed into left application conditions on matches, enabling static analysis of rule effects.
+
+- **Typed attributed graph transformation**: Integration of typed graphs with DSIG-algebras for data attributes. The category (AGraphsATG, M) is adhesive HLR, so all theorems apply.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+**gen-derive** (Major influence):
+
+gen-derive implements the algebraic graph transformation vocabulary as the core structure of its rule dispatch system, mapped to Nix's pure functional evaluation model rather than to literal graph mutation.
+
+- **Rule structure as DPO span analogue**: `mkRule { condition; produce; nac; identity; priority; overrides; }` maps to the conceptual span `L <- K -> R`. The condition is the match morphism's applicability test (L pattern), the `produce` function generates the right-hand side actions (R), and the rule's identity serves as the interface (K) — preserved across fixpoint iterations for dedup. Located in the `mkRule` constructor.
+
+- **Match morphism**: The `match : condition -> id -> ctx -> bool` function parameter realizes Ehrig's match morphism `m : L -> G`. For `fromFunction` rules, `builtins.functionArgs` extracts the required context keys as the "pattern" to match against the working context (the "host graph"). `fromFunctionMatch` implements the actual matching — checking that all required args are present in context.
+
+- **Negative Application Conditions**: The first-class `nac` field on rules directly implements Ehrig's NAC(x). In gen-derive's dispatch sequence, NAC check occurs *before* condition matching: "NAC check -> condition match -> override suppression -> priority sort -> exclusive filter -> fire -> classify -> group." A rule with `nac` set only fires when the NAC pattern does NOT match — precisely Ehrig's semantics that "there does not exist an injective p : X -> G with p . x = m."
+
+- **Override as rule replacement**: The `overrides` field on rules (suppressing named rules by identity) corresponds to the controlled deletion aspect of DPO — removing matched structure before adding new structure. `derive.override original replacement` provides sugar for this pattern.
+
+- **Conflict resolution via critical pair analysis**: gen-derive's three-tier conflict resolution (override -> priority -> specificity) addresses the same problem as Ehrig's critical pairs — what happens when multiple rules can fire on overlapping structure. The Critical Pair Lemma says local confluence requires all critical pairs to be strictly confluent; gen-derive achieves determinism through explicit priority ordering and exclusive mode rather than exhaustive critical pair analysis.
+
+- **Fixpoint convergence as transformation sequence**: gen-derive's `fixpoint` loop — dispatch, extract feedback, widen context, check stability — models an iterated graph transformation sequence `G0 => G1 => ... => Gn`. The convergence check (`eq`) corresponds to reaching a normal form. The `maxIter` guard (default 100) is a practical termination bound analogous to Ehrig's layer conditions for termination.
+
+- **Rule composition**: `derive.restrict` (narrow condition), `derive.override` (replace rule), and `derive.chain` (sequential composition) parallel the production composition operations in the tutorial: restriction of matches, concurrent productions, and E-concurrent sequential composition.
+
+- **Phase stratification as typed transformation**: gen-derive's stratified phases with DAG ordering (`entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`) parallel typed graph transformation systems where the type graph constrains which productions can apply in which order.
+
+**gen-graph** (Minor conceptual influence):
+
+gen-graph's edge map operations (`unionEdges`, `intersectEdges`, `differenceEdges`) correspond to the set-theoretic operations on graph components used in pushout and pullback constructions. The `fixpoint` function with monotonicity enforcement (throws on non-monotonic steps) reflects the categorical requirement that transformation sequences preserve structure.
+
+### Relevance to Den v2 HOAG Pipeline
+
+Den v2's demand-driven HOAG (Higher-Order Attribute Grammar) over scope graphs uses algebraic graph transformation as the formal model for how policies transform the scope graph during evaluation:
+
+- **Policy dispatch as graph production**: Den policies are rules that transform the scope graph by adding nodes (`spawn`), edges (`edge`), and declarations (`enrich`). Each policy invocation corresponds to a DPO application: the policy's pattern (its function signature destructured from scope context) is the match morphism L -> G; the emitted effects construct the right-hand side additions. The preserved interface K is the existing scope context that persists across the transformation.
+
+- **Effect vocabulary as typed actions**: Den v2's effect vocabulary — `spawn`, `enrich`, `emit`, `edge`, `drop`, `reroute`, `inject` — constitutes the typed attributed graph transformation's action repertoire. Each effect modifies the scope graph's typed structure: `spawn` adds typed nodes, `edge` adds I-edges, `drop` constrains resolution (analogous to a NAC on future queries), `reroute` redirects edge targets.
+
+- **`drop` as NAC constraint**: Den's `drop aspect` constraint prunes an aspect from resolution, implementing a graph-level negative condition — when evaluating, if aspect X is dropped, resolution queries skip it. This is a runtime NAC: the "pattern that must not match" during scope graph traversal.
+
+- **Scope graph confluence**: Den v2 must ensure that policy evaluation order doesn't affect the final scope graph. The Local Church-Rosser Theorem's conditions (parallel independence when overlaps are on preserved structure) guide the design: policies that operate on disjoint scope regions are commutable, while policies with overlapping effects must be ordered via phase stratification.
+
+- **Fixpoint convergence as normal form**: The gen-derive fixpoint loop driving policy dispatch converges to a normal form of the scope graph — the point where no more policies can fire (all conditions satisfied, context fully enriched). This is exactly the functional behavior theorem: a terminating, locally confluent GTS has unique normal forms.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Pushout complement construction** (Part III, slide 31): The explicit two-step construction — "delete matched elements except interface, then add new elements" — is described but gen-derive's current dispatch treats deletion and addition as separate opaque actions. A unified delete-then-add primitive that automatically preserves the interface would give structural guarantees currently left to consumers.
+
+- **Embedding Theorem** (Part III, slide 32-34): Extension of a transformation to a larger graph via consistent morphisms. Den currently re-dispatches policies when context grows; the Embedding Theorem suggests that if the boundary (shared structure) is preserved, extensions can be constructed without re-dispatch — potentially enabling incremental policy evaluation.
+
+- **E-concurrent productions** (Part IV, slide 42-44): The Concurrency Theorem's `p1 *_E p2` construction fuses dependent sequential transformations into a single production. gen-derive's `chain` combinator is a manual approximation; a formal E-concurrent construction could automatically fuse rule sequences for performance.
+
+- **Graph constraints as application conditions** (Part VI, slide 64-68): The construction transforming graph constraints into equivalent left application conditions (`H |= c` iff `m |= lacc`) is not exploited. This would enable static pre-checking of invariants: "will this rule maintain the well-formedness constraint?" without actually applying it.
+
+- **Adhesive HLR generalization** (Part V): The categorical abstraction to adhesive HLR categories is entirely unexploited. gen-derive works in the concrete setting of Nix attrsets as "graphs." Formalizing the Nix data structures as objects in an adhesive HLR category would enable proving that all the classical theorems (Church-Rosser, Parallelism, Concurrency, Critical Pair Lemma) hold for gen-derive's dispatch.
+
+- **Typed attributed graph transformation with inheritance** (Part VI, slide 69): Inheritance in the type graph (abstract node types with concrete subtypes) could map to den's entity hierarchy — e.g., abstract "entity" type with concrete "host" and "home" subtypes, where rules written for the abstract type apply to all concrete instances.
+
+### Potential New Libraries or Features
+
+- **gen-critical**: Static critical pair analysis for gen-derive rule sets. Given a set of rules, compute all critical pairs (minimal overlapping matches) and check strict confluence. Scope: medium (~300-500 lines). Would consume gen-derive rule definitions and gen-select selectors. Output: conflict report identifying which rule pairs can produce non-confluent results, with concrete minimal counterexample graphs. This directly implements the Critical Pair Lemma and would catch policy conflicts at definition time rather than at runtime.
+
+- **gen-derive incremental dispatch**: Implement the Embedding Theorem as an optimization. When context grows (new nodes/edges added), determine which existing policy results remain valid (boundary preservation check) and only re-dispatch policies affected by the boundary change. Scope: significant (~500-800 lines within gen-derive). Would require tracking the "boundary" of each dispatch result — which context elements were actually read. Interaction: extends gen-derive's fixpoint loop with differential re-evaluation.
+
+- **gen-derive concurrent productions**: Automatic fusion of sequentially dependent rule pairs into E-concurrent productions. When two rules always fire in sequence and share intermediate structure, fuse them into a single rule that skips the intermediate state. Scope: medium (~300 lines as gen-derive extension). Interaction: consumes `chain` results and gen-derive's override system.
+
+### Research Directions
+
+- **Confluence verification for den policies**: Can den v2's policy set be statically verified as locally confluent? The Critical Pair Lemma says: enumerate all critical pairs, check strict confluence. The challenge is that den policies operate on scope graphs (not finite typed graphs), so the critical pair space may be infinite. A bounded model checking approach — enumerate critical pairs up to a size bound — would give practical confidence.
+
+- **Termination guarantees via layer conditions**: Ehrig's layered typed graph grammar termination theorem requires suitable layer conditions on deleting vs non-deleting productions. Den policies are mostly non-deleting (`spawn`, `edge`, `enrich` add structure; only `drop` constrains). Formalizing den's phase stratification as a layering and proving that each layer's productions satisfy the termination conditions would give a formal termination proof for policy evaluation.
+
+- **Adhesive HLR formalization of Nix attrsets**: Are Nix attrsets with `//` (merge) as the pushout construction an adhesive HLR category? The merge operation is not a true categorical pushout (it's left-biased, not universal). However, a restricted setting — attrsets with disjoint keys and union as pushout — likely satisfies the van Kampen square property. Formalizing this would establish whether gen-derive's correctness can be derived from the categorical framework rather than verified case-by-case.
+
+- **NAC composition**: Ehrig's NACs are individual morphisms checked independently. In practice, den policies often need conjunctions of negative conditions ("fire only when aspect X is NOT present AND entity Y has NOT been spawned"). Formalizing NAC composition (conjunction, disjunction, nesting) while preserving the transformation to left application conditions would strengthen gen-derive's constraint system.

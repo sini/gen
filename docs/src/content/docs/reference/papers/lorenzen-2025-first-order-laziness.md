@@ -1,0 +1,123 @@
+---
+title: Lorenzen et al. (2025) — First-Order Laziness
+description: Our reading of First-Order Laziness.
+source:
+  - den-ag-design:used/summaries/lorenzen-2025-first-order-laziness.md
+---
+
+> A. Lorenzen, D. Leijen, W. Swierstra, and S. Lindley, "First-Order Laziness," *Proceedings of the ACM on Programming Languages*, vol. 9, no. ICFP, pp. 734–762, 2025. doi: [10.1145/3747530](https://doi.org/10.1145/3747530) · [open access](https://dl.acm.org/doi/pdf/10.1145/3747530) · [summary](/reference/papers/lorenzen-2025-first-order-laziness/).
+
+## Paper Summary
+
+Lorenzen, Leijen, Swierstra, and Lindley address a fundamental tension in strict functional languages: efficient purely functional data structures (as catalogued by Okasaki 1998) require laziness, but the standard implementation via higher-order thunks (closures that defer computation) carries three costs — closures cannot be inspected or printed for debugging, they require extra memory allocation (indirection nodes between every pair of adjacent elements), and reasoning about their performance is notoriously subtle. These costs discourage adoption of lazy data structures even where they provide asymptotic benefits.
+
+The paper introduces **lazy constructors**: first-order data constructors that carry their arguments as inspectable tagged data, with an associated computation that executes on demand. Unlike traditional thunks (which wrap an opaque closure), a lazy constructor like `SAppend(s1, s2)` stores its operands as plain fields. The runtime never exposes lazy constructors to pattern matching — when a match encounters one, the associated computation fires automatically. The result is memoized (overwriting the constructor in place), so subsequent matches see the computed value. The key insight is that most lazy data structures use only a small, fixed set of deferred operations (e.g., append and reverse for queues). By defunctionalizing these operations into named constructors, all laziness becomes first-order: no closures, no opaque thunks.
+
+The paper's contributions span programming methodology, formal semantics, compiler optimizations, and empirical evaluation:
+
+**Programming methodology (Section 2).** The authors reimplement Okasaki's Bankers Queue and Realtime Queue using lazy constructors, showing how the approach arises naturally. They demonstrate progressive refinement: amortized constant-time (via basic lazy constructors), logarithmic worst-case (via `eval-one` that forces a single step), and true constant worst-case (via a schedule parameter, following Okasaki's technique). They also address the practical problem of stack overflow from recursive evaluation of nested lazy constructors — a problem they discovered affects OCaml and Koka 3.1.3 on real workloads.
+
+**Formal semantics (Section 4).** The authors formalize lazy constructors as an extension of Launchbury's (1993) natural semantics for lazy evaluation. The core calculus is a first-order lambda calculus (no closures) with a new type `A ->_F B` representing a lazy computation: input type `A`, evaluation function `F`, result type `B`. Introduction forms are `lazy_F v` (deferred) and `memo v` (already computed); elimination is `step v` (force one level). The formalization proceeds in stages: first, non-recursive lazy constructors; then recursive lazy constructors modeled as `A ->_F B := mu alpha. A ->_F (B + alpha)` (a delay monad / trampoline structure); finally, a refined type with first-class indirection nodes that can be safely short-cut. The authors prove:
+
+- **Theorem 1 (Type Soundness):** Well-typed expressions evaluate to correctly-typed values, established via a step-indexed logical relation.
+- **Theorem 2 (Referential Transparency):** Evaluating lazy constructors in the store does not change the observable result of any expression. Formally: if `Gamma : e => Delta : v` and `Gamma <= Gamma'`, then `Gamma' : e => Delta' : v` with `Delta <= Delta'`.
+- **Theorem 3 (Short-cutting indirections is referentially transparent):** Extends Theorem 2 to the refined calculus with indirection short-cutting rules `cut_i` and `cut_m`.
+
+**Compiler optimizations (Section 5).** The first-order nature enables optimizations impossible with general closures: (1) in-place reuse of lazy constructor memory cells for their results (avoiding indirection nodes entirely when the result constructor fits); (2) tail-recursive evaluation via a Schorr-Waite traversal stored in the lazy constructors themselves (solving the stack overflow problem); (3) a small-step implementation calculus with `lazy match` and `memoize` primitives, connected to the high-level semantics via Lemma 2 (the low-level calculus implements the high-level calculus) and Lemma 3 (small-step implements big-step). The tail-recursive evaluation (Section 5.5-5.6) uses in-place pointer reversal (link/unlink primitives) to traverse nested lazy constructors without stack growth.
+
+**Benchmarks (Section 6).** All of Okasaki's lazy queues and heaps benchmarked in a sequential setting across Koka, OCaml, and Haskell. Traditional thunks incur 110-150% overhead versus strict versions. Lazy constructors reduce this to 43% average overhead in Koka, and in some cases under 25%, approaching strict performance while maintaining superior theoretical (amortized/persistent) properties.
+
+## Key Concepts
+
+- **Lazy constructors** — First-order data constructors with associated computations. Tagged data (not closures) that evaluate on demand and memoize results. Inspectable before forcing via `debug-show` / `lazy match`.
+
+- **Defunctionalization of thunks** — Lazy constructors arise as the defunctionalization (Reynolds 1972) of explicit thunks. Each distinct closure passed to `delay` becomes a named constructor with its free variables as fields.
+
+- **Fusion of streams and stream cells** — By inlining the stream cell type into the stream type (removing the `Memo` wrapper), indirection nodes between adjacent elements are eliminated. This is impossible with traditional thunks where every cell boundary requires an indirection for memoization.
+
+- **In-place reuse** — The compiler overwrites a lazy constructor's memory cell with its result when the result constructor fits (same or smaller size). Combined with Perceus reference counting, this enables zero-allocation lazy evaluation in favorable cases.
+
+- **Schorr-Waite evaluation** — Nested lazy constructors are evaluated tail-recursively by reversing pointers in-place (storing the continuation zipper in the locked cells themselves), eliminating stack overflow.
+
+- **`eval-one`** — A compiler-generated function that forces exactly one lazy constructor without recursion. Enables logarithmic worst-case bounds by incrementally advancing nested computations.
+
+- **Recursive lazy constructors** — Modeled as `A ->_F B := mu alpha. A ->_F (B + alpha)`, a delay monad where `eval` iterates `step` until a normal constructor is reached.
+
+- **Indirection short-cutting** — Rules `cut_i` (redirect indirection chains) and `cut_m` (replace indirections pointing to memoized values). Proven referentially transparent (Theorem 3).
+
+- **Quotient type interpretation** — Lazy constructors `A ->_F B` can be viewed as a quotient type over `A + B` quotiented by `step`. Recursive lazy constructors are quotiented by `eval`. Mutation under the quotient preserves referential transparency.
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+**gen-aspects** (Major influence)
+
+The paper's central idea — lazy constructors as inspectable-before-forcing deferred computation — is realized by `deferredModule` in gen-aspects' type system (`lib/types.nix`).
+
+When an aspect declares class content (e.g., `networking.nixos.networking.hostName = "test"`), gen-aspects routes the `nixos` key to an explicit `lib.types.deferredModule` option:
+
+```nix
+# lib/types.nix, line 99-106
+classOptions = lib.genAttrs (builtins.attrNames (cnf.classes or { })) (
+  _: lib.mkOption {
+    description = "Class content (deferred module)";
+    default = { };
+    type = lib.types.deferredModule;
+  }
+);
+```
+
+This maps to the paper as follows:
+
+| Paper concept (S1-2.3)                      | gen-aspects realization                                                                                                                                                                                                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lazy constructor (tagged data, not closure) | `deferredModule` — an attrset carrying module content as data, not an evaluated NixOS module                                                                                                                                                                              |
+| Inspectable before forcing                  | The scope graph can examine aspect metadata, includes, identity, and class key presence without triggering NixOS `evalModules`                                                                                                                                            |
+| Evaluated on demand                         | The `deferredModule` is only forced when the consuming `nixosSystem` / `darwinSystem` / `homeManagerConfiguration` imports it                                                                                                                                             |
+| Memoization                                 | NixOS `evalModules` memoizes module evaluation; once forced, the result is shared across all consumers                                                                                                                                                                    |
+| Defunctionalization (S3.1)                  | Guard functions (`{ host, ... }: { ... }`) are defunctionalized to tagged data (`__isWrappedFn`, `__functionArgs`) with explicit dispatch (`__functor`) — Reynolds 1972, but the lazy-constructor framing from Lorenzen provides the inspectable-before-forcing semantics |
+
+The paper's fusion optimization (S3.3, eliminating indirection nodes between stream cells and streams) has an analogue in gen-aspects' design: class options are declared directly on the aspect submodule (not wrapped in an intermediate container), so there is no indirection layer between the aspect and its class content.
+
+### Relevance to Den v2 HOAG Pipeline
+
+In den v2, the HOAG (Higher-Order Attribute Grammar) pipeline evaluates a scope graph demand-driven. Aspects are nodes in this graph, and their class content (NixOS modules, darwin modules, homeManager modules) must flow from the scope graph into external evaluation systems. Lazy constructors are critical at this boundary:
+
+**Fleet-scale lazy evaluation.** A fleet of 50 hosts shares a pool of aspects. Each aspect's `nixos` class content is a `deferredModule` — a lazy constructor in Lorenzen's sense. When building host `igloo`, only aspects reachable from `igloo`'s scope are resolved, and only their class content for `igloo`'s target platform is forced. Aspects for other hosts, or aspects gated by guards that don't match `igloo`, remain as inspectable-but-unforced data. This directly realizes the paper's core value proposition: "the append of two streams happens on-demand, only traversing as much of the first stream as is necessary" (S1, p.2).
+
+**Scope graph inspection without forcing.** The HOAG evaluator (gen-scope) computes attributes over the scope graph: includes edges, neededBy reverse edges, guard predicates, drop constraints. All of these operate on aspect structure and metadata — they never need to force class content. Because `deferredModule` is a lazy constructor (inspectable before forcing), the entire resolution, constraint propagation, and edge computation phase runs without triggering any NixOS evaluation. This is analogous to the paper's `debug-show` examining stream structure without forcing lazy constructors (S2.3).
+
+**Class content as terminal attributes.** In AG terms, class content is a synthesized terminal attribute — the final output of the grammar. The `deferredModule` is the lazy constructor that carries this terminal value. It is "forced" only at the output boundary, when `nixosSystem { modules = [ ... ]; }` imports the collected modules. This separation is structurally identical to the paper's distinction between lazy constructors (which defer) and normal constructors (which the program matches on).
+
+**gen-bind as the forcing mechanism.** When den v2 assembles the final module list for a class, gen-bind injects scope-computed values (entity bindings, collection data) into the deferred modules via partial application. This is the moment the lazy constructor transitions from data to computation — the module function receives its arguments and becomes evaluable. The memoization guarantee (Theorem 2: forcing is referentially transparent) ensures that the order in which hosts are built does not affect the result.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+**`eval-one` for incremental forcing (S2.4).** The paper's `eval-one` primitive forces exactly one lazy constructor without recursion, enabling logarithmic worst-case bounds. gen-aspects currently has no analogue — `deferredModule` is either fully unforced or fully forced (by NixOS `evalModules`). An `eval-one` equivalent could enable incremental validation: force one level of a deferred module to check its top-level option declarations without evaluating nested imports or config values.
+
+**Schorr-Waite traversal for nested deferred modules (S2.5, S5.5-5.6).** When aspects include other aspects that include further aspects, the chain of deferred modules can nest deeply. The paper's Schorr-Waite technique evaluates nested lazy constructors in constant stack space by reversing pointers in-place. While Nix's lazy evaluation handles this via thunk chains, the conceptual model of in-place pointer reversal could inform a more memory-efficient scope graph traversal for deep inclusion chains.
+
+**Fusion / indirection elimination (S3.3).** The paper shows how inlining stream cells into streams eliminates indirection nodes, halving memory usage. In the gen ecosystem, there is currently an indirection between "aspect node in scope graph" and "class content as deferredModule". Fusing these — making the scope graph node directly carry its class content without an intermediate option layer — could reduce the per-aspect evaluation overhead.
+
+**Quotient type interpretation (S7).** Lazy constructors as quotient types (quotienting `A + B` by the forcing function) provide a clean semantic model for any "inspectable deferred value" pattern. This interpretation has not been applied to gen-schema's deferred refs or gen-bind's config thunks, both of which are deferred values that could benefit from the quotient framing.
+
+**In-place reuse with reference counting (S3.5).** Koka's combination of lazy constructor reuse with Perceus reference counting achieves zero-allocation forcing in favorable cases. While Nix lacks reference counting, the concept of reusing the "shell" of a deferred value for its result could inform future Nix evaluator optimizations or custom evaluation strategies in gen-scope.
+
+### Potential New Libraries or Features
+
+**gen-lazy: First-order deferred values.** A small library providing typed lazy constructors for Nix — tagged attrsets with `__lazy` markers, an `inspect` function that reads fields without forcing, and a `force` function that evaluates the associated computation. Scope: ~200 lines, zero deps. Would formalize the pattern currently ad-hoc in `deferredModule`, gen-bind's `__configThunk`, and gen-schema's deferred refs into a unified abstraction. Interactions: gen-aspects would consume it for class content, gen-bind for config thunks, gen-schema for deferred coerce.
+
+**Incremental class validation in gen-aspects.** Extend class content inspection to support partial forcing: check option declarations (the "shape" of the deferred module) without evaluating config values. This would enable early error detection in the scope graph phase — before the expensive `evalModules` call. Scope: moderate (requires understanding NixOS module evaluation boundaries). Depends on: gen-aspects, possibly gen-schema for option type introspection.
+
+**Lazy collection aggregation in gen-scope.** Collection attributes currently force all contributors to compute their merged value. A lazy-constructor approach would represent the collection as a chain of deferred contributions, forced incrementally as consumers demand specific entries. Scope: significant (requires redesign of `collectionAttr` traversal). Depends on: gen-scope, gen-algebra.
+
+### Research Directions
+
+**Lazy constructors in a pure lazy language.** The paper targets strict languages where laziness must be explicitly introduced. Nix is already lazy, so `deferredModule` achieves its effect by leveraging Nix's native thunk mechanism rather than implementing lazy constructors per se. The interesting research question is whether the *first-order* aspect — making deferred computations inspectable as tagged data — can be achieved more systematically in Nix. Currently, `deferredModule` achieves inspectability by being an attrset (which Nix can introspect without forcing nested values). A formal treatment of which Nix attrset patterns preserve inspectability-before-forcing would strengthen the theoretical foundation.
+
+**Interaction with demand-driven AG evaluation.** The paper's lazy constructors interact with Launchbury's semantics. gen-scope's demand-driven evaluation interacts with Nix's native laziness. Formalizing the relationship — showing that gen-scope's `_eval` cache is a correct implementation of the paper's memoization store under Nix's evaluation semantics — would connect the two formal systems.
+
+**Open lazy constructors (S8).** The paper notes that lazy constructors must be declared up-front in the data type, and suggests open data types as a solution. This limitation mirrors gen-aspects' current design where classes must be registered in `cnf.classes`. Exploring open lazy constructors could enable dynamic class registration — aspects contributing to classes not known at type-definition time. This connects to the broader question of extensible scope graphs and open-world AG evaluation.
