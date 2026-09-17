@@ -1,0 +1,6 @@
+# Starlight UI string overrides. The collection has to be non-empty or every
+# build warns, and this is where any future wording change to the chrome goes.
+#
+# The site brands itself lower-case, so the chrome follows.
+skipLink.label: skip to content
+search.label: search

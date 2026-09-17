@@ -1,0 +1,51 @@
+---
+// Replaces Starlight's light/dark/auto <select> with a trigger for the dialog
+// in PaletteOverlay.astro. Rendered twice per page (header + mobile menu
+// footer); both instances drive the same dialog via a delegated handler, and
+// both labels are kept in sync by class.
+---
+
+<button type="button" class="palette-trigger" aria-haspopup="dialog" aria-label="Change palette">
+  <span class="dot" aria-hidden="true"></span>
+  <span class="palette-label">palette</span>
+  <kbd aria-hidden="true">t</kbd>
+</button>
+
+<style>
+  .palette-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 4px;
+    background: none;
+    color: var(--sl-color-gray-2);
+    font-family: var(--sl-font-mono, var(--__sl-font-mono));
+    font-size: var(--sl-text-xs);
+    line-height: 1.4;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .palette-trigger:hover {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+  }
+
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--sl-color-accent);
+    flex: 0 0 auto;
+  }
+
+  kbd {
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 2px;
+    padding: 0 0.25rem;
+    color: var(--sl-color-gray-4);
+    font-size: var(--sl-text-2xs);
+  }
+</style>

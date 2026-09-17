@@ -1,0 +1,62 @@
+name: Docs
+
+# The docs site is node, not nix — it is the one thing in this repository that
+# does not go through the flake. Scoped to docs/** so a change to the libraries
+# does not rebuild and redeploy the site.
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/docs-pages.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/docs-pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancel a deploy in flight; queue behind it instead.
+concurrency:
+  group: docs-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+      # Version comes from `packageManager` in docs/package.json, so CI runs the
+      # same pnpm that produced the lockfile rather than a range that can drift.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: docs/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+      # --frozen-lockfile so a lockfile that disagrees with package.json fails
+      # here rather than silently resolving to something no one has built.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist
+
+  # Split from the build so pull requests get the build signal without a deploy.
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,42 @@
+---
+import DefaultFooter from '@astrojs/starlight/components/Footer.astro';
+import PaletteOverlay from './PaletteOverlay.astro';
+import { attributions } from '../palettes.mjs';
+
+// Palettes adapted from upstream projects are credited here. The list is
+// derived from the palette table itself, so adding a palette publishes its
+// notice automatically rather than relying on someone updating this file.
+const credits = attributions();
+---
+
+<DefaultFooter />
+<PaletteOverlay />
+
+{
+  credits.length > 0 && (
+    <p class="palette-credits">
+      Palettes adapted from{' '}
+      {credits.map((c, i) => (
+        <>
+          {i > 0 && ', '}
+          <a href={c.url} rel="noopener">{c.project}</a> ({c.license})
+        </>
+      ))}
+      .
+    </p>
+  )
+}
+
+<style>
+  .palette-credits {
+    margin-top: 1rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-2xs);
+    line-height: 1.6;
+  }
+
+  .palette-credits a {
+    color: inherit;
+    text-decoration-color: var(--sl-color-gray-4);
+  }
+</style>

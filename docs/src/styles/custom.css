@@ -1,0 +1,35 @@
+/*
+ * Font assignment. Victor Mono carries headings and chrome, JetBrains Mono
+ * carries body code and links.
+ *
+ * The first selector list is mirrored by the emphasis rule in layout.css —
+ * Victor Mono's italic is a cursive face, so wherever this applies, `em` has to
+ * be restyled. Keep the two lists in step.
+ */
+
+.site-title,
+.tab-link,
+header,
+strong,
+article.card p.title,
+.starlight-aside__title,
+.expressive-code .title,
+pre[data-language="console"] *,
+pre[data-language="plaintext"] *,
+h1, h2, h3, h4, h5, h6, th {
+  font-family: var(--font-victor-mono);
+}
+
+a, code, code * {
+  font-family: var(--font-jetbrains-mono);
+}
+
+/* Sidebar: top-level items use monospace, sub-items use sans */
+.top-level > li > details > summary .group-label,
+.top-level > li > a span {
+  font-family: var(--font-victor-mono);
+}
+
+.top-level > li > details > ul a span {
+  font-family: var(--font-jetbrains-mono);
+}

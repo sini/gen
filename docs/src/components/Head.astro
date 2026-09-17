@@ -1,0 +1,20 @@
+---
+import { Font } from "astro:assets";
+import DefaultHead from '@astrojs/starlight/components/Head.astro';
+import { bootScript, paletteCss } from '../palettes.mjs';
+
+// Both run before first paint so the palette is settled by the time anything
+// renders. Starlight's own ThemeProvider is overridden to not fight this.
+const css = paletteCss();
+const boot = bootScript();
+---
+
+<DefaultHead />
+
+<Font cssVariable="--font-victor-mono" preload />
+<Font cssVariable="--font-jetbrains-mono" preload />
+
+<style is:global set:html={css}></style>
+<script is:inline set:html={boot}></script>
+
+<script src="./svg-zoom.js"/>
