@@ -1,10 +1,27 @@
 // @ts-check
+import { fileURLToPath } from 'node:url';
 import { defineConfig, fontProviders } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 import mermaid from 'astro-mermaid';
 import starlightLinksValidator from 'starlight-links-validator';
+import { unified } from '@astrojs/markdown-remark';
+import { codeImport } from 'remark-code-import';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { wholeTokenTextMarkers } from './src/ec-whole-token-markers.mjs';
+
+// The repository root, one level above docs/. Code fences cite library sources
+// relative to it, which live outside the Astro project.
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+
+// remark-code-import declares its transformer as returning `Promise<void[]>`,
+// which unified's `Plugin` return type does not admit. The plugin is a valid
+// remark plugin — the assertion is confined to that declaration mismatch rather
+// than applied to the plugin list, so a genuinely wrong entry there still fails.
+const codeImportPlugin = /** @type {import('@astrojs/markdown-remark').RemarkPlugin} */ (
+	/** @type {unknown} */ (codeImport)
+);
 
 // https://astro.build/config
 export default defineConfig({
@@ -12,6 +29,24 @@ export default defineConfig({
 	// the sitemap and Open Graph tags are built against; leaving it unset makes
 	// all three either relative or absent.
 	site: 'https://gen.wtf',
+	// `markdown.remarkPlugins` / `rehypePlugins` are the deprecated path now that
+	// Sätteri is Astro's default processor; the remark pipeline is opted into
+	// explicitly through `unified()`.
+	markdown: {
+		processor: unified({
+			remarkPlugins: [
+				// Code fences cite real source instead of carrying a copy:
+				//   ```nix file=<rootDir>/lib/compose.nix#L10-L24
+				// A snippet copied by hand goes stale silently, and a docs site whose
+				// examples no longer match the library is worse than one with none.
+				// This way a rename or a refactor fails the build.
+				[codeImportPlugin, { rootDir: repoRoot, allowImportingFromOutside: true, removeRedundantIndentations: true }],
+				// gen's documentation argues from algebra, so the notation has to render.
+				remarkMath,
+			],
+			rehypePlugins: [rehypeKatex],
+		}),
+	},
 	// Weights must cover every weight the stylesheets actually request. Without
 	// them only 400 is fetched and the browser synthesises the rest by thickening
 	// the 400 glyphs, which reads as blur — most visibly on the sidebar, which
@@ -84,30 +119,89 @@ export default defineConfig({
 					label: 'Gen',
 					items: [
 						{ label: 'Overview', slug: 'overview' },
+						{ label: 'Why gen', slug: 'motivation' },
+						{ label: 'Trust', slug: 'trust' },
+						{ label: 'Validation', slug: 'validation' },
+						{ label: 'Benchmarks', slug: 'benchmarks' },
 					],
 				},
 				{
 					label: 'Understand',
 					items: [
 						{ label: 'Architecture', slug: 'explanation/architecture' },
+						{ label: 'Strata', slug: 'explanation/strata' },
+						{ label: 'The Graph Model', slug: 'explanation/graph-model' },
+						{ label: 'Policies', slug: 'explanation/policies' },
+						{ label: 'Execution', slug: 'explanation/execution' },
 					],
 				},
 				{
 					label: 'Start',
 					items: [
 						{ label: 'Getting Started', slug: 'guides/getting-started' },
+						{ label: 'Add Gen to a Flake', slug: 'guides/flake' },
+						{ label: 'Your First Graph', slug: 'guides/first-graph' },
 					],
 				},
+				// Grouped by the stratum `lib/mkGenLibs.nix` assigns each member, not
+				// alphabetically. That declaration is total — a member cannot join the
+				// roster without one — so it is the only grouping that cannot drift out
+				// of step with the roster itself.
 				{
 					label: 'Libraries',
 					items: [
 						{ label: 'The Roster', slug: 'libraries/roster' },
+						{
+							label: 'Substrate',
+							items: [
+								{ label: 'gen-prelude', slug: 'libraries/prelude' },
+								{ label: 'gen-identity', slug: 'libraries/identity' },
+								{ label: 'gen-algebra', slug: 'libraries/algebra' },
+								{ label: 'gen-scope', slug: 'libraries/scope' },
+								{ label: 'gen-memo', slug: 'libraries/memo' },
+								{ label: 'gen-graph', slug: 'libraries/graph' },
+								{ label: 'gen-bind', slug: 'libraries/bind' },
+								{ label: 'gen-schema', slug: 'libraries/schema' },
+								{ label: 'gen-select', slug: 'libraries/select' },
+								{ label: 'gen-dispatch', slug: 'libraries/dispatch' },
+								{ label: 'gen-product', slug: 'libraries/product' },
+								{ label: 'gen-view', slug: 'libraries/view' },
+							],
+						},
+						{
+							label: 'Modules',
+							items: [
+								{ label: 'gen-types', slug: 'libraries/types' },
+								{ label: 'gen-merge', slug: 'libraries/merge' },
+							],
+						},
+						{
+							label: 'Aspects',
+							items: [
+								{ label: 'gen-aspects', slug: 'libraries/aspects' },
+								{ label: 'gen-link', slug: 'libraries/link' },
+								{ label: 'gen-class', slug: 'libraries/class' },
+							],
+						},
+						{
+							label: 'Framework',
+							items: [
+								{ label: 'gen-settings', slug: 'libraries/settings' },
+								{ label: 'gen-assemble', slug: 'libraries/assemble' },
+								{ label: 'gen-program', slug: 'libraries/program' },
+								{ label: 'gen-inspect', slug: 'libraries/inspect' },
+								{ label: 'gen-delivery', slug: 'libraries/delivery' },
+							],
+						},
 					],
 				},
 				{
 					label: 'Reference',
 					items: [
 						{ label: 'Terminology', slug: 'reference/terminology' },
+						{ label: 'Retirements', slug: 'reference/retirements' },
+						{ label: 'CI and Checks', slug: 'reference/ci' },
+						{ label: 'Tooling', slug: 'reference/tooling' },
 					],
 				},
 			],
@@ -122,6 +216,8 @@ export default defineConfig({
 				baseUrl: 'https://github.com/sini/gen/edit/main/docs/',
 			},
 			customCss: [
+				// KaTeX ships its own stylesheet; rehype-katex only emits the markup.
+				'katex/dist/katex.min.css',
 				'./src/styles/layout.css',
 				'./src/styles/custom.css'
 			],
