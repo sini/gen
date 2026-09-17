@@ -1,0 +1,178 @@
+---
+title: Krishnan & Van Wyk (2012) -- Termination Analysis for Higher-Order Attribute Grammars
+description: Our reading of Termination Analysis for Higher-Order Attribute Grammars.
+source:
+  - den-ag-design:used/summaries/krishnan-2012-termination-analysis-hoag.md
+---
+
+> L. Krishnan and E. Van Wyk, "Termination Analysis for Higher-Order Attribute Grammars," *Lecture notes in computer science*, pp. 44–63, 2013. doi: [10.1007/978-3-642-36089-3_4](https://doi.org/10.1007/978-3-642-36089-3_4).
+
+**SLE 2012, LNCS 7745, pp. 44-63. Springer, Heidelberg (2013). DOI 10.1007/978-3-642-36089-3_4.**
+Lijesh Krishnan and Eric Van Wyk, Department of Computer Science and Engineering, University of Minnesota.
+Full proofs are in Krishnan's PhD thesis (*Composable Semantics Using Higher-Order Attribute Grammars*,
+Minnesota 2012), cited by the paper as its reference [9]. Implemented in **Silver** and evaluated on
+**ableJ**, the Silver attribute grammar for Java 1.4.
+
+> ★★ **THE HELD ARTEFACT IS THE AUTHORS' PREPRINT, NOT THE LNCS CHAPTER**, fetched from Eric Van Wyk's
+> UMN publication page. It paginates 1-20 with no publisher furniture, so **LNCS page citations (44-63)
+> cannot be verified against it** -- twenty pages against twenty makes `LNCS = preprint + 43`
+> arithmetically available and that is all it is. Cite by preprint page and by numbered result
+> (Theorems 1-3, Lemmas 1-6, Figs. 1-8), which are stable across both versions.
+>
+> ★ **THE ORDERING RELATIONS ARE INVISIBLE IN THE TRANSCRIPTION.** `⪰` extracts as byte `0x17` and `≻`
+> as byte `0x1F`; both read as an extra space on any terminal, so **the strict/non-strict distinction is
+> lost to the naked eye** in the one construct this paper exists for. They are recoverable --
+> `grep -a -o -P '\x17'` (23 hits, non-strict) and `'\x1f'` (10 hits, strict). Details in the
+> transcription's header note.
+
+## Paper Summary
+
+Higher-order attribute grammars (HOAGs, Vogt-Swierstra-Kuiper 1989) let an attribute's **value be a new
+syntax tree**, which is then itself decorated and evaluated. That admits a failure mode no circularity
+analysis catches: evaluation that never repeats a dependency but generates an **unbounded sequence of
+new trees**, each built as a local attribute on its predecessor. Knuth's circularity test and the HOAG
+extension of it both terminate cleanly on such a grammar and report nothing wrong. This paper supplies
+the missing analysis -- to the authors' knowledge the first of its kind -- and it is **conservative**:
+it proves termination or it fails, and there exist terminating grammars on which it fails.
+
+The analysis is stated over **RHOAG** (Fig. 4), a restricted class of HOAGs designed to be expressive
+enough for real grammars (ableJ converted into it "with a few modest modifications") while isolating
+tree creation to local-attribute evaluation. The restrictions that matter: no inherited occurrences on
+the root; a production may not read its own synthesized or its children's inherited occurrences; **no
+nested attribute-on-attribute accesses**; primitive functions neither take nor return trees. Silver's
+`forwarding` is outside RHOAG but is shown translatable into it without loss of precision *for this
+analysis* (§6) -- notably not for completeness or circularity, where translating forwarding away is
+known to lose precision.
+
+The argument runs in two halves that meet in Theorem 3.
+
+**Half one -- rewriting, for the non-inherited case (§4).** Non-termination of attribute evaluation is
+first reduced to the existence of an **infinite tree creation sequence** (Theorem 1). Where no
+higher-order *inherited* attributes are involved, tree creation is modelled by generated **term rewrite
+rules**, so that an infinite creation sequence implies an infinite rewrite sequence (Lemma 2). Rule
+termination is discharged by the external prover **AProVE**. The generated rules are deliberately
+over-approximate -- attribute instance names are dropped from sub-terms, so the rules derive sequences
+for *every* possible higher-order synthesized instance where only one occurs at run time.
+
+**Half two -- an ordering, for the inherited case (§5).** Higher-order *inherited* attributes break the
+rewriting model, because the rules lack the context in which inherited attributes are evaluated and
+represent such accesses with an `INH` placeholder. So the analysis additionally requires a
+**well-founded, reflexive, transitive ordering `⪰` on non-terminals** (conditions in Fig. 7), computed
+by **Procedure A** (Fig. 8):
+
+1. build a directed graph `G_NT` on non-terminals, edge `⟨X, Y⟩` iff `S(X, Y)`;
+2. condense it to its strongly connected components as `G_SCC`, edge `⟨S_X, S_Y⟩` iff some `X ∈ S_X`,
+   `Y ∈ S_Y` with `I(X, Y)`, or with `S(X, Y)` and `¬S(Y, X)`;
+3. **if `G_SCC` has a cycle, return failure -- the required ordering does not exist**;
+4. otherwise `X ⪰ Y` iff `G_SCC` has a (possibly trivial) path from X's SCC to Y's SCC, and
+   `X ≈ Y` iff X and Y share an SCC.
+
+Condensation, then acyclicity, then reachability-as-order: exactly the shape ADR-0009 assigns to
+gen-graph. Lemma 3 says the ordering Procedure A produces satisfies Fig. 7.
+
+**Where they meet.** Lemma 4: with `⪰` in hand, every created tree is *no larger* than the tree it was
+created on -- `t_i ⪰ t_(i+1)`, **non-increasing, not strictly decreasing**. Lemma 5: any infinite tree
+creation sequence therefore contains an infinite **constant** sub-sequence (`t_0 ≈ t_1 ≈ t_2 ≈ ...`),
+because only finitely many steps can strictly descend. Lemma 6: constant sub-sequences use no inherited
+accesses, so the rewrite rules *do* model them (via a pruned term where sub-trees below the constant
+level are replaced by `INH`). **Theorem 3:** if the grammar is complete and non-circular, the generated
+rewrite rules terminate, and the non-terminals can be ordered as required, then no improper evaluation
+sequence exists. The worked example: `Stmt ≈ Expr`, `Stmt ≈ Type`, `Stmt ≻ Env`; adding a C-style
+`typedef` type environment inherited on `Env` adds a level, `Env ≻ TypeEnv`, `TypeEnv ≈ TypeRep`.
+
+§6 states the limits plainly. The analysis cannot handle a definition whose generated tree carries the
+**same production name** as the defining production with children fetched through synthesized accesses
+(the generated rules are then always non-terminating). And -- decisively for how this archive reaches
+the paper -- *"since the analysis assumes that the grammar is non-circular, it does not handle reference
+attribute grammars since the circularity problem is undecidable in that setting."* §8 lists relaxing
+that assumption, **in order to handle RAGs**, as future work, alongside a modular version whose
+composed-grammar ordering condition could be checked per extension.
+
+## Relevance to den-hoag -- this is the primary behind a live-arc anchor, and it narrows it
+
+The paper enters this archive through **Söderberg & Hedin 2013 §7**, whose single citing sentence is
+*"Krishnan and Van Wyk have suggested an approach to conservatively determine termination for such
+multi-level NTAs [19]. It is based on ordering the nonterminals (the node types), so that each new NTA
+has a lower order than its host."* `used/KEYSTONES.md` carries the same compression -- *"ordering node
+types so that each new NTA ranks below its host"* -- and, until this acquisition, a
+**NOT-VERIFIABLE-AT-PRIMARY** marking with it. With the primary in hand, **four scope limits appear that
+the secondhand sentence does not carry:**
+
+1. **The ordering is non-increasing, not strictly decreasing.** Lemma 4 is `t_i ⪰ t_(i+1)`; equal-order
+   steps are explicitly permitted and are exactly what the paper calls a *constant tree creation
+   sequence*. "Lower order than its host" is a **stricter claim than the primary makes** -- it describes
+   the strict steps only, and drops the `≈` case that the ordering deliberately allows.
+2. **The ordering is one conjunct of three, and it is not the one that closes the equal-order case.**
+   Theorem 3 needs completeness + non-circularity, **terminating rewrite rules** (AProVE), and the
+   ordering. The ordering bounds only the higher-order *inherited* steps; the constant runs it leaves
+   are discharged by the rewrite system (Lemma 6). Citing the ordering alone drops half the argument.
+3. ★ **The analysis explicitly excludes reference attribute grammars -- the setting of the paper that
+   cites it, and of gen-scope.** §6 rules RAGs out on undecidable circularity, and §8 files handling
+   them as future work. Söderberg & Hedin's own verb is careful (*"have suggested"*); it is a suggested
+   approach, not a result carried into the RAG setting. **Any den ruling that leans on "Krishnan-Van
+   Wyk gives us termination" for a circular/RAG construction is leaning on something the primary
+   disclaims.** This is the same undecidability wall ADR-0008 already cites through **Boyland 2005
+   Theorem 3.3** -- and Krishnan & Van Wyk cite Boyland (their [2]) for precisely that.
+4. **Procedure A may simply fail.** A cycle in the SCC condensation means no such ordering exists; the
+   analysis returns failure rather than a weaker guarantee.
+
+Two things the primary *adds* that are usable:
+
+- **Procedure A is a condensation-and-reachability construction**, which is the ordering machinery
+  ADR-0009 puts in gen-graph (*"one Kahn, condensation, phase machinery"*). If a bounded-NTA guard is
+  ever built rather than cited, this is its shape, and its failure mode is a named refusal
+  (`return failure`) rather than a silent pass -- the fail-closed posture the arc already prefers.
+- **The two-halves decomposition is the honest frame here.** gen-scope's
+  expressible SCC shape is one circular instance over a product carrier, not per-node circular
+  attributes across a cycle. Krishnan & Van Wyk's split says the ordering handles the *cross-level*
+  (inherited) steps and something else must handle the *same-level* runs. den's product carrier is the
+  same-level device; nothing in this paper supplies its termination argument, and this paper does not
+  claim to.
+
+## Key Concepts
+
+- **Improper evaluation sequence / infinite tree creation sequence (§3, Theorem 1):** the HOAG-specific
+  non-termination that circularity analysis cannot see -- evaluation generates unboundedly many new
+  trees without ever repeating a dependency.
+
+- **RHOAG (Fig. 4):** the restricted HOAG class the analysis is stated over. No inherited occurrences on
+  the root, no nested attribute-on-attribute access, functions neither consume nor produce trees. Chosen
+  so that tree creation is isolated to local-attribute evaluation.
+
+- **Rewrite-rule modelling of tree creation (§4, Lemma 2):** generated term rewrite rules over-approximate
+  the trees a grammar can build; if the rules terminate, no infinite creation sequence exists. Discharged
+  by AProVE.
+
+- **The non-terminal ordering `⪰` / `≻` / `≈` (Fig. 7):** well-founded, reflexive, transitive. `X ≻ Y`
+  is forced by higher-order *inherited* use `I(X, Y)`; `X ⪰ Y` by synthesized/local use `S(X, Y)`.
+
+- **Procedure A (Fig. 8, Lemma 3):** SCC graph -> condensation -> refuse on cycle -> order by
+  reachability. `X ≈ Y` iff same SCC.
+
+- **Constant tree creation sequence (§5, Lemmas 4-6):** a run of equal-order creation steps. The ordering
+  permits them; the rewrite rules (over `INH`-pruned terms) close them.
+
+- **Theorem 3:** complete + non-circular grammar, terminating generated rules, existing ordering ⇒ no
+  improper evaluation sequence. A conjunction, not a single condition.
+
+- **Conservativeness (§6):** AProVE is conservative, the ordering generator is conservative, and the
+  generated rules over-derive. Terminating grammars can fail the analysis.
+
+- **RAG exclusion (§6, future work in §8):** non-circularity is assumed, so reference attribute grammars
+  are out of scope by construction.
+
+- **Forwarding as non-destructive rewriting (§6):** a forwarding production designates a semantically
+  equivalent tree and forwards unanswered attribute queries to it; translatable to higher-order
+  attributes with generated copy rules, at no precision cost *for this analysis*.
+
+## Cited works already in the catalog
+
+Knuth 1968 (`knuth-1968`, and its 1971 correction, which their reference [8] names and which this
+archive does **not** hold), Vogt-Swierstra-Kuiper 1989 (`vogt-1989`), Vogt's thesis 1989, Boyland 2005
+(`boyland-2005`, remote attributes and undecidable circularity -- their [2]), Hedin 2000 (`hedin-2000`),
+Ekman-Hedin 2007 (JastAdd; the archive holds Hedin-Magnusson 2003), Van Wyk et al. 2010 (`vanwyk-2010`,
+Silver), Sloane 2011 (Kiama GTTSE; the archive holds `sloane-2010-kiama-ag-embedding` and
+`reference-catalog/sloane-2009-kiama-lightweight`). Not held: Van Wyk et al. 2002 (forwarding, CC),
+Van Wyk et al. 2007 (ableJ, ECOOP), Dershowitz 1982 (orderings for term rewriting), Lee-Jones-Ben-Amram
+2001 (size-change principle), Sereni-Jones 2005, Backhouse 2002, Johnsson 1987, Giesl et al. 2003
+(AProVE).

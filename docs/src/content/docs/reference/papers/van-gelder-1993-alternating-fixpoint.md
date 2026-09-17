@@ -1,0 +1,153 @@
+---
+title: Van Gelder (1993) -- The Alternating Fixpoint of Logic Programs with Negation
+description: Our reading of The alternating fixpoint of logic programs with negation.
+source:
+  - den-ag-design:used/summaries/van-gelder-1993-alternating-fixpoint.md
+---
+
+> A. Van Gelder, "The alternating fixpoint of logic programs with negation," *Journal of Computer and System Sciences*, vol. 47, no. 1, pp. 185–221, 1993. doi: [10.1016/0022-0000(93)90024-q](<https://doi.org/10.1016/0022-0000(93)90024-q>) · [open access](https://www.sciencedirect.com/science/article/pii/002200009390024Q/pdf).
+
+**Journal of Computer and System Sciences 47(1), pp. 185-221, 1993. DOI 10.1016/0022-0000(93)90024-Q.**
+Single author -- Allen Van Gelder, UC Santa Cruz. Received February 20, 1991; revised May 21, 1992.
+Preliminary version: an extended abstract at PODS 1989 (a different, shorter document).
+Companion: the *semantics* this paper computes is Van Gelder, Ross & Schlipf 1991, already in this
+archive, which this paper cites as its reference [51]. **1991 is the semantics; 1993 is the construction.**
+
+> ★ **TWO WARNINGS ABOUT THE HELD ARTEFACT, both detailed in the transcription's header note.**
+> (1) The PDF is DEFECTIVE: **printed page 193 is missing** and printed page 201 appears twice (PDF
+> pages 9 and 17 are byte-identical at both the text and image layers). Subsection 2.6 is lost with
+> it. Nothing in Sections 3-9 is affected, so every result cited below is present and complete.
+> (2) The PDF is a 2003 OCR scan and **every mathematical symbol is SUBSTITUTED by a lookalike**, not
+> dropped -- a mangled formula reads as well-formed content. Prose is reliable; formulas, rule
+> displays and tables are not. Quote prose only, and open the PDF for anything symbolic.
+
+## Paper Summary
+
+Stable models (Gelfond & Lifschitz 1988) and well-founded partial models (Van Gelder, Ross & Schlipf
+1991\) were both defined *non-constructively*: a set could be recognised as a model if you were handed
+one, but neither paper gave an algorithm to build it from the program. This paper closes that gap for
+the well-founded semantics, and the abstract states the aim in one sentence (printed 185): "The
+alternating fixpoint of a logic program with negation is defined constructively."
+
+The construction rests on an observation the paper says had not been emphasised before: the
+**stability transformation is ANTIMONOTONIC**. Section 2.7 (printed 194) states it and draws the
+consequence -- "the stability transformation, upon which stable models are based, is antimonotonic, a
+fact that has not been emphasized in previous work, but serves to explain the intractability
+surrounding stable models." Gelfond & Lifschitz's transformation is
+usually presented in three stages over a set of true atoms -- delete each rule with a negative literal
+whose atom you believe, drop the remaining negative literals, take the minimum model of the resulting
+Horn program. Van Gelder re-presents it over a set of **negative** literals instead, saying plainly why
+(printed 199): "it turns out to be simpler and more intuitive, at least for our purpose, to describe
+the transformation in terms of a set of negative literals."
+
+That re-presentation is Definitions 4.1 and 4.2 (printed 200). A fixed set of negative facts `Ī` is
+treated as a *parameter* of the immediate-consequence operator; the **eventual consequence mapping**
+`S_P(Ī)` is the least fixpoint of that parameterised operator -- the positive facts derivable from `P`
+once `Ī` is granted -- and `Ŝ_P(Ī)` is its conjugate, complemented back into negative literals. `S_P`
+is monotonic, and the monotonicity of `S_P` is exactly what makes `Ŝ_P` antimonotonic. A fixpoint of
+`Ŝ_P` is a stable model, "by a direct translation of the three-stage definition above" (printed 200) --
+which is the paper's second contribution: one operator yields both semantics.
+
+The **alternating transformation** then does the obvious thing with an antimonotonic map: composes it
+with itself. Definition 5.1 (printed 200) sets `A_P(Ī) = Ŝ_P(Ŝ_P(Ī))`, and since a composition of two
+antimonotonic maps is monotonic, Knaster-Tarski applies and the least fixpoint `Ā = A_P^∞(∅)` exists.
+The name is explained in the abstract: the transformation "runs in two passes; the first pass
+transforms an underestimate of the set of negative conclusions into an (intermediate) overestimate;
+the second pass transforms the overestimate into a new underestimate; the composition of the two
+passes is monotonic." Section 2.7 (printed 194) adds the picture: one subsequence converges to the
+negative portion `W̄` from below, the other to `W̄ ∪ W'` from above.
+
+Definition 5.2 (printed 201) assembles the model: with `A⁺ = S_P(Ā)`, the **alternating fixpoint
+partial model (AFP model) is `(A⁺ + Ā)`** -- the union of the positive and the negative conclusions --
+and when that is total it is the AFP total model. The paper is careful that every stable model is a
+fixpoint of `A_P` but `A_P` may have further fixpoints that correspond to no total model (printed 201).
+For finite `H` the least fixpoint is computable in time polynomial in `|H|`, the program held fixed.
+
+Section 7 proves the payoff. Having reviewed unfounded sets and the operator `W_P(I) = T_P(I) ∪ ¬·U_P(I)`
+whose least fixpoint *is* the well-founded partial model (Definitions 6.1-6.2, printed 203-204), the
+argument is a sandwich: Lemma 7.5 puts `A_P^∞(∅)` inside `W̄`, Lemma 7.7 puts it outside, and
+**Theorem 7.8 (printed 206) concludes: "The alternating fixpoint model is identical to the well-founded
+partial model."** The positive half comes free from Lemma 7.1, `S_P(W̄) = W⁺`. So a construction that is
+just "iterate a monotone square from `∅`" computes a semantics that was defined by quantifying over
+unfounded sets.
+
+Section 8 is a separate result on expressive power, and is the paper's third contribution. Rule bodies
+are generalised to arbitrary first-order formulas (this is *alternating fixpoint logic*), and the
+comparison target is fixpoint logic (FP), where IDB relations may appear only positively. Theorem 8.1
+(printed 209) handles programs with only positive IDB literals; Theorems 8.6 and 8.7 (printed 215-216)
+show any FP system can be rewritten into a normal logic program whose AFP positive part agrees with the
+original FP model; and Theorem 8.10 (printed 217) gives the converse **on finite structures**, so the
+two are equally expressive there while alternating fixpoint logic is at least as expressive on all
+structures. Section 8.5 discusses the complement of transitive closure as the hard case. The conclusion
+(printed 218) names the open problem: identify classes of *unstratified* programs for which alternating
+fixpoint semantics is computationally tractable.
+
+## Relevance to gen-scope (ADR-0020)
+
+`gen-scope/lib/well-founded.nix` already names this paper in its header -- "Van Gelder, Ross & Schlipf
+1991 define the well-founded model of a program with negation; **Van Gelder 1993 gives the construction
+computed here**" -- so this acquisition closes a cited-not-held gap on the *implemented* construction
+rather than on background reading. The library computes `S` (antimonotone), squares it, and takes
+`lfp(S²)` from `∅`, which is Definition 5.1 exactly.
+
+★ **ONE THING TO CHECK WHEN READING THE CODE AGAINST THE PAPER: THE POLARITY IS FLIPPED.** The paper
+states the whole construction over sets of **negative** literals -- that is the deliberate choice
+announced on printed 199 and formalised in Definitions 4.1-4.2 -- so in the paper `Ā = lfp(A_P)` is the
+**negative** portion `W̄`, and the positive portion is recovered afterwards as `A⁺ = S_P(Ā)` (Lemma 7.1,
+Theorem 7.8). `well-founded.nix` uses the positive dual: its `S(J) = lfp T_{P/J}` maps a guess of true
+atoms to true atoms, so its `lfp(S²)` is `W⁺` directly. The two agree, and Definition 3.2's conjugate
+operator `¬·I` (printed 195) is the bridge between them -- but a reader checking `lfp(S²)` against
+Theorem 7.8 will find the paper calling that fixpoint the *negative* portion, and should not read the
+mismatch as a defect before applying the conjugate.
+
+For the **interpretation-parameter work**, the load-bearing sentence is Theorem 7.8:
+the correspondence is an **identity**, not a containment or an approximation. Any modification to the
+construction is therefore a modification to the *semantics* unless it is proved to preserve that
+identity -- there is no slack in it to spend. Definition 4.1's framing is the natural anchor for a
+parameter, since it already treats the negative-fact set as "a parameter of a transformation whose
+domain is H" (printed 200); that is the paper's own parameterisation point, and it sits *below* the
+alternating composition, not inside it.
+
+The companion refusal oracle stays where ADR-0020 put it: stable models are fixpoints of `Ŝ_P` (printed
+200\) and this paper does **not** supply a decision procedure for their existence either. It supplies the
+*relation* -- every stable model is a fixpoint of `A_P`, but not conversely (printed 201).
+
+## Key Concepts
+
+- **Antimonotonicity of the stability transformation (Sections 2.7 and 4, printed 194 and 199).** The
+  paper's diagnostic claim, said not to have been emphasised in prior work, and offered as the
+  explanation for the intractability surrounding stable models. Everything else routes around it.
+
+- **Eventual consequence mapping, `S_P` and `Ŝ_P` (Definitions 4.1-4.2, printed 200).** A fixed set of
+  negative facts is a *parameter* of the immediate-consequence operator; `S_P(Ī)` is that operator's
+  least fixpoint. `S_P` monotonic ⇒ `Ŝ_P` antimonotonic. A fixpoint of `Ŝ_P` is a stable model.
+
+- **The alternating transformation (Definition 5.1, printed 200).** `A_P(Ī) = Ŝ_P(Ŝ_P(Ī))`. An
+  antimonotone map composed with itself is monotone, so `Ā = A_P^∞(∅)` exists by Knaster-Tarski.
+  Two passes: underestimate → overestimate → new underestimate. Polynomial in `|H|` for finite `H`.
+
+- **The AFP partial model (Definition 5.2, printed 201).** With `A⁺ = S_P(Ā)`, the model is `(A⁺ + Ā)`:
+  **the union of the positive and the negative conclusions.** Total ⇒ AFP total model.
+
+- **★ Theorem 7.8 (printed 206): "The alternating fixpoint model is identical to the well-founded
+  partial model."** The keystone. Proved by Lemma 7.5 (`⊆ W̄`) and Lemma 7.7 (`⊇ W̄`) sandwiching the
+  negative portion, with Lemma 7.1 (`S_P(W̄) = W⁺`, printed 204) supplying the positive portion.
+
+- **Unfounded sets and `W_P` (Definitions 6.1-6.2, printed 203-204).** Reviewed from VGRS 1991, not
+  new here: `W_P(I) = T_P(I) ∪ ¬·U_P(I)`, and the well-founded partial model is its least fixpoint.
+  This is the *definition* Theorem 7.8 identifies the construction with.
+
+- **Alternating fixpoint logic vs fixpoint logic (Section 8).** At least as expressive as FP on all
+  structures (Theorems 8.6-8.7, printed 215-216); equally expressive on finite structures
+  (Theorem 8.10, printed 217). Strictness and dependency graphs are Definitions 8.3-8.4 (printed 208-210).
+
+- **⚠ A NUMBERING ERRATUM IN THE PAPER.** The corollary after Theorem 3.1 is **printed** as
+  "COROLLARY 2.3" (printed 196) but is **cited** as "Corollary 3.2" five times. Both names denote one
+  result: if `T` is monotonic and `T(I) ⊆ I` then `lfp T ⊆ I`. There is no Theorem 3.2.
+
+## Cited works already in the catalog
+
+Gelfond & Lifschitz 1988 (stable models, this paper's [18] -- the transformation it re-presents);
+Van Gelder, Ross & Schlipf 1991 (well-founded semantics, this paper's [51] -- the semantics it
+constructs); Apt, Blair & Walker 1988 and Przymusinski 1988 (stratified and perfect-model semantics,
+discussed in Section 2.3 as the restriction this work escapes).

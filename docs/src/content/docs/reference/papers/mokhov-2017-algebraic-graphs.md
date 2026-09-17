@@ -1,0 +1,133 @@
+---
+title: Mokhov (2017) -- Algebraic Graphs with Class
+description: Our reading of Algebraic graphs with class (functional pearl).
+source:
+  - den-ag-design:used/summaries/mokhov-2017-algebraic-graphs.md
+---
+
+> A. Mokhov, "Algebraic graphs with class (functional pearl)," *ICFP '17: ACM SIGPLAN International Conference on Functional Programming*, pp. 2–13, 2017. doi: [10.1145/3122955.3122956](https://doi.org/10.1145/3122955.3122956).
+
+## Paper Summary
+
+Mokhov presents a minimalistic algebraic foundation for constructing and transforming graphs in functional programming, motivated by the observation that the standard (V, E) pair representation is a source of partial functions. The inconsistency invariant E \<= V x V cannot be statically enforced: one can construct a value `G [1] [(1,2)]` where edge (1,2) refers to non-existent vertex 2. Existing Haskell libraries (containers, fgl) both suffer from this -- containers uses adjacency arrays with unchecked bounds, fgl uses inductive graphs with partial edge insertion.
+
+The paper's core contribution is a four-primitive algebra: `empty` (the empty graph), `vertex` (a single-vertex graph), `overlay` (union of vertices and edges of two graphs), and `connect` (overlay plus cross-product edges from left vertices to right vertices). This core is both *complete* (any graph can be constructed) and *sound* (malformed graphs cannot be constructed). The absorption theorem `x -> y + x + y = x -> y` guarantees that an edge always carries its endpoints, making the API inherently consistent.
+
+The algebra is characterized by 8 axioms: overlay is commutative and associative; connect with empty forms a monoid; connect distributes over overlay (both left and right); and the decomposition axiom `x -> y -> z = x -> y + x -> z + y -> z`. The decomposition axiom is the structural heart of the algebra -- it distinguishes algebraic graphs from semirings (which would require an annihilating zero). Notably, the shared identity of overlay and connect, the identity law for overlay, and the idempotence of overlay all follow from decomposition alone. The minimal axiom set was verified in Agda by Alekseyev (2014).
+
+The partial order `x <= y  iff  x + y = y` corresponds exactly to the subgraph relation, with overlay-connect order `x + y <= x -> y` and monotonicity of both operations. This enables equational reasoning: the paper proves `vertices xs <= clique xs` by structural induction using only algebraic laws.
+
+A central result is the canonical form theorem (Section 4.1): any algebraic graph expression g can be rewritten as `(sum of vertices in Vg) + (sum of u -> v for (u,v) in Eg)`. The Relation instance (isomorphic to the (V, E) pair) is *free* -- it satisfies exactly the 8 axioms and nothing more. This follows from repeated application of decomposition to break connect chains into pairs, then distributivity and commutativity to rearrange into canonical form.
+
+Section 4 demonstrates the algebra's flexibility through Graph instances "a la carte": undirected graphs (add commutativity of connect, reducing to 6 axioms), reflexive graphs (self-loop axiom `v = v -> v`), transitive graphs (closure axiom), preorders, equivalence relations, and hypergraphs. The k-decomposition hierarchy generalizes: 3-decomposition produces hypergraphs where triples are atomic, and the pattern extends to arbitrary rank. All variants share the same four-primitive core; only the axiom set changes.
+
+Section 5 develops a polymorphic transformation library exploiting Haskell's type class polymorphism and zero-cost newtype wrappers: `transpose` (swap connect arguments -- zero runtime cost), `gmap` (vertex map -- satisfies functor laws), `bind` (vertex substitution -- monad), `induce` (subgraph by predicate), `removeVertex`, `splitVertex`, `removeEdge`, and `box` (Cartesian product). The De Bruijn graph construction demonstrates the library's expressiveness: dimension-n De Bruijn graphs on alphabet A are constructed in ~6 lines using `bind` and `edges`.
+
+The paper identifies four open limitations: no algebraic characterization of edge-labelled graphs (partial workaround via `a -> Graph`), restriction to homogeneous graphs (cannot model Petri nets), logarithmic overhead in some instances (Relation uses Set), and no efficient algorithms operating directly on the algebraic core (must convert to adjacency representations). Future directions include modular decomposition for minimizing algebraic expressions and formulating graph algorithms as algebraic equation systems.
+
+## Key Concepts
+
+- **Four primitives (S2.1):** `empty`, `vertex`, `overlay`, `connect` -- total functions closed on graphs. Connect is the sole edge source; overlay is edge-free composition.
+- **8-axiom characterization (S3.1):** Overlay commutative monoid + connect monoid (shared identity) + distributivity + decomposition. Decomposition is the key differentiator from semirings.
+- **Canonical form (S4.1):** Every expression reduces to vertex sum + edge sum. Proves the Relation instance is the free graph.
+- **Absorption theorem (S3.1):** `x -> y + x + y = x -> y` -- edges are inseparable from their endpoints. Guarantees soundness (no dangling edges).
+- **Subgraph partial order (S3.2):** `x <= y  iff  x + y = y`, corresponding to the standard subgraph relation. Enables equational reasoning about graph containment.
+- **Graphs a la carte (S4):** Same core, different axiom sets. Undirected (commutative connect, 6 axioms), reflexive (self-loop), transitive (closure), hypergraphs (k-decomposition).
+- **Zero-cost transpose (S5.2):** Newtype wrapper flipping connect argument order. Polymorphic graphs are transposed at compile time.
+- **Graph functor/monad (S5.3-5.4):** `gmap` maps vertices preserving structure; `bind` replaces vertices with subgraphs. Powers mergeVertices, induce, removeVertex, splitVertex.
+- **Derived constructors (S2.2, S5.1):** `edge`, `vertices`, `clique`, `path`, `circuit`, `star`, `tree`, `forest` -- all defined purely from the four primitives.
+- **Deep embedding (S4.2):** The `Graph a` data type provides linear-size representation for dense graphs (clique [1..n] is O(n) vs O(n^2) for Relation).
+
+## Implementation Mapping
+
+### Current Usage in Gen Ecosystem
+
+#### gen-scope (MAJOR -- directly implements S2.1-S5.1)
+
+gen-scope implements all four core primitives as graph constructors for scope graph topology:
+
+- `empty`, `vertex`, `overlay`, `connect` -- direct implementations of S2.1, used in `buildNodes` to specify parent graphs (`parentGraph`) and import graphs (`importGraph`).
+- `overlays` -- fold of overlay over a list (S2.2 `vertices` pattern generalized to graphs).
+- `vertices` -- list of isolated vertices (S2.2).
+- `edge`, `edges` -- single and multiple edge construction (S3.1 `edge x y = connect (vertex x) (vertex y)`).
+- `path` -- sequential chain (S5.1), used for linear parent hierarchies.
+- `circuit` -- cycle construction (S5.1), connecting last to first.
+- `star` -- center with leaves (S5.1 `star x ys = connect (vertex x) (vertices ys)`). **Inverted in gen-scope**: leaves point TO center (parent edges), matching scope graph convention where children reference their parent. This is the primary constructor for den's entity hierarchies: `star "host:igloo" ["user:tux" "user:root"]` creates parent edges from both users to the host.
+- `clique` -- fully connected subgraph (S2.2 `foldr connect empty . map vertex`).
+- `tree`, `forest` -- recursive tree construction (S5.1).
+- `gmap` -- vertex map (S5.3), used for ID transformations on scope graphs.
+- `induce` -- subgraph by predicate (S5.4).
+- `transpose` -- edge reversal (S5.2). Used to flip import graph direction.
+- `removeVertex`, `removeEdge` -- structural modification (S5.4-5.5).
+- `hasVertex`, `hasEdge` -- membership tests derived from the algebra.
+
+The overlay operation's properties (commutative, associative, idempotent) are load-bearing for gen-scope's design: independent modules can contribute scope graph fragments via overlay, and the result is order-independent. This directly enables den v2's modular graph composition model.
+
+#### gen-graph (Minor -- algebraic foundation for edge map operations)
+
+gen-graph operates on materialized edge maps `{ id -> [id] }` rather than algebraic graph expressions, but its set operations follow the algebraic structure:
+
+- `unionEdges` -- corresponds to overlay on materialized graphs (S2.1 vertex/edge union).
+- `intersectEdges` -- intersection of edge sets, no direct paper analogue but follows from the partial order (S3.2).
+- `differenceEdges` -- edge set difference, complementary to union.
+- `selectEdges` -- predicate-based edge filtering, analogous to `induce` (S5.4) on edges.
+- `transpose` -- follows **S5.2 "Graph Transpose"** directly: reverses all edge directions (the law flips `connect`, leaving `overlay` unchanged). Used for `dependents`/`dependentsOf` reverse reachability.
+  > ⚠ **This line previously read "follows S4.3 directly" and was the SEED of a ten-site citation defect.** S4.3 is "Undirected Graphs" (verified against the paper, where S4.3 is "Undirected Graphs" and S5.2 is "Graph Transpose"). The wrong wording propagated verbatim into our paper index and from there into **eight `.nix` comments**, each author copying it from adjacent code rather than from the paper. Note lines 17, 29 and 53 of this very file said **S5.2 correctly the whole time** — the document contained both answers, and the wrong one is the one that got copied.
+- `transitiveClosure` -- iterates `compose` to fixpoint, realizing the transitive graph instance (S4.5) as a computation.
+- `transitiveReduction` -- minimal graph preserving reachability, the complement of transitive closure.
+
+#### gen-select (Minor -- algebraic composition of predicates)
+
+gen-select's combinator design was informed by algebraic graph composition:
+
+- `sel.and` / `sel.or` -- parallel the overlay (union) and connect (cross-product) composition patterns. `sel.and` is associative and commutative (like overlay); `sel.or` is associative and commutative.
+- `sel.not` -- complements a selector, analogous to graph complement.
+- The compositional property that selectors can be freely combined without coupling to representation mirrors the paper's type-class polymorphism: selectors work over any context satisfying the accessor interface, just as graph expressions work over any Graph instance.
+
+### Relevance to Den v2 HOAG Pipeline
+
+Den v2 uses algebraic graph composition as the structural substrate for its demand-driven HOAG pipeline. The mapping is direct:
+
+**Scope graph construction.** Entity declarations (`den.hosts`, `den.homes`) translate to algebraic graph expressions. `star "host:igloo" ["user:tux" "user:root"]` constructs a star graph (S5.1) where user nodes have parent edges to the host. The `connect` primitive (S2.1) produces the cross-product: connecting a host vertex to a vertices-list of users creates all parent edges in one expression.
+
+**Modular fragment composition via overlay.** Independent flake modules each contribute scope graph fragments. Overlay's commutativity and associativity (axioms 1-2) guarantee that module evaluation order is irrelevant -- the final graph is the same regardless of which module is processed first. Overlay's idempotence (theorem from S3.1) means duplicate declarations are harmlessly absorbed. This is the algebraic justification for den's claim that aspects can be defined across multiple files with no ordering constraints.
+
+**Import edges via overlay.** `includes = [ "networking" "security" ]` on an aspect translates to import (I) edges in the scope graph. These are composed via overlay on the import graph, separate from the parent (P) graph. The two graphs are independent overlay monoids that combine at `buildNodes` time.
+
+**Constraint propagation via the partial order.** The subgraph relation (S3.2) provides the semantic foundation for den's constraint model: `drop aspect` removes an aspect from resolution by inducing a subgraph (S5.4) that excludes the dropped node. The monotonicity property (S3.2) guarantees that dropping a node from a subgraph preserves all remaining relationships.
+
+**Entity hierarchy as star graphs.** Den's entity model is a forest of star graphs: each host is a star center with users as leaves, each environment is a star center with hosts as leaves. The `star` constructor (S5.1) is the canonical building block. The `tree` and `forest` constructors (S5.1) handle deeper hierarchies (environment -> host -> user -> home).
+
+**Graph transformations in the pipeline.** `gmap` (S5.3) enables ID namespace transformations -- when aspects are resolved in different scope contexts, vertex IDs are remapped. `induce` (S5.4) implements selective materialization -- only the subtree relevant to a given entity is forced.
+
+## Appendix: Follow-up Work
+
+### Unexploited Ideas
+
+- **Deep embedding for compact representation (S4.2).** The paper notes that `clique [1..n] :: Graph Int` has O(n) memory as a deep embedding vs O(n^2) as a Relation. Gen-scope currently materializes all edges eagerly via `buildNodes`. For dense scope graphs (many-to-many imports), a deep embedding could defer materialization and reduce memory proportional to the expression size rather than the edge count. This is relevant for fleet-scale den configurations with thousands of cross-cutting aspects.
+
+- **Hypergraph k-decomposition (S4.7).** The 3-decomposition axiom and its generalization to arbitrary rank are unexploited. In den's context, ternary (or higher) relationships -- such as "host X, user Y, aspect Z" triples -- are currently modeled as binary edge chains. A hypergraph representation could express multi-entity relationships as atomic units, with the k-decomposition axiom controlling how they collapse to binary edges when needed.
+
+- **Modular decomposition for expression minimization (S7).** The paper identifies modular decomposition as a canonical form that minimizes algebraic expression size. Gen-scope's graph expressions grow linearly with the number of declarations. For large fleets, minimizing expressions before evaluation could reduce the constant factor on graph construction and equality comparison.
+
+- **Edge-labelled graph instance via `a -> Graph` (S7).** The paper sketches a Graph instance for `a -> g` where `a` is the label type, representing a collection of graphs indexed by edge label. Gen-scope currently handles custom edge labels via `edgeGraphs` (a plain attrset of graphs per label), which is structurally similar but does not exploit the algebraic Graph instance. Formalizing edge labels algebraically could enable label-polymorphic graph transformations.
+
+- **Algebraic equation formulation of graph algorithms (S7).** The paper suggests formulating graph algorithms as systems of algebraic equations with unknowns. Gen-scope's attribute computations are essentially fixpoint equations over the graph; expressing them in the algebraic framework could enable automated verification of attribute grammar properties (e.g., proving that a set of attributes is well-defined).
+
+### Potential New Libraries or Features
+
+- **gen-graph deep embedding mode.** Add an optional `Graph a` deep embedding representation alongside the current materialized edge maps. Scope: small (100-200 lines). The deep embedding would compose via `overlay`/`connect` and defer materialization to query time. Most impactful for dense subgraphs where edge count >> expression size. Interacts with gen-scope's `buildNodes` (which would produce deep embeddings instead of materialized edge lists) and gen-graph's traversal functions (which would need a `fold`-based interpreter, following S4.2's `fold :: Graph g => Graph (Vertex g) -> g`).
+
+- **Hypergraph-aware scope graph layer.** A gen-scope extension that supports ternary edges for multi-entity relationships. Scope: medium (300-500 lines). Would implement 3-decomposition (S4.7) to project hyperedges to binary edges for resolution, while preserving the hyperedge structure for constraint checking. Relevant to den's entity model where host-user-aspect triples are a natural unit.
+
+- **Algebraic graph minimizer.** A gen-graph utility that takes a materialized edge map and produces a minimal algebraic expression (using modular decomposition). Scope: medium-large (500+ lines, algorithmically complex). Output would be a tree of overlay/connect/vertex nodes. Primary use case: diagram generation, where minimal expressions produce cleaner visualizations than raw edge lists.
+
+### Research Directions
+
+- **Lazy algebraic graph evaluation.** The paper's deep embedding provides compact representation but the paper does not explore lazy evaluation of graph queries over unexpanded expressions. In Nix, where laziness is the execution model, algebraic graph expressions could remain unevaluated until a specific query demands materialization of the relevant subgraph. This would connect the algebraic graph representation to gen-scope's demand-driven evaluation model -- the graph structure itself would be demand-driven, not just the attributes computed over it.
+
+- **Algebraic characterization of scope graph well-formedness.** Neron (2015) defines well-formedness as a path property (P\*.I\*). It may be possible to express well-formedness constraints algebraically: a scope graph is well-formed iff its algebraic expression can be decomposed into a specific normal form involving parent-edge and import-edge sub-expressions. This would enable compile-time well-formedness checking via algebraic rewriting.
+
+- **Typed algebraic graphs for heterogeneous scope graphs.** The paper identifies homogeneity as a limitation (S7) -- all vertices are interchangeable. Den's scope graphs are heterogeneous (hosts, users, aspects are different types). A typed extension of the algebra, where `connect` is only valid between compatible types, would statically prevent malformed scope graph constructions (e.g., connecting a user directly to an aspect without an intervening host). This connects to van Antwerpen (2018) "scopes as types" but via the algebraic route rather than the constraint-based route.
+
+- **Incremental algebraic graph updates.** When a user adds a host to a den configuration, the scope graph changes by one `overlay` with a new star graph. The algebraic structure makes the delta explicit: the new graph = old graph + delta. Exploiting this for incremental re-evaluation (only recompute attributes affected by the delta) would significantly reduce rebuild times for large configurations. This connects to Mokhov et al. (2018) "Build Systems a la Carte" demand-driven evaluation with change propagation.
