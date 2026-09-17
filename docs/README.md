@@ -12,8 +12,31 @@ Scaffolding and components only at this point — every page under
 ```bash
 pnpm install
 pnpm run dev      # local server
-pnpm run build    # static build into dist/
+pnpm run check    # typecheck only
+pnpm run build    # typecheck, static build into dist/, validate every link
 ```
+
+Published to <https://gen.wtf> by `.github/workflows/docs-pages.yml` on every
+push to `main` that touches `docs/`. Pull requests get the build without the
+deploy.
+
+## Gates
+
+Three things fail the build rather than reaching the site, because each one
+would otherwise render as something plausible instead of as an error:
+
+- **Broken internal links** — `starlight-links-validator` names the file, line
+  and link. A dead cross-reference is indistinguishable from a live one on the
+  page.
+- **Type errors** — `astro check`, chained ahead of `astro build` so it cannot
+  be skipped. `tsconfig.json` extends Astro's `strict` preset; leaving the
+  checker out of the build made that preset decorative.
+- **Malformed palettes** — see below.
+
+`typescript` is held at 6.x on purpose. TypeScript 7 is the native compiler and
+does not yet expose the programmatic API `astro check` needs; on 7.x the check
+aborts rather than reporting. Likewise `mermaid` stays on 11.x because
+`astro-mermaid` peers `^10 || ^11`.
 
 ## Layout
 
@@ -46,7 +69,9 @@ project.
 
 ## Not yet wired up
 
-- `site` is unset in `astro.config.mjs`, so sitemap generation is skipped and
-  canonical URLs are relative. Set it once the deploy URL is decided.
-- No CI job builds this. gen's workflow is pure Nix and this needs node.
 - No favicon; Starlight's default is in use.
+- No formatter covers this tree. gen's `treefmt` handles `*.nix`, `*.md` and
+  the workflow files; `.astro`, `.mjs`, `.css` and `.mdx` are unmatched.
+- No maths rendering (`remark-math` + `rehype-katex`) and no source-file code
+  includes (`remark-code-import`), both of which the library documentation is
+  likely to want.

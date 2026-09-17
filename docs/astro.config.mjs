@@ -3,6 +3,7 @@ import { defineConfig, fontProviders } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 import mermaid from 'astro-mermaid';
+import starlightLinksValidator from 'starlight-links-validator';
 import { wholeTokenTextMarkers } from './src/ec-whole-token-markers.mjs';
 
 // https://astro.build/config
@@ -63,6 +64,15 @@ export default defineConfig({
 			expressiveCode: {
 				plugins: [wholeTokenTextMarkers()],
 			},
+			// A broken cross-reference is the failure this site is most exposed to:
+			// it renders as ordinary text, so nothing about the page says the link
+			// went nowhere. Fail the build on one instead.
+			plugins: [
+				starlightLinksValidator({
+					errorOnRelativeLinks: false,
+					errorOnLocalLinks: false,
+				}),
+			],
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/sini/gen' }
 			],

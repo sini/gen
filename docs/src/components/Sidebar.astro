@@ -2,14 +2,19 @@
 import MobileMenuFooter from '@astrojs/starlight/components/MobileMenuFooter.astro';
 import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro';
 import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
-
-const { sidebar, id } = Astro.locals.starlightRoute;
-
 import { Icon } from '@astrojs/starlight/components';
+import type { StarlightRouteData } from '@astrojs/starlight/route-data';
 
 import TabbedContent from './tabs/TabbedContent.astro';
 import TabListItem from './tabs/TabListItem.astro';
 import TabPanel from './tabs/TabPanel.astro';
+
+// Derived from the route data rather than imported: Starlight exports the route
+// type publicly but not the sidebar member types.
+type SidebarEntry = StarlightRouteData['sidebar'][number];
+type SidebarGroup = Extract<SidebarEntry, { type: 'group' }>;
+
+const { sidebar } = Astro.locals.starlightRoute;
 
 /** Get the icon for a group. Update the icon names in the array to change the icons associated with a group. */
 const getIcon = (index: number) =>
@@ -20,17 +25,27 @@ const getIcon = (index: number) =>
 const makeId = (label: string) => '__tab-' + label.toLowerCase().replaceAll(/\s+/g, '-');
 
 /** Determine if an array of sidebar items contains the current page.  */
-const isCurrent = (sidebar: SidebarEntry[]): boolean =>
-	sidebar
-		.map((entry) => (entry.type === 'link' ? entry.isCurrent : isCurrent(entry.entries)))
-		.some((entry) => entry === true);
+const isCurrent = (entries: SidebarEntry[]): boolean =>
+	entries.some((entry) => (entry.type === 'link' ? entry.isCurrent : isCurrent(entry.entries)));
 
+// A tab is a group of pages, so a bare top-level link has nothing to be a tab
+// of. Refusing is the point: rendering the rest would drop that link from the
+// only navigation the site has, and nothing on the page would say so.
+const groups: SidebarGroup[] = sidebar.map((entry) => {
+	if (entry.type !== 'group') {
+		throw new Error(
+			`gen-docs: sidebar entry "${entry.label}" is a link, but the tabbed sidebar renders ` +
+				`only top-level groups. Wrap it in a group with \`items\`, or give it a group of its own.`
+		);
+	}
+	return entry;
+});
 ---
 <SidebarPersister>
 	<TabbedContent class="tabbed-sidebar">
 		<Fragment slot="tab-list">
 			{
-				sidebar.map(({ label, entries }, index) => (
+				groups.map(({ label, entries }, index) => (
 					<TabListItem id={makeId(label)} initial={isCurrent(entries)} class="tab-item">
 						<Icon class="icon" name={getIcon(index)} /> {label}
 					</TabListItem>
@@ -38,7 +53,7 @@ const isCurrent = (sidebar: SidebarEntry[]): boolean =>
 			}
 		</Fragment>
 		{
-			sidebar.map(({ label, entries }) => (
+			groups.map(({ label, entries }) => (
 				<TabPanel id={makeId(label)} initial={isCurrent(entries)}>
 					<SidebarSublist sublist={entries} />
 				</TabPanel>
