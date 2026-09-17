@@ -8,7 +8,7 @@ source:
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside type="note" title="The paper">
-E. Van Wyk, D. Bodin, J. Gao, and L. Krishnan, "Silver: An extensible attribute grammar system," *Science of Computer Programming*, vol. 75, no. 1-2, pp. 39–54, 2009.
+E. Van Wyk, D. Bodin, J. Gao, and L. Krishnan, "Silver: An extensible attribute grammar system," *Science of Computer Programming*, vol. 75, no. 1-2, pp. 39–54, 2010.
 
 [doi:10.1016/j.scico.2009.07.004](https://doi.org/10.1016/j.scico.2009.07.004) · [read the paper](https://www.sciencedirect.com/science/article/pii/S0167642309001099/pdf)
 
@@ -81,7 +81,7 @@ The paper demonstrates these mechanisms through: (1) the SimpleC imperative lang
 
 ### Unexploited Ideas
 
-**Context-aware scanning / verifiable composition (Section 3.3, 1.1; Schwerdfeger & Van Wyk 2009).** Silver's integration with Copper enables guaranteed conflict-free composition of independently developed grammar extensions. The gen ecosystem has no analogue for verifiable composition — there is no static analysis that guarantees two independently developed aspects or policies will not conflict when composed. The closest mechanism is gen-derive's conflict resolution (override, priority, specificity), which resolves conflicts at dispatch time rather than preventing them at composition time.
+**Context-aware scanning / verifiable composition (Section 2.1.2, 4; Schwerdfeger & Van Wyk 2009).** Silver's integration with Copper enables guaranteed conflict-free composition of independently developed grammar extensions. The gen ecosystem has no analogue for verifiable composition — there is no static analysis that guarantees two independently developed aspects or policies will not conflict when composed. The closest mechanism is gen-derive's conflict resolution (override, priority, specificity), which resolves conflicts at dispatch time rather than preventing them at composition time.
 
 **Data-flow analysis via model checking (Section 3.4).** Silver's extension for specifying data-flow analyses as temporal logic formulas model-checked on control flow graphs is entirely unexploited. While gen-scope constructs scope graphs, not control flow graphs, the methodology of integrating external analysis tools via attribute grammar extensions is applicable. Configuration validation could be expressed as properties over the scope graph structure.
 
