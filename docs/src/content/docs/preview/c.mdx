@@ -73,8 +73,8 @@ an unplaced library fails the build.
 }
 ```
 
-One module argument, carrying the resolved configuration as values. gen's types
-stay inside the pure evaluation; only values cross.
+One module argument, carrying the resolved configuration as plain values. Your
+nixpkgs modules read it and never meet gen's own machinery.
 
 <CardGrid>
   <LinkCard title="The roster" href="/libraries/roster/"

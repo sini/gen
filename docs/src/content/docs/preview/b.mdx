@@ -52,8 +52,8 @@ mechanism, and the mechanism runs.
 
 ## What that buys you
 
-One module argument. The resolved configuration arrives as values, and gen's own
-types never leave the pure evaluation.
+One module argument, carrying the resolved configuration as plain values. Your
+nixpkgs modules read it and never meet gen's own machinery.
 
 ```nix
 { genValues, ... }:
