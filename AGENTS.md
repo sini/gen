@@ -42,6 +42,7 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `assemble`           | `gen-assemble` — "gen-assemble — the shared framework toolkit: the contribution protocol, its union, the id convention and the structural boilerplate that every framework assembling a node set otherwise writes for itself"                |
 | `delivery`           | `gen-delivery` — "gen-delivery — the delivery-class realization surface: the projection that discovers declared delivery classes per node and the fold that hands each class's collected content to its target-owned terminal"               |
 | `identity`           | `gen-identity` — "gen-identity: the substrate's one identity mint — a bounded canonical encoding of inert values and the kind-tagged digest over it"                                                                                         |
+| `inspect`            | `gen-inspect` — "gen-inspect — the library that interrogates a materialized gen graph: which nodes exist and of what kind, which edges are declared, which a policy program produced and why, and what reaches what"                         |
 | `memo`               | `gen-memo` — "gen-memo — the incremental plane: a decision layer over the evaluator that never evaluates, only decides reuse"                                                                                                                |
 | `program`            | `gen-program` — "gen-program — the consumer that turns a framework's declarations into a logic program, drives gen-scope's well-founded engine over it, and carries the third value out under its own name"                                  |
 | `view`               | `gen-view` — "gen-view: the substrate's derived-view constructor — the (L, E, \<, k) carrier with van Antwerpen's relation sort published as a raw calculus, and the named compositions over it"                                             |
@@ -78,7 +79,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 <!-- gen-inputs:begin -->
 
 ```json
-["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
+["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-inspect","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
 
 <!-- gen-inputs:end -->
@@ -146,7 +147,7 @@ Current assignment (derive it from `strata`, never from this heading):
 
 ```
 aspects  aspects class link
-framework  assemble delivery program settings
+framework  assemble delivery inspect program settings
 modules  merge types
 substrate  algebra bind dispatch graph identity memo prelude product schema scope select view
 ```
@@ -261,7 +262,7 @@ Current output (verbatim):
 <!-- gen-drift:begin -->
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
 ```
 
 <!-- gen-drift:end -->

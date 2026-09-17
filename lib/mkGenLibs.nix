@@ -48,6 +48,7 @@
   dispatch,
   graph,
   identity,
+  inspect,
   link,
   memo,
   merge,
@@ -78,6 +79,14 @@ let
     # block — its flake `.lib` resolves its own gen-prelude and gen-graph.
     inherit memo;
     inherit graph;
+    # gen-inspect INTERROGATES a materialized graph: which nodes exist and of what kind, which edges
+    # are declared, which a policy program produced and WHY, and what reaches what. It publishes its
+    # `.lib` UNAPPLIED and takes its substrate injected, so the hub wires it through
+    # `./hubSubstrate.nix` rather than re-exporting a self-resolved `.lib` — the fourth member that
+    # file names. It implements no semantics and never evaluates: every fixpoint goes through
+    # gen-scope, the sole evaluator (ADR-0006), and this library reads a model that evaluator already
+    # produced. Entry landed when content existed, per the ruled roster timing.
+    inherit inspect;
     inherit bind;
     inherit schema;
     inherit aspects;
@@ -252,6 +261,11 @@ let
       settings = "framework";
       assemble = "framework";
       program = "framework";
+      # ★ The bucket turns on what the surface DOES. gen-inspect is a thing a person and a framework
+      # plug INTO an assembled graph to interrogate it — "above the stack rather than a layer of it"
+      # on the bucket's own words. It defines no substrate vocabulary in its own terms, which is the
+      # bucket's second clause, and ADR-0035 conformance is asserted by its own CI.
+      inspect = "framework";
       # ★ OWNER-RULED. The bucket turns on what the surface DOES, and this one is a thing
       # frameworks plug into: it realizes delivery targets by invoking a caller-supplied terminal,
       # which is "above the stack rather than a layer of it" on the bucket's own words. Putting the

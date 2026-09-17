@@ -66,6 +66,7 @@ flowchart TD
   subgraph framework["framework"]
     gen_assemble["gen-assemble"]
     gen_delivery["gen-delivery"]
+    gen_inspect["gen-inspect"]
     gen_program["gen-program"]
     gen_settings["gen-settings"]
   end
@@ -78,6 +79,10 @@ flowchart TD
   gen_class --> gen_prelude
   gen_dispatch --> gen_prelude
   gen_graph --> gen_prelude
+  gen_inspect --> gen_graph
+  gen_inspect --> gen_prelude
+  gen_inspect --> gen_scope
+  gen_inspect --> gen_select
   gen_link --> gen_algebra
   gen_link --> gen_aspects
   gen_link --> gen_identity
@@ -136,7 +141,7 @@ silent default — and the four published strata are the consumer paths the hub'
 | `substrate` | the base layer: values, graphs, selection, evaluation                                                                                   | gen-algebra · gen-bind · gen-dispatch · gen-graph · gen-identity · gen-memo · gen-prelude · gen-product · gen-schema · gen-scope · gen-select · gen-view |
 | `modules`   | the module system: the checking half and the merging half                                                                               | gen-merge · gen-types                                                                                                                                    |
 | `aspects`   | the aspect layer, built on the module system                                                                                            | gen-aspects · gen-class · gen-link                                                                                                                       |
-| `framework` | above the stack rather than a layer of it — a framework assembles with these, and no substrate vocabulary may be defined in their terms | gen-assemble · gen-delivery · gen-program · gen-settings                                                                                                 |
+| `framework` | above the stack rather than a layer of it — a framework assembles with these, and no substrate vocabulary may be defined in their terms | gen-assemble · gen-delivery · gen-inspect · gen-program · gen-settings                                                                                   |
 
 **The direction of dependence is the law** (ADR-0015): no member may declare an input above its own
 stratum, under `substrate < modules < aspects < framework`. `ci/checks.direction-of-dependence` is the
@@ -166,6 +171,7 @@ check prints the exception entry by entry on every run rather than hiding it in 
 | gen-class    | aspects   | the **share class** — an equivalence over members under a caller-supplied `keyOf`, an optimization over sharing. Deliberately **not** the delivery class (ADR-0028).                                                                                                                                                                           | C9                                           |
 | gen-link     | aspects   | cross-flake federation: a subgraph packaged and exchanged, with the adapter/lens that ADR-0027 makes the correctness unit of a framework boundary.                                                                                                                                                                                             | C11                                          |
 | gen-assemble | framework | the shared framework toolkit: contribution assembly, commutative shape union, structural declarations. **It never evaluates** — it constructs inside the consumer's own evaluation and declares no flake input at all.                                                                                                                         | C8, C16                                      |
+| gen-inspect  | framework | interrogates a materialized graph: which nodes exist and of what kind, which edges are declared, which a policy program produced and **why**, what reaches what. Implements no semantics and never evaluates.                                                                                                                                  | C5                                           |
 | gen-program  | framework | turns a framework's policy declarations into a **program** and reaches the solver. Adjacent to assembly, never inside it.                                                                                                                                                                                                                      | C5                                           |
 | gen-delivery | framework | the delivery-class realization surface (ADR-0028): the projection that discovers which declared keys are delivery classes, and the fold that hands each class's collected content to a target-owned terminal.                                                                                                                                  | C6                                           |
 | gen-settings | framework | stratified settings resolution: a static `{ default; merge }` schema folded over an ordered layer list, with identity-bearing cross-references as inert data and per-field provenance. Lattice-blind by design — the layer order arrives precomputed.                                                                                          | — none                                       |

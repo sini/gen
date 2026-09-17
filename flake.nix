@@ -97,6 +97,12 @@
     gen-view.inputs.gen-graph.follows = "gen-graph";
     gen-view.inputs.gen-prelude.follows = "gen-prelude";
 
+    gen-inspect.url = "github:sini/gen-inspect";
+    gen-inspect.inputs.gen-prelude.follows = "gen-prelude";
+    gen-inspect.inputs.gen-graph.follows = "gen-graph";
+    gen-inspect.inputs.gen-select.follows = "gen-select";
+    gen-inspect.inputs.gen-scope.follows = "gen-scope";
+
     gen-program.url = "github:sini/gen-program";
     gen-delivery.url = "github:sini/gen-delivery";
 

@@ -80,6 +80,7 @@
         "gen-dispatch": "gen-dispatch",
         "gen-graph": "gen-graph",
         "gen-identity": "gen-identity",
+        "gen-inspect": "gen-inspect",
         "gen-link": "gen-link",
         "gen-memo": "gen-memo",
         "gen-merge": "gen-merge",
@@ -337,6 +338,39 @@
       "original": {
         "owner": "sini",
         "repo": "gen-identity",
+        "type": "github"
+      }
+    },
+    "gen-inspect": {
+      "inputs": {
+        "gen-graph": [
+          "gen",
+          "gen-graph"
+        ],
+        "gen-prelude": [
+          "gen",
+          "gen-prelude"
+        ],
+        "gen-scope": [
+          "gen",
+          "gen-scope"
+        ],
+        "gen-select": [
+          "gen",
+          "gen-select"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789609825,
+        "narHash": "sha256-RGY7cnydIJzTNk7TD5LBHgtOgOKbaL97d0L/7WOE8LY=",
+        "owner": "sini",
+        "repo": "gen-inspect",
+        "rev": "d5e13ae4bb615eb26b2c8faee46b54a99e1b565f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-inspect",
         "type": "github"
       }
     },

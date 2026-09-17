@@ -92,6 +92,7 @@ in
   dispatch ? inputs.gen-dispatch or (dep [ "gen-dispatch" ]),
   graph ? inputs.gen-graph or (dep [ "gen-graph" ]),
   identity ? inputs.gen-identity or (dep [ "gen-identity" ]),
+  inspect ? inputs.gen-inspect or (dep [ "gen-inspect" ]),
   link ? inputs.gen-link or (dep [ "gen-link" ]),
   memo ? inputs.gen-memo or (dep [ "gen-memo" ]),
   merge ? inputs.gen-merge or (dep [ "gen-merge" ]),
@@ -127,6 +128,7 @@ let
       dispatch
       graph
       identity
+      inspect
       link
       memo
       merge

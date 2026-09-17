@@ -53,6 +53,7 @@ let
     "dispatch"
     "graph"
     "identity"
+    "inspect"
     "link"
     "memo"
     "merge"
@@ -354,6 +355,11 @@ let
     dispatch = "b6b0c94a150ba0aadad4a22c85c8f189b542592710ea51201f3d9151f8d00cc2";
     graph = "bc24315b9783c2f1a6db815bb1668b6d3f0135c87c181af99161abcecad133cf";
     identity = "ae39363fd50eb2100013362d3d43563146bf24fe8539675c8e8a944d62eaa201";
+    # gen-inspect, the roster's 22nd member and the 4th at `framework`: the library that
+    # interrogates a materialized graph. Its surface is 13 names — the IR construction and its
+    # gen-graph wrapper, the three-route compile rule with its reserved set, the door, the copied
+    # parser's two entry points, the executor's two, the selector API and the renderers.
+    inspect = "f7d77bca2538837379cb3fe80c22a12a48e2e008d68625491dd8beff1b93875c";
     link = "90b36cc605f281fd7dd1d2dcf9af76c2fcf5cebdead79376b724ee2958e930a4";
     memo = "b7342e22fec4f96698e5a88a755635be782fb27e3f4c0f7868eb1a7cca2b6166";
     merge = "053639722c1a3b00c17acfaebfea9ad8c130162b6e81895c424238786bd201bc";
