@@ -111,7 +111,6 @@ flowchart TD
   gen_scope --> gen_graph
   gen_scope --> gen_identity
   gen_scope --> gen_prelude
-  gen_scope --> gen_schema
   gen_select --> gen_algebra
   gen_settings --> gen_algebra
   gen_settings --> gen_bind
