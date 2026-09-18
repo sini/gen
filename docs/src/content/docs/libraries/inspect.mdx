@@ -15,10 +15,12 @@ surface over a graph someone else already resolved, not a second evaluator stand
 gen-scope.
 
 It sits in the framework stratum: above the stack rather than a layer inside it, defining no
-substrate vocabulary of its own. It declares gen-graph, gen-prelude, gen-scope, and gen-select as
-inputs — confirmed independently by this hub's own `flake.nix` follows-edges and by the
-dependency graph in `ARCHITECTURE.md`, which agree on exactly those four — and this hub separately
-injects the same four as substrate:
+substrate vocabulary of its own. It takes gen-graph, gen-prelude, gen-scope and gen-select as
+substrate from this hub — four of the five it declares. The fifth, gen-program, cannot be supplied
+here, and the reason is structural rather than an oversight: this file is a function of the roster
+entries whose `.lib` is published already applied, and gen-program is one of the three that is not.
+It is produced by the fold this very file feeds. So gen-inspect declares four formals at this gate
+and takes gen-program at the one that builds its program route:
 
 ```nix file=<rootDir>/lib/hubSubstrate.nix#L15-L22
 
