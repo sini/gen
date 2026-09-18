@@ -2,84 +2,108 @@
 /*
  * The landing hero: a graph that assembles itself, then gets traversed.
  *
- * Inline SVG with CSS animation rather than canvas or a layout library. Every
- * colour resolves through `--sl-color-*`, so it follows the active palette the
- * same way the rest of the site does, and it costs no JavaScript on the page a
- * first-time reader loads.
+ * Inline SVG animated in CSS. No canvas, no layout library, no JavaScript on the
+ * first page a reader loads. Every colour resolves through `--sl-color-*`, so it
+ * follows the active palette like the rest of the site.
  *
  * The sequence is the argument: edges draw first because the relationships are
  * the thing, nodes settle onto them, then a pulse runs the graph — declare the
- * relationships, ask the graph a question, get an answer back.
+ * relationships, ask a question, get an answer.
+ *
+ * Positions are hand-placed rather than generated into columns. A tiered layout
+ * reads as a pipeline, and the claim here is the opposite: these concepts are
+ * one graph, and the edges cross wherever the real relationships do.
  */
 
-// Four tiers, because the claim is that these are all the same shape.
-const tiers = [
-  { label: 'packages', x: 90, ys: [60, 150, 240], hue: 'var(--sl-color-purple)' },
-  { label: 'hosts', x: 290, ys: [95, 205], hue: 'var(--sl-color-accent)' },
-  { label: 'network', x: 490, ys: [60, 150, 240], hue: 'var(--sl-color-blue)' },
-  { label: 'services', x: 680, ys: [95, 205], hue: 'var(--sl-color-green)' },
+type Node = { x: number; y: number; label?: string; hue: string };
+
+const accent = 'var(--sl-color-accent)';
+const blue = 'var(--sl-color-blue)';
+const green = 'var(--sl-color-green)';
+const purple = 'var(--sl-color-purple)';
+const orange = 'var(--sl-color-orange)';
+
+const nodes: Node[] = [
+  { x: 60, y: 168, label: 'package', hue: purple },
+  { x: 132, y: 74, hue: purple },
+  { x: 148, y: 246, hue: purple },
+  { x: 236, y: 132, label: 'module', hue: blue },
+  { x: 258, y: 226, hue: blue },
+  { x: 196, y: 170, hue: purple },
+  { x: 342, y: 62, label: 'host', hue: accent },
+  { x: 356, y: 178, hue: accent },
+  { x: 392, y: 262, label: 'user', hue: accent },
+  { x: 452, y: 120, label: 'service', hue: green },
+  { x: 486, y: 216, hue: green },
+  { x: 548, y: 58, label: 'network', hue: blue },
+  { x: 578, y: 158, hue: green },
+  { x: 622, y: 252, label: 'secret', hue: orange },
+  { x: 676, y: 118, label: 'fleet', hue: accent },
+  { x: 700, y: 208, hue: orange },
 ];
 
-type Node = { id: string; x: number; y: number; ti: number; hue: string };
-type Edge = { a: Node; b: Node };
+// Explicit pairs, so the web is a shape somebody chose rather than a product of
+// tier arithmetic.
+const links: [number, number][] = [
+  [0, 1], [0, 5], [0, 2], [1, 3], [5, 3], [2, 4], [5, 4],
+  [3, 6], [3, 7], [4, 7], [4, 8], [7, 8], [6, 7],
+  [6, 9], [7, 9], [7, 10], [8, 10], [9, 11], [9, 12],
+  [10, 12], [10, 13], [11, 14], [12, 14], [12, 15], [13, 15], [14, 15],
+  [3, 9], [6, 11], [1, 6], [4, 10],
+];
 
-const nodes: Node[] = tiers.flatMap((t, ti) =>
-  t.ys.map((y, ni) => ({ id: `${ti}-${ni}`, x: t.x, y, ti, hue: t.hue }))
-);
+const edges = links.map(([i, j]) => ({ a: nodes[i], b: nodes[j] }));
 
-// Every node links forward to the next tier; a few extra edges keep it from
-// reading as a pipeline, because a graph is not a pipeline.
-const edges: Edge[] = [];
-for (let ti = 0; ti < tiers.length - 1; ti++) {
-  const from = nodes.filter((n) => n.ti === ti);
-  const to = nodes.filter((n) => n.ti === ti + 1);
-  from.forEach((a, ai) =>
-    to.forEach((b, bi) => {
-      if (Math.abs(ai - bi) > 1) return;
-      edges.push({ a, b });
-    })
-  );
-}
-edges.push({ a: nodes[0], b: nodes[5] }, { a: nodes[3], b: nodes[8] });
-
-const path = ({ a, b }: Edge) => {
+// A gentle arc rather than a straight run: curvature perpendicular to the edge,
+// so the web reads as connections instead of a wire diagram.
+const path = ({ a, b }: { a: Node; b: Node }) => {
   const mx = (a.x + b.x) / 2;
-  return `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const bow = Math.min(len * 0.12, 22);
+  return `M ${a.x} ${a.y} Q ${mx - (dy / len) * bow} ${my + (dx / len) * bow}, ${b.x} ${b.y}`;
 };
 ---
 
 <div class="hero-graph" aria-hidden="true">
-  <svg viewBox="0 0 770 300" role="presentation" preserveAspectRatio="xMidYMid meet">
-    {
-      edges.map((e, i) => (
-        <path class="edge" d={path(e)} style={`--i:${i}`} />
-      ))
-    }
-    {
-      edges.map((e, i) => (
-        <path class="pulse" d={path(e)} style={`--i:${i}`} />
-      ))
-    }
+  <svg viewBox="0 0 760 310" role="presentation" preserveAspectRatio="xMidYMid meet">
+    {edges.map((e, i) => <path class="edge" d={path(e)} style={`--i:${i}`} />)}
+    {edges.map((e, i) => <path class="pulse" d={path(e)} style={`--i:${i}`} />)}
     {
       nodes.map((n, i) => (
-        <circle class="node" cx={n.x} cy={n.y} r="7" style={`--i:${i}; --hue:${n.hue}`} />
+        <circle
+          class:list={['node', { keyed: n.label }]}
+          cx={n.x}
+          cy={n.y}
+          r={n.label ? 8 : 4.5}
+          style={`--i:${i}; --hue:${n.hue}`}
+        />
       ))
     }
     {
-      tiers.map((t) => (
-        <text class="tier" x={t.x} y="288" text-anchor="middle">{t.label}</text>
-      ))
+      nodes.map((n, i) =>
+        n.label ? (
+          <text class="label" x={n.x} y={n.y - 17} text-anchor="middle" style={`--i:${i}`}>
+            {n.label}
+          </text>
+        ) : null
+      )
     }
   </svg>
 </div>
 
 <style>
+  /* No max-width of its own: it takes the content container, so it cannot drift
+     out of alignment with the header and hero above it. */
   .hero-graph {
-    margin: 0 auto 1rem;
-    max-width: 46rem;
+    margin: 0 0 1.5rem;
+    width: 100%;
   }
 
   .hero-graph svg {
+    display: block;
     width: 100%;
     height: auto;
     overflow: visible;
@@ -88,12 +112,12 @@ const path = ({ a, b }: Edge) => {
   .edge {
     fill: none;
     stroke: var(--sl-color-gray-5);
-    stroke-width: 1.2;
-    stroke-dasharray: 1 1;
+    stroke-width: 1.1;
     pathLength: 1;
+    stroke-dasharray: 1 1;
     stroke-dashoffset: 1;
-    animation: draw 0.7s ease-out forwards;
-    animation-delay: calc(var(--i) * 45ms);
+    animation: draw 0.8s ease-out forwards;
+    animation-delay: calc(var(--i) * 32ms);
   }
 
   /* A short dash chasing the same path reads as a value moving along the edge. */
@@ -103,32 +127,37 @@ const path = ({ a, b }: Edge) => {
     stroke-width: 2;
     stroke-linecap: round;
     pathLength: 1;
-    stroke-dasharray: 0.06 0.94;
+    stroke-dasharray: 0.05 0.95;
     stroke-dashoffset: 1;
     opacity: 0;
-    animation: travel 4.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    animation-delay: calc(1s + var(--i) * 60ms);
+    animation: travel 5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    animation-delay: calc(1.1s + var(--i) * 42ms);
   }
 
   .node {
     fill: var(--sl-color-bg);
     stroke: var(--hue);
-    stroke-width: 2;
+    stroke-width: 1.8;
     transform-origin: center;
     transform-box: fill-box;
     opacity: 0;
     animation: settle 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
-    animation-delay: calc(0.35s + var(--i) * 55ms);
+    animation-delay: calc(0.3s + var(--i) * 42ms);
   }
 
-  .tier {
-    fill: var(--sl-color-gray-4);
+  .node.keyed {
+    stroke-width: 2.4;
+    fill: color-mix(in srgb, var(--hue) 14%, var(--sl-color-bg));
+  }
+
+  .label {
+    fill: var(--sl-color-gray-3);
     font-family: var(--sl-font-mono, var(--__sl-font-mono));
-    font-size: 11px;
-    letter-spacing: 0.08em;
+    font-size: 12px;
+    letter-spacing: 0.04em;
     opacity: 0;
     animation: fade 0.6s ease-out forwards;
-    animation-delay: 1.1s;
+    animation-delay: calc(0.9s + var(--i) * 42ms);
   }
 
   @keyframes draw {
@@ -136,7 +165,7 @@ const path = ({ a, b }: Edge) => {
   }
 
   @keyframes settle {
-    from { opacity: 0; scale: 0.4; }
+    from { opacity: 0; scale: 0.3; }
     to { opacity: 1; scale: 1; }
   }
 
@@ -146,15 +175,24 @@ const path = ({ a, b }: Edge) => {
 
   @keyframes travel {
     0% { stroke-dashoffset: 1; opacity: 0; }
-    8% { opacity: 0.9; }
-    55% { stroke-dashoffset: 0; opacity: 0.9; }
-    68%, 100% { stroke-dashoffset: 0; opacity: 0; }
+    6% { opacity: 0.85; }
+    52% { stroke-dashoffset: 0; opacity: 0.85; }
+    64%, 100% { stroke-dashoffset: 0; opacity: 0; }
   }
 
-  /* Motion is the whole point of this graphic, so when it is unwelcome the
-     finished graph is shown rather than a frozen half-drawn one. */
+  /* Motion is the whole point here, so when it is unwelcome the finished graph
+     is shown rather than a frozen half-drawn one. */
   @media (prefers-reduced-motion: reduce) {
-    .edge, .node, .tier { animation: none; opacity: 1; stroke-dashoffset: 0; }
-    .pulse { display: none; }
+    .edge,
+    .node,
+    .label {
+      animation: none;
+      opacity: 1;
+      stroke-dashoffset: 0;
+    }
+
+    .pulse {
+      display: none;
+    }
   }
 </style>
