@@ -5,4 +5,101 @@ source:
   - TRUST.md
 ---
 
-Not written yet. This page adapts `TRUST.md`.
+import { Aside, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Writing a gen module means handing it to an evaluator you didn't write, running rules you didn't
+write, to produce a config you're going to build. That's a real transfer of trust, and gen answers
+it with artifacts instead of assurances. Every claim on this page names the command that re-runs
+it — or, where no command exists, says so instead of borrowing a green build from somewhere else to
+imply one.
+
+Three axes carry the whole ecosystem: correctness, performance, and observability. The full
+per-proof inventory is [Validation](/validation/); the measured numbers are
+[Benchmarks](/benchmarks/); the CI mechanics that run these commands on every push are
+[CI and checks](/reference/ci/). This page is the map from a promise to what enforces it.
+
+## Every promise, and what enforces it
+
+| Promise | Enforced by | Enforcer |
+|---|---|---|
+| Every roster library is free of `nixpkgs.lib` | A source scanner (`ci/tests/purity.nix`, or `types-purity.nix` for gen-types), per library, on every run | Command |
+| Full nixpkgs enters at exactly one boundary — the terminal a realization is handed to | The same scanners forbid the nixpkgs tether tokens in `lib/`, and a stated policy pulls the pinned `nixpkgs.lib` alone everywhere a library needs `lib` at all | Command + policy |
+| The pure module system agrees with nixpkgs, byte for byte, on the registry/schema surface | The byte-parity oracle, run by `nix flake check ./ci` in this hub | Command |
+| The same agreement over the aspect grammar | *(below — nothing currently runs this)* | **Person** |
+| A performance win can never ship alongside a correctness regression | The performance gate's parity check, evaluated before any timing number counts | Command |
+| Every library states what it does not own, and names the sibling that does | A capability sheet's "not this library's job" table, kept accurate by review — a uniform convention, not a CI gate | **Person** |
+| A name answers to the literature it's drawn from | Review against a per-term provenance reference — no job verifies a citation | **Person** |
+
+Three rows name a person rather than a command, and that's the point of naming them at all: each
+is a property no scanner is positioned to decide today, and folding it into a green build
+elsewhere would be a worse kind of dishonesty than admitting it plainly.
+
+## Correctness: the byte-parity oracle, and its one open gap
+
+The load-bearing check holds the pure module system — gen-prelude → gen-types → gen-merge → the
+re-hosted gen-schema — byte-identical to a frozen nixpkgs reference, run over den's real registry
+shape, across every instance key and every non-identity field. It carries mutation teeth: perturb
+one host's field and only that instance's record may move — a sibling failing identically the same
+way can't read as agreement.
+
+<Aside type="note" title="The one excluded field">
+`id_hash` sits outside that frozen comparison. gen-schema re-minted the identity encoding by a
+design ruling, and no forward-compatible pin of the old reference can carry the new encoding. The
+field is still minted and forced on both engines — a stack that stops minting one fails loudly —
+just checked through the pure engine's own seeded-control teeth instead of against the frozen
+witness.
+</Aside>
+
+A frozen reference holds the *bar* still. It cannot hold the *subject* still where the subject
+moves by ruling rather than by accident, and the aspect grammar moves that way. A sibling oracle
+that once covered it was retired rather than re-pinned, and for eight days the promise it
+checked — **module system compatibility**, the thing anyone porting nixpkgs modules actually
+relies on — had no reproduction command running anywhere. The ruling that retired it named exactly
+what survives:
+
+> "I want to proceed with development towards correctness rather than burden ourselves with a
+> legacy trust oracle. The promises by the oracle stand; but they don't need to hold at every
+> gate. We can rebuild the oracle during the final rounds so we can make the same guarantees."
+
+A successor landed a little over a week later — a differential harness whose reference side is a
+parameter rather than a frozen pin, so a ruled grammar change registers as a named divergence
+instead of an unattributable red. Its first home is gen-merge's own CI: the engine held against
+nixpkgs across the shared grammar at two distinct substitution seams, with a seam-routed identity
+control and mutation teeth both shown seedable to fail. What it does **not** yet reach is the
+aspect-grammar layer specifically — the retired oracle's one contribution this successor hasn't
+picked up. That stays a named, open gap rather than a quietly dropped one.
+
+## Performance: parity first, then counters
+
+Every performance claim is gated on byte-parity before it's gated on speed — a change that's fast
+but wrong fails on the digest mismatch, whatever its timing says. Past that gate, three families
+of deterministic evaluator counters decide pass or fail; cpu is measured and reported everywhere
+and gates nothing. [Benchmarks](/benchmarks/) is the full case for why, with the numbers.
+
+## Observability
+
+The surface nixpkgs's own module system doesn't offer at all: which module set an option, at what
+priority, and a decision trace over the memoization plane. It's carried by gen-merge's always-on
+provenance channel and gen-memo's warm-decision trace, and it's asserted in tests the same way
+correctness is — including a tooth proving the provenance channel forces only its own bookkeeping
+and never the values it reports on, and an adversarial test proving a data module that falsely
+claims purity gets caught at the byte oracle rather than silently corrupting output.
+
+## Re-running it
+
+```bash
+nix flake check ./ci           # the byte-parity oracle, the named checks, treefmt
+nix run ./ci#perf-bench        # parity + ratio + linearity
+nix run ./ci#fleet-consistency # cited fleet numbers vs their own arithmetic
+```
+
+Per library — clone it, then from its root: `nix flake check ./ci` for the gate, or
+`nix develop ./ci -c nix-unit --flake ./ci#tests` for its own count.
+
+## Keep reading
+
+<CardGrid>
+  <LinkCard title="Validation" href="/validation/" description="Every oracle, its command, and its failure mode." />
+  <LinkCard title="Benchmarks" href="/benchmarks/" description="What's measured, and what's actually gated." />
+  <LinkCard title="CI and checks" href="/reference/ci/" description="Every gate the hub runs, mechanically." />
+</CardGrid>

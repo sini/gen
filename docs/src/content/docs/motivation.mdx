@@ -6,4 +6,75 @@ source:
   - ARCHITECTURE.md
 ---
 
-Not written yet. This page adapts `README.md`, `ARCHITECTURE.md`.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## The shape of the problem
+
+Every configuration tool converges on the same shape: modules that need each other, wired by hand,
+in the order the evaluator happens to want them. You write an `imports` list and hope you got the
+order right. You thread an argument through three levels of module so a leaf can see a value a
+root declared. You build an `mkIf` tower because a module can't just ask whether some other module
+applies — it has to be handed the answer, pre-computed, by whoever assembled the tree above it.
+
+None of that is the interesting work. The interesting work was deciding that a host needs a user,
+that a user needs a shell, that a shell needs a package. The plumbing is what's left after you've
+made those decisions, and it's also where the failures live — a reordered import, a value threaded
+one level short, a condition that was true when you wrote it and silently isn't anymore.
+
+## Assembly is the wrong shape for a relationship
+
+Hand-assembly asks you to encode a relationship as *position*: this module comes before that one,
+this argument is passed down that path, this list contains that entry. Position is fragile in a
+way a relationship itself isn't — move the entry, reorder the list, refactor the path, and the
+relationship the position was standing in for is gone, with nothing left pointing at where it used
+to be.
+
+A graph asks for the relationship directly. "This host needs this user" is an edge, not a place in
+a list. Asking what a host needs is a graph traversal, not a re-read of every module that might
+have contributed an answer. Nothing about *where* a declaration sits determines what it can see —
+what it can see is exactly what it's connected to.
+
+<Aside type="note" title="What this replaces, concretely">
+The `imports` list that has to be in the right order. The argument threaded through modules that
+don't otherwise care about it, purely so a descendant can read it. The `mkIf` tower standing in
+for a question a module can't just ask. Behavior that depends on which order the evaluator visited
+your modules in, rather than on what you actually declared.
+</Aside>
+
+## What doesn't change
+
+This isn't a rewrite of the module system out from under you. nixpkgs's own module system — its
+merge order, its priority discharge, its type checking — is real, and a huge amount of
+configuration already depends on its exact behavior. gen's pure composition plane reimplements
+that behavior rather than replacing it: same merge semantics, same priorities, checked
+byte-for-byte against the original on every change, running ahead of nixpkgs rather than instead
+of it. A framework built on gen still ends up with ordinary NixOS, nix-darwin, or home-manager
+modules at the terminal — the graph decides what gets declared, it isn't a replacement for what
+gets built from it.
+
+## Where the idea comes from
+
+Resolving a name against the modules that can see it is the same problem language tooling has
+already solved for imports and visibility: a reachability query over a graph of scopes, with a
+well-formedness condition on which paths count. Naming the problem the way it's already been
+solved is what gives it a decidable answer, instead of a bespoke evaluation-order convention
+nobody wrote down. The [scope graphs](/reference/papers/neron-2015-scope-graphs/) work is where
+that comes from, and [Policies](/explanation/policies/) is where declarations doing the same job
+as a scope query actually get built.
+
+## One graph, not a graph per framework
+
+The relationships don't stop at one host. A network is a graph of hosts. A fleet is a graph of
+networks. The same node notion — identity, attributes, incident edges — that describes a
+package's dependency on another package describes a host's dependency on a network. That's why
+gen has one graph rather than a library of graph-shaped tools: a single machine's config and a
+thousand-host fleet's are the same query, run over a bigger graph, not two different problems that
+happen to rhyme.
+
+## Keep reading
+
+<CardGrid>
+  <LinkCard title="Overview" href="/overview/" description="What gen actually is, if you haven't read that yet." />
+  <LinkCard title="The graph model" href="/explanation/graph-model/" description="What a node and a labelled edge are, precisely." />
+  <LinkCard title="Policies" href="/explanation/policies/" description="Declarations that compile into a program, and the program that solves it." />
+</CardGrid>

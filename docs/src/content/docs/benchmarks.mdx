@@ -5,4 +5,139 @@ source:
   - BENCHMARKS.md
 ---
 
-Not written yet. This page adapts `BENCHMARKS.md`.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Every performance gate in this ecosystem reads a deterministic evaluator counter — thunks
+created, allocation, function calls. None reads cpu. That's not a missing feature, it's the
+conclusion of a measurement. On this project's own benchmarking hardware, the pure-vs-reference
+cpu ratio moved **0.734–1.873×** across repeated runs of byte-identical trees, while every counter
+on those same runs stayed byte-identical (`ci/README.md`, CPU frequency scaling). A number that
+swings by a factor of 2.5 on work that didn't change is not a signal — it's the host's frequency
+governor, measured, not assumed. Counters don't have that problem: they're a function of the
+expression alone, not of the expression and the machine's mood.
+
+Every figure on this page carries the date or revision it was measured at. None of them are live
+HEAD numbers — they're dated snapshots, and they say so.
+
+## What's gated, and on what
+
+All three performance gates — **parity**, **ratio**, **linearity** — read deterministic counters.
+Parity requires every cell's output digest to match across stacks first, so a fast-but-wrong
+change fails before its timing is even considered. Ratio requires the pure stack to build lighter
+than the reference stack on thunks and allocation at the largest workload size. Linearity requires
+those counters to grow no worse than linearly across a ×4 size step — the net that once caught a
+real quadratic bug in a key-union helper. cpu is measured and printed beside all three, and gates
+none of them.
+
+The mechanical detail — which CI job runs this, and how it fails the build — is
+[CI and checks](/reference/ci/). This page is the numbers, and what they do and don't support.
+
+## Composition-plane results
+
+Pure-gen vs. the frozen nixpkgs stack it replaced, on den's own composition shapes, from the
+**2026-07-04 module-system audit** — isolated composition shapes, terminal-plane closure
+evaluation excluded:
+
+| workload | n | nixpkgs | pure-gen | speedup | thunks× | alloc× |
+|---|---:|---:|---:|---:|---:|---:|
+| aspects | 1600 | 0.353s | 0.126s | 2.80× | 2.99× | 3.60× |
+| registry | 2000 | 0.165s | 0.073s | 2.27× | 2.20× | 2.64× |
+| lazyRegistry | 2000 | 0.165s | 0.077s | 2.14× | 2.20× | 2.64× |
+| schemaHosts | 1600 | 0.223s | 0.126s | 1.77× | 1.75× | 2.04× |
+| scalar | 16000 | 0.182s | 0.114s | 1.59× | 1.27× | 1.52× |
+| startup | 1 | 11.6ms | 7.7ms | 1.5× | — | — |
+
+`thunks×`/`alloc×` are nixpkgs ÷ pure-gen — higher means pure-gen allocates less. Scaling is
+linear on both stacks; pure-gen's per-item slope is lower on every row measured here. gen-merge's
+engine (936 lines) reimplements what nixpkgs' `modules.nix` plus `types.nix` (4225 lines) does,
+over the surface den exercises. The same audit caught a real quadratic key-union bug that the
+linearity gate now guards against permanently.
+
+Two dedicated workloads carry their own tighter gate: gen-class's fixed-input reconstruction
+builds roughly **0.17×** the full re-merge's thunk graph, and gen-merge's warm re-eval builds
+roughly **0.17×** the cold path's thunks and allocation — both byte-identical to the path they
+shortcut, both permanently gated at ≤ 0.30×.
+
+### What observability costs
+
+gen-merge's always-on provenance channel — the machinery behind [Trust](/trust/)'s observability
+promise — is not free, and the cost is measured rather than assumed: **+3.7–6.3% pure-side
+thunks** across the workload set (scalar 0.844→0.882 ratio-to-ref, registry 0.493→0.524), measured
+against gen-merge `11b39d7`, still comfortably inside every ratio gate. Observability is a channel
+paid for once, up front, not per item read from it.
+
+## Compat mode
+
+A hybrid stack — the gen-merge engine driven by **real** nixpkgs option types instead of
+gen-schema's own — runs the same corpus byte-identically, because nixpkgs option types already
+speak the same merge contract gen-merge implements. Leaf-type shims are free; structural-type
+shims (`submodule`) give the whole engine-side win back, because a nixpkgs submodule's own
+`.merge` calls `lib.evalModules` per instance. Compat mode is a migration and escape-hatch tool,
+not a way to run the ecosystem fast.
+
+## The 3-way comparison, told straight
+
+<Aside type="caution" title="Read this before quoting a speedup">
+On one of the three benchmarks in this comparison, gen-lib is the **slowest of the three
+frameworks on wall clock** — while carrying the **lowest** deterministic function-call, prim-op,
+and thunk counts of the three on every single benchmark, including that one. Both facts are true,
+from the same run, and this page reports both rather than the one that reads better.
+</Aside>
+
+One representative flake (three packages, one devShell, one formatter, × 3 systems) expressed
+three ways — flake-parts, adios-flake, and the hub's own `gen.lib` — under the same methodology,
+the same pinned nixpkgs, 5 reps per cell. Re-baselined against the hub at rev `8dd9fda`
+(2026-08-26):
+
+| Benchmark | flake-parts | adios-flake | gen-lib |
+|---|---:|---:|---:|
+| packages.x86_64-linux (1 system) | 0.186s | 0.366s | 0.332s |
+| formatter (3 systems) | 0.916s | 0.900s | 0.397s |
+| devShells (3 systems) | 0.503s | 0.491s | **0.822s** |
+
+gen-lib carries the lowest function-call, prim-op, and thunk counts of the three on every one of
+those rows — including the devShells row it loses on wall clock. Both facts are sourced from the
+same table. The deltas here are small next to a published **28–30%** cpu figure from adios-flake's
+own benchmark of a much larger, real 36-input flake — that isn't a fair comparison to draw,
+because the workload shapes differ: a small synthetic flake like this one is dominated by the
+shared nixpkgs terminal every variant pays equally, diluting whatever the framework itself
+contributes.
+
+What actually holds across all five outputs, all three systems, all three frameworks: **drvPath
+equivalence, 15 for 15.** Every output this comparison builds is byte-identical regardless of
+which framework built it. That's the oracle this comparison is really for — the counter table
+describes engine overhead on an already-proven-identical result, not a different, cheaper answer.
+
+## Fleet-scale results
+
+The numbers above are self-contained in this hub's own CI, on isolated composition shapes.
+Fleet-scale numbers are measured somewhere else, deliberately:
+**[hola](https://github.com/sini/hola)**, a separate public repository, forces a real three-host
+fleet pinned by a separately versioned config repo, under the same deterministic-counter
+discipline, byte-gated first. This hub's own CI does not re-run that measurement — its
+`fleet-consistency` check only re-derives the arithmetic behind already-committed baseline
+numbers.
+
+All figures below were green at hola `d643a8d` (CI run `28727988245`), against the fleet pinned by
+nix-config `8f84aa6`:
+
+- Composition is **5.2%** of the terminal's `//`-merge storm, fleet-wide.
+- A localized single-host edit skips **66.7%** of fleet composition, floored at a permanent
+  ≥ 60% gate.
+- Injecting a byte-identical shared systemd-units core saves roughly **1.6%** function calls and
+  **0.18%** `//`-copies per added fleet member, floored at ≥ 0.8%.
+- A class-share arm carries **+4.6%** overhead, byte-sound but never floored as a win — a cost
+  that's measured and reported rather than hidden because it didn't help.
+
+<Aside type="tip" title="Not every number here is a win, on purpose">
+That last row is in this table because this page reports what was measured, not what flatters the
+result. A regression-gate suite that only ever prints wins isn't measuring anything.
+</Aside>
+
+## Keep reading
+
+<CardGrid>
+  <LinkCard title="Trust" href="/trust/" description="Every promise this ecosystem makes, and what enforces it." />
+  <LinkCard title="Validation" href="/validation/" description="Every oracle behind these numbers, and how each fails." />
+  <LinkCard title="CI and checks" href="/reference/ci/" description="Which job runs which gate, mechanically." />
+</CardGrid>

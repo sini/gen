@@ -5,4 +5,143 @@ source:
   - VALIDATION.md
 ---
 
-Not written yet. This page adapts `VALIDATION.md`.
+import { Aside, CardGrid, Card, LinkCard } from '@astrojs/starlight/components';
+
+[Trust](/trust/) is the map from a promise to what enforces it. This page is the inventory behind
+one row of that map — correctness — expanded: every proof, the artifact behind it, the command
+that reproduces it, and the specific way it fails. Nothing here is asserted without a way to
+re-run it.
+
+## The inventory at a glance
+
+| Proof | Command | Fails if |
+|---|---|---|
+| Module-system core compatibility | `nix-unit --flake ./ci#tests.differential` (gen-merge repo) | The engine and nixpkgs' `lib.evalModules` disagree on the shared grammar at either substitution seam, the identity control diverges, or a coverage-floor key fails |
+| Module-system aspect-grammar compatibility | *(none)* | Unenforced today — the retired oracle's one contribution this successor hasn't picked up |
+| Real-registry byte-parity (`rehost-den-parity`) | `nix flake check ./ci` | den's real registry shape diverges across stacks |
+| Per-library unit suites | `nix flake check ./ci` (per library repo) | That library's own nix-unit suite regresses |
+| Purity — nixpkgs-lib-free cores | `nix-unit --flake ./ci#tests.purity` (per pure library) | A banned nixpkgs tether token appears in `lib/` |
+| Config-thunk deferral | `nix-unit --flake ./ci#tests.deferral` (gen-merge) | A marker forces early, or diverges from nixpkgs at the terminal |
+| Migrated demos (canaries) | Each demo's own `nix flake check` | A re-hosted demo stops producing byte-identical output |
+| Performance (parity + ratio + linearity) | `nix run ./ci#perf-bench` | A cell mis-digests, a ratio erodes past its gate, or growth is worse than linear |
+| 3-way comparison (drvPath equivalence) | `nix run ./ci#flake-compare` | Any output builds differently across the three frameworks |
+| Fleet-scale dedup gates | `nix run ./ci#fleet-gates` (hola, a separate repo) | A byte gate flips, a saving no longer equals its arithmetic, or a floor is breached |
+| Fleet-number consistency (in this hub) | `nix run ./ci#fleet-consistency` | A cited fleet number drifts from its own arithmetic |
+
+## The byte-parity oracle
+
+Covered in full on [Trust](/trust/): the load-bearing proof that the pure module system agrees
+with nixpkgs byte-for-byte on the registry/schema surface, and the named, still-open gap over the
+aspect grammar. Its successor harness — the module-system-core differential suite living in
+gen-merge's own CI — reports 120 cells green on both counters at gen-merge rev `fe45472` against
+machinery pinned at `b10e69f`, the last time this page's source was regenerated from a run.
+
+## Per-library unit suites
+
+Every library ships its own `nix-unit` suite and gates on it in its own CI — a library with a
+failing suite fails its own `nix flake check ./ci`, independent of the hub. Coverage of that table
+is a property this page states honestly rather than smooths over: not every roster member has a
+recorded, current count, and the ones that do are pinned to the revision they were measured at
+rather than to today's HEAD. A gap in the table is named as a gap, not folded into an
+ecosystem-wide total that would overstate what's actually been counted recently. Run the suite
+yourself rather than trust a cited number: `nix develop ./ci -c nix-unit --flake ./ci#tests` from
+any library's root prints its own current `N/N successful`.
+
+## Purity invariants
+
+The pure plane's core promise is that its libraries never touch `nixpkgs.lib` — gen-merge is the
+`lib.evalModules`/`lib.types` **replacement**, so it cannot call them without contradicting its own
+reason to exist. This is enforced, not asserted in prose.
+
+<Aside type="tip" title="A count that keeps its own receipts">
+The purity scanner's own source notes that a hand-kept count of how many libraries carry it has
+gone stale three separate times, each time the roster moved and the number didn't follow. The fix
+isn't a better hand-kept number — it's a one-line command anyone can re-run against the sibling
+checkouts on their own disk, so the figure is never more than a `for` loop away from current.
+That's the model this page follows too: a count you can regenerate is worth writing down; a count
+you can't is worth naming as a command instead.
+</Aside>
+
+The scan reads every `lib/**.nix` file, strips comments, and asserts zero occurrences of the
+nixpkgs tether tokens — `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`, `lib.evalModules`,
+`evalModules`, `{ lib }`, `{ lib,`. A library's own API names (`mkOption`, `mkMerge`, and so on)
+are deliberately not forbidden — only the nixpkgs tether is. gen-types ships a teeth test proving
+the scanner actually fires on an injected violation rather than passing because it matches
+nothing.
+
+Three shapes sit outside the ordinary scan, each recorded rather than smoothed over:
+
+<CardGrid>
+  <Card title="gen-merge's pureModule contract">
+    The warm-override path trusts an author-supplied purity marker on a data module. That trust is
+    verified, not assumed: teeth prove what counts as pure, prove the marker never leaks into a
+    merged value, and prove a *lying* marker is caught at the byte oracle rather than silently
+    corrupting output.
+  </Card>
+  <Card title="gen-prelude needs no scanner">
+    It declares no flake inputs at all, so nothing transitive — no nixpkgs — can enter its lock.
+    The flake structure is itself the proof.
+  </Card>
+  <Card title="gen-vars is the documented exception">
+    Deliberately `nixpkgs.lib`-tethered outside its bottom pure tier, off the pure plane by
+    design, and carrying no purity scanner because it never claimed to be pure.
+  </Card>
+</CardGrid>
+
+## The config-thunk deferral regression
+
+A quirk value that depends on the final rendered config — unknowable until the terminal fixpoint —
+has to ride the engine as opaque, unforced data through composition and a mid-pipeline re-eval,
+then resolve byte-identically to what nixpkgs' own `lib.evalModules` produces once the terminal
+actually has a config to read. The suite proves this with a poison payload: forcing it early
+throws, proving the marker was genuinely carried rather than reconstructed, and the deferred value
+is checked to differ from what an early force would have produced — so the deferral is shown to
+change the answer, not just to run without crashing.
+
+## Demos as regression canaries
+
+Three libraries carry demos that were migrated onto the pure engine and byte-checked against their
+pre-migration output — real small consumers, not synthetic fixtures, that break loudly the moment
+a re-host or engine change shifts a byte anywhere in their path. One of those demos has now
+survived two separate engine changes with its digest unchanged, which is exactly the property a
+canary is supposed to have: an unrelated engine change must not perturb a settled consumer's
+output.
+
+## Performance gates
+
+The performance twin of the parity oracles, and the full case for it — including why cpu is
+measured everywhere and gated nowhere — is [Benchmarks](/benchmarks/). Two dedicated workloads run
+their own byte-and-reuse gates alongside the main matrix: gen-class's fixed-input reconstruction
+and gen-merge's warm re-eval must each build no more than 0.30× the full path's thunk graph, byte
+identically. The 3-way framework comparison runs its own drvPath-equivalence oracle — every
+output, across all three frameworks compared, builds byte-identically.
+
+## Fleet-scale regression gates
+
+The gates above measure the engine on isolated shapes inside this hub. A separate, public
+measurement lab — [hola](https://github.com/sini/hola) — forces a real, heterogeneous fleet
+(pinned by a separately versioned config repo) under the same deterministic-counter discipline,
+and freezes the result as its own gates. This hub does not re-run that measurement: its own
+`fleet-consistency` check re-derives every fleet number it cites from already-committed baseline
+JSON — pin agreement, saving arithmetic, digest ties, two named floors — by pure arithmetic, with
+no live fleet evaluation. A `--selftest` mode corrupts a copy of a baseline and asserts the gate
+actually fires, so the check is shown to have teeth without touching the real committed numbers.
+[Benchmarks](/benchmarks/#fleet-scale-results) has the figures, dated and sourced to the lab run
+that produced them.
+
+## Re-running it
+
+```bash
+nix flake check ./ci           # rehost-den-parity + every named check + treefmt
+nix run ./ci#perf-bench        # parity + ratio + linearity
+nix run ./ci#flake-compare     # the 3-way drvPath-equivalence check
+nix run ./ci#fleet-consistency # cited fleet numbers vs their own arithmetic
+```
+
+## Keep reading
+
+<CardGrid>
+  <LinkCard title="Trust" href="/trust/" description="Every promise, and what enforces it." />
+  <LinkCard title="Benchmarks" href="/benchmarks/" description="What's measured, and what's not gated." />
+  <LinkCard title="CI and checks" href="/reference/ci/" description="The mechanical gate/report split, job by job." />
+</CardGrid>
