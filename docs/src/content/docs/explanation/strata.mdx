@@ -6,4 +6,65 @@ source:
   - lib/mkGenLibs.nix
 ---
 
-Not written yet. This page adapts `ARCHITECTURE.md`, `lib/mkGenLibs.nix`.
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Every library on the roster declares exactly one stratum. Not zero, not two — one. The declaration
+lives in a single total map in the hub's own source, and "total" is not a description, it's a
+build-time property: a roster member with no entry there is a build error by design, not a lint
+that happens to catch it later.
+
+```nix file=<rootDir>/lib/mkGenLibs.nix#L42-L63
+
+```
+
+Each of those twenty-two names is bound to exactly one of five stratum values in
+`lib/mkGenLibs.nix`'s strata map.
+
+## Four ranked, one lifecycle exit
+
+Four stratum values form an ordered chain: `substrate < modules < aspects < framework`. The fifth,
+`retiring`, isn't a layer at all — it's the state of a library whose content is moving into another
+member and off the roster. It sits outside the ranking, because ranking it would mean deciding
+where a thing that's leaving belongs relative to things that are staying, and there's no coherent
+answer to that.
+
+```nix file=<rootDir>/ci/mkgenlibs-eval.nix#L164-L172
+
+```
+
+At the current roster's count: twelve libraries are substrate (the base layer — values, graphs,
+selection, evaluation), two are modules (the module system's checking and merging halves), three
+are aspects (the aspect layer, built on the module system), and five are framework (above the
+stack rather than a layer of it — nothing may define substrate vocabulary in framework's terms).
+Nothing currently sits in `retiring`; the bucket exists for when something does, and a library
+that's there stays reachable on the flat roster rather than disappearing the moment it starts to
+leave.
+
+## The direction of dependence is the law
+
+No member may declare an input above its own stratum. A substrate library cannot depend on an
+aspects library; a modules library cannot depend on a framework library. That's not a style
+preference — it's what makes "substrate" mean anything: if a base-layer library could reach up into
+the aspect layer, there would be no base layer, just a graph of libraries that happens to draw
+a diagram in one particular order today.
+
+A dedicated check walks that graph on every run. Exactly one upward edge is ruled through as a
+named exception rather than hidden: gen-schema, substrate by role, declares kinds whose fields are
+options and so is written in the module system's language — reaching up into gen-schema's neighbor,
+gen-merge, in the modules stratum. The check doesn't soften the rule to let that edge pass quietly;
+it prints the exception, entry by entry, on every run.
+
+<Aside type="tip" title="Why exactly one, and not a set">
+  A library that could hold two strata could satisfy the ordering two different ways, and the
+  ordering check would have to pick one to enforce — silently deciding something the roster never
+  actually decided. A total, single-valued map removes that: the position is a fact about the
+  library, not a choice available to whoever runs the check.
+</Aside>
+
+## Keep reading
+
+<LinkCard
+  title="The graph model"
+  description="What a node and a labelled edge are, once a library's stratum is settled."
+  href="/explanation/graph-model/"
+/>

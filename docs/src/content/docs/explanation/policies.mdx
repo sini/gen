@@ -5,4 +5,67 @@ source:
   - ARCHITECTURE.md
 ---
 
-Not written yet. This page adapts `ARCHITECTURE.md`.
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+A policy is not a callback and not a hook. It's a rule in a logic program, and the edges it
+produces are the program's model — the set of atoms that follow from what's declared, computed the
+same way a Datalog engine computes one.
+
+## Declarations become a program
+
+gen-program turns a framework's policy declarations into a program: every rule becomes a head, a
+positive body, a negative body, and the relata the head relates. gen-program sits adjacent to
+assembly, never inside it — it doesn't merge a framework's contributions, it reads the graph
+assembly already produced and turns declared policy into something solvable.
+
+Solving that program is gen-scope's job, as [the sole evaluator](/explanation/execution/):
+the program is stratified and solved to its model. A rule "fires" — its head atom is admitted —
+once every atom in its positive body holds and every atom in its negative body doesn't, evaluated
+stratum by stratum so a rule can never depend on the very fact it's still deciding.
+
+## Negation without a cycle check
+
+A policy program produces edges, and a query over those edges could, in principle, decide whether
+an edge exists — which would make `includes → ¬holds → includes` a legal thing to write. gen closes
+that off by construction rather than by detecting it after the fact: a consumed query observes only
+already-reached, materialized declarations. It is never handed the raw, still-evolving edge
+relation to observe. Ordering can't see a conditional edge because the ordering entry point's input
+type is the materialized projection, not the relation itself — there's nothing for a cycle detector
+to catch, because the cycle can't be expressed in the first place.
+
+<Aside type="caution" title="This is enforced structurally, not checked">
+  The boundary holds because of what a query's input type is, not because something scans for
+  violations. Relax that discipline and the cycle becomes representable again — and an
+  unstratified program doesn't throw when that happens. It quietly has no total model, which is a
+  quieter failure than a thrown error and worth knowing about if a policy program isn't producing
+  the edges you expect.
+</Aside>
+
+## The third value
+
+Not every program has a clean two-valued answer. A negative cycle in the stratification yields a
+**well-founded partial model** instead of failing outright: a contested atom — one whose truth
+depends on itself through negation — comes out **UNDEFINED**, a named third value rather than an
+error or an arbitrary pick between true and false. That's the standard well-founded-semantics
+result for logic programs with negation, not a gen-specific accommodation.
+
+## Joining the same graph
+
+An admitted atom becomes a dynamic edge: its predicate is the label, its relata are the endpoints,
+and it joins the one graph from [the graph model](/explanation/graph-model/) — never a second
+structure sitting next to it. It keeps its own label, so a dynamic edge a policy produced is never
+mistakable for a declared one just by looking at the graph; the label always says which it is.
+
+The stratification result comes from [Apt, Blair & Walker
+(1988)](/reference/papers/apt-1988-towards-theory-declarative-knowledge/); the well-founded
+semantics and its third value come from the alternating-fixpoint line of work — see [Van Gelder
+(1993)](/reference/papers/van-gelder-1993-alternating-fixpoint/) for the construction gen's solver
+follows.
+
+## Keep reading
+
+<LinkCard
+  title="Execution"
+  description="What gen-scope solving a program, and gen-memo deciding reuse over it, actually means."
+  href="/explanation/execution/"
+/>
