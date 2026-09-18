@@ -13,7 +13,7 @@ harder to get right — one graph, one evaluator, one incremental plane over tha
 algebra, and the interface through which a framework supplies its own names. Everything a framework
 needs is built from those five things, and nothing else is load-bearing.
 
-Twenty-two libraries implement that. Every one of them sits under a single hub, and every one of
+A roster of libraries implements that. Every one of them sits under a single hub, and every one of
 them has exactly one job.
 
 ## One path, one library per stage
@@ -51,16 +51,16 @@ model](/explanation/graph-model/) is what a node and an edge are, [policies](/ex
 is how declarations become the program gen-scope solves, and [execution](/explanation/execution/)
 is what "gen-scope solves" and "gen-memo decides reuse" actually mean.
 
-## Twenty-two libraries, one roster
+## One concern per library
 
 The roster is not a convention — it's an enumerated, total set of formal arguments. A library that
-isn't one of these twenty-two doesn't wire into the hub at all:
+isn't named there doesn't wire into the hub at all:
 
 ```nix file=<rootDir>/lib/mkGenLibs.nix#L42-L63
 
 ```
 
-Every one of those twenty-two belongs to exactly one of four ordered strata, plus a fifth,
+Every one of them belongs to exactly one of four ordered strata, plus a fifth,
 unordered lifecycle state for a library on its way off the roster. That total assignment — and why
 a member can't hold two of them — is [the next page](/explanation/strata/).
 

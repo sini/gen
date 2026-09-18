@@ -1,6 +1,6 @@
 ---
 title: The roster
-description: The twenty-two libraries, the stratum each belongs to, and how the hub wires them.
+description: The libraries, the stratum each belongs to, and how the hub wires them.
 source:
   - lib/mkGenLibs.nix
   - ARCHITECTURE.md
@@ -8,7 +8,7 @@ source:
 
 import { CardGrid, Card, Aside } from '@astrojs/starlight/components';
 
-gen is not one library. It is twenty-two, each owning exactly one concern — evaluation, graph
+gen is not one library. It is a roster of them, each owning exactly one concern — evaluation, graph
 queries, pattern matching, module merging, rule dispatch — and each shipping its own test suite
 and its own CI gate. This hub owns none of those concerns itself. It publishes the roster and
 wires the ones that need wiring; everything else you can take one flake input at a time.
