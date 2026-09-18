@@ -7,21 +7,23 @@ source:
 
 import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
-gen is a substrate for building configuration frameworks in Nix. It is not itself a configuration
+A package's dependencies, a host's own configuration, the network that host sits on, the services
+depending on each other across it, the fleet those hosts belong to — every one of those is a
+graph. gen is the one evaluation layer underneath all of it. It is not itself a configuration
 framework — it declares no domain entity and fixes no vocabulary. What it fixes instead is
 narrower and does more work: one graph, one evaluator, one incremental plane over that evaluator,
 a query algebra, and the interface through which a framework supplies its own names. A framework
 built on gen brings the words — `host`, `aspect`, `service`, whatever it needs — and gen brings the
-machine that resolves them.
+machine that resolves them, whether the graph in front of it is one laptop or a fleet.
 
 ## One graph, one node notion
 
-Whatever a framework calls its content units, they sit on one graph, and there is exactly one node
-notion for the whole ecosystem. A node is an identity, a set of attributes — some declared, some
-computed — and its incident labelled edges. A "kind" isn't a second notion sitting beside that: it's
-schema-level data a node carries, and nothing in the substrate reads a kind to decide what a node
-*is*. That's what makes `aspect` and `entity` ordinary gen-declared kinds rather than special cases
-wired into the core.
+A package, a host, a network, a service, a fleet — whatever a framework calls its content units,
+they sit on one graph, and there is exactly one node notion for the whole ecosystem. A node is an
+identity, a set of attributes — some declared, some computed — and its incident labelled edges. A
+"kind" isn't a second notion sitting beside that: it's schema-level data a node carries, and
+nothing in the substrate reads a kind to decide what a node *is*. That's what makes `aspect` and
+`entity` ordinary gen-declared kinds rather than special cases wired into the core.
 
 An edge carries a label and nothing else. A relation that needs to carry content can't be an edge,
 so it becomes a node instead — a binding node, identified by which relation it is and what it

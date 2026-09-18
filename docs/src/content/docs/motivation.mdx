@@ -10,16 +10,19 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## The shape of the problem
 
-Every configuration tool converges on the same shape: modules that need each other, wired by hand,
-in the order the evaluator happens to want them. You write an `imports` list and hope you got the
-order right. You thread an argument through three levels of module so a leaf can see a value a
-root declared. You build an `mkIf` tower because a module can't just ask whether some other module
-applies — it has to be handed the answer, pre-computed, by whoever assembled the tree above it.
+The wiring problem isn't specific to one layer. A package's dependencies, a host's own
+configuration, the services a network exposes, the hosts a fleet includes — each one converges on
+the same shape: things that need each other, wired by hand, in the order the evaluator happens to
+want them. You write an `imports` list and hope you got the order right. You thread an argument
+through three levels of module so a leaf can see a value a root declared. You build an `mkIf`
+tower because a module can't just ask whether some other module applies — it has to be handed the
+answer, pre-computed, by whoever assembled the tree above it.
 
 None of that is the interesting work. The interesting work was deciding that a host needs a user,
-that a user needs a shell, that a shell needs a package. The plumbing is what's left after you've
-made those decisions, and it's also where the failures live — a reordered import, a value threaded
-one level short, a condition that was true when you wrote it and silently isn't anymore.
+that a service needs the host it runs on, that a fleet needs this host at all. The plumbing is
+what's left after you've made those decisions, and it's also where the failures live — a reordered
+import, a value threaded one level short, a condition that was true when you wrote it and silently
+isn't anymore.
 
 ## Assembly is the wrong shape for a relationship
 
