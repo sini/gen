@@ -1,0 +1,160 @@
+---
+/*
+ * The landing hero: a graph that assembles itself, then gets traversed.
+ *
+ * Inline SVG with CSS animation rather than canvas or a layout library. Every
+ * colour resolves through `--sl-color-*`, so it follows the active palette the
+ * same way the rest of the site does, and it costs no JavaScript on the page a
+ * first-time reader loads.
+ *
+ * The sequence is the argument: edges draw first because the relationships are
+ * the thing, nodes settle onto them, then a pulse runs the graph — declare the
+ * relationships, ask the graph a question, get an answer back.
+ */
+
+// Four tiers, because the claim is that these are all the same shape.
+const tiers = [
+  { label: 'packages', x: 90, ys: [60, 150, 240], hue: 'var(--sl-color-purple)' },
+  { label: 'hosts', x: 290, ys: [95, 205], hue: 'var(--sl-color-accent)' },
+  { label: 'network', x: 490, ys: [60, 150, 240], hue: 'var(--sl-color-blue)' },
+  { label: 'services', x: 680, ys: [95, 205], hue: 'var(--sl-color-green)' },
+];
+
+type Node = { id: string; x: number; y: number; ti: number; hue: string };
+type Edge = { a: Node; b: Node };
+
+const nodes: Node[] = tiers.flatMap((t, ti) =>
+  t.ys.map((y, ni) => ({ id: `${ti}-${ni}`, x: t.x, y, ti, hue: t.hue }))
+);
+
+// Every node links forward to the next tier; a few extra edges keep it from
+// reading as a pipeline, because a graph is not a pipeline.
+const edges: Edge[] = [];
+for (let ti = 0; ti < tiers.length - 1; ti++) {
+  const from = nodes.filter((n) => n.ti === ti);
+  const to = nodes.filter((n) => n.ti === ti + 1);
+  from.forEach((a, ai) =>
+    to.forEach((b, bi) => {
+      if (Math.abs(ai - bi) > 1) return;
+      edges.push({ a, b });
+    })
+  );
+}
+edges.push({ a: nodes[0], b: nodes[5] }, { a: nodes[3], b: nodes[8] });
+
+const path = ({ a, b }: Edge) => {
+  const mx = (a.x + b.x) / 2;
+  return `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
+};
+---
+
+<div class="hero-graph" aria-hidden="true">
+  <svg viewBox="0 0 770 300" role="presentation" preserveAspectRatio="xMidYMid meet">
+    {
+      edges.map((e, i) => (
+        <path class="edge" d={path(e)} style={`--i:${i}`} />
+      ))
+    }
+    {
+      edges.map((e, i) => (
+        <path class="pulse" d={path(e)} style={`--i:${i}`} />
+      ))
+    }
+    {
+      nodes.map((n, i) => (
+        <circle class="node" cx={n.x} cy={n.y} r="7" style={`--i:${i}; --hue:${n.hue}`} />
+      ))
+    }
+    {
+      tiers.map((t) => (
+        <text class="tier" x={t.x} y="288" text-anchor="middle">{t.label}</text>
+      ))
+    }
+  </svg>
+</div>
+
+<style>
+  .hero-graph {
+    margin: 0 auto 1rem;
+    max-width: 46rem;
+  }
+
+  .hero-graph svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .edge {
+    fill: none;
+    stroke: var(--sl-color-gray-5);
+    stroke-width: 1.2;
+    stroke-dasharray: 1 1;
+    pathLength: 1;
+    stroke-dashoffset: 1;
+    animation: draw 0.7s ease-out forwards;
+    animation-delay: calc(var(--i) * 45ms);
+  }
+
+  /* A short dash chasing the same path reads as a value moving along the edge. */
+  .pulse {
+    fill: none;
+    stroke: var(--sl-color-accent-high);
+    stroke-width: 2;
+    stroke-linecap: round;
+    pathLength: 1;
+    stroke-dasharray: 0.06 0.94;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    animation: travel 4.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    animation-delay: calc(1s + var(--i) * 60ms);
+  }
+
+  .node {
+    fill: var(--sl-color-bg);
+    stroke: var(--hue);
+    stroke-width: 2;
+    transform-origin: center;
+    transform-box: fill-box;
+    opacity: 0;
+    animation: settle 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+    animation-delay: calc(0.35s + var(--i) * 55ms);
+  }
+
+  .tier {
+    fill: var(--sl-color-gray-4);
+    font-family: var(--sl-font-mono, var(--__sl-font-mono));
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    opacity: 0;
+    animation: fade 0.6s ease-out forwards;
+    animation-delay: 1.1s;
+  }
+
+  @keyframes draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes settle {
+    from { opacity: 0; scale: 0.4; }
+    to { opacity: 1; scale: 1; }
+  }
+
+  @keyframes fade {
+    to { opacity: 1; }
+  }
+
+  @keyframes travel {
+    0% { stroke-dashoffset: 1; opacity: 0; }
+    8% { opacity: 0.9; }
+    55% { stroke-dashoffset: 0; opacity: 0.9; }
+    68%, 100% { stroke-dashoffset: 0; opacity: 0; }
+  }
+
+  /* Motion is the whole point of this graphic, so when it is unwelcome the
+     finished graph is shown rather than a frozen half-drawn one. */
+  @media (prefers-reduced-motion: reduce) {
+    .edge, .node, .tier { animation: none; opacity: 1; stroke-dashoffset: 0; }
+    .pulse { display: none; }
+  }
+</style>
