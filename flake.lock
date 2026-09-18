@@ -1257,17 +1257,14 @@
         ],
         "gen-prelude": [
           "gen-prelude"
-        ],
-        "gen-schema": [
-          "gen-schema"
         ]
       },
       "locked": {
-        "lastModified": 1789593702,
-        "narHash": "sha256-bsgFnyzVQAh/naa9LS9NWoQkBExnim1BlZ6fr5VyMpg=",
+        "lastModified": 1789748129,
+        "narHash": "sha256-jVsY6G279DcIcvMszeWVRrGv1uy+1/hiTwnf98aKbUs=",
         "owner": "sini",
         "repo": "gen-scope",
-        "rev": "675d9f3542320546351605ba29f7c6361fcb0268",
+        "rev": "1c0fe80b2446edaad3a681f1f72d1b2eea0cdf9f",
         "type": "github"
       },
       "original": {

@@ -48,7 +48,6 @@
     gen-scope.inputs.gen-graph.follows = "gen-graph";
     gen-scope.inputs.gen-identity.follows = "gen-identity";
     gen-scope.inputs.gen-prelude.follows = "gen-prelude";
-    gen-scope.inputs.gen-schema.follows = "gen-schema";
 
     gen-memo.url = "github:sini/gen-memo";
     gen-memo.inputs.gen-graph.follows = "gen-graph";
