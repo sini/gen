@@ -141,7 +141,7 @@ Den v2 replaces the ~7000-line handler chain with a demand-driven HOAG evaluatio
 
 ### Potential New Libraries or Features
 
-- **gen-rename (new library, small scope).** Implement Neron's alpha-equivalence (Definition 5) and valid renaming (Definition 7) over gen-scope's scope graphs. Input: a scope graph and a rename request (position + new name). Output: the set of positions that must change, or an error if the rename would cause capture. Depends on gen-scope only. ~200-400 lines. Enables safe refactoring tooling for den configurations.
+- **gen-rename (new library, small scope).** Implement Neron's alpha-equivalence (Definition 5) and valid renaming (Definition 8) over gen-scope's scope graphs. Input: a scope graph and a rename request (position + new name). Output: the set of positions that must change, or an error if the rename would cause capture. Depends on gen-scope only. ~200-400 lines. Enables safe refactoring tooling for den configurations.
 
 - **gen-scope: per-edge reachability policy (feature).** Extend `query` to accept a WF parameter as a regular-language specification over edge labels, rather than the current boolean `transitiveImports`. This would support the full range of policies from Section 2.5: non-transitive imports, mixed transitive/non-transitive, Coq-style exports, and include semantics. Requires extending `buildNodes`'s `importGraph` to carry per-edge labels and `query` to consult a policy function. Medium complexity — the query combinator's inner loop needs refactoring.
 

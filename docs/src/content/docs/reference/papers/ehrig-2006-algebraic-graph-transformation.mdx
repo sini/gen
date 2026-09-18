@@ -99,7 +99,7 @@ Den v2's demand-driven HOAG (Higher-Order Attribute Grammar) over scope graphs u
 
 ### Unexploited Ideas
 
-- **Pushout complement construction** (Part III, slide 31): The explicit two-step construction — "delete matched elements except interface, then add new elements" — is described but gen-derive's current dispatch treats deletion and addition as separate opaque actions. A unified delete-then-add primitive that automatically preserves the interface would give structural guarantees currently left to consumers.
+- **Pushout complement construction** (Part III, slide 30): The explicit two-step construction — "delete matched elements except interface, then add new elements" — is described but gen-derive's current dispatch treats deletion and addition as separate opaque actions. A unified delete-then-add primitive that automatically preserves the interface would give structural guarantees currently left to consumers.
 
 - **Embedding Theorem** (Part III, slide 32-34): Extension of a transformation to a larger graph via consistent morphisms. Den currently re-dispatches policies when context grows; the Embedding Theorem suggests that if the boundary (shared structure) is preserved, extensions can be constructed without re-dispatch — potentially enabling incremental policy evaluation.
 
