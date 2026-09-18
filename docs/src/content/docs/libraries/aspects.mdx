@@ -14,10 +14,12 @@ nested sub-aspects, and how includes compose.
 by guessing from shape. gen-aspects is that classification surface — `aspectsType`, parameterized
 by the key semantics a framework supplies.
 
-It is the roster's one library tethered to nixpkgs `lib` directly rather than staying pure: it
-builds on `lib.types` and `lib.evalModules`, plus gen-identity, gen-merge, gen-prelude, and
-gen-schema. One roster member builds on gen-aspects: gen-link, for cross-flake federation over the
-same category classification.
+Its type system is re-hosted on gen-merge rather than on nixpkgs: `evalModuleTree`, the structural
+types and `mkOption`/`mkMerge` stand where `lib.types` and `lib.evalModules` used to, with leaf
+checkers arriving from gen-types through merge. The grammar produces the aspect node set without
+`evalModules` at all. It builds on gen-identity, gen-merge, gen-prelude and gen-schema. One roster
+member builds on gen-aspects: gen-link, for cross-flake federation over the same category
+classification.
 
 ## Take it alone
 
