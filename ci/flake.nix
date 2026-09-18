@@ -957,6 +957,32 @@
           };
 
           soleEvaluatorReport = mkSoleEvaluatorReport "sole-evaluator" soleEvaluator;
+
+          # ── THE TWO-ACT LOCK BUMP, REACHED À LA CARTE LIKE EVERY OTHER HARNESS GATE HERE ──
+          # The hub is not an mkCi consumer — it publishes flake `checks` and perf `app`s rather
+          # than a nix-unit `tests` output, so it cannot take the flake module every member takes,
+          # and `relock` arrived with that module. Until gen-harness published it as a builder the
+          # one command that mutates locks across the whole roster was the single harness surface
+          # this repository could not reach, and bumping the hub's own locks stayed the hand-run
+          # two-act every member had been relieved of.
+          #
+          # THE SCANNER, NOT A SECOND CONSTRUCTION OF IT: `relock` execs the self-input predicate
+          # over the lock it has just written, and that must be the predicate the check runs.
+          # `lib.checks.ciSelfInput` carries it as `passthru.scanner`, so both ends run one
+          # implementation. `sourceInfo.outPath` and NOT `outPath`, for the reason given above the
+          # sheet check: this subflake is `?dir=ci`.
+          relockCmd = inputs.gen-harness.lib.relock {
+            inherit pkgs;
+            name = "gen";
+            inherit
+              (inputs.gen-harness.lib.checks.ciSelfInput {
+                inherit pkgs;
+                name = "gen";
+                root = self.sourceInfo.outPath;
+              })
+              scanner
+              ;
+          };
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -1242,6 +1268,16 @@
                 help = "Format all files";
                 command = ''
                   cd "$FLAKE_ROOT/ci" && nix fmt
+                '';
+              }
+              {
+                name = "relock";
+                help = "Bump this repository's locks, root then ci [relock [<input>|--hub]]";
+                # The same binary every member's devshell carries, built here from the published
+                # builder rather than inherited from a module this repository cannot take. It
+                # resolves `$FLAKE_ROOT` itself and refuses to leave a self-input violation behind.
+                command = ''
+                  "${relockCmd}/bin/gen-relock" "$@"
                 '';
               }
               {
