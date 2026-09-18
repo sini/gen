@@ -26,19 +26,19 @@ Every member sits in exactly one of four ranked strata. The order is one-way —
 depend down the ranking or sideways within it, never up:
 
 <CardGrid stagger>
-  <Card title="substrate — 12">
+  <Card title="substrate">
     Values, graphs, selection, evaluation. The base layer: gen-prelude, gen-identity,
     gen-algebra, gen-scope, gen-memo, gen-graph, gen-bind, gen-schema, gen-select,
     gen-dispatch, gen-product, gen-view.
   </Card>
-  <Card title="modules — 2">
+  <Card title="modules">
     The module system's checking and merging halves, built on the substrate:
     gen-types, gen-merge.
   </Card>
-  <Card title="aspects — 3">
+  <Card title="aspects">
     Composition on top of the module system: gen-aspects, gen-link, gen-class.
   </Card>
-  <Card title="framework — 5">
+  <Card title="framework">
     Above the whole stack rather than a layer inside it: gen-assemble, gen-program,
     gen-delivery, gen-settings, gen-inspect.
   </Card>
@@ -62,8 +62,8 @@ gen-delivery) get it injected by this hub instead, by construction rather than c
 
 ```
 
-That is the entire cost of the hub, for the three libraries that need it. The other nineteen never
-see this file. [Add gen to a flake](/guides/flake/) walks both routes — one library alone, and
+That is the entire cost of the hub, and only the members publishing an unapplied `.lib` need it.
+Every other library never sees this file. [Add gen to a flake](/guides/flake/) walks both routes — one library alone, and
 the full hub — end to end.
 
 <Aside type="note" title="Two names still moving">
