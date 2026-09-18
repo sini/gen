@@ -1,8 +1,38 @@
 ---
 title: gen-assemble
-description: The framework library `gen-assemble`.
+description: One protocol for assembling a node set from many layers' contributions.
 source:
   - gen-assemble:README.md
 ---
 
-Not written yet. This page adapts `gen-assemble:README.md`.
+A configuration framework that assembles one node set from many layers' contributions writes the
+same protocol around the same call every time. gen-assemble is that protocol, extracted once: the
+contribution union, an identifier convention, structural declarations, and precondition checks
+over the substrate an assembly depends on. What's genuinely per-framework is the contribution
+dimension and the computation over it — gen-assemble owns everything else.
+
+**The problem it owns:** three defects showed up independently in hand-rolled assembly code, two of
+them silent — a library built green against them would have handed a caller a wrong answer with no
+diagnostic anywhere. `substratePreconditions` publishes the properties an assembly depends on, and
+an assembly over a substrate failing any of them refuses to evaluate by name rather than continuing
+on a base it can't trust.
+
+Unlike most of the roster, gen-assemble publishes its `.lib` **unapplied** — a function of its
+substrate rather than a resolved value. This hub supplies that substrate by construction rather
+than by convention:
+
+```nix file=<rootDir>/lib/hubSubstrate.nix
+
+```
+
+## Take it alone
+
+```nix
+assemble = import "${genInputs.gen-assemble}/lib" {
+  inherit (genInputs) prelude scope algebra;
+};
+```
+
+Pass `prelude`, `scope`, and `algebra` yourself — gen-assemble never re-exports a self-resolved
+`.lib`, so nothing is wired for you implicitly. No roster member currently builds on gen-assemble;
+it's meant to be assembled into directly by a framework.

@@ -1,8 +1,36 @@
 ---
 title: gen-class
-description: The aspects library `gen-class`.
+description: A pure-Nix, nixpkgs-free class-share mechanism for the module system.
 source:
   - gen-class:README.md
 ---
 
-Not written yet. This page adapts `gen-class:README.md`.
+gen-class is a pure-Nix, `nixpkgs.lib`-free class-share mechanism for the pure-gen module system:
+partition nodes into classes, compute one shared core per class, and let each member reconstruct
+itself as a delta against that core.
+
+**The problem it owns:** a fleet of nodes that are mostly identical shouldn't pay for their
+similarity twice — once in config size, once in evaluation. gen-class partitions by a caller-supplied
+key, computes the core once per class, and hands each member back a merge or extend over that core
+rather than its own independent copy.
+
+It depends only on gen-prelude, using the tier-1 surface (`merge = null`). No roster member
+currently builds on gen-class.
+
+## Take it alone
+
+```nix
+let
+  genClass = import (fetchGit "https://github.com/sini/gen-class").outPath {
+    prelude = genPrelude;
+  };
+  inherit (genClass) mkClasses mkCore applyCoreMerge invariantUnder gateCore;
+in
+
+classes = mkClasses {
+  nodes = { blade = { class = "host"; }; cortex = { class = "host"; }; lonely = { class = "solo"; }; };
+  keyOf = name: node: node.class;
+};
+# ⇒ [ { key = "host"; members = [ "blade" "cortex" ]; archetype = "blade"; … }
+#      { key = "solo"; members = [ "lonely" ]; … } ]
+```

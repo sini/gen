@@ -1,8 +1,39 @@
 ---
 title: gen-bind
-description: The substrate library `gen-bind`.
+description: Module binding with external arguments — closure-based injection for NixOS modules.
 source:
   - gen-bind:README.md
 ---
 
-Not written yet. This page adapts `gen-bind:README.md`.
+gen-bind is module binding with external arguments for Nix — partial application of bindings into
+NixOS module functions, with closure-based injection, collision detection with blame, lazy
+contracts, and thunk resolution for config-dependent values.
+
+**The problem it owns:** a module function that needs `host` or `user` in scope, and a value for
+that argument that isn't known until later, is an ordinary problem in a framework built on modules.
+gen-bind wraps the module and the binding together, resolves the thunk when the value finally
+exists, and tells you by name — not by a silent wrong merge — when two bindings collide.
+
+It depends on gen-graph and gen-prelude. One roster member builds on it: gen-settings, which
+resolves settings schemas through gen-bind's binding surface.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-bind.url = "github:sini/gen-bind";
+  # gen-bind's only dependency is gen-prelude, pulled in transitively.
+
+  outputs = { gen-bind, ... }:
+    let
+      genBind = gen-bind.lib;
+    in {
+      wrappedModule = (genBind.wrap {
+        module = { host, config, lib, ... }: {
+          networking.hostName = host.name;
+        };
+        bindings = { host = { name = "igloo"; }; };
+      }).module;
+    };
+}
+```

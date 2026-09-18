@@ -1,8 +1,42 @@
 ---
 title: gen-identity
-description: The substrate library `gen-identity`.
+description: The one place in gen that mints an identity — nothing else does.
 source:
   - gen-identity:README.md
 ---
 
-Not written yet. This page adapts `gen-identity:README.md`.
+`hashIdentity` is the one minting authority for the gen ecosystem. Nothing else mints. Every node,
+every registry entry, every place gen needs to say "this is the same thing as that" goes through
+this one kind-tagged canonical hash, so structurally equal values mint one identity and equality
+follows Nix `==` in both directions.
+
+**The problem it owns:** an ecosystem with more than one place inventing identities eventually
+disagrees with itself — two libraries hash the same value two different ways, and "the same thing"
+stops being a fact you can check. gen-identity closes that by being the only door. What can't be
+encoded totally is refused by name rather than hashed partially: a partial hash is a wrong answer
+wearing a right answer's shape.
+
+It depends on nothing — `builtins` only, deliberately, so any library can take it without a cycle.
+Six roster members declare it as a flake input: gen-aspects, gen-link, gen-schema, gen-scope,
+gen-settings, and gen-types.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-identity.url = "github:sini/gen-identity";
+
+  outputs = { gen-identity, ... }:
+    let inherit (gen-identity.lib) hashIdentity; in
+    {
+      # kind -> [label] -> (label -> value) -> "<kind>:<sha256hex>"
+      id = hashIdentity "host" [ "name" "system" ]
+        (k: { name = "igloo"; system = "x86_64-linux"; }.${k});
+      # → "host:9d5cc671…"
+    };
+}
+```
+
+Only `hashIdentity` publishes. The encoder underneath it stays internal on purpose — its
+signature threads a budget, and publishing it would hand a caller a second refusal policy over
+the same encoding.

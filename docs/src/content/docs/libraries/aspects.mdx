@@ -1,8 +1,52 @@
 ---
 title: gen-aspects
-description: The aspects library `gen-aspects`.
+description: Aspect-oriented composition types for Nix module systems.
 source:
   - gen-aspects:README.md
 ---
 
-Not written yet. This page adapts `gen-aspects:README.md`.
+gen-aspects is aspect-oriented composition types for Nix module systems: a `category`-keyed
+option type that lets a caller declare which keys of an attrset are class content, which are
+nested sub-aspects, and how includes compose.
+
+**The problem it owns:** a framework wants to let a value be "networking config" in one branch and
+"a nested aspect that includes other aspects" in another, classified by a declared key rather than
+by guessing from shape. gen-aspects is that classification surface — `aspectsType`, parameterized
+by the key semantics a framework supplies.
+
+It is the roster's one library tethered to nixpkgs `lib` directly rather than staying pure: it
+builds on `lib.types` and `lib.evalModules`, plus gen-identity, gen-merge, gen-prelude, and
+gen-schema. One roster member builds on gen-aspects: gen-link, for cross-flake federation over the
+same category classification.
+
+## Take it alone
+
+```nix
+# flake.nix
+{
+  inputs.gen-aspects.url = "github:sini/gen-aspects";
+  outputs = { gen-aspects, ... }: {
+    lib.aspects = gen-aspects.lib;   # lib + gen-schema are wired in by the flake
+  };
+}
+```
+
+```nix
+eval = lib.evalModules {
+  modules = [{
+    options.aspects = lib.mkOption {
+      type = aspects.aspectsType {
+        keySemantics = {
+          nixos = { category = "class"; };
+          homeManager = { category = "class"; };
+        };
+      };
+      default = { };
+    };
+    config.aspects.networking = {
+      nixos.networking.hostName = "myhost";
+      nixos.networking.firewall.enable = true;
+    };
+  }];
+};
+```

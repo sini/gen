@@ -1,8 +1,53 @@
 ---
 title: gen-view
-description: The substrate library `gen-view`.
+description: The substrate's derived-view constructor — one construction under several names.
 source:
   - gen-view:README.md
 ---
 
-Not written yet. This page adapts `gen-view:README.md`.
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+Every derived view is a named materialized query result over the selector algebra. gen-view is
+that constructor: registry, topology, channel, role, and the aspect/entity classification are one
+construction under different names, not five separate mechanisms that happen to look alike.
+
+**The problem it owns:** a framework wants named, queryable views over a graph — "everything with
+this role," "the topology reachable from here" — and without gen-view, each of those becomes its
+own bespoke query. gen-view's raw calculus is a deliberate narrowing of a published scope-graph
+formalism, so the constructor stays small while the views it produces stay expressive.
+
+<Aside type="note" title="The name is provisional">
+  `gen-view` is the roster's current name for this library, and it is explicitly not the final
+  one — its constructs are ruled to migrate into a consolidated library later, and the provisional
+  marking travels with every citation of it, including this page. What you get from `gen-view.lib`
+  today is real and stable in behavior; the name it lives under is what's still moving.
+</Aside>
+
+It depends on gen-graph and gen-prelude. One roster member builds on it: gen-link, which threads
+gen-view's constructs into cross-flake federation.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-view.url = "github:sini/gen-view";
+  outputs = { gen-view, ... }:
+    let view = gen-view.lib;
+    in { /* ... */ };
+}
+```
+
+```nix
+graph = view.compositions.movement {
+  channel = "settings";
+  relation = "import";
+  root = "leaf";
+  direction = "outbound";
+};
+```
+
+<LinkCard
+  title="van Antwerpen, Bach Poulsen, Rouvoet & Visser — Scopes as Types (2018)"
+  description="gen-view's raw calculus (L, E, <, k) is a stated narrowing of this paper's Figure 1."
+  href="/reference/papers/van-antwerpen-2018-scopes-as-types/"
+/>

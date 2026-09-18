@@ -5,4 +5,39 @@ source:
   - gen-select:REFERENCE.md
 ---
 
-Not written yet. This page adapts `gen-select:README.md`, `gen-select:REFERENCE.md`.
+gen-select is a pure pattern matching library for Nix. Selectors are `{ __sel = tag; ... }`
+attrsets, matched by `matches` against an ID-based accessor context.
+
+**The problem it owns:** "does this node match this predicate" comes up everywhere a graph gets
+queried, and hand-rolling the predicate logic per caller means hand-rolling it wrong per caller
+eventually. gen-select gives you one small selector algebra — `and`, `star`, `attrs`, and the rest —
+and one `matches` function that evaluates any of them against a context.
+
+It depends on exactly one thing: gen-algebra, for the conservative-equality regime a selector's
+`attrs` matcher dispatches through — a tagged-sum comparison rather than a bespoke one, so gen-select
+doesn't carry its own copy of a discipline gen-algebra already owns. One roster member builds on
+gen-select: gen-inspect, which matches against a materialized graph through it.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-select.url = "github:sini/gen-select";
+  outputs = { gen-select, ... }:
+    let
+      sel = gen-select.lib;
+    in {
+      # sel.matches, sel.star, sel.attrs, sel.and, ...
+    };
+}
+```
+
+Without flakes:
+
+```nix
+let
+  sel = (import ./path/to/gen-select).lib;
+in
+sel.matches (sel.attrs { role = "backend"; }) "api" myContext
+# => true if myContext.data "api" has role = "backend"
+```

@@ -1,8 +1,34 @@
 ---
 title: gen-product
-description: The substrate library `gen-product`.
+description: The four standard graph products, built over caller-supplied accessor graphs.
 source:
   - gen-product:README.md
 ---
 
-Not written yet. This page adapts `gen-product:README.md`.
+gen-product is pure graph products for Nix. It builds the four standard graph products —
+Cartesian, tensor (direct), strong, and lexicographic — over accessor-graphs, the same
+caller-supplies-the-structure convention gen-graph itself uses.
+
+**The problem it owns:** combining two graphs — a topology and a role assignment, say — into one
+product graph is standard graph theory, and standard graph theory is exactly the kind of thing
+worth getting from a library instead of reimplementing per caller. gen-product is the four products,
+correct, with no opinion about what your nodes represent.
+
+It depends only on gen-prelude. No roster member currently builds on it — like gen-dispatch, it's
+meant to be taken directly.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-product.url = "github:sini/gen-product";
+  # gen-product pulls in gen-prelude transitively — no nixpkgs input required.
+}
+```
+
+`gen-product.lib` is the `genProduct` attrset. Without flakes:
+
+```nix
+let genProduct = import (fetchTarball "https://github.com/sini/gen-product/archive/main.tar.gz") { };
+in genProduct.cartesian hostFactor userFactor
+```

@@ -1,8 +1,44 @@
 ---
 title: gen-types
-description: The modules library `gen-types`.
+description: A pure, nixpkgs-free structural type checker — the checking half of the module system.
 source:
   - gen-types:README.md
 ---
 
-Not written yet. This page adapts `gen-types:README.md`.
+gen-types is a pure, `nixpkgs.lib`-free structural type checker for Nix — the checking half of a
+pure-Nix module system. A type is a predicate boundary: `verify` a value and get back `null` on
+success or an error string on failure.
+
+**The problem it owns:** `lib.types` couples checking and merging into one mechanism, and a
+pure-gen module system needs the two split so gen-merge can own merging without needing nixpkgs.
+gen-types is the half that answers "is this value of this type," and nothing else.
+
+It depends on gen-identity and gen-prelude. Two roster members build on it: gen-merge, which hands
+gen-types leaf checkers off to `evalModuleTree`, and gen-settings.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-types.url = "github:sini/gen-types";
+}
+```
+
+Every constructor returns a record:
+
+```nix
+{
+  name;    # full structural name, e.g. "listOf<int>"
+  verify;  # value -> null | errString      (null = ok)
+  check;   # v: v2: throws verify's error on failure, else returns v2
+  __name;  # base name with polymorphic metadata stripped ("listOf")
+  __mint;  # tagged identity regime
+  __id;    # the accessor for a consumer demanding an identity
+}
+```
+
+```nix
+t.int.verify 5              # => null
+t.int.verify "x"            # => "expected type 'int' but value \"x\" is of type 'string'"
+t.int.check 5 5             # => 5        (validate-and-pass-through)
+```

@@ -5,4 +5,39 @@ source:
   - gen-graph:GUIDE.md
 ---
 
-Not written yet. This page adapts `gen-graph:README.md`, `gen-graph:GUIDE.md`.
+gen-graph is pure graph query combinators for Nix. Queries take accessor functions as arguments —
+not node maps. The graph structure is supplied by the caller; gen-graph only answers questions
+about it.
+
+**The problem it owns:** reachability, roots, phase ordering, SCC partitioning — the questions
+every graph-shaped problem eventually asks — without forcing the caller to first materialize the
+graph into a concrete data structure gen-graph controls. You keep your own representation; gen-graph
+just needs a way to ask it "what are this node's edges."
+
+It depends on nothing but gen-prelude. That makes it one of the roster's widest load-bearing
+libraries: gen-bind, gen-inspect, gen-memo, gen-scope, gen-settings, and gen-view all build on it
+directly, and gen-scope's well-founded engine consumes gen-graph's SCC partitioning rather than
+carrying a second one of its own.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-graph.url = "github:sini/gen-graph";
+  # gen-graph pulls in gen-prelude transitively — no nixpkgs input required.
+
+  outputs = { gen-graph, ... }:
+    let graph = gen-graph.lib;
+    in { /* use graph.reachableFrom, graph.roots, graph.phaseOrder, etc. */ };
+}
+```
+
+Without flakes, the standalone entry derives gen-prelude from the pinned `flake.lock` and takes no
+arguments:
+
+```nix
+let
+  graph = import ./path/to/gen-graph { };
+in
+graph.reachableFrom { edges = id: deps.${id} or [ ]; } "start"
+```

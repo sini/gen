@@ -1,8 +1,51 @@
 ---
 title: gen-schema
-description: The substrate library `gen-schema`.
+description: A typed record registry for Nix — the module system's other half.
 source:
   - gen-schema:README.md
 ---
 
-Not written yet. This page adapts `gen-schema:README.md`.
+gen-schema is a typed record registry for Nix with extension points, strict validation, refinement
+contracts, identity hashing, cross-instance references, first-class mixins, introspection, and
+declarative methods — built on the pure-gen module system, with no `nixpkgs.lib` dependency.
+
+**The problem it owns:** a fleet of typed instances — hosts, users, anything with a declared shape
+and a registry of concrete values — needs one place that validates them, hashes them for identity,
+and lets one instance reference another by that identity. gen-schema is that place.
+
+It depends on gen-algebra, gen-identity, gen-merge, and gen-prelude. That gen-merge dependency is
+the roster's one ruled exception to the strata ordering: gen-schema sits in substrate by role, but
+it declares kinds whose fields are options, so it's written in the module system's language and
+reaches sideways into gen-merge. Four roster members build on gen-schema in turn: gen-aspects,
+gen-link, gen-scope, and gen-settings.
+
+## Take it alone
+
+```nix
+# flake.nix
+{
+  inputs.gen-schema.url = "github:sini/gen-schema";
+  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
+
+  outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+    imports = [ inputs.gen-schema.flakeModules.default ];
+
+    schema.host = {
+      options.addr = lib.mkOption { type = lib.types.str; };
+      options.role = lib.mkOption { type = lib.types.str; default = "worker"; };
+    };
+
+    options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
+    hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
+    hosts.iceberg = { addr = "10.0.2.1"; };  # role defaults to "worker"
+
+    flake.fleet = {
+      iglooAddr = config.hosts.igloo.addr;     # → "10.0.1.1"
+      iglooHash = config.hosts.igloo.id_hash;  # → "host:<deterministic SHA-256>"
+    };
+  };
+}
+```
+
+The flake-parts module ships default settings (`strict = true`, no `baseModule`). For a custom
+`strict`, `baseModule`, `collections`, or `computed`, use the programmatic API directly.

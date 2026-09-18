@@ -6,4 +6,100 @@ source:
   - ARCHITECTURE.md
 ---
 
-Not written yet. This page adapts `lib/mkGenLibs.nix`, `ARCHITECTURE.md`.
+import { CardGrid, Card, Aside } from '@astrojs/starlight/components';
+
+gen is not one library. It is twenty-two, each owning exactly one concern — evaluation, graph
+queries, pattern matching, module merging, rule dispatch — and each shipping its own test suite
+and its own CI gate. This hub owns none of those concerns itself. It publishes the roster and
+wires the ones that need wiring; everything else you can take one flake input at a time.
+
+The roster of record is `mkGenLibs`'s function signature and the total `strata` map beside it —
+never a count kept anywhere else:
+
+```nix file=<rootDir>/lib/mkGenLibs.nix#L248-L263
+
+```
+
+## Four strata, one direction
+
+Every member sits in exactly one of four ranked strata. The order is one-way — a library may
+depend down the ranking or sideways within it, never up:
+
+<CardGrid stagger>
+  <Card title="substrate — 12">
+    Values, graphs, selection, evaluation. The base layer: gen-prelude, gen-identity,
+    gen-algebra, gen-scope, gen-memo, gen-graph, gen-bind, gen-schema, gen-select,
+    gen-dispatch, gen-product, gen-view.
+  </Card>
+  <Card title="modules — 2">
+    The module system's checking and merging halves, built on the substrate:
+    gen-types, gen-merge.
+  </Card>
+  <Card title="aspects — 3">
+    Composition on top of the module system: gen-aspects, gen-link, gen-class.
+  </Card>
+  <Card title="framework — 5">
+    Above the whole stack rather than a layer inside it: gen-assemble, gen-program,
+    gen-delivery, gen-settings, gen-inspect.
+  </Card>
+</CardGrid>
+
+Exactly one edge runs against that order, and it is ruled rather than hidden: gen-schema sits in
+substrate by role but declares kinds whose fields are options, so it reaches sideways into
+gen-merge in modules. The checker that walks the whole graph prints that exception on every run
+instead of passing quietly around it. The full case for why a member holds exactly one stratum,
+and what the ordering actually buys, is [Strata](/explanation/strata/).
+
+## Wiring is optional
+
+Every library exports exactly one `.lib`, and every library resolves its own dependencies — there
+is nothing this hub does for a single library that the library doesn't already do for itself. Take
+`inputs.gen-graph.lib` and you have gen-graph; nothing else loads. The three framework-tier
+libraries that don't declare their own substrate as flake inputs (gen-assemble, gen-program,
+gen-delivery) get it injected by this hub instead, by construction rather than convention:
+
+```nix file=<rootDir>/lib/hubSubstrate.nix
+
+```
+
+That is the entire cost of the hub, for the three libraries that need it. The other nineteen never
+see this file. [Add gen to a flake](/guides/flake/) walks both routes — one library alone, and
+the full hub — end to end.
+
+<Aside type="note" title="Two names still moving">
+  gen-view's name is ruled provisional; its constructs migrate into a consolidated library later.
+  gen-settings is marked experimental in this hub's own summary table. Both are real, working
+  libraries today — their own pages say exactly where each stands.
+</Aside>
+
+## The full roster
+
+| library | stratum | depends on |
+|---|---|---|
+| [gen-prelude](/libraries/prelude/) | substrate | — |
+| [gen-identity](/libraries/identity/) | substrate | — |
+| [gen-algebra](/libraries/algebra/) | substrate | — |
+| [gen-scope](/libraries/scope/) | substrate | graph, identity, prelude, schema |
+| [gen-memo](/libraries/memo/) | substrate | graph, prelude |
+| [gen-graph](/libraries/graph/) | substrate | prelude |
+| [gen-bind](/libraries/bind/) | substrate | graph, prelude |
+| [gen-schema](/libraries/schema/) | substrate | algebra, identity, merge, prelude |
+| [gen-select](/libraries/select/) | substrate | algebra |
+| [gen-dispatch](/libraries/dispatch/) | substrate | prelude |
+| [gen-product](/libraries/product/) | substrate | prelude |
+| [gen-view](/libraries/view/) | substrate | graph, prelude |
+| [gen-types](/libraries/types/) | modules | identity, prelude |
+| [gen-merge](/libraries/merge/) | modules | memo, prelude, types |
+| [gen-aspects](/libraries/aspects/) | aspects | identity, merge, prelude, schema |
+| [gen-link](/libraries/link/) | aspects | algebra, aspects, identity, prelude, schema, scope, view |
+| [gen-class](/libraries/class/) | aspects | prelude |
+| [gen-assemble](/libraries/assemble/) | framework | prelude, scope, algebra (injected) |
+| [gen-program](/libraries/program/) | framework | prelude, scope (injected) |
+| [gen-delivery](/libraries/delivery/) | framework | algebra, aspects (injected) |
+| [gen-settings](/libraries/settings/) | framework | algebra, bind, graph, identity, prelude, schema, types |
+| [gen-inspect](/libraries/inspect/) | framework | graph, prelude, scope, select |
+
+The "depends on" column is direct dependencies only — `gen-scope` reaching `gen-prelude` through
+`gen-graph` doesn't count twice. Every one of those edges is a `follows` in the dependent's own
+`flake.nix`, checked against this hub's own graph on every run so the two can't drift apart
+unnoticed.

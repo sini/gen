@@ -1,8 +1,45 @@
 ---
 title: gen-program
-description: The framework library `gen-program`.
+description: Turns a framework's declarations into a logic program, and drives gen-scope's engine over it.
 source:
   - gen-program:README.md
 ---
 
-Not written yet. This page adapts `gen-program:README.md`.
+gen-program is the consumer that turns a framework's declarations into a logic program, drives
+gen-scope's well-founded engine over it, and carries the third value — `undefined`, not just true
+or false — out under its own name. `head` is the fact a declaration asserts; `pos` and `neg` are its
+guard's positive and negative literals. A declaration with neither body is a fact, gen-scope's own
+base case for `mkRule`.
+
+**The problem it owns:** contested rules — two declarations that can't both hold — need a semantics
+with a real answer for "neither is currently derivable," not just true or false forced one way.
+gen-scope's engine states three values plainly: **true** is an external fact; **false** is inert,
+since `verdict` is already total; **undefined** is a suspension of falsity, an atom whose support
+lies outside the program.
+
+An atom is one fact — one membership, one promotion — never a whole relation, so one contested pair
+can be contested while its neighbors in the same relation settle. Atom names are always the
+caller's; gen-program mints none of its own, so it can't encode topology or kind into a name by
+accident.
+
+It takes gen-prelude and gen-scope as injected substrate, the same pattern gen-assemble uses:
+
+```nix
+program = import "${genInputs.gen-program}/lib" {
+  inherit (genInputs) prelude scope;
+};
+```
+
+## Take it alone
+
+```nix
+model = genProgram.model {
+  program = genProgram.program { declarations = /* ... */; frozen = /* ... */; };
+  interpretation = [ { atom = "member:X"; verdict = "undefined"; } ];
+  complete = false;
+};
+```
+
+`engine.solve` takes `{ program, interpretation }`; the interpretation is a prior pass's verdicts,
+crossing as themselves — a first pass supplies `[ ]` explicitly rather than falling back to an
+implicit default. No roster member currently builds on gen-program.

@@ -1,8 +1,43 @@
 ---
 title: gen-algebra
-description: The substrate library `gen-algebra`.
+description: The pure primitives underneath the rest of gen — a search monad, record algebra, intensional functions.
 source:
   - gen-algebra:README.md
 ---
 
-Not written yet. This page adapts `gen-algebra:README.md`.
+import { LinkCard } from '@astrojs/starlight/components';
+
+gen-algebra is foundational primitives for the gen family: a search monad, intensional functions,
+standalone identity hashing, record algebra with scoped labels, and Either combinators. Nothing
+here knows about graphs, scopes, or aspects — it's the vocabulary those libraries are written in.
+
+**The problem it owns:** a handful of algebraic shapes — nondeterministic search, layered record
+merging, a value that is "this or that" — show up over and over across the roster, and each one has
+a right answer that is easy to get subtly wrong by hand. gen-algebra gets them right once.
+
+It is `builtins`-only: zero flake inputs, a stated contract enforced by its own purity suite. Four
+roster members build on it: gen-link, gen-schema, gen-select, and gen-settings.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-algebra.url = "github:sini/gen-algebra";
+
+  outputs = { gen-algebra, ... }:
+    let
+      search = gen-algebra.lib.search;
+      inherit (gen-algebra.lib) mkIntensional conservativeEq record either;
+    in
+    { /* ... */ };
+}
+```
+
+Without flakes, `import ./path/to/gen-algebra { }` gets you the same value — the non-flake entry
+is a nullary function, `{ }` applies it.
+
+<LinkCard
+  title="Palmer, Filardo & Wu — Intensional Functions (2024)"
+  description="The paper gen-algebra's intensional-function constructors implement."
+  href="/reference/papers/palmer-2024-intensional-functions/"
+/>

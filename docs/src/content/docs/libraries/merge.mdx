@@ -1,8 +1,46 @@
 ---
 title: gen-merge
-description: The modules library `gen-merge`.
+description: The pure-Nix module merge engine — evalModules and lib.types-merge, replaced.
 source:
   - gen-merge:README.md
 ---
 
-Not written yet. This page adapts `gen-merge:README.md`.
+gen-merge is a pure-Nix, `nixpkgs.lib`-free module merge engine — the drop-in replacement for
+`lib.evalModules` plus `lib.types`-merge in the pure-gen module system. `evalModuleTree` collects a
+tree of modules, ties the self-referential `config` fixpoint, and resolves per-option definitions
+by priority.
+
+**The problem it owns:** NixOS's own module system is powerful but drags `nixpkgs.lib` and its
+whole option-type machinery along with it. gen-merge is that machinery, rebuilt without the
+dependency, so the pure substrate can have module merging without pulling in nixpkgs to get it.
+
+It depends on gen-memo, gen-prelude, and gen-types — gen-memo for the incremental decision layer
+folded into evaluation, gen-types for the leaf checkers `evalModuleTree` accepts. Two roster
+members build on gen-merge in turn: gen-aspects and gen-schema — the latter being the roster's one
+ruled exception to the strata ordering, reaching sideways from substrate into modules for exactly
+this dependency.
+
+## Take it alone
+
+```nix
+let
+  genMerge = import (fetchGit "https://github.com/sini/gen-merge").outPath {
+    prelude = genPrelude;
+    types = genTypes;               # the leaf checkers
+  };
+  inherit (genMerge) evalModuleTree mkOption mkForce;
+  t = genMerge.types;
+
+  result = evalModuleTree {
+    modules = [
+      { options.name = mkOption { type = t.str; default = "anon"; }; }
+      { name = mkForce "pinned"; }
+    ];
+  };
+in
+  result.config                     # ⇒ { name = "pinned"; }
+```
+
+`evalModuleTree` returns `{ config; options; type; provenance; undeclared; deprecations }`.
+`.config` is the merged output; `.options` is the merged descriptor map; `.provenance` is a lazy
+per-location record of where each value came from.

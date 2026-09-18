@@ -1,8 +1,31 @@
 ---
 title: gen-inspect
-description: The framework library `gen-inspect`.
+description: Interrogates a materialized graph — what exists, what's declared, what reaches what.
 source:
   - gen-inspect:README.md
 ---
 
-Not written yet. This page adapts `gen-inspect:README.md`.
+gen-inspect interrogates a materialized graph: which nodes exist and of what kind, which edges are
+declared, which a policy program produced and why, and what reaches what. It implements no
+semantics and never evaluates — every fixpoint it reads goes through gen-scope, the sole evaluator.
+
+**The problem it owns:** once a graph is built, something has to answer questions about it without
+becoming a second place that decides what's true of it. gen-inspect is that something — a read
+surface over a graph someone else already resolved, not a second evaluator standing next to
+gen-scope.
+
+It sits in the framework stratum: above the stack rather than a layer inside it, defining no
+substrate vocabulary of its own. It declares gen-graph, gen-prelude, gen-scope, and gen-select as
+inputs — confirmed independently by this hub's own `flake.nix` follows-edges and by the
+dependency graph in `ARCHITECTURE.md`, which agree on exactly those four — and this hub separately
+injects the same four as substrate:
+
+```nix file=<rootDir>/lib/hubSubstrate.nix#L15-L22
+
+```
+
+No roster member currently builds on gen-inspect.
+
+This page doesn't show a usage example. gen-inspect is rostered but not checked out for this
+documentation pass, and its API is real work belonging to whoever writes the page next against
+the actual source — not something to guess at here.

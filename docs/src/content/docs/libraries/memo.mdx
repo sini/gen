@@ -1,8 +1,49 @@
 ---
 title: gen-memo
-description: The substrate library `gen-memo`.
+description: The incremental plane over gen-scope — a decision layer that never evaluates.
 source:
   - gen-memo:README.md
 ---
 
-Not written yet. This page adapts `gen-memo:README.md`.
+import { LinkCard } from '@astrojs/starlight/components';
+
+gen-memo is the incremental plane: a decision layer over the evaluator that never evaluates,
+only decides reuse. It inherits gen-resolve's warm fold and override cone, plus a predecessor
+library's dirty-cone propagation, and rebuilds them as one plane rather than two mechanisms
+bolted together.
+
+**The problem it owns:** re-running a whole evaluation because one input changed is wasteful, but
+a cache that quietly drifts from a cold evaluation is worse — it's a wrong answer that looks fast.
+gen-memo's definition is a byte-parity oracle against a cold evaluation: a plane output must be
+byte-identical to what evaluating from scratch would produce, and a plane that accumulates its
+own evaluation state has failed by construction.
+
+It depends on gen-graph and gen-prelude. One roster member builds on it: gen-merge, which folds
+gen-memo's decision layer into its own module-tree evaluation.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-memo.url = "github:sini/gen-memo";
+}
+```
+
+`gen-memo.lib` is the plane's attrset directly. Every entry point that reaches a store takes the
+engine first — the plane decides reuse and populates no store of its own:
+
+```nix
+let
+  engine = import "${genMemo-src}/reference/schedule.nix" { prelude = gen-prelude.lib; };
+  ctx = genMemo.build engine { /* … */ };
+in
+```
+
+The reference scheduler ships outside `lib/`, at `reference/schedule.nix`, precisely because it
+is not part of the plane itself — a real caller hands its own evaluator instead.
+
+<LinkCard
+  title="Mokhov, Mitchell & Jones — Build Systems à la Carte (2018)"
+  description="The incrementality theory gen-memo's decision layer is shaped by."
+  href="/reference/papers/mokhov-2018-build-systems-a-la-carte/"
+/>

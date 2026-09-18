@@ -1,8 +1,60 @@
 ---
 title: gen-settings
-description: The framework library `gen-settings`.
+description: Resolves an aspect's settings against ordered override layers, with full provenance.
 source:
   - gen-settings:README.md
 ---
 
-Not written yet. This page adapts `gen-settings:README.md`.
+import { Aside } from '@astrojs/starlight/components';
+
+gen-settings resolves an aspect's settings — a static, introspectable schema of `{ default;
+merge }` leaves — against an ordered list of override layers, producing a resolved value plus a
+full per-field provenance chain.
+
+**The problem it owns:** "why does this field have this value" needs a real answer once more than
+one layer can set it — env defaults, host overrides, an explicit per-node value. gen-settings
+resolves the merge and keeps the chain that produced it, so the answer to "why" is a lookup, not an
+investigation.
+
+<Aside type="note" title="Marked experimental">
+  This hub's own summary table marks gen-settings experimental, subject to replacement. It works
+  today — the schema/resolution surface below is real and current — but it isn't the settled
+  framework interface, and building tooling that assumes its shape won't change is premature.
+</Aside>
+
+It has the largest dependency footprint on the roster: gen-algebra, gen-bind, gen-graph,
+gen-identity, gen-prelude, gen-schema, and gen-types. No roster member currently builds on
+gen-settings.
+
+## Take it alone
+
+```nix
+let
+  genSettings = (import ./lib) {
+    prelude = gen-prelude.lib;
+    algebra = gen-algebra.lib;
+    bind = gen-bind.lib;
+    graph = gen-graph.lib;
+  };
+  inherit (genSettings) mkSchema resolveOne;
+
+  schema = mkSchema {
+    aspect = config.aspects.firewall;      # a registry entry (carries id_hash)
+    fields = {
+      "allowed-tcp" = { default = [ 22 ]; merge = "append"; };
+      hostname = { default = "unset"; };   # replace (implicit)
+    };
+  };
+
+  resolved = resolveOne {
+    inherit schema;
+    layers = [
+      { scope = { env = config.envs.prod; }; rendered = "prod"; via = null;
+        value = { "allowed-tcp" = [ 80 ]; }; }
+      { scope = { host = den.hosts.axon-01; }; rendered = "axon-01"; via = null;
+        value = { "allowed-tcp" = [ 443 ]; hostname = "axon-01"; }; }
+    ];
+  };
+in
+resolved.value    # => { "allowed-tcp" = [ 22 80 443 ]; hostname = "axon-01"; }
+```

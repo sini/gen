@@ -1,8 +1,50 @@
 ---
 title: gen-delivery
-description: The framework library `gen-delivery`.
+description: The delivery-class realization surface — from a flat aspect registry to built artifacts.
 source:
   - gen-delivery:README.md
 ---
 
-Not written yet. This page adapts `gen-delivery:README.md`.
+gen-delivery is the delivery-class realization surface: the projection that discovers which
+aspect keys are declared delivery classes and reshapes the flat aspect registry per node, plus the
+fold that hands each class's collected content to its target-owned terminal.
+
+**The problem it owns:** a key counts as a delivery class only if it's *declared* `category =
+"class"` **and** carries content — shape is never consulted. A key with no category source refuses
+by name rather than falling back to a shape test; a key whose category is `null` is just an
+unregistered nested aspect, not an error. Collapsing those two absences into one is the reading
+gen-delivery is built to avoid.
+
+| surface | what it does |
+|---|---|
+| `project { values, cnf, selectHosts? }` | the flat aspect registry + the per-node build projection |
+| `realize { projected, terminals, bindings?, refinements?, layerOrder?, extraModules? }` | class-major artifacts, `{ <class>.<node> = artifact; }` |
+| `defaultLayerOrder` | `[ "projection" "global" "refinement" ]`, readable and overridable |
+
+The contribution order is total in both directions: naming a layer that doesn't exist refuses, and
+so does omitting one. It takes gen-algebra and gen-aspects as substrate, supplied directly at the
+`.lib` call:
+
+```nix
+genDelivery = inputs.gen-delivery.lib {
+  algebra = inputs.gen-algebra.lib;
+  aspects = inputs.gen-aspects.lib;
+};
+
+projected = genDelivery.project {
+  values = composed.values;   # your own resolved config
+  cnf = myAspectSchemaArgs;   # the mkAspectSchema argument you built your grammar from
+};
+
+realized = genDelivery.realize {
+  inherit projected;
+  terminals.nixos = carriage: mySystemBuilder carriage;
+};
+# => { nixos = { <node> = <artifact>; }; }
+```
+
+## Take it alone
+
+Bring your own terminal — gen-delivery discovers and reshapes; it never decides what building an
+artifact means for your target. No roster member currently builds on gen-delivery; it's meant to
+be realized against directly.

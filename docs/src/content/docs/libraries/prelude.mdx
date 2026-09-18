@@ -1,8 +1,40 @@
 ---
 title: gen-prelude
-description: The substrate library `gen-prelude`.
+description: The zero-dependency utility base every other gen library builds on.
 source:
   - gen-prelude:README.md
 ---
 
-Not written yet. This page adapts `gen-prelude:README.md`.
+gen-prelude is the small pure-utility dependency that lets the pure gen substrate drop
+`nixpkgs.lib` entirely. `builtins` re-exports plus the list, attrset, and string helpers the rest
+of the roster needs, vendored behaviour-identically from `nixpkgs.lib` so nothing downstream has
+to carry it.
+
+**The problem it owns:** every gen library needs `map`, `filter`, `unique`, `genAttrs` — the
+handful of combinators that make Nix bearable — without pulling in the whole of nixpkgs to get
+them. gen-prelude is that handful, and nothing more.
+
+It is the one leaf every other member of the roster reaches, directly or transitively: gen-aspects,
+gen-bind, gen-class, gen-dispatch, gen-graph, gen-inspect, gen-link, gen-memo, gen-merge,
+gen-product, gen-schema, gen-scope, gen-settings, gen-types, and gen-view all declare it as a flake
+input. gen-prelude itself declares none — it is `builtins` only.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-prelude.url = "github:sini/gen-prelude";
+
+  outputs = { gen-prelude, ... }:
+    let
+      prelude = gen-prelude.lib;
+    in
+    {
+      example = prelude.genAttrs [ "a" "b" ] (n: n + "!");
+      # => { a = "a!"; b = "b!"; }
+    };
+}
+```
+
+No `nixpkgs` input, no `.lib { }` functor call — the flake output is a plain value. Without
+flakes, `import ./path/to/gen-prelude/lib` gets you the same attrset directly.

@@ -5,4 +5,50 @@ source:
   - gen-scope:examples/*/README.md
 ---
 
-Not written yet. This page adapts `gen-scope:README.md`, `gen-scope:examples/*/README.md`.
+import { LinkCard, Aside } from '@astrojs/starlight/components';
+
+gen-scope is a demand-driven Higher-Order Attribute Grammar evaluator over algebraic scope graphs,
+implemented as a pure Nix library. It is gen's sole evaluator: gen-scope is the one library in the
+roster permitted to evaluate at all, kept thin so a single incremental plane over it is even
+definable.
+
+**The problem it owns:** a graph of nodes with attributes that depend on each other — some
+declared, some computed, some growing the tree as they resolve — needs one evaluation discipline
+everyone else can build on rather than reinvent. gen-scope is that discipline: nodes carry a
+distributed memoization cache, so attribute access is `O(1)` per lookup and nothing is evaluated
+twice.
+
+<Aside type="tip">
+  "Sole evaluator" is a strong, load-bearing design rule enforced by a scanner that checks the rest
+  of the roster for evaluation-driving constructs outside this library — and that scanner's own
+  documentation says it under-approximates the true property. A green run is a statement about the
+  scanner, not a proof over every possible construct. [Execution](/explanation/execution/) has the
+  full picture.
+</Aside>
+
+It depends on gen-graph, gen-identity, gen-prelude, and gen-schema — gen-graph for the well-founded
+engine's SCC partitioning, gen-schema for the identity mint that stages node creation. Two roster
+members build on gen-scope directly: gen-inspect and gen-link. The framework-tier libraries
+gen-assemble and gen-program take it as injected substrate rather than a declared input.
+
+## Take it alone
+
+```nix
+# flake.nix
+{
+  inputs.gen-scope.url = "github:sini/gen-scope";
+  outputs = { gen-scope, ... }:
+    let engine = gen-scope.lib;
+    in { /* ... */ };
+}
+
+# Or without flakes (all three dependencies auto-derived from the pinned flake.lock):
+let engine = import ./gen-scope { };
+in { /* ... */ }
+```
+
+<LinkCard
+  title="Vogt, Swierstra & Kuiper — Higher Order Attribute Grammars (1989)"
+  description="The formalism gen-scope's demand-driven evaluator is built on."
+  href="/reference/papers/vogt-1989-higher-order-ag/"
+/>

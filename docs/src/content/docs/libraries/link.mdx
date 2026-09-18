@@ -1,8 +1,42 @@
 ---
 title: gen-link
-description: The aspects library `gen-link`.
+description: Cross-flake aspect federation over origin-labeled subgraphs.
 source:
   - gen-link:README.md
 ---
 
-Not written yet. This page adapts `gen-link:README.md`.
+import { LinkCard } from '@astrojs/starlight/components';
+
+gen-link is cross-flake aspect federation over origin-labeled subgraphs, implemented as a pure Nix
+library. Where gen-aspects classifies content within one evaluation, gen-link is what lets two
+flakes' aspect graphs meet without collapsing into one undifferentiated tree.
+
+**The problem it owns:** a graph assembled from more than one flake needs to know which parts came
+from where, so a name collision between two origins is a fact you can see rather than a silent
+overwrite. gen-link labels subgraphs by origin and federates across that label.
+
+It's the widest-reaching library in the aspects stratum: gen-algebra, gen-aspects, gen-identity,
+gen-prelude, gen-schema, gen-scope, and gen-view all declare it as a flake input. No roster member
+currently builds on gen-link in turn.
+
+## Take it alone
+
+```nix
+# flake.nix
+{
+  inputs.gen-link.url = "github:sini/gen-link";
+  outputs = { gen-link, ... }:
+    let link = gen-link.lib;
+    in { /* ... */ };
+}
+
+# Or without flakes (siblings auto-derived from the pinned flake.lock):
+let link = import ./gen-link { };
+in { /* ... */ }
+```
+
+<LinkCard
+  title="Néron, Tolmach, Visser & Wachsmuth — A Theory of Name Resolution (2015)"
+  description="The scope-graph theory behind federating origin-labeled subgraphs."
+  href="/reference/papers/neron-2015-scope-graphs/"
+/>

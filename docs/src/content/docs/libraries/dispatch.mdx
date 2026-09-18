@@ -1,8 +1,50 @@
 ---
 title: gen-dispatch
-description: The substrate library `gen-dispatch`.
+description: Relational rule dispatch — the guard-to-effect step, as a pure Nix library.
 source:
   - gen-dispatch:README.md
 ---
 
-Not written yet. This page adapts `gen-dispatch:README.md`.
+import { LinkCard } from '@astrojs/starlight/components';
+
+gen-dispatch is relational rule dispatch — the guard→effect dispatch step, implemented as a pure
+Nix library. Ordering comes from gen-graph; gen-dispatch threads context between groups in that
+order and classifies actions without interpreting them.
+
+**The problem it owns:** policy-like rules — "if this context matches, enrich it and produce a
+typed action" — need a dispatch step that stays out of the business of deciding what those actions
+*mean*. gen-dispatch classifies; it never interprets. That split is what lets the same dispatch
+mechanism serve callers with completely different action vocabularies.
+
+It depends only on gen-prelude. No roster member currently builds on it — it's meant to be taken
+directly by a caller with its own action vocabulary, gen-dispatch's fx classification underneath.
+
+## Take it alone
+
+```nix
+{
+  inputs.gen-dispatch.url = "github:sini/gen-dispatch";
+  outputs = { gen-dispatch, ... }:
+    let dispatch = gen-dispatch.lib;
+    in { /* ... */ };
+}
+```
+
+```nix
+let
+  dispatch = gen-dispatch.lib;
+  graph    = gen-graph.lib;
+
+  fx = dispatch.mkActions {
+    structural = [ "spawn" "enrich" ];
+    resolution = [ "edge" ];
+  };
+in
+# ...
+```
+
+<LinkCard
+  title="Forgy — Rete (1982)"
+  description="The pattern-matching algorithm gen-dispatch's rule dispatch is shaped by."
+  href="/reference/papers/forgy-1982-rete/"
+/>
