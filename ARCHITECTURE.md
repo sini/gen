@@ -74,9 +74,15 @@ flowchart TD
   gen_aspects --> gen_merge
   gen_aspects --> gen_prelude
   gen_aspects --> gen_schema
+  gen_assemble --> gen_algebra
+  gen_assemble --> gen_prelude
+  gen_assemble --> gen_scope
   gen_bind --> gen_graph
   gen_bind --> gen_prelude
+  gen_class --> gen_merge
   gen_class --> gen_prelude
+  gen_delivery --> gen_algebra
+  gen_delivery --> gen_aspects
   gen_dispatch --> gen_prelude
   gen_graph --> gen_prelude
   gen_inspect --> gen_graph
@@ -96,6 +102,8 @@ flowchart TD
   gen_merge --> gen_prelude
   gen_merge --> gen_types
   gen_product --> gen_prelude
+  gen_program --> gen_prelude
+  gen_program --> gen_scope
   gen_schema --> gen_algebra
   gen_schema --> gen_identity
   gen_schema --> gen_merge
