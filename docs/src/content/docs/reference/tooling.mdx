@@ -8,4 +8,54 @@ source:
   - gen-differential:README.md
 ---
 
-Not written yet. This page adapts `gen-harness:README.md`, `gen-demo:README.md`, `gen-lsp:README.md`, `gen-differential:README.md`.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Four more repositories sit beside the twenty-two-library roster. None of them is named in
+`lib/mkGenLibs.nix`'s formal arguments, and none publishes a `gen-*.lib` a framework composes
+with. They build the roster's CI, exercise it as a consumer, or project its structure into other
+tools — support work the roster itself doesn't do. See [the roster](/libraries/roster/) for what
+does count as a library, and [retirements](/reference/retirements/) for libraries that once did.
+
+## gen-harness
+
+The CI harness the gen ecosystem's test flakes are built from: `mkCi` and the flake module it
+imports give a library's `ci/flake.nix` nix-unit wiring, treefmt with the tree-root invariant, a
+dev shell, pre-commit hooks, and the `flake.tests` / `flake.testsError` options every library uses
+to declare its own suite.
+
+It declares no gen library input at all, and that is the whole reason it is a separate repository:
+a CI harness that itself depended on a roster member would have to be built and gated by the thing
+it exists to gate.
+
+## gen-demo
+
+The acceptance corpus for the gen ecosystem. gen-demo is a consumer, not a library — it contains no
+library code of its own, takes the hub as its only input of note, and drives that hub the way a
+real framework does: through the published surface (`flakeModules.default`,
+`flakeModules.genLibs`), with no direct pin on any single `gen-*` member.
+
+It belongs to no framework, no fleet, and no real machine. Nothing in it is a configuration anyone
+runs. It exists so that an integration error between landed components — something that works in
+each library's own tests but not when composed — reads red somewhere, rather than surfacing for
+the first time in a real framework's build.
+
+## gen-lsp
+
+LSP/MCP projection tooling for the gen module stack. gen-lsp turns a fleet's option, aspect, and
+gen-lib API surface into editor- and agent-facing artifacts: the option tree an LSP worker walks
+for hovers and completions, and a JSON-safe enumeration an MCP server hands to coding agents so
+they stop guessing at option paths and library signatures instead of reading them.
+
+## gen-differential
+
+Comparison machinery for differential testing: a parameterized subject, a seam-routed identity
+control, a required claim on every comparison, an observable set per fixture, and a divergence
+register that asserts rather than mutes a disagreement. It is not scoped to one library —
+gen-merge's own CI wires it in directly, as the module-system-core byte-parity harness described on
+[CI and checks](/reference/ci/).
+
+<CardGrid>
+  <LinkCard title="The roster" description="What does count as a library, and why." href="/libraries/roster/" />
+  <LinkCard title="Retirements" description="Libraries that left the roster, and gen-rebuild's unresolved status." href="/reference/retirements/" />
+  <LinkCard title="CI and checks" description="Where gen-differential's harness is wired into a gate." href="/reference/ci/" />
+</CardGrid>

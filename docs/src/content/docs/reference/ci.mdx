@@ -3,6 +3,92 @@ title: CI and checks
 description: Every gate the hub runs, and which are reported rather than gating.
 source:
   - ci/README.md
+  - .github/workflows/ci.yml
+  - ci/flake.nix
 ---
 
-Not written yet. This page adapts `ci/README.md`.
+import { Aside } from '@astrojs/starlight/components';
+
+Two CI surfaces exist. A five-job GitHub Actions workflow declares what runs on every push and
+pull request; the checks and apps those jobs invoke live one level down, in a separate Nix flake
+under `ci/`. A third workflow builds and deploys this documentation site over `pnpm` — "the one
+thing in this repository that does not go through the flake" — and is not a gate over gen's
+libraries, so it is out of scope below.
+
+## Gate, or report
+
+This distinction is the whole value of this page, and the hub is explicit about it rather than
+leaving it implicit in which jobs happen to be green. A **gate** fails the build on a bad result. A
+**report** prints a result for a person to read and fails nothing — a report that nobody reads is
+silently worthless, in a way a failing gate cannot be.
+
+Two of the five jobs say this about themselves in their own comments. The performance job:
+
+```yaml file=<rootDir>/.github/workflows/ci.yml#L35-L43
+
+```
+
+And the trust-surface job:
+
+```yaml file=<rootDir>/.github/workflows/ci.yml#L59-L67
+
+```
+
+## The five jobs
+
+| Job | What it runs | Disposition |
+|---|---|---|
+| `format` | `nix fmt -- --ci` in `ci/` | **Gates** — fails on unformatted code |
+| `checks` | `nix flake check` (root), then `nix flake check ./ci --keep-going` | **Gates** — every one of the 18 named checks below |
+| `perf-bench` | `nix run ./ci#perf-bench` | **Partial** — gates on parity, ratio, and linearity; cpu is measured and reported, gated by nothing |
+| `sole-evaluator-report` | `nix run ./ci#sole-evaluator-report` | **Reported, gated by nothing** — deliberately |
+| `fleet-consistency` | `nix run ./ci#fleet-consistency` | **Gates** — 9 arithmetic-consistency checks over committed baseline JSON, no live fleet evaluation |
+
+The `checks` job runs the root flake's own check first — its only relevant output is a `roster`
+binding that forces the roster to depth, so an unhealthy member reds it — and then every check
+declared in `ci/flake.nix`.
+
+## The 18 checks
+
+All 18 are ordinary Nix derivations picked up by `nix flake check ./ci`, so a non-zero build exit
+fails the job for every one of them:
+
+`agents-md-citations` · `agents-md-hub-inputs` · `architecture-library-graph` ·
+`ci-plane-coverage` · `declared-content` · `direction-of-dependence` · `hub-entry` ·
+`hub-substrate` · `inject-payload` · `lock-agreement` · `mdformat-plugins` · `mkgenlibs-eval` ·
+`pin-coherence` · `publication-coverage` · `readme-audience` · `readme-figures` ·
+`rehost-den-parity` · `treefmt-tree-root`
+
+<Aside type="caution" title="Two of the eighteen gate on less than they look like they do">
+`lock-agreement` and `pin-coherence` are checks, not apps, and a non-zero exit from either still
+fails the build — but only on their own arming. Each is a self-test that must run correctly, and
+does fail the build if it can't. On their **primary finding** — an actual pin or lock disagreement
+— both are currently **observe-only**: the disagreement prints, but does not fail the build. Which
+way that primary-finding disposition should go is an open question the hub has not settled yet.
+Treat it as unresolved rather than as gated either way.
+</Aside>
+
+## The 4 apps
+
+Apps are invoked with `nix run` rather than picked up by `nix flake check`, and gate only insofar
+as their own script's exit code says so:
+
+| App | What it does | Disposition |
+|---|---|---|
+| `perf-bench` | Runs the performance-regression matrix | Gates on **parity** (every cell's digest must match across stacks), **ratio** (pure allocates and thunks less than the reference stack by a fixed margin), and **linearity** (growth stays bounded across a workload-size step). Never gates on cpu. |
+| `sole-evaluator-report` | Scans the roster for evaluation-driving constructs outside gen-scope | **Reported, gated by nothing.** The property it checks — "anything that evaluates, wherever it's hosted" — is not statically decidable, so the scan under-approximates it by design; a green run is a statement about the scanner, not a proof about the ecosystem. |
+| `fleet-consistency` | Re-derives 9 named consistency figures by pure arithmetic over three committed baseline JSON files | **Gates**, but performs **no live fleet evaluation** — it checks that already-committed numbers still agree with their own arithmetic, plus a `--selftest` mode that corrupts a baseline copy and asserts the gate actually fires. |
+| `flake-compare` | Compares gen-lib, flake-parts, and adios-flake over one synthetic flake | **Defined, wired into no CI job.** It exists in `ci/flake.nix` and runs locally or manually; the workflow above never invokes it. |
+
+```yaml file=<rootDir>/.github/workflows/ci.yml#L51-L57
+
+```
+
+<Aside type="tip" title="Why a report can outrank a gate here">
+A report is not a weaker gate — it is the right instrument for a different kind of property. Some
+findings (the sole-evaluator scan is the clearest case) are true or false of a whole tree by
+design, ruling, or standing exception, and clearing a red one is an owner act, not a code fix.
+Gating a check of that kind would fail the build on something no commit in the PR can fix, which is
+worse than reporting it: the report still has to be read on every run, but nothing hides behind a
+green checkmark that shouldn't be there.
+</Aside>

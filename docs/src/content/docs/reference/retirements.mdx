@@ -5,4 +5,67 @@ source:
   - lib/mkGenLibs.nix
 ---
 
-Not written yet. This page adapts `lib/mkGenLibs.nix`.
+import { Aside } from '@astrojs/starlight/components';
+
+The roster in `lib/mkGenLibs.nix` is total and explicit: a library is one of the twenty-two named
+arguments, or it does not wire into the hub. There is no quiet third state — the closest thing to
+one, `retiring`, is itself a stop on the way to full removal, not a resting place, and nothing sits
+there today. Five libraries have already made that whole trip. Each left by a named ruling,
+recorded in the hub's own source for a specific reason: the roster is where a reader asks "why is
+there no `edge` key?", and an unanswered absence reads as a drop.
+
+Retirement is not deletion. A retired library's repository stays readable and keeps its surface —
+the bindings are removed from the roster rather than commented out, but nothing is deleted from the
+library itself. Its obligations move to a named destination, or are dissolved with a stated reason;
+either way, none of the five gains a new consumer from here on.
+
+## The five
+
+| Library | Retired into | What happened |
+|---|---|---|
+| **gen-demand** | gen-scope | Its typed demand cascade re-expresses over gen-scope, the sole evaluator. A demand becomes a **claim** there — named for the request it is, rather than for the evaluation strategy that used to drive it. |
+| **gen-edge** | gen-view | Its content-movement algebra, edge-set derivation, and Kahn-ordered materialization moved into the movement vocabulary. Its own edge trace was the instrument that validated the retirement, so it left last, after the acceptance criterion built on it had already run. |
+| **gen-pipe** | gen-view, gen-select | Retired on the same ruling as gen-edge: scoped channels and the dataflow algebra re-express as view constructs, `sel` binds gen-select directly, and the determinism and provenance guarantees restate as properties of the query construction rather than of a standalone library. |
+| **gen-flake** | gen-memo, gen-delivery, the hub's own `lib.compose`, the crossing's Adapter set | Dissolved into four named successors: the pure compose core at the hub's `lib.compose` and interim flake module, the warm/override/trace arm at gen-memo, the delivery projection and `realize` at gen-delivery, and inject/terminals at the crossing's Adapter set. |
+| **gen-resolve** | gen-view, gen-bind, gen-scope, gen-memo (two dissolved) | Left on a transfer ruling rather than a single completed move: its published exports are dispositioned row by row across four destinations, and two dissolve outright rather than transferring anywhere. |
+
+<Aside type="note" title="gen-view is a way station, not a permanent name">
+Three of the five retirements above land content in gen-view. That name is explicitly provisional
+— its constructs are expected to migrate into a consolidated library later — so treat it as the
+live home for this vocabulary today, not as a name to build a permanent dependency on.
+</Aside>
+
+## gen-rebuild: an unresolved disagreement between our own documents
+
+<Aside type="caution" title="Not smoothed over">
+gen-rebuild does not appear in the table above, and that is deliberate rather than an oversight.
+Two of the hub's own documents describe it as retired: `VALIDATION.md` calls it "archived for
+reference" with a named test suite at a pinned revision, and gen-memo's own README says gen-memo
+"inherits gen-resolve's warm fold plus override cone and gen-rebuild's dirty-cone propagation" —
+language that only makes sense if gen-rebuild's obligations already transferred, the way a
+retirement's do. Its own README says **ARCHIVED**.
+
+But `lib/mkGenLibs.nix`'s retirement narrative — the account the five libraries above are drawn
+from — never names gen-rebuild. Grepping that file for it returns nothing.
+
+We are not picking a side here, and we are not inventing a ruling to paper over the gap.
+gen-rebuild is a real predecessor library whose retirement is attested by `VALIDATION.md` and by
+gen-memo's own README, but it is not recorded as having gone through the same named-ruling roster
+process as the five libraries above. Both things are true at once, and a tidy sixth row in the
+table above would hide that.
+</Aside>
+
+## On disk, but never on the roster
+
+Cloning every `gen-*` repository locally produces more directories than the roster has members.
+Beyond the five retirements above, four repositories were never library candidates in the first
+place — gen-demo, gen-differential, gen-harness, and gen-lsp exist to test, exercise, or tool
+around the roster rather than to join it; see [tooling](/reference/tooling/) for what each one is
+for. gen-rebuild is the one case that does not sort cleanly into either bucket, for the reason
+above. And gen-vars is a standing, deliberate non-roster utility — tethered to `nixpkgs.lib` by
+design, and never described anywhere as a former roster member — which is a different thing again
+from a retirement: it was never on the roster to leave.
+
+The inverse case exists too: gen-inspect is a rostered member with no local clone on at least one
+machine at a time. Being on the roster and being cloned locally are two different facts, and
+neither implies the other.
