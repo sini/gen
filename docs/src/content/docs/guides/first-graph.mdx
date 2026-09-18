@@ -6,4 +6,129 @@ source:
   - gen-demo:README.md
 ---
 
-Not written yet. This page adapts `README.md`, `gen-demo:README.md`.
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+[Getting started](/guides/getting-started/) resolved one relation over four nodes. This
+page does the same three things with a graph big enough to be worth asking about: declare
+the nodes, relate them, read the answer back — still one library, `gen-graph`, still no
+hub.
+
+<Steps>
+
+1. ##### Declare the nodes
+
+   Nodes are just your data. Nothing here is gen vocabulary — `type` is a field you
+   invented, not a keyword gen-graph knows about:
+
+   ```nix
+   services = {
+     web    = { deps = [ "api" ];         type = "frontend";  };
+     api    = { deps = [ "db" "cache" ];  type = "backend";   };
+     worker = { deps = [ "db" "queue" ];  type = "backend";   };
+     db     = { deps = [ ];               type = "datastore"; };
+     cache  = { deps = [ ];               type = "datastore"; };
+     queue  = { deps = [ ];               type = "datastore"; };
+   };
+   ```
+
+2. ##### Relate them
+
+   The relation is the `deps` field, and an accessor record is how you tell gen-graph
+   to read it. `edges` is the only field a traversal needs; `nodeData` is what lets a
+   query read a node's other attributes back out:
+
+   ```nix
+   g = {
+     edges    = id: services.${id}.deps or [ ];
+     parent   = _: null;
+     nodes    = builtins.attrNames services;
+     nodeData = id: services.${id};
+   };
+   ```
+
+3. ##### Read the result back
+
+   ```nix
+   {
+     entryPoints  = graph.roots g;                           # nothing depends on these
+     datastores   = graph.leaves g;                           # these depend on nothing
+     webDeps      = graph.reachableFrom g "web";               # everything "web" needs, transitively
+     dbImpact     = graph.dependents g "db";                   # everything that needs "db"
+     backendNodes = graph.select g (d: d.type == "backend");   # a query over nodeData, not deps
+     hasCycles    = graph.cycles g != [ ];
+   }
+   ```
+
+   Evaluated against `gen-graph` at HEAD, this returns:
+
+   ```json
+   {
+     "entryPoints": ["web", "worker"],
+     "datastores": ["cache", "db", "queue"],
+     "webDeps": ["api", "db", "cache"],
+     "dbImpact": ["api", "web", "worker"],
+     "backendNodes": ["api", "worker"],
+     "hasCycles": false
+   }
+   ```
+
+   Only membership is a contract worth relying on — the order of `webDeps` and
+   `dbImpact` is whatever the traversal visits first, not something to build logic on.
+
+</Steps>
+
+## A second relation, for free
+
+`g` above declares `parent = _: null;` — every node relates to nothing by containment.
+Give it a real containment relation instead and the same accessor record answers a
+different kind of question, `ancestorsOf` instead of `reachableFrom`:
+
+```nix
+hosts = {
+  "env:prod" = { parent = null; };
+  "host:web" = { parent = "env:prod"; };
+  "host:db"  = { parent = "env:prod"; };
+};
+
+g2 = {
+  edges = _: [ ];
+  parent = id: hosts.${id}.parent or null;
+  nodes = builtins.attrNames hosts;
+  nodeData = id: hosts.${id};
+};
+
+graph.ancestorsOf g2 "host:web"   # [ "env:prod" ]
+```
+
+`edges` and `parent` are two different relations over the same node set, read by two
+different accessors. Nothing stops a real graph from declaring both, plus a third for
+whatever else your data relates by.
+
+## The same model, at any scale
+
+This is the graph the rest of gen builds on, not a simplified stand-in for it. A
+framework's hosts, users and aspects are nodes exactly like `services` above; what a
+framework adds is more relations (declared, and some produced by policies rather than
+written by hand) and a vocabulary of its own. [The graph model](/explanation/graph-model/)
+covers what a node and an edge are in gen's own terms; [Policies](/explanation/policies/)
+covers the ones a program produces instead of you writing them.
+
+<Aside type="note" title="gen eats its own graph">
+gen ships its own acceptance corpus, `gen-demo` — a graph like this one, declared against
+every capability the roster ships, in deliberately invented vocabulary. It's not written to
+teach; it's written so a regression in the hub shows up there before a real framework ever
+sees it.
+</Aside>
+
+## Going further
+
+<CardGrid>
+  <LinkCard title="gen-graph reference" href="/libraries/graph/"
+    description="The full query surface: traversal, condensation, phase order, edge algebra." />
+  <LinkCard title="gen-scope" href="/libraries/scope/"
+    description="Nodes with computed attributes and dynamic growth, for when a plain accessor graph isn't enough." />
+</CardGrid>
+
+gen-graph's structural combinators (`overlay`, `connect`, the edge-map algebra) are
+informed by Mokhov's algebraic graph construction — see [our reading](/reference/papers/mokhov-2017-algebraic-graphs/)
+if you want the theory behind them.

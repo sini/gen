@@ -5,4 +5,90 @@ source:
   - README.md
 ---
 
-Not written yet. This page adapts `README.md`.
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+gen is not a framework you install. It's 22 small libraries, and the fastest way in is
+to take exactly one of them. No hub, no nixpkgs, no NixOS module — a flake, ten lines of
+data, and a question answered.
+
+<Steps>
+
+1. ##### Add one library
+
+   Every gen library is a flake that exports one `.lib`. Take `gen-graph` — pure graph
+   queries, nothing else pulled in:
+
+   ```nix
+   # flake.nix
+   {
+     inputs.gen-graph.url = "github:sini/gen-graph";
+
+     outputs = { gen-graph, ... }:
+       let
+         graph = gen-graph.lib;
+
+         myData = {
+           web = { deps = [ "api" ]; };
+           api = { deps = [ "cache" "database" ]; };
+           cache = { deps = [ "database" ]; };
+           database = { deps = [ ]; };
+         };
+
+         g = {
+           edges = id: myData.${id}.deps or [ ];
+           parent = id: myData.${id}.parent or null;
+           nodes = builtins.attrNames myData;
+           nodeData = id: myData.${id};
+         };
+       in
+       {
+         reachableFromWeb = graph.reachableFrom g "web";
+         roots = graph.roots g;
+       };
+   }
+   ```
+
+   `myData` is your own data — nothing here is gen vocabulary yet. `g` is the one thing
+   gen-graph asks for: four accessor functions over it. Nothing is copied or re-shaped;
+   `edges` and `nodeData` just read `myData` directly.
+
+2. ##### Ask it a question
+
+   ```sh
+   nix eval --json .#reachableFromWeb
+   # ["api","cache","database"]
+
+   nix eval --json .#roots
+   # ["web"]
+   ```
+
+   That's a resolved graph: `web` depends (transitively) on everything gen-graph just
+   listed, and `web` is the only node nothing else points at.
+
+</Steps>
+
+<Aside type="tip">
+No `nixpkgs` input, no lock beyond `gen-graph`'s own transitive `gen-prelude`. Both commands
+above were run against `github:sini/gen-graph` at HEAD to write this page.
+</Aside>
+
+## What just happened
+
+`myData` held the nodes. The `deps` field held the relation between them — an edge. `g`
+told gen-graph how to read both off data you already owned. `reachableFrom` and `roots`
+are queries over that relation; gen-graph never stored a graph of its own, it answered
+questions about yours.
+
+That's the whole model the rest of the ecosystem builds on: nodes are data, relations are
+edges, and you get answers by asking rather than by assembling them by hand.
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Your first graph" href="/guides/first-graph/"
+    description="Richer nodes, more relations, and reading attributes back out." />
+  <LinkCard title="Add gen to a flake" href="/guides/flake/"
+    description="Wire the hub for the full compose-to-NixOS route, and what each piece is for." />
+  <LinkCard title="The roster" href="/libraries/roster/"
+    description="22 libraries across four strata. gen-graph is one of them." />
+</CardGrid>

@@ -5,4 +5,98 @@ source:
   - README.md
 ---
 
-Not written yet. This page adapts `README.md`.
+import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+There are two ways to bring gen into a flake, and the second one is optional.
+
+<Tabs>
+<TabItem label="One library">
+
+Take a single library's `.lib` and use it directly. This is [Getting started](/guides/getting-started/)
+in full — no hub input, no framework surface:
+
+```nix
+{
+  inputs.gen-graph.url = "github:sini/gen-graph";
+
+  outputs = { gen-graph, ... }:
+    let
+      graph = gen-graph.lib;
+    in
+    {
+      # … use graph.reachableFrom / graph.roots / … directly
+    };
+}
+```
+
+A consumer reading `inputs.gen-X.lib` never needs this hub repository at all.
+
+</TabItem>
+<TabItem label="The hub">
+
+The hub (this repository) publishes the roster and one flake-parts module for the full
+compose-to-NixOS route:
+
+```nix file=<rootDir>/README.md#L120-L126
+```
+
+</TabItem>
+</Tabs>
+
+## What each hub input does
+
+Wiring `inputs.gen.flakeModules.default` gets you three options and one module argument.
+
+- **`gen.tree`** — a directory of gen definition modules: the nodes and relations you
+  declare, the same shape [Your first graph](/guides/first-graph/) builds by hand at the
+  library level.
+- **`gen.aspectCnf`** — the key-category declaration the delivery projection classifies
+  against. It has **no default**. A delivery class realizes only on content declared
+  through it, never by guessing from a value's shape — so with no `aspectCnf` supplied,
+  the hub refuses by name rather than falling back to a shape test. `gen.tree`'s own
+  `mkAspectSchema` call takes the exact same argument, so the honest way to wire this is
+  one file, imported by both:
+
+  ```nix
+  # gen-modules/_aspect-cnf.nix, imported by both the tree and the flake
+  gen.aspectCnf = import ./gen-modules/_aspect-cnf.nix;
+  ```
+- **`gen.extraModules.<name>`** — per-node platform modules (hardware configuration, the
+  base NixOS profile) that ride alongside what the tree composes.
+- **`genValues`** — the module argument your ordinary NixOS modules read the resolved
+  graph through:
+
+  ```nix file=<rootDir>/README.md#L140-L145
+  ```
+
+<Aside type="caution">
+`flakeModules.default` is the **interim** entry surface — rehomed here when gen-flake
+dissolved, and the settled framework interface arrives later. The shape above is real and
+current, but it is a surface still moving, not a stable v1 API to build tooling against.
+</Aside>
+
+## The hub is optional
+
+Nothing above is required to use gen. `mkGenLibs` hands you the whole roster under short
+keys (`genLibs.graph`, `genLibs.merge`, …), and `gen.lib.substrate` / `gen.lib.modules` /
+`gen.lib.aspects` / `gen.lib.framework` give you one stratum of it at a time. Both are
+selections from the same roster, not re-exports — so a bucket path and the flat library
+name are one build, never two evaluations of the same source. If you only ever read
+`inputs.gen-graph.lib` or `inputs.gen-scope.lib` directly, as the first tab above does,
+you can ignore this repository entirely.
+
+## What this page doesn't get you to
+
+Populating `gen.tree` with real declarations, and turning that into a booting NixOS host,
+is a framework's job — the tree is the shape [den](https://github.com/denful/den) builds
+its own vocabulary on top of. This page shows the wiring surface, honestly, rather than a
+worked host: there is no generic `gen.tree` example that builds a real machine, because
+what goes in it is exactly the part a framework supplies. For a graph you can build and
+query today, with every step run and verified, see the two guides below.
+
+<CardGrid>
+  <LinkCard title="Getting started" href="/guides/getting-started/"
+    description="One library, no hub, a resolved graph in two commands." />
+  <LinkCard title="Your first graph" href="/guides/first-graph/"
+    description="Declaring nodes, relating them, and reading the result back." />
+</CardGrid>
