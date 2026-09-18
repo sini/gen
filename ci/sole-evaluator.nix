@@ -847,12 +847,12 @@ let
     world: ev: keys:
     lib.foldl' (acc: k: acc // { ${classOf world ev k} = acc.${classOf world ev k} + 1; }) (
       builtins.listToAttrs
-      (
-        map (c: {
-          name = c;
-          value = 0;
-        }) classes
-      )
+        (
+          map (c: {
+            name = c;
+            value = 0;
+          }) classes
+        )
     ) keys;
 
   accountedIn =
