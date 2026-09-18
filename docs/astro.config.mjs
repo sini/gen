@@ -111,9 +111,10 @@ export default defineConfig({
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/sini/gen' }
 			],
-			// Top-level groups are the tabs in Sidebar.astro, and it assigns each an
-			// icon by position, so the order here is also the icon order. Six is the
-			// ceiling before a seventh tab renders without one.
+			// Starlight's own sidebar: a collapsible tree. A custom tab switcher
+			// used to live here, where picking a tab silently replaced the panel
+			// below it — clicking navigation should expand it or go somewhere, not
+			// reshuffle a region you are not looking at.
 			sidebar: [
 				{
 					label: 'Gen',
@@ -217,7 +218,6 @@ export default defineConfig({
 			],
 			components: {
 				Head: './src/components/Head.astro',
-				Sidebar: './src/components/Sidebar.astro',
 				Footer: './src/components/Footer.astro',
 				ThemeProvider: './src/components/ThemeProvider.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',

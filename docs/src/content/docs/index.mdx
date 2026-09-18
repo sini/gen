@@ -1,10 +1,12 @@
 ---
 title: gen
-description: Your configuration is already a graph. gen lets you query it.
+description: Packages, hosts, networks, services — it is all one graph. gen gives it one evaluation layer, from a single machine to thousands.
 template: splash
 editUrl: false
 hero:
-  tagline: Your configuration is already a graph. gen lets you query it.
+  tagline: |
+    It is all a graph — packages, hosts, networks, services.
+    One evaluation layer, from a single machine to thousands.
   actions:
     - text: Start here
       link: /guides/getting-started/
@@ -17,6 +19,16 @@ hero:
 
 import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
+## You already know this
+
+Package dependencies are a graph. So is the OS configuration that installs them.
+So is the network the host sits on, and the services depending on each other
+across it, and the fleet those hosts belong to.
+
+Every one of those is the same shape. You describe each in a different language,
+with a different tool, and you reconcile them by hand — at the seams, where the
+interesting failures live.
+
 ## Every config tool makes you assemble
 
 You write the modules. You wire them together. You remember which host needs
@@ -28,10 +40,11 @@ plumbing.
 
 ## So declare the relationships instead
 
-Systems, users and aspects are nodes. What relates them is an edge. Policies are
-small programs that produce more edges from the ones you wrote.
+Systems, users, packages and services are nodes. What relates them is an edge.
+Policies are small programs that produce more edges from the ones you wrote.
 
-Then you ask the graph a question, and it answers.
+Then you ask the graph a question, and it answers. One model and one evaluator,
+whether you are describing a laptop or a fleet.
 
 ```nix
 { genValues, ... }:

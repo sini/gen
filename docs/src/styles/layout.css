@@ -199,20 +199,6 @@
   --ec-tm-delBrdCol: color-mix(in srgb, var(--sl-color-red) 50%, transparent);
 }
 
-/* Sidebar section icons. Each section gets its own hue from the palette's
-   semantic set, so the five tabs are distinguishable at a glance rather than
-   five identical accent marks. Every hue is palette-defined, so this stays in
-   key on gruvbox as much as on latte.
-
-   Purple is deliberately last: several palettes use a violet as their accent
-   (Catppuccin's mauve is exactly --sl-color-accent), so placing it earlier
-   would make one section indistinguishable from the first. */
-#starlight__sidebar .tab-item:nth-of-type(1) .icon { color: var(--sl-color-accent); }
-#starlight__sidebar .tab-item:nth-of-type(2) .icon { color: var(--sl-color-blue); }
-#starlight__sidebar .tab-item:nth-of-type(3) .icon { color: var(--sl-color-green); }
-#starlight__sidebar .tab-item:nth-of-type(4) .icon { color: var(--sl-color-orange); }
-#starlight__sidebar .tab-item:nth-of-type(5) .icon { color: var(--sl-color-red); }
-#starlight__sidebar .tab-item:nth-of-type(6) .icon { color: var(--sl-color-purple); }
 
 /* Numbered steps: the bullet is the eye's anchor when following a tutorial. */
 .sl-markdown-content .sl-steps > li::before {
