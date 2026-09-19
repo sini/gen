@@ -175,6 +175,25 @@ largest size per workload:
 Linearity (pure side, ×4 size step) is 3.98–4.00× on every workload — exactly linear, the O(n²) net:
 wideFreeform 3.988×/3.985×, deepSubmodule 3.998×/3.996×.
 
+**`schemaHosts` changed SHAPE on 2026-09-18 and its gated counters did not move** (`den-hoag-b5qrc`).
+The cell used to seed its registry from `eval.config.schema.host` — a read out of the fixpoint the
+same `P.eval` pass was still building, the crossing the gen-schema relocation retires — and now
+freezes the kind in a prior pass (`hostSchema` / `frozenHost`), symmetrically on both stacks. Because
+a counter cell's acceptance is its counters and not only its parity digest, the delta was measured
+rather than assumed, both runs on one machine minutes apart, the tree otherwise untouched:
+
+|                             |        thunks p/r |         alloc p/r | thunk linearity | alloc linearity |
+| --------------------------- | ----------------: | ----------------: | --------------: | --------------: |
+| n=400, one-pass → two-pass  |     0.890 → 0.889 |     0.747 → 0.746 |               — |               — |
+| n=1600, one-pass → two-pass | 0.891 → **0.891** | 0.747 → **0.747** |   3.990 → 3.989 |   3.987 → 3.986 |
+
+Parity `ok` at both sizes in both runs, `ALL GATES PASSED` in both, and every other workload's gated
+counters are byte-identical across the pair (only the ungated cpu columns moved). **No threshold in
+`perf-bench.sh` moves**, which is the whole of the re-baseline this shape change owed under
+"Updating thresholds / workloads" below. Note that the ratio row above is the LIVE reading at
+gen-merge `3aa6dacc`, not this block's `fdbf140` figures (0.650 / 0.545): the table is dated and
+pinned, and the gap between the two is engine drift since 2026-07-05, not this change.
+
 The `fdbf140` pin's pure-side counter ratios sit slightly above the pre-warm `018bafa` baseline (e.g.
 scalar thunks 0.844 → 0.882, registry 0.493 → 0.524) — still comfortably inside every win-gate. The
 shift isolates ~99.9% to the always-on lazy **provenance channel** landed in gen-merge `11b39d7` (which

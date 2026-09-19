@@ -213,10 +213,22 @@ let
 
   # schemaHosts — the parity oracle's schemaFleet at scale: kind + n instances. The `id_hash` is
   # minted and FORCED here but does not enter the digest — see the excluded axis at the projection.
+  #
+  # ── MANUAL SYMMETRIC TWO-PASS FREEZE (a PRECEDENT, not a specified mechanism) ──
+  # The relocation spec §2.6 retires the crossing spelling
+  # `mkInstanceRegistry <binding>.config.<path>.schema.<k>` — a read out of the fixpoint the same
+  # pass is still constructing — onto `mkInstanceRegistry <frozen>.<k>` with
+  # `<frozen> = evalSchema {…}`. That ordinary let-bind is the ONLY construction §2.6 prescribes,
+  # and it is unavailable here: this cell runs on BOTH stacks, and `refP.schema` is the permanently
+  # pinned `gen-schema-orig` (ci/flake.nix), a revision predating `evalSchema` entirely. So the kind
+  # is frozen in its own prior pass instead, on plain `P.eval` + `mkSchemaOption` — the API both
+  # engines carry — exactly as ci/rehost-den-parity.nix's `driveInstances`/`driveNested` do. Same
+  # shape on both arms, so the parity digest stays an engine comparison and not a shape comparison.
+  # The kind has no dependency on the registry it seeds, which is what makes the split sound.
   schemaHosts =
     P:
     let
-      eval = P.eval {
+      hostSchema = P.eval {
         modules = [
           {
             options.schema = P.schema.mkSchemaOption { };
@@ -229,8 +241,13 @@ let
               };
             };
           }
+        ];
+      };
+      frozenHost = hostSchema.config.schema.host;
+      eval = P.eval {
+        modules = [
           {
-            options.hosts = P.schema.mkInstanceRegistry eval.config.schema.host { };
+            options.hosts = P.schema.mkInstanceRegistry frozenHost { };
             config.hosts = toAttrs (i: {
               name = "host${toString i}";
               value = {
