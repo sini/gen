@@ -802,6 +802,14 @@
                   echo "PIN COHERENCE — this check cannot reach a member lock it enumerates, which is a broken instrument and not a coherence:" >&2
                   ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"} >&2") s.report.refusals}
                 ''}
+                echo "ROOT PLANE: ${toString (builtins.length s.report.rootPlaneReading.pathSites)} path-typed gen-* root edges over ${toString s.report.rootPlaneReading.edgeCount} edges in ${toString s.report.rootPlaneReading.readCount} members' own ROOT locks (owner-ruled 2026-09-18: a path: self-reference is legitimate at ci/ ONLY, never at the root). ${toString (builtins.length s.report.rootPlaneReading.lockAbsent)} members declare no root inputs and so have no root lock at all: ${lib.concatStringsSep " " s.report.rootPlaneReading.lockAbsent}"
+                ${lib.optionalString (s.report.rootPlaneReading.violations != [ ]) ''
+                  echo "ROOT PLANE VIOLATION — a published library's ROOT lock resolves a gen-* edge by path:, carrying a second identity formula for one node into the plane consumers actually resolve through:" >&2
+                  ${lib.concatMapStringsSep "\n" (
+                    r: "echo ${lib.escapeShellArg "    ${r}"} >&2"
+                  ) s.report.rootPlaneReading.violations}
+                  echo "Disposed of by relocking that root onto a REVISION. The very same node in that member's ci/ lock is LEGITIMATE and is reported out of domain below — the PLANE is the difference, not the type." >&2
+                ''}
                 ${lib.optionalString (s.report.exclusions != [ ]) ''
                   echo "OUT OF DOMAIN — ${toString s.report.pathSiteCount} of ${
                     toString (s.report.siteCount + s.report.pathSiteCount)

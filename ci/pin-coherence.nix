@@ -50,18 +50,33 @@
 # what it FINDS in their locks. `gen-harness`, `gen-differential` and `gen-scope-unmet` appear as
 # pinned nodes and are on no roster — subtracting them would delete the one live positive control.
 #
-# ── ★★★ A `path:` PIN SITE IS OUTSIDE THE RELATION, BY TYPE ──
+# ── ★★★ A `path:` PIN SITE IS OUTSIDE THE RELATION, BY TYPE — AND THE PLANE DECIDES ITS VERDICT ──
 # The subject of this check is: do members AGREE on which REVISION of a node they pin. A `path:`
 # input NAMES A TREE, NOT A PUBLICATION, so it carries no `rev` — there is nothing for it to agree or
 # disagree ABOUT. It is not a participant whose revision happens to be null; it is not a participant.
 # A `path:` site is therefore dropped from the relation BY ITS NODE TYPE, and NAMED in `pathExcluded`
 # so the site count is never quietly short.
 #
-# ★★ THIS IS NOT THE NARROWING `mkPinCoherenceCheck` FORBIDS. That message reads, verbatim:
+# ★★★ OWNER-RULED 2026-09-18: "the path is valid for self-ref at ci/ only, never at the root."
+# So the type alone does not settle the verdict — THE PLANE DOES, and this cell reads both:
+#   `ci/` lock  + `path:` node  ⇒ LEGITIMATE. Outside the coherence relation; it names the tree under
+#                                 test, which is what makes the self-input invariant testable.
+#   ROOT lock   + `path:` node  ⇒ A VIOLATION, NAMED. A published library's root is the plane
+#                                 consumers actually resolve through, and it must name a REVISION.
+#   either lock + revless NON-path node ⇒ REFUSED, unchanged. The genuine broken-instrument case.
+# `rootPlaneOf` is the second reading and `root-plane-refuses-path` the arm. The corpus already
+# honours the rule — 53 `gen-*` root edges over 19 members, all `github`, measured 2026-09-18 — and a
+# rule the corpus happens to satisfy is exactly the kind that rots silently, so it ships ARMED.
+#
+# ★★ THIS IS NOT THE NARROWING `mkPinCoherenceCheck` FORBIDS — AND THE PLANE PARTITION IS ITS
+# OPPOSITE. That message reads, verbatim:
 #     "Disposed of by converging the members' ci locks onto ONE revision per node — NEVER by
 #      narrowing this cell's domain, and NEVER by removing a member's flake input
 #      (den-hoag-mehb8 fences that)."
-# It forbids excluding a MEMBER, or a node, TO HIDE A REAL DISAGREEMENT ABOUT A REAL REVISION. The
+# Partitioning by PLANE shrinks nothing: the relation keeps every node it could ever have judged, and
+# the cell GAINS a case it previously could not express at all, because it read no member's own root
+# lock. The domain grew by one plane. The `ci/`-side exclusion below is the only subtraction, and it
+# forbids excluding a MEMBER, or a node, TO HIDE A REAL DISAGREEMENT ABOUT A REAL REVISION. The
 # exclusion here removes only sites that CANNOT CARRY A REVISION AT ALL, so it cannot remove a
 # revision from any comparison: every non-path site is compared exactly as before, and two members
 # naming two revisions of one repository are still named however either of them reaches it. A `path:`
@@ -104,6 +119,22 @@ let
     map (
       n:
       lib.nameValuePair n (if builtins.pathExists (lockPathOf n) then readLock (lockPathOf n) else null)
+    ) memberNames
+  );
+
+  # ── THE ROOT PLANE, a SECOND reading over the SAME trees ──
+  # Owner-ruled 2026-09-18: "the path is valid for self-ref at ci/ only, never at the root." The two
+  # planes are not the same object and this cell now reads both — the ci lock beside it, each
+  # member's own ROOT lock here, one path component away on the tree this hub already pins. This is
+  # the ONLY reader in this file of a member's own root lock; `hubRootLock` below is the HUB's, used
+  # as reading (2)'s reference value and never enumerated per-member.
+  rootLockPathOf = n: "${gen.inputs.${n}.outPath}/flake.lock";
+  liveRootLocks = builtins.listToAttrs (
+    map (
+      n:
+      lib.nameValuePair n (
+        if builtins.pathExists (rootLockPathOf n) then readLock (rootLockPathOf n) else null
+      )
     ) memberNames
   );
 
@@ -158,6 +189,76 @@ let
   genEdgesOf =
     lock:
     sorted (builtins.filter (lib.hasPrefix "gen-") (builtins.attrNames (inputsOf lock lock.root)));
+
+  # ── THE ROOT-PLANE READING ──
+  # Owner-ruled 2026-09-18: a `path:` self-reference is legitimate at `ci/` and a VIOLATION at the
+  # root. The ci plane's path sites leave the coherence relation (header); a root plane's path site
+  # is NAMED, because a published library's root is the plane consumers actually resolve through and
+  # it must name a REVISION. Same edge class as the coherence walk, same `follows` resolver, same
+  # type reader — so this is one more reading of the objects already open, not a second instrument.
+  #
+  # ★ THREE OUTCOMES, AND THE THIRD IS NOT A FAILURE. A member whose root flake declares NO inputs
+  # has NO root `flake.lock` AT ALL, by construction — measured 2026-09-18: `gen-algebra`,
+  # `gen-identity` and `gen-prelude`, the three zero-dependency leaves, corroborated from their
+  # clones' `origin/main` by `git cat-file -e`. That is a fact about the member, like REFUSAL 2, and
+  # it is NAMED in `lockAbsent` rather than counted as a violation or as a clean read. Folding it
+  # into either one would be wrong in opposite directions.
+  #
+  # ★★ PARAMETERISED ON THE LOCK SET so a seeded root world runs THIS code. The live reading is
+  # `pathSites == [ ]` today — 53 `gen-*` root edges over the 19 members that have a root lock, type
+  # histogram `{ github = 53; }` — and a green from a walk that reached nothing would look identical,
+  # which is why `root-plane-refuses-path` asserts the edge count and the member partition too.
+  rootPlaneOf =
+    domain: resolve: rootLocks:
+    let
+      lockAbsent = sorted (builtins.filter (m: rootLocks.${m} or null == null) domain);
+      present = builtins.filter (m: !(builtins.elem m lockAbsent)) domain;
+
+      # ★★ AN INDEPENDENT COUNT OF THE SAME QUANTITY, and the arm asserts the two AGREE. `present` is
+      # derived from `lockAbsent`; this is derived from the LOCKS. The arithmetic floor alone cannot
+      # separate "absent" from "read but contributed no edges" — measured 2026-09-18: seeding
+      # `lockAbsent = [ ]` leaves `readCount + 0 == 22` balanced and the floor passes, while three
+      # members that have NO root lock are being counted as read. Two derivations of one number
+      # disagree there; one derivation cannot.
+      readableCount = builtins.length (builtins.filter (m: rootLocks.${m} or null != null) domain);
+      # ★ TOTAL ON A MISSING LOCK, and that is a refusal rather than a convenience — `fieldIn` below
+      # meets the same problem and answers it the same way. If `lockAbsent` ever stopped partitioning
+      # the domain correctly, a `null` lock would reach `genEdgesOf` and abort the WHOLE cell with
+      # `expected a set but found null` from inside `derivationStrict` — indistinguishable from a typo
+      # in this file, and printing none of the named arming refusals the builder exists to emit.
+      # Driven 2026-09-18: with this guard absent, seeding `lockAbsent = [ ]` took the cell to rc 1 by
+      # ABORT; with it, the same seed leaves the walk short and `root-plane-refuses-path` says so.
+      edgesOf =
+        m:
+        let
+          lock = rootLocks.${m} or null;
+        in
+        if lock == null then
+          [ ]
+        else
+          map (e: {
+            member = m;
+            edge = e;
+            type = typeIn lock (resolve lock lock.root e);
+          }) (genEdgesOf lock);
+      edges = builtins.concatMap edgesOf present;
+      pathEdges = builtins.filter (e: e.type == "path") edges;
+    in
+    {
+      inherit lockAbsent readableCount;
+      readCount = builtins.length present;
+      edgeCount = builtins.length edges;
+      pathSites = sorted (map (e: "${e.member} → ${e.edge}") pathEdges);
+      pathMembers = sorted (unique (map (e: e.member) pathEdges));
+      absentNamed = map (
+        m:
+        "${m}: declares no root inputs, so it has no root `flake.lock` — no root-plane reading, and that is not a violation"
+      ) lockAbsent;
+      violations = map (
+        e:
+        "${e.member}: its ROOT `flake.lock` resolves `${e.edge}` by `path:` — a published library's root must name a REVISION. `path:` self-reference is ruled legitimate at `ci/` ONLY (owner, 2026-09-18)"
+      ) pathEdges;
+    };
 
   # ── THE COMPARATOR ──
   # Parameterised on the DOMAIN, the RESOLVER, the member LOCK VALUES and the hub lock, so every
@@ -314,6 +415,7 @@ let
     };
 
   live = coherenceOf memberNames following liveLocks hubRootLock;
+  liveRootPlane = rootPlaneOf memberNames following liveRootLocks;
 
   # ── THE ARMING ──
   # `crossMemberCoherent == true` is an ABSENCE CLAIM, so it travels with seeds that FIRE in the same
@@ -354,16 +456,21 @@ let
   # Rewrite ONE member's lock: its root inputs and its node table, one constructor, so a seed differs
   # from the live object in exactly the field it names. A rev-only mutation would be invisible — nix
   # resolves by node, so these seeds move the NODE an edge points at.
-  seedMemberLock =
+  # ★ PARAMETERISED ON THE LOCK SET, because the same seed must be plantable in EITHER PLANE. The
+  # owner's rule is that one node is legitimate in a `ci/` lock and a violation in a ROOT lock, so
+  # the pair that makes it falsifiable is the IDENTICAL seed differing only in which lock set it
+  # lands in — `seedMemberLock` for the ci plane, `seedRootLock` for the root plane.
+  seedLockIn =
+    locks:
     {
       member,
       nodes ? { },
       rootInputs ? (i: i),
     }:
     let
-      lock = liveLocks.${member};
+      lock = locks.${member};
     in
-    liveLocks
+    locks
     // {
       ${member} = lock // {
         nodes =
@@ -377,10 +484,15 @@ let
       };
     };
 
+  seedMemberLock = seedLockIn liveLocks;
+  seedRootLock = seedLockIn liveRootLocks;
+
   # THE CONTROL NODE. `gen-harness` is the one node that is roster-wide coherent today — 21 sites,
   # 1 revision — so seeding ONE of its sites is the cleanest possible demonstration that this
   # comparator can turn a coherent node incoherent and NAME the member that moved.
   controlNode = "gen-harness";
+  # ★ `gen-types` must HAVE a root lock for the root-plane seed to land in one — it does; the three
+  # that do not are the zero-input leaves named in `rootPlaneOf`'s header.
   seedMember = "gen-types";
 
   seededIncoherence = coherenceOf memberNames following (seedMemberLock {
@@ -398,11 +510,32 @@ let
   # The exclusion's own seed, identical to `seededUnlocked` in EVERY respect but `locked.type`. One
   # variable between two worlds: the tarball is refused and stays in the site count, the path is
   # excluded and leaves it. A seed that changed more than the type would not isolate the type.
+  #
+  # ★★★ AND THIS IS THE `ci/` ARM OF THE OWNER'S RULE. The very same node, the very same member, the
+  # very same `locked.type = "path"` — planted HERE, in a `ci/` lock, it is LEGITIMATE and leaves the
+  # relation. Planted in the ROOT lock by `seededRootPath` below, it is a VIOLATION and is named.
+  # The two seeds differ in NOTHING but the lock set they land in, which is exactly the distinction
+  # the ruling draws, so the pair is the ruling made falsifiable rather than asserted.
+  seedPathAt = i: i // { ${controlNode} = "seed-pin"; };
   seededPathNode = coherenceOf memberNames following (seedMemberLock {
     member = seedMember;
     nodes."seed-pin" = seedNodePath;
-    rootInputs = i: i // { ${controlNode} = "seed-pin"; };
+    rootInputs = seedPathAt;
   }) hubRootLock;
+
+  # …the ROOT arm of that pair.
+  seededRootPath = rootPlaneOf memberNames following (seedRootLock {
+    member = seedMember;
+    nodes."seed-pin" = seedNodePath;
+    rootInputs = seedPathAt;
+  });
+
+  # ★ WHAT PROVES THE PARTITION IS KEYED ON THE PLANE rather than on "a path node anywhere" is a RED
+  # DRIVE, not an arm here: pointing `rootLockPathOf` at `ci/flake.lock` reds
+  # `root-plane-refuses-path` on the LIVE corpus, because `gen-inspect` and `gen-memo`'s legitimate
+  # self-references become violations. An in-cell arm for it would have to read the root plane over a
+  # world whose CI lock was seeded — and the root locks are untouched there, so both sides would be
+  # the live reading. That arm cannot fail, and an arm that cannot fail is not a control.
 
   seededNoGenEdges = coherenceOf memberNames following (seedMemberLock {
     member = seedMember;
@@ -559,6 +692,33 @@ let
       siteCount = seededPathNode.siteCount;
       pathSiteCount = seededPathNode.pathSiteCount;
     };
+    # ── THE ROOT PLANE (owner-ruled 2026-09-18) ──
+    # The live reading, and the SAME seed as `seededPathNode` planted one plane over.
+    rootPlane = {
+      inherit (liveRootPlane)
+        lockAbsent
+        readCount
+        readableCount
+        edgeCount
+        pathSites
+        ;
+      clean = liveRootPlane.violations == [ ];
+    };
+    seededRootPath = {
+      named = seededRootPath.violations != [ ];
+      atSeedMember = builtins.elem seedMember seededRootPath.pathMembers;
+      sites = builtins.length seededRootPath.pathSites;
+      # The seed must not have moved the plane's SHAPE beyond the one edge it plants: same members
+      # read, edge count up by EXACTLY one. A seed that also dropped an edge could name a violation
+      # by accident of the walk shortening somewhere else.
+      # ★ The ci arm's site count is UNMOVED by the identical seed and this one's edge count GROWS,
+      # and that asymmetry is a true fact about the two planes rather than a defect: `gen-harness` is
+      # a root edge of every member's CI lock (so the seed REPLACES) and of no member's ROOT lock (so
+      # it ADDS). Measured 2026-09-18 — `gen-types`' root lock declares `gen-identity`, `gen-prelude`;
+      # its ci lock declares those plus `gen-harness`.
+      readCount = seededRootPath.readCount;
+      edgeCount = seededRootPath.edgeCount;
+    };
     seededNoGenEdges = {
       named = builtins.elem seedMember seededNoGenEdges.noGenEdges;
       refused = seededNoGenEdges.refusals != [ ];
@@ -695,6 +855,45 @@ let
       # The site does not vanish — it MOVES, out of the relation and into the named exclusions.
       && arming.seededPathNode.siteCount == live.siteCount - 1
       && arming.seededPathNode.pathSiteCount == live.pathSiteCount + 1;
+
+    # ★★★ THE ROOT PLANE REFUSES WHAT `ci/` PERMITS — owner-ruled 2026-09-18, "the path is valid for
+    # self-ref at ci/ only, never at the root". A published library's ROOT is the plane consumers
+    # resolve through, and a root that names itself by `path:` carries a second identity formula for
+    # one node into exactly that plane.
+    #
+    # ★★ THIS IS NOT THE NARROWING `mkPinCoherenceCheck` FORBIDS — it is the opposite operation. That
+    # message forbids shrinking this cell's domain to hide a disagreement. PARTITIONING BY PLANE
+    # shrinks nothing: the relation keeps every node it could ever have judged, and the cell GAINS a
+    # case it previously could not express at all, because it read no member's root lock. The domain
+    # grew by one plane.
+    #
+    # ★ THE PAIR THAT MAKES THE RULING FALSIFIABLE IS `seededPathNode` AND `seededRootPath`: one node,
+    # one member, one `locked.type`, differing ONLY in the lock set it is planted in — legitimate and
+    # excluded in the first, named as a violation in the second. Asserted together, here, so neither
+    # can be read alone.
+    #
+    # ★ AND THE FLOOR, because the live reading is an ABSENCE and the corpus already honours the rule
+    # (53 `gen-*` root edges, all `github`, measured 2026-09-18): a walk that opened nothing would
+    # also report no violations. The member partition must be TOTAL — every member either read or
+    # named as having no root lock — and the edge count non-zero.
+    root-plane-refuses-path =
+      arming.rootPlane.clean
+      && arming.rootPlane.pathSites == [ ]
+      && arming.rootPlane.readCount > 0
+      && arming.rootPlane.edgeCount > 0
+      && arming.rootPlane.readCount + builtins.length arming.rootPlane.lockAbsent == live.memberCount
+      # …and the same count derived from the LOCKS rather than from the partition, because the
+      # arithmetic above balances even when a member with no root lock is counted as read.
+      && arming.rootPlane.readCount == arming.rootPlane.readableCount
+      # ROOT ARM — the seed is NAMED, at the member that carries it, exactly once.
+      && arming.seededRootPath.named
+      && arming.seededRootPath.atSeedMember
+      && arming.seededRootPath.sites == 1
+      && arming.seededRootPath.readCount == arming.rootPlane.readCount
+      && arming.seededRootPath.edgeCount == arming.rootPlane.edgeCount + 1
+      # `ci/` ARM — the identical node, planted one plane over, is legitimate and excluded.
+      && arming.seededPathNode.excluded
+      && arming.seededPathNode.notRefused;
   };
 in
 {
@@ -708,6 +907,19 @@ in
     direction = "EXACT over the members' ROOT ci edges and SILENT below them: a member's transitive nodes are not compared, and a second gen-prelude reached only through a dependency's own lock is invisible here";
     domainSource = "`gen.lib.mkGenLibs { }`'s member keys MAPPED through `\"gen-\" + k` (the roster's keys are BARE), minus `strata` — ADR-0015's roster of record, never a count and never a lock";
     siteDomain = "every root `gen-*` edge of every enumerated member, MINUS the `path:`-typed ones: a `path:` input names a TREE and pins no revision, so it is not a participant in a relation about revisions (header). Excluded BY `locked.type` and NAMED in `pathExcluded`/`pathSites` — a revless NON-path node still REFUSES";
+    rootPlane = "a SECOND reading, over each member's own ROOT `flake.lock`: a `path:`-typed `gen-*` root edge there is a VIOLATION and is named (owner-ruled 2026-09-18, `path:` self-reference is legitimate at `ci/` ONLY). A member declaring no root inputs has no root lock at all and is named in `rootPlane.lockAbsent` — not a violation, not a clean read";
+
+    rootPlaneReading = {
+      inherit (liveRootPlane)
+        lockAbsent
+        readCount
+        edgeCount
+        pathSites
+        pathMembers
+        absentNamed
+        violations
+        ;
+    };
     hubReference = "the hub ROOT `flake.lock`'s `follows`-resolved revision per node. NOT SATISFIABLE while the member ci edge graph holds a cycle (header) — reported, not gated";
 
     inherit (live)
