@@ -49,6 +49,33 @@
 # ★ THE NODES ARE NOT THE DOMAIN. The members are what this check ENUMERATES; the shared nodes are
 # what it FINDS in their locks. `gen-harness`, `gen-differential` and `gen-scope-unmet` appear as
 # pinned nodes and are on no roster — subtracting them would delete the one live positive control.
+#
+# ── ★★★ A `path:` PIN SITE IS OUTSIDE THE RELATION, BY TYPE ──
+# The subject of this check is: do members AGREE on which REVISION of a node they pin. A `path:`
+# input NAMES A TREE, NOT A PUBLICATION, so it carries no `rev` — there is nothing for it to agree or
+# disagree ABOUT. It is not a participant whose revision happens to be null; it is not a participant.
+# A `path:` site is therefore dropped from the relation BY ITS NODE TYPE, and NAMED in `pathExcluded`
+# so the site count is never quietly short.
+#
+# ★★ THIS IS NOT THE NARROWING `mkPinCoherenceCheck` FORBIDS. That message reads, verbatim:
+#     "Disposed of by converging the members' ci locks onto ONE revision per node — NEVER by
+#      narrowing this cell's domain, and NEVER by removing a member's flake input
+#      (den-hoag-mehb8 fences that)."
+# It forbids excluding a MEMBER, or a node, TO HIDE A REAL DISAGREEMENT ABOUT A REAL REVISION. The
+# exclusion here removes only sites that CANNOT CARRY A REVISION AT ALL, so it cannot remove a
+# revision from any comparison: every non-path site is compared exactly as before, and two members
+# naming two revisions of one repository are still named however either of them reaches it. A `path:`
+# pin has no revision to hide behind. Reading the prohibition to cover this type would make the check
+# unable to coexist with the self-input invariant (den-hoag-c0wc1) that `gen-inspect` and `gen-memo`
+# hold by following their own node onto the tree under test — which is what makes THAT invariant
+# testable, is CI-green in both members, and is not this check's to undo.
+#
+# ★ AND THE BROKEN-INSTRUMENT CASE SURVIVES INTACT. A node with NO `locked.rev` that is NOT a path —
+# a tarball, a `file:`, a node this walk failed to resolve — still REFUSES by name, because there
+# `null == null` reading as agreement is exactly the rubber stamp REFUSAL 3 exists to prevent. The
+# two cases are separated by `locked.type` and by nothing else, and both ship armed: `seededUnlocked`
+# seeds a revless NON-path node and must be REFUSED, `seededPathNode` seeds a path node and must be
+# EXCLUDED — refused and excluded are different lists, asserted against each other.
 {
   gen,
   lib,
@@ -121,6 +148,13 @@ let
   revIn =
     lock: key:
     if key != null && lock.nodes ? ${key} then lock.nodes.${key}.locked.rev or null else null;
+  # The NODE TYPE beside the revision, read off the same resolved key. This is the only field that
+  # separates "names a tree, so it has no revision to agree about" from "should name a revision and
+  # does not" — see the header. An unresolvable key reads `null`, which is NOT `"path"`, so an edge
+  # this walk could not follow falls to the refusal and never to the exclusion.
+  typeIn =
+    lock: key:
+    if key != null && lock.nodes ? ${key} then lock.nodes.${key}.locked.type or null else null;
   genEdgesOf =
     lock:
     sorted (builtins.filter (lib.hasPrefix "gen-") (builtins.attrNames (inputsOf lock lock.root)));
@@ -146,13 +180,36 @@ let
         let
           lock = locks.${m};
         in
-        map (n: {
-          node = n;
-          member = m;
-          rev = revIn lock (resolve lock lock.root n);
-        }) (genEdgesOf lock);
+        map (
+          n:
+          let
+            key = resolve lock lock.root n;
+          in
+          {
+            node = n;
+            member = m;
+            rev = revIn lock key;
+            type = typeIn lock key;
+          }
+        ) (genEdgesOf lock);
 
-      pins = builtins.concatMap pinsOfMember readable;
+      # EXCLUSION — a `path:` site names a TREE and carries no revision, so it is not a participant
+      # in a relation ABOUT revisions (header). Dropped BY TYPE and NAMED, never by member and never
+      # by "has no rev" — that second spelling would swallow REFUSAL 3 below whole.
+      #
+      # ★ THE EXCLUDED SET AND THE COMPARED SET ARE ONE PREDICATE, COMPLEMENTED — never two filters
+      # written to agree. Two independent spellings can drift into leaving a site in BOTH lists or in
+      # NEITHER, and a site in neither is one this check silently stopped ranging over: `siteCount`
+      # would simply be short and nothing would say so. Complementing one predicate makes the
+      # partition hold by construction, and makes a red drive on it move both sides together.
+      allPins = builtins.concatMap pinsOfMember readable;
+      isPathPin = p: p.type == "path";
+
+      pathPins = builtins.filter isPathPin allPins;
+      pathExcluded = sorted (unique (map (p: p.node) pathPins));
+      pathSites = sorted (map (p: "${p.member} → ${p.node}") pathPins);
+
+      pins = builtins.filter (p: !(isPathPin p)) allPins;
       nodes = sorted (unique (map (p: p.node) pins));
       sitesOf = n: builtins.filter (p: p.node == n) pins;
 
@@ -181,9 +238,12 @@ let
 
       rowsBy = f: sorted (map (r: r.node) (builtins.filter f rows));
 
-      # REFUSAL 3 — `locked.rev` equality is NOT total. A node pinned as a `path:` or tarball input
-      # carries no `rev`, and `null == null` would read as AGREEMENT. It is a named refusal, never a
-      # coherence.
+      # REFUSAL 3 — `locked.rev` equality is NOT total. A node that SHOULD name a revision and does
+      # not — a tarball, a `file:`, an edge this walk could not resolve — carries no `rev`, and
+      # `null == null` would read as AGREEMENT. It is a named refusal, never a coherence.
+      # ★ `pins` is already path-free, so this reads the GENUINE broken-instrument case only: a
+      # `path:` site is excluded above, by type, because it names a tree and has no revision to
+      # agree about. Widening this back to "has no rev" would re-swallow the exclusion.
       unlocked = sorted (unique (map (p: p.node) (builtins.filter (p: p.rev == null) pins)));
 
       incoherent = rowsBy (r: r.distinct > 1);
@@ -215,6 +275,13 @@ let
           n:
           "${n}: pinned without a `locked.rev` by some member — a null revision reads as agreement and must not"
         ) unlocked;
+
+      # STATED, and deliberately NOT a refusal: these sites are out of the relation's domain, not
+      # unreachable within it. They print so the site count is never quietly short.
+      exclusions = map (
+        s:
+        "${s}: a `path:` input — it names a TREE, not a publication, so it pins no revision to agree about"
+      ) pathSites;
     in
     {
       inherit
@@ -228,11 +295,15 @@ let
         noGenEdges
         unlocked
         refusals
+        pathExcluded
+        pathSites
+        exclusions
         ;
       memberCount = builtins.length domain;
       readCount = builtins.length readable;
       nodeCount = builtins.length nodes;
       siteCount = builtins.length pins;
+      pathSiteCount = builtins.length pathPins;
       divergentCount = builtins.length divergentSites;
       agreeingCount = builtins.length agreeingSites;
 
@@ -262,7 +333,18 @@ let
       type = "github";
     };
   };
+  # ★★ THE REFUSAL SEED IS A REVLESS **NON-PATH** NODE, AND THE TYPE IS THE WHOLE POINT. REFUSAL 3
+  # is about a node that SHOULD name a revision and does not; a `path:` node is out of the relation
+  # entirely (header). Seeding this as a path node would make the refusal arm and the exclusion arm
+  # assert the same world, and one of the two would then be proving nothing.
   seedNodeUnlocked = {
+    locked = {
+      type = "tarball";
+      url = "https://seed.invalid/no-rev.tar.gz";
+    };
+  };
+  # …and its opposite number: a node that names a TREE. Must be EXCLUDED, never refused.
+  seedNodePath = {
     locked = {
       path = "..";
       type = "path";
@@ -313,6 +395,15 @@ let
     rootInputs = i: i // { ${controlNode} = "seed-pin"; };
   }) hubRootLock;
 
+  # The exclusion's own seed, identical to `seededUnlocked` in EVERY respect but `locked.type`. One
+  # variable between two worlds: the tarball is refused and stays in the site count, the path is
+  # excluded and leaves it. A seed that changed more than the type would not isolate the type.
+  seededPathNode = coherenceOf memberNames following (seedMemberLock {
+    member = seedMember;
+    nodes."seed-pin" = seedNodePath;
+    rootInputs = i: i // { ${controlNode} = "seed-pin"; };
+  }) hubRootLock;
+
   seededNoGenEdges = coherenceOf memberNames following (seedMemberLock {
     member = seedMember;
     rootInputs = lib.filterAttrs (n: _: !(lib.hasPrefix "gen-" n));
@@ -335,23 +426,41 @@ let
   seededFollows = coherenceOf memberNames following seedFollowsLocks hubRootLock;
   seededFollowsDirectOnly = coherenceOf memberNames directOnly seedFollowsLocks hubRootLock;
 
-  # ★★★ THE HUB-ROOT AXIS READS `agreeingCount = 0` OVER 80 SITES, AND A ZERO FROM A PREDICATE THAT
-  # HAS NEVER MATCHED IS NOT AN ABSENCE. This seed points one member's `gen-prelude` edge at a node
-  # carrying the HUB ROOT's OWN revision for it, so exactly one site crosses from divergent to
-  # agreeing — the comparator is shown reading AGREEMENT on the axis whose live reading is zero.
-  # Without it, `matchesHubRoot = false` would be indistinguishable from a comparator that cannot
-  # return true at all.
+  # ★★★ THE HUB-ROOT AXIS NEEDS A POSITIVE CONTROL BECAUSE NEITHER OF ITS COUNTS IS A READING ON ITS
+  # OWN. Whichever way the ecosystem happens to sit, a comparator that cannot return `agreeing` at
+  # all, and one that cannot return `divergent` at all, both produce a plausible pair of numbers.
+  # This pair of seeded worlds moves ONE site across the axis and reads the crossing in both
+  # directions: same member, same node, same site count, differing ONLY in the seeded revision.
+  #
+  # ★★ AND THE DELTA IS READ BETWEEN THE TWO SEEDS, NOT AGAINST `live`. This arm used to assert
+  # `seeded.agreeingCount == live.agreeingCount + 1`, which silently made the LIVE ecosystem the
+  # arm's operand: it holds only while that one site is divergent TODAY, and it goes red the moment
+  # a relock converges it — a green check turning red on nothing but good news, with a message about
+  # the domain floor. That is line-for-line the defect the block above forbids ("EVERY ARM READS ITS
+  # SEED AT THE ROW, NEVER AS A SET DIFFERENCE AGAINST THE LIVE READING"), and this was the one arm
+  # that broke it. Measured 2026-09-18 at the converged pins: `agreeingCount` 59 in BOTH worlds,
+  # because `gen-types` had by then come to pin `gen-prelude` at the hub root's own revision, so the
+  # seed had nothing left to move. The two-world form is immune: it CONSTRUCTS its own operand.
   hubRefNode = "gen-prelude";
-  seededHubRootAgreement = coherenceOf memberNames following (seedMemberLock {
-    member = seedMember;
-    nodes."seed-agrees" = {
-      locked = {
-        rev = revIn hubRootLock (following hubRootLock hubRootLock.root hubRefNode);
-        type = "github";
+  seedHubRootAt =
+    rev:
+    coherenceOf memberNames following (seedMemberLock {
+      member = seedMember;
+      nodes."seed-hub-axis" = {
+        locked = {
+          inherit rev;
+          type = "github";
+        };
       };
-    };
-    rootInputs = i: i // { ${hubRefNode} = "seed-agrees"; };
-  }) hubRootLock;
+      rootInputs = i: i // { ${hubRefNode} = "seed-hub-axis"; };
+    }) hubRootLock;
+
+  # The two worlds. `seedRev` is all zeroes and no live lock can produce it, so the divergent arm is
+  # divergent by construction rather than by the ecosystem's current state.
+  seededHubRootDivergent = seedHubRootAt seedRev;
+  seededHubRootAgreement = seedHubRootAt (
+    revIn hubRootLock (following hubRootLock hubRootLock.root hubRefNode)
+  );
 
   # ★★ THE READINGS' OWN POSITIVE CONTROL, NON-DEGENERATE. Both readings are FALSE of the live
   # ecosystem, and a predicate never seen to return true is not a reading. This world keeps all 21
@@ -417,6 +526,9 @@ let
       inherit (seededHubRootAgreement) agreeingCount divergentCount;
       inherit hubRefNode;
     };
+    seededHubRootDivergent = {
+      inherit (seededHubRootDivergent) agreeingCount divergentCount;
+    };
     seededAllCoherent = {
       inherit (seededAllCoherent)
         crossMemberCoherent
@@ -430,6 +542,22 @@ let
       named = builtins.elem controlNode seededUnlocked.unlocked;
       carriesSeed = builtins.elem "<unlocked>" (revsIn seededUnlocked controlNode);
       refused = seededUnlocked.refusals != [ ];
+      # …and it stays IN the relation: a refusal is a site this check could not read, never a site
+      # it declined to range over.
+      excluded = builtins.elem controlNode seededUnlocked.pathExcluded;
+      siteCount = seededUnlocked.siteCount;
+    };
+    # The type's other side. Same seed, same member, same node, `locked.type = "path"`: NAMED in the
+    # exclusions, ABSENT from the refusals, and the site leaves the count rather than reading as a
+    # null revision that equals every other null.
+    seededPathNode = {
+      excluded = builtins.elem controlNode seededPathNode.pathExcluded;
+      named = seededPathNode.exclusions != [ ];
+      notRefused = !(builtins.elem controlNode seededPathNode.unlocked);
+      notIncoherent = !(builtins.elem controlNode seededPathNode.incoherent);
+      readsNoUnlockedRev = !(builtins.elem "<unlocked>" (revsIn seededPathNode controlNode));
+      siteCount = seededPathNode.siteCount;
+      pathSiteCount = seededPathNode.pathSiteCount;
     };
     seededNoGenEdges = {
       named = builtins.elem seedMember seededNoGenEdges.noGenEdges;
@@ -501,12 +629,14 @@ let
       && arming.seededIncoherence.sites == live.memberCount
       && !arming.seededIncoherence.coherent;
 
-    # ★★ THE HUB-ROOT AXIS'S OWN CONTROL — `agreeingCount` is 0 across 80 sites today, and a zero
-    # from a predicate never seen to match is not a reading. One seeded site carrying the hub root's
-    # own revision moves it by exactly one, in both directions.
+    # ★★ THE HUB-ROOT AXIS'S OWN CONTROL, READ BETWEEN THE TWO SEEDED WORLDS AND NOT AGAINST `live`.
+    # Neither count is a reading on its own: a comparator that can never return `agreeing`, and one
+    # that can never return `divergent`, both yield a plausible pair. One site crosses the axis
+    # between the two worlds, and it must move BOTH counts by exactly one, in opposite directions —
+    # so a limb that has gone blind in either direction fails here whatever the ecosystem's state.
     arming-hub-root-axis =
-      arming.seededHubRootAgreement.agreeingCount == live.agreeingCount + 1
-      && arming.seededHubRootAgreement.divergentCount == live.divergentCount - 1;
+      arming.seededHubRootAgreement.agreeingCount == arming.seededHubRootDivergent.agreeingCount + 1
+      && arming.seededHubRootAgreement.divergentCount == arming.seededHubRootDivergent.divergentCount - 1;
 
     # O-2 — the `follows` limb is load-bearing, shown by the same comparator reading the same seed
     # with the limb removed: the full reader walks the path to the seeded revision and NAMES the
@@ -544,7 +674,27 @@ let
       && arming.seededNoGenEdges.siteCount < live.siteCount
       && arming.seededUnlocked.named
       && arming.seededUnlocked.carriesSeed
-      && arming.seededUnlocked.refused;
+      && arming.seededUnlocked.refused
+      # ★ THE REFUSAL SEED IS A REVLESS **NON-PATH** NODE, AND IT STAYS IN THE RELATION. This is the
+      # genuine broken-instrument case the message is really for, and the path exclusion must not
+      # have swallowed it: the seeded site is refused, is NOT excluded, and does not leave the count.
+      && !arming.seededUnlocked.excluded
+      && arming.seededUnlocked.siteCount == live.siteCount;
+
+    # ★★★ A `path:` SITE IS OUT OF THE RELATION'S DOMAIN, BY TYPE — see the header, including why
+    # this is outside `mkPinCoherenceCheck`'s prohibition on narrowing. Asserted against the refusal
+    # seed above, from which it differs in `locked.type` AND NOTHING ELSE: that one field decides
+    # excluded-vs-refused, the two lists are disjoint on it, and the path site leaves the count
+    # instead of contributing a null revision that would read as agreement with every other null.
+    path-nodes-out-of-domain =
+      arming.seededPathNode.excluded
+      && arming.seededPathNode.named
+      && arming.seededPathNode.notRefused
+      && arming.seededPathNode.notIncoherent
+      && arming.seededPathNode.readsNoUnlockedRev
+      # The site does not vanish — it MOVES, out of the relation and into the named exclusions.
+      && arming.seededPathNode.siteCount == live.siteCount - 1
+      && arming.seededPathNode.pathSiteCount == live.pathSiteCount + 1;
   };
 in
 {
@@ -557,6 +707,7 @@ in
     observable = "`locked.rev` at each member's `ci/flake.lock` root `gen-*` edges, resolved through `follows`, never by indexing `lock.nodes.<label>`";
     direction = "EXACT over the members' ROOT ci edges and SILENT below them: a member's transitive nodes are not compared, and a second gen-prelude reached only through a dependency's own lock is invisible here";
     domainSource = "`gen.lib.mkGenLibs { }`'s member keys MAPPED through `\"gen-\" + k` (the roster's keys are BARE), minus `strata` — ADR-0015's roster of record, never a count and never a lock";
+    siteDomain = "every root `gen-*` edge of every enumerated member, MINUS the `path:`-typed ones: a `path:` input names a TREE and pins no revision, so it is not a participant in a relation about revisions (header). Excluded BY `locked.type` and NAMED in `pathExcluded`/`pathSites` — a revless NON-path node still REFUSES";
     hubReference = "the hub ROOT `flake.lock`'s `follows`-resolved revision per node. NOT SATISFIABLE while the member ci edge graph holds a cycle (header) — reported, not gated";
 
     inherit (live)
@@ -569,10 +720,14 @@ in
       noGenEdges
       unlocked
       refusals
+      pathExcluded
+      pathSites
+      exclusions
       memberCount
       readCount
       nodeCount
       siteCount
+      pathSiteCount
       divergentCount
       agreeingCount
       crossMemberCoherent

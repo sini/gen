@@ -802,6 +802,12 @@
                   echo "PIN COHERENCE — this check cannot reach a member lock it enumerates, which is a broken instrument and not a coherence:" >&2
                   ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"} >&2") s.report.refusals}
                 ''}
+                ${lib.optionalString (s.report.exclusions != [ ]) ''
+                  echo "OUT OF DOMAIN — ${toString s.report.pathSiteCount} of ${
+                    toString (s.report.siteCount + s.report.pathSiteCount)
+                  } enumerated sites pin a TREE rather than a publication, so they carry no revision to agree or disagree about and are outside this relation BY TYPE (ci/pin-coherence.nix header). NOT a narrowing of the kind forbidden above: that forbids hiding a real disagreement about a real REVISION, and a path input has none to hide. A revless NON-path node still refuses, by name, one message up."
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"}") s.report.exclusions}
+                ''}
                 ${lib.optionalString (armingFailed != [ ]) ''
                   echo "PIN COHERENCE ARMING — a seeded incoherence this cell exists to name went unnamed, or the domain floor stopped discriminating: ${lib.concatStringsSep " " armingFailed}. Read report.arming above: every arm reads its seed AT THE ROW, carrying a revision no live lock can produce" >&2
                 ''}
