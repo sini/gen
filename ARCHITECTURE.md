@@ -324,8 +324,9 @@ flowchart TD
 
 **gen-scope is the sole evaluator** (ADR-0006), kept thin: Nix's laziness schedules, and nothing else
 evaluates. That is a load-bearing constraint rather than a preference — it is what makes a single
-incremental plane definable at all, and `ci/checks.sole-evaluator` scans the roster for
-evaluation-driving constructs outside gen-scope. The check states its own reach on every run: the ruled
+incremental plane definable at all, and `ci#apps.sole-evaluator-report` scans the roster for
+evaluation-driving constructs outside gen-scope — reported, and gating nothing. It states its own reach
+on every run: the ruled
 domain is a property ("anything that evaluates, wherever hosted"), which is not statically decidable, so
 the criterion under-approximates it and a green is a statement about the instrument, never about the
 property.

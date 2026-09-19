@@ -312,19 +312,21 @@ let
       builtins.filter (e: e.type == "directory" && builtins.elem e.entry excludedDirs) (topEntries t.src)
     );
 
-  # ── THE STRIP: STRING-LITERAL BODIES, INTERPOLATION-AWARE ──
-  # Comments are ALREADY stripped, by the pre-existing `cut` below (unchanged) — a `#` starts a
-  # comment only OUTSIDE any string, and `cut`'s naive "first `#` on the line" search is sound
-  # exactly because THIS function runs first and removes every literal `#` a string body could
-  # contain, structurally closing the one soundness gap `cut` had on its own (a `#` inside a
-  # string would otherwise let `cut` truncate real code after it, with no signal — the ORIGINAL
-  # file carried a `stripPremiseBreaches` diagnostic reporting exactly that gap, "reported and
-  # not gated"; composing this strip ahead of `cut` makes the gap's own premise provably true
-  # rather than merely asserted, so that diagnostic is now vacuous by construction and has been
-  # removed rather than kept as dead weight).
+  # ── THE STRIP: COMMENTS AND STRING-LITERAL BODIES, IN ONE PASS, INTERPOLATION-AWARE ──
+  # ★★ ONE PASS TRACKING BOTH STATES, BECAUSE TWO SEQUENTIAL SINGLE-STATE PASSES ARE WRONG IN
+  # EITHER ORDER. Strings first: an unbalanced `"` inside an ordinary `#` comment opens a frame the
+  # tracker never closes, and every line after it is blanked — measured as the shipped behaviour at
+  # gen-merge `3aa6dac`, where `lib/modules.nix:106` quotes a grep pattern in prose and took 33,963
+  # characters of real code out of the scan's reach, the engine's own definition and its
+  # self-recursion among them (den-hoag-ghkyx). Comments first: a `#` inside a string literal reads
+  # as a comment opener and truncates real code after the string on the same line — the mirror
+  # image, and the gap the ORIGINAL file's `stripPremiseBreaches` diagnostic reported without
+  # gating. Neither order removes both; ONE state machine does, because `#` is inert while a
+  # string frame is open and `"`/`''` are inert while a comment is. That is the construction in
+  # which neither intermediate can form, rather than one that forms and is filtered afterwards.
   #
-  # A string's own text is not evaluated code, so it is blanked from matching for the same reason
-  # a comment is — EXCEPT a `${ ... }` interpolation inside a string IS evaluated code, and
+  # A comment's text and a string's own text are not evaluated code, so both are blanked from
+  # matching — EXCEPT a `${ ... }` interpolation inside a string IS evaluated code, and
   # blanking it would be exactly the MISS this file's opening section warns against: a construct
   # reached only through a string interpolation must still be caught. Blanking replaces a
   # character with a space and NEVER a newline, so line numbers and line COUNT stay identical to
@@ -347,10 +349,13 @@ let
     let
       lines = lib.splitString "\n" text;
 
-      # Per-CHARACTER decision, unchanged from the flat design and unit-verified there: given the
-      # current frame stack and the three lookahead characters, decide this character's
-      # classification and the next state. Only the SCOPE changed — one line's characters, not
-      # the whole file's — because that scope is what the reach fix below needs.
+      # Per-CHARACTER decision for the STRING half of the state: given the current frame stack
+      # and the three lookahead characters, decide this character's classification and the next
+      # state. The COMMENT half lives in `step` below and gates this function rather than being
+      # threaded through its branches — a comment's extent is one LINE, which is `step`'s scope
+      # and not this one's, and the two halves are still one machine because `step` consults the
+      # frame stack (`#` opens a comment only outside a string) and this function never runs
+      # while a comment is open (so no `"` it carries can move the stack).
       decideAt =
         s: chars: n: i:
         let
@@ -493,7 +498,23 @@ let
               s // { skip = s.skip - 1; }
             else
               let
-                decision = decideAt s chars n i;
+                # THE COMMENT HALF. `#` opens a comment only OUTSIDE a string frame, and once one
+                # is open every character to the line's end is inert — a `"` there cannot push a
+                # frame, which is the whole defect this gates out. `inComment` is seeded false per
+                # line by the fold below and is NOT threaded through the outer carry: a comment
+                # ends at the newline, unlike a `''…''` frame.
+                top = lib.head s.stack;
+                opensComment = (top.t == "top" || top.t == "interp") && builtins.elemAt chars i == "#";
+                inComment = s.inComment || opensComment;
+                decision =
+                  if inComment then
+                    {
+                      kind = "blank";
+                      stack = s.stack;
+                      skip = 0;
+                    }
+                  else
+                    decideAt s chars n i;
                 closesRun = decision.kind != s.segKind;
                 # Same reasoning as the file-level fold this replaces: force `stack`/`segments` to
                 # WHNF HERE, one line's worth of chain at most, never deferred to the outer join.
@@ -512,6 +533,7 @@ let
                     s.segments;
               in
               {
+                inherit inComment;
                 stack = builtins.seq nextStack nextStack;
                 skip = decision.skip;
                 segStart = if closesRun then i else s.segStart;
@@ -522,6 +544,7 @@ let
           final = lib.foldl' step {
             stack = carry.stack;
             skip = carry.skip;
+            inComment = false;
             segStart = 0;
             segKind = "";
             segments = [ ];
@@ -569,12 +592,6 @@ let
       } lines;
     in
     builtins.concatStringsSep "\n" finalCarry.renderedLines;
-
-  # THE COMMENT STRIP — pre-existing and unchanged: a `#` starts a comment only OUTSIDE a string,
-  # and by the time this runs every string body has already been blanked by `stripText` above, so
-  # no `#` this cuts at can stand inside one. The premise this line's ORIGINAL author could only
-  # assert (and separately reported breaches of, never gated) is now true by construction.
-  cut = line: lib.head (lib.splitString "#" line);
 
   # ── THE BINDING-POSITION MASK: A NAME BEING BOUND IS NOT A CONSTRUCT BEING DRIVEN ──
   # The criterion's own cause names "the three constructs by which a Nix expression drives an
@@ -748,15 +765,17 @@ let
   # ★ THE READ AND THE STRIP ARE ONE STAGE PER FILE, AND EVERY WORLD BELOW SHARES IT. `raw` is kept
   # beside `kept` because a second read of the same tree is a second population that can disagree
   # with the first, and because the arming below compares stripped text against the original.
-  # String-stripping runs FIRST, over the whole file (interpolation-aware, cross-line for
-  # `''...''` blocks); comment-cutting runs SECOND, per resulting line — the original design,
-  # unchanged, now fed sound input; the binding-position mask runs THIRD, over the resulting lines,
-  # because an `inherit` clause is only recognisable once strings and comments are gone.
+  # `stripText` runs FIRST and removes comments AND string-literal bodies together in ONE pass
+  # (interpolation-aware, cross-line for `''...''` blocks); the binding-position mask runs SECOND,
+  # over the resulting lines, because an `inherit` clause is only recognisable once strings and
+  # comments are gone. There is no separate comment stage to order against the string one — that
+  # ordering was itself the defect, and a second single-state pass here would reintroduce one of
+  # its two faces whichever side it sat on (den-hoag-ghkyx).
   prep =
     name: text:
     let
       raw = lib.splitString "\n" text;
-      kept = maskInheritNames (map cut (lib.splitString "\n" (stripText text)));
+      kept = maskInheritNames (lib.splitString "\n" (stripText text));
     in
     {
       inherit name raw kept;
@@ -1029,8 +1048,9 @@ let
   seedResolvedWidened = resolved ++ [ "gen-widget" ];
 
   # Axis 7 — THE STRING STRIP. Both string forms (`"…"` and `''…''`, the latter spanning lines)
-  # must stop matching — comments are the PRE-EXISTING `cut`'s job, untouched here, so this arm
-  # does not re-test them — and, the arm that makes this a repair rather than a preference, a
+  # must stop matching — comments are axis 9's arm, and the two are kept apart so a regression
+  # names which half of the one state machine moved — and, the arm that makes this a repair rather
+  # than a preference, a
   # construct reached only through a string INTERPOLATION must still match: a stripper that
   # blanked interpolations too would trade one miss for another, exactly the direction this
   # file's header calls unsound. `prep`/`hitsIn` are the real functions the scan uses on every
@@ -1071,6 +1091,34 @@ let
     live = evalModuleTree { modules = [ ]; };
   '';
   bindingPositionSites = hitsIn criterion (prep "bindingPosition.nix" bindingPositionText);
+
+  # Axis 9 — THE COMMENT STATE, ARMED AS AN INVARIANCE AND NOT AS A COUNT (den-hoag-ghkyx).
+  # ★ THE SEED IS A STRAY `"` INSIDE A `#` COMMENT, and the claim is that the enumeration does not
+  # move under it. The same body is run TWICE through the real `prep`/`hitsIn` — once clean, once
+  # with one unbalanced quote appended to each of its two comments — because the defect this arm
+  # closes is precisely a reading that is CORRECT on text without such a comment and COLLAPSES on
+  # text with one. A cell pinning today's site list would have been the blindness written down: it
+  # reads green on the broken lexer over any file that happens to carry no stray quote.
+  #
+  # The two conjuncts in O10 below catch the two failures independently, and both are needed:
+  #   · INVARIANCE alone passes a stripper that blanks the whole file in both runs;
+  #   · the EXPECTED list alone passes a stripper that reads comments FIRST and then strings — the
+  #     mirror-image defect — because that one collapses clean and seeded identically. Line 4's
+  #     `#` inside a string literal is what it loses, and line 4 is in the expected list.
+  #
+  # Line by line: `:1` is a whole-line comment naming a criterion token (the filed trigger's own
+  # shape) and must not match; `:2` is a plain call and must; `:3` is code whose TRAILING comment
+  # names a token, so the code part must survive while the comment part contributes nothing; `:4`
+  # carries a `#` inside a string literal followed by real code on the same line, so it must match
+  # on that code; `:5` is a string body naming a token and must not match.
+  commentStateBody = seed: ''
+    # a comment naming genericClosure must not count${seed}
+    live = evalModuleTree { modules = [ ]; };
+    quiet = 1; # a trailing comment naming evalModules${seed} must not count either
+    mirror = "a # inside a string is not a comment"; alsoLive = evalModules { modules = [ ]; };
+    dead = "a string body naming genericClosure must not count";
+  '';
+  commentStateSites = seed: hitsIn criterion (prep "commentState.nix" (commentStateBody seed));
 
   # ── THE WORLDS ──
   # The live one is scanned; the three seeded ones are DERIVED from it by the same algebra the scan
@@ -1208,6 +1256,18 @@ let
         "bindingPosition.nix:13"
       ];
     };
+    # The seed is one `"` appended to each comment; `clean` is its live control in the same run.
+    # The seed text is not written down anywhere a later reader could quote — it is a single
+    # quote character, which is in every corpus already and therefore carries no false liveness.
+    seededCommentState = {
+      seed = "one unbalanced double quote appended to each `#` comment of the same body";
+      clean = commentStateSites "";
+      seeded = commentStateSites "\"";
+      expected = [
+        "commentState.nix:2"
+        "commentState.nix:4"
+      ];
+    };
   };
 
   # Every key MUST be true. The check builder is handed `builtins.attrNames` of this rather than a
@@ -1288,6 +1348,15 @@ let
     # free would mean the mask never ran, and the second half failing would mean it ate real code.
     binding-position-sound =
       arming.seededBindingPosition.sites == arming.seededBindingPosition.expected;
+
+    # O10 — A COMMENT'S QUOTES ARE INERT, AND A STRING'S `#` IS TOO. The enumeration over a body
+    # carrying comments must be IDENTICAL whether or not those comments carry an unbalanced `"`,
+    # and must equal the list the body's real code earns. Either half failing is red: the
+    # invariance alone passes a stripper that blanks everything, and the expected list alone
+    # passes the mirror-image stripper that cuts comments before it knows about strings.
+    comment-state-sound =
+      arming.seededCommentState.clean == arming.seededCommentState.expected
+      && arming.seededCommentState.seeded == arming.seededCommentState.expected;
   };
 in
 {
