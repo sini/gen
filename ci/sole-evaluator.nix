@@ -166,6 +166,10 @@ let
       label,
       keyField,
       width,
+      # A call site that owes a fourth field states it here; the `withoutField`/`widenedWith`
+      # arming already ranges over `required` as a whole, so a set widened this way gets the
+      # same field-arm coverage for free — no second arming shape.
+      extraRequired ? [ ],
     }:
     entries:
     let
@@ -173,7 +177,8 @@ let
         keyField
         "cause"
         "carrier"
-      ];
+      ]
+      ++ extraRequired;
       checked = map (
         x:
         let
@@ -1277,7 +1282,11 @@ let
   # ★ EACH KEY CONJOINS ITS READING WITH ITS OWN ARMING, so a failing key is EITHER the lint firing
   # OR the arming having stopped firing, and both are red — a guard that can no longer refuse is not
   # a passing guard. The `arming` block above prints every sub-arm, so which half failed is one look.
-  gate = {
+  #
+  # `rec`, added for `arming-sound` below alone: it lets that key reuse O2/O6/O8/O9/O10 by name
+  # rather than re-typing their bodies, and changes nothing about O1..O10 themselves, none of which
+  # references a sibling.
+  gate = rec {
     # O1 — THE LINT ITSELF. Green reads: no tree in the scanned domain exhibits, at these pins, the
     # criterion this instrument carries. It NEVER reads "nothing else evaluates".
     no-second-evaluator = liveRefusedKeys == [ ];
@@ -1357,6 +1366,36 @@ let
     comment-state-sound =
       arming.seededCommentState.clean == arming.seededCommentState.expected
       && arming.seededCommentState.seeded == arming.seededCommentState.expected;
+
+    # ★ den-hoag-0pk67 unit-c-instruments-build — THE ARMING'S OWN KEY, additive only: O1..O10
+    # above are untouched, so no ruling-cleared reading changes disposition by this landing.
+    # `rec` lets this reuse O2, O6, O8, O9 and O10 BY NAME — each is ALREADY pure arming, with no
+    # live-reading conjunct to strip. O3, O4, O5 and O7 conjoin a live-reading half with an arming
+    # half; their arming halves are restated here, since neither is exposed as its own key, and
+    # must be kept in step with the bodies above by hand.
+    #
+    # False here means a SEEDED self-test stopped catching its own plant — an instrument that
+    # cannot discriminate is a defect CLEARED BY A FIX (den-hoag-6fmmb's second sentence), unlike
+    # O1..O10's live-reading halves, cleared by a RULING, which must never gate. A live refusal on
+    # the real corpus (O1, or O3/O4/O5/O7's reading halves) cannot make this key false — only a
+    # broken seed can.
+    arming-sound =
+      arming-planted-violation
+      && (!arming.seededShortTreeSet.partitionTotal)
+      && (
+        arming.seededUnreadable.named == [ seedUnreadableKey ]
+        && arming.seededUnreadable.accounted == declared
+      )
+      && (arming.seededDeadCriterion.evaluatorHits == 0 && arming.seededDeadCriterion.refused == [ ])
+      && exception-arms
+      && (
+        arming.seededDomain.registerShort == [ "gen-harness" ]
+        && arming.seededDomain.lockWidened == [ "gen-widget" ]
+        && arming.seededDomain.rejectedOneObjectBuild == [ ]
+      )
+      && strip-sound
+      && binding-position-sound
+      && comment-state-sound;
   };
 in
 {

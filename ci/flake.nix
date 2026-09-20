@@ -589,11 +589,23 @@
           #
           # ★ An EVALUATION failure of this app still reds its job, and that is correct under the
           # same rule: a scan that cannot run is an instrument defect, cleared by a fix.
+          # ★ den-hoag-0pk67 unit-c-instruments-build — `arming-sound` (`ci/sole-evaluator.nix`) IS
+          # THE ONE PURE-ARMING GATE KEY. O1..O10 conjoin a live reading with their own arming by
+          # design (the comment above `gate` in that file), so `failed` cannot be partitioned by
+          # exclusion the way `mkLockAgreementCheck`'s `armingFailed` is — every OTHER key mixes a
+          # ruling-cleared reading into the same boolean. `arming-sound` alone is fix-cleared: it is
+          # false only when a SEEDED plant stopped being caught, never when the live corpus turns up
+          # a real refusal. den-hoag-6fmmb binds both halves of this: a reading cleared by a ruling
+          # must not gate (readingFailed, below, never does); a check cleared by a fix should
+          # (armingFailed does).
           mkSoleEvaluatorReport =
             name: s:
             let
               allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
               failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              armingFailed = builtins.filter (k: k == "arming-sound") failed;
+              readingFailed = builtins.filter (k: k != "arming-sound") failed;
+              gating = armingFailed != [ ];
               report = builtins.toJSON ({ inherit allOk failed; } // s.report);
               reportFile = pkgs.writeText "${name}-report.json" report;
             in
@@ -606,10 +618,14 @@
                 echo "── ${name} ──"
                 cat ${reportFile}
                 echo
-                ${lib.optionalString (!allOk) ''
+                ${lib.optionalString (readingFailed != [ ]) ''
                   echo "SOLE EVALUATOR — a tree in the scanned domain exhibits an evaluation construct outside gen-scope, or the scan's own arming stopped firing. A refusal is the RULED PROPERTY being true of that tree: it is disposed of by an exception entry carrying a cause and a carrier, or by the reading standing — NEVER by narrowing the criterion until the tree passes"
                   echo "REPORTED, GATED BY NOTHING (den-hoag-6fmmb): the arms above are cleared by a RULING, not by a fix, so this does not fail CI. Read it, do not ignore it."
                 ''}
+                ${lib.optionalString gating ''
+                  echo "SOLE EVALUATOR ARMING — a seeded plant this scan exists to catch went uncaught, or a seeded self-test stopped discriminating: ${lib.concatStringsSep " " armingFailed}. Read report.arming above: each sub-arm is a seeded reading compared against its expectation, printed beside the reading it arms. Disposed of by a FIX to the scan itself, never by a ruling."
+                ''}
+                ${lib.optionalString gating "exit 1"}
               '';
             };
           # Build the lock-agreement check (den-hoag-0moiy): prints the two-edge report and the
