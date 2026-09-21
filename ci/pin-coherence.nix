@@ -1,21 +1,21 @@
-# pin-coherence — L7: roster-wide pin coherence across the 21 members' `ci/flake.lock` files.
+# pin-coherence — L7: roster-wide pin coherence across the 22 members' `ci/flake.lock` files.
 #
 # ── WHAT THIS IS FOR, AND WHY IT IS A CLAUSE AND NOT HOUSEKEEPING ──
 # `specs/2026-09-14-gen-module-layout-pattern-spec.md` §2, L7. Under L1 a library's `default.nix`
 # defaults each dependency out of its OWN `ci/flake.lock`, so a flakeless construction of one
 # library resolves each shared dependency once per pinning member. `import` memoises by STORE PATH:
 # coherent pins collapse that split to one value with no further mechanism, and incoherent pins
-# re-open it silently the moment one library lands. The hub is the only place that sees all 21 ci
+# re-open it silently the moment one library lands. The hub is the only place that sees all 22 ci
 # locks — it does not already hold the answer, it holds the only lever.
 #
 # ── THE SUBJECT IS THE MEMBERS' CI LOCKS, NOT THE HUB'S OWN TWO ──
 # `ci/lock-agreement.nix` (den-hoag-0moiy) is the hub's own root-vs-ci predicate and this check sits
 # BESIDE it, never over it: that one compares two locks of ONE repository at the hub's direct edges,
-# this one compares ONE edge class across TWENTY-ONE repositories. Neither subsumes the other.
+# this one compares ONE edge class across TWENTY-TWO repositories. Neither subsumes the other.
 #
 # ── THE TWO READINGS, AND WHY THEY ARE SEPARATE KEYS ──
 # (1) CROSS-MEMBER coherence — for each shared node, all members pinning it name ONE revision. This
-#     is the property that makes `import` memoise, and it is satisfiable: `gen-harness` reads 21
+#     is the property that makes `import` memoise, and it is satisfiable: `gen-harness` reads 22
 #     sites at 1 revision today, live, in the domain.
 # (2) HUB-ROOT agreement — every member pin equals the hub ROOT lock's `follows`-resolved revision
 #     for that node. The spec names this as L7's reference and the bump's target.
@@ -28,11 +28,11 @@
 # to contain `r_memo = H(content(r_memo))` and `content(r_memo)` contain `r_merge = H(content(r_merge))`.
 # 14 of the 21 members sit in that cyclic component; the 7 outside it (gen-identity, gen-algebra,
 # gen-prelude, gen-bind, gen-graph, gen-product, gen-types) are orderable and CAN reach it.
-# ★★ And the live control says the same thing from the other side: `gen-harness` is the one node
-# that IS roster-wide coherent, its 21 pins name `d56dece7`, and `gen-harness`'s own HEAD is
-# `b12b5e3b` — the ecosystem's only instance of the property is coherent WITH ITSELF and not with any
-# HEAD. `gen-harness` is also not a hub root input at all, so under reading (2) the only live
-# positive control is out of domain.
+# ★★ And the live control says the same thing from the other side. Re-derived at gen `f274abd`:
+# `gen-harness` is the one node that IS roster-wide coherent, its 22 pins all name `27b54422`, and
+# `gen-harness`'s own HEAD is `a150fead` — the ecosystem's only instance of the property is coherent
+# WITH ITSELF and not with any HEAD. `gen-harness` is also not a hub root input at all, so under
+# reading (2) the only live positive control is out of domain.
 # ⇒ BOTH readings are COMPUTED and PRINTED; neither GATES, pending the owner's disposition. That is
 # `mkLockAgreementCheck`'s shipped arm verbatim (`ci/flake.nix`, `gating`) and for the same reason:
 # the predicate, the domain, the traversal and the message are identical under either disposition and
@@ -110,7 +110,7 @@ let
   memberNames = sorted (map (k: "gen-" + k) rosterKeys);
 
   # ── REACHING THE MEMBER TREES ──
-  # `gen.inputs.<name>.outPath`, which is `ci/sole-evaluator.nix`'s route to the same 21 trees. Each
+  # `gen.inputs.<name>.outPath`, which is `ci/sole-evaluator.nix`'s route to the same 22 trees. Each
   # is the member AT THE REVISION THIS HUB PINS, which is the revision a consumer of the hub gets —
   # so the reading is about the published ecosystem and not about anybody's working tree.
   lockPathOf = n: "${gen.inputs.${n}.outPath}/ci/flake.lock";
@@ -487,19 +487,64 @@ let
   seedMemberLock = seedLockIn liveLocks;
   seedRootLock = seedLockIn liveRootLocks;
 
-  # THE CONTROL NODE. `gen-harness` is the one node that is roster-wide coherent today — 21 sites,
-  # 1 revision — so seeding ONE of its sites is the cleanest possible demonstration that this
-  # comparator can turn a coherent node incoherent and NAME the member that moved.
+  # THE CONTROL NODE, AND IT IS NOT LOAD-BEARING. The name selects only WHICH input name the seeds
+  # are planted on; the construction below forces that edge onto every member and supplies its
+  # revision, so the arming world's coherence is a property of THIS FILE rather than of the
+  # ecosystem. `gen-harness` is kept because it is a real `gen-*` root edge of every member's ci
+  # lock, so the narrowed world's edges are real edges rather than synthetic ones.
+  #
+  # ★★ THE SENTENCE THAT STOOD HERE — "`gen-harness` is the one node that is roster-wide coherent
+  # today" — RECORDED A MEASUREMENT AS THOUGH IT WERE A PROPERTY, and THAT was the defect, not the
+  # name. An arming arm resting on it refuses the moment one member lands out of step, which is a
+  # state ADR-0037 explicitly tolerates; an arming world must be coherent by construction or it is
+  # reading the very ecosystem it exists to judge.
   controlNode = "gen-harness";
   # ★ `gen-types` must HAVE a root lock for the root-plane seed to land in one — it does; the three
   # that do not are the zero-input leaves named in `rootPlaneOf`'s header.
   seedMember = "gen-types";
 
-  seededIncoherence = coherenceOf memberNames following (seedMemberLock {
-    member = seedMember;
-    nodes."seed-pin" = seedNodeAtRev;
-    rootInputs = i: i // { ${controlNode} = "seed-pin"; };
-  }) hubRootLock;
+  # ── THE CONSTRUCTED CONTROL BASE, and it replaces `seededAllCoherent`'s live-pin narrowing ──
+  # That narrowing kept every member's own PIN of the control edge, so the world it built was
+  # coherent only while the ecosystem was. Pointing the narrowed edge at ONE synthetic node makes
+  # the world's coherence a property of this file, which is what an arming world is for.
+  controlBaseRev = "1111111111111111111111111111111111111111";
+  atControl =
+    label: locks:
+    builtins.mapAttrs (
+      _: lock:
+      lock
+      // {
+        nodes = lock.nodes // {
+          "control-base".locked = {
+            rev = controlBaseRev;
+            type = "github";
+          };
+          "control-moved".locked = {
+            rev = seedRev;
+            type = "github";
+          };
+          ${lock.root} = lock.nodes.${lock.root} // {
+            inputs = lib.filterAttrs (n: _: !(lib.hasPrefix "gen-" n)) (inputsOf lock lock.root) // {
+              ${controlNode} = label;
+            };
+          };
+        };
+      }
+    ) locks;
+
+  # THE PAIR. They differ in ONE member's ONE site and in nothing else, so every count read between
+  # them is attributable to that site. `seedRev` is all zeroes and no live lock can produce it.
+  controlBaseLocks = atControl "control-base" liveLocks;
+  controlMovedLocks = controlBaseLocks // {
+    ${seedMember} =
+      (atControl "control-moved" { ${seedMember} = liveLocks.${seedMember}; }).${seedMember};
+  };
+
+  # ★★ O-1's WORLD, BUILT RATHER THAN OBSERVED. The binding that stood here seeded one site of the
+  # control node over the LIVE lock set, which made `arming-incoherence`'s `distinct == 2` an
+  # accidental live reading — exact only while every other site agreed. Over the constructed pair it
+  # is a statement about the pair: `controlBaseRev` and `seedRev`, two revisions, by construction.
+  seededIncoherence = coherenceOf memberNames following controlMovedLocks hubRootLock;
 
   seededUnlocked = coherenceOf memberNames following (seedMemberLock {
     member = seedMember;
@@ -595,24 +640,14 @@ let
     revIn hubRootLock (following hubRootLock hubRootLock.root hubRefNode)
   );
 
-  # ★★ THE READINGS' OWN POSITIVE CONTROL, NON-DEGENERATE. Both readings are FALSE of the live
-  # ecosystem, and a predicate never seen to return true is not a reading. This world keeps all 21
-  # members and narrows every one of them to the single edge that IS coherent — 1 node, 21 sites,
-  # `crossMemberCoherent = true`. The empty-domain seed below also returns true, but over ZERO sites,
-  # which is the answer `domain-from-roster` exists to refuse; this one is the answer it accepts.
-  seededAllCoherent = coherenceOf memberNames following (builtins.mapAttrs (
-    _: lock:
-    lock
-    // {
-      nodes = lock.nodes // {
-        ${lock.root} = lock.nodes.${lock.root} // {
-          inputs = lib.filterAttrs (n: _: !(lib.hasPrefix "gen-" n) || n == controlNode) (
-            inputsOf lock lock.root
-          );
-        };
-      };
-    }
-  ) liveLocks) hubRootLock;
+  # ★★ THE READINGS' OWN POSITIVE CONTROL, NON-DEGENERATE — AND CONSTRUCTED, NOT OBSERVED. Both
+  # readings are FALSE of the live ecosystem, and a predicate never seen to return true is not a
+  # reading. This world keeps all 22 members and narrows every one of them to the single CONSTRUCTED
+  # edge — 1 node, 22 sites, `crossMemberCoherent = true`, guaranteed by `atControl` rather than read
+  # off whatever the roster happens to agree on today. The empty-domain seed below also returns true,
+  # but over ZERO sites, which is the answer `domain-from-roster` exists to refuse; this one is the
+  # answer it accepts.
+  seededAllCoherent = coherenceOf memberNames following controlBaseLocks hubRootLock;
 
   # ── THE SILENT-GREEN SEED, and it is why `domain-from-roster` exists ──
   # The domain written WITHOUT the map — "the `gen-`-prefixed members of `mkGenLibs { }`" — over the
@@ -762,17 +797,20 @@ let
     pins-cross-member-coherent = live.crossMemberCoherent;
     pins-match-hub-root = live.matchesHubRoot;
 
-    # ★★ THE LIVE POSITIVE CONTROL, AND ITS CARDINALITY IS HALF THE ASSERTION. `gen-harness` is
-    # pinned by every member and at one revision, so it shows this comparator reading coherence on a
-    # real node rather than on an empty walk. O2's rule, applied: a walk that reaches exactly one
-    # site ALSO yields `distinct = 1`, so `distinct == 1` alone is the same defect in a second dress
-    # — the arm asserts the PAIR, `21 sites` against the roster's own member count.
+    # ★★ THE POSITIVE CONTROL, AND ITS CARDINALITY IS HALF THE ASSERTION. The world it reads is
+    # CONSTRUCTED — every member narrowed to one synthetic node at one synthetic revision — so it
+    # shows this comparator reading coherence on a real traversal over real member locks without
+    # asserting anything about which nodes the ecosystem currently agrees on. The two conjuncts that
+    # did assert that (`controlRow.distinct == 1`, `controlRow.sites == live.memberCount`) are SHED:
+    # they made this arm red whenever one member was a commit out of step, a state ADR-0037
+    # tolerates. O2's rule still applies and the degeneracy PAIR is what carries it: a walk reaching
+    # exactly one site ALSO yields `distinct = 1`, so `nodeCount == 1` alone is the same defect in a
+    # second dress — the arm asserts it against `22 sites`, the roster's own member count, and over
+    # the constructed world those counts are guaranteed rather than observed.
     coherent-control =
       controlRow != null
-      && controlRow.distinct == 1
-      && controlRow.sites == live.memberCount
       && live.memberCount == builtins.length rosterKeys
-      # …and the READING itself returns true over that world, over 21 sites rather than over zero.
+      # …and the READING itself returns true over that world, over 22 sites rather than over zero.
       && arming.seededAllCoherent.crossMemberCoherent
       && arming.seededAllCoherent.incoherent == [ ]
       && arming.seededAllCoherent.nodeCount == 1
@@ -846,11 +884,21 @@ let
     # seed above, from which it differs in `locked.type` AND NOTHING ELSE: that one field decides
     # excluded-vs-refused, the two lists are disjoint on it, and the path site leaves the count
     # instead of contributing a null revision that would read as agreement with every other null.
+    #
+    # ★★★ `arming.seededPathNode.notIncoherent` IS NOT A CONJUNCT HERE, AND ITS ABSENCE IS THE
+    # PROPERTY. It still PRINTS, in the `arming` projection — as a reading, which is what it always
+    # was. `incoherent = rowsBy (r: r.distinct > 1)` over `distinct = length (unique revs)`, and the
+    # excluded set is this file's ONE `isPathPin` predicate complemented, so excluding a site can
+    # only SHRINK the revision set: `distinct` is monotone non-increasing under exclusion and an
+    # exclusion therefore CANNOT CREATE an incoherence. That leaves `notIncoherent` exactly two ways
+    # to be false — the control node is already incoherent among the sites that remain, which is a
+    # fact about the ecosystem and one ADR-0037 tolerates; or the exclusion did not fire, which
+    # `readsNoUnlockedRev`, `excluded`, `named`, `notRefused` and both site counts below all assert
+    # already. There is no third cause, so the conjunct carried a READING and no guard.
     path-nodes-out-of-domain =
       arming.seededPathNode.excluded
       && arming.seededPathNode.named
       && arming.seededPathNode.notRefused
-      && arming.seededPathNode.notIncoherent
       && arming.seededPathNode.readsNoUnlockedRev
       # The site does not vanish — it MOVES, out of the relation and into the named exclusions.
       && arming.seededPathNode.siteCount == live.siteCount - 1
@@ -901,7 +949,7 @@ in
   gateKeys = builtins.attrNames gate;
 
   report = {
-    governs = "revision coherence of every shared node across the 21 roster members' `ci/flake.lock` files, read at the revision this hub pins";
+    governs = "revision coherence of every shared node across the 22 roster members' `ci/flake.lock` files, read at the revision this hub pins";
     property = "for each shared node, every member pinning it names ONE revision — so a flakeless construction resolves one store path and `import` memoises to one value (spec §2, L7)";
     observable = "`locked.rev` at each member's `ci/flake.lock` root `gen-*` edges, resolved through `follows`, never by indexing `lock.nodes.<label>`";
     direction = "EXACT over the members' ROOT ci edges and SILENT below them: a member's transitive nodes are not compared, and a second gen-prelude reached only through a dependency's own lock is invisible here";
