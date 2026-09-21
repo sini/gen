@@ -28,6 +28,7 @@
   gen-types,
   gen-merge,
   gen-memo, # the incremental plane gen-merge's warm decision now consults (den-hoag-stmv6)
+  gen-scope, # the sole evaluator gen-merge's module-tree pass runs on (ADR-0006)
   gen-algebra,
   gen-schema, # PURE re-host (published main)
   gen-schema-orig, # ORIGINAL nixpkgs-signature { lib, algebra } (pre-re-host pin)
@@ -48,6 +49,9 @@ let
     inherit prelude;
     types = genTypes;
     memo = gen-memo.lib; # the flake input's published lib; the plane decides reuse, gen-merge computes the fact
+    # Wired exactly as gen-merge's own flake wires it (gen-merge/flake.nix `scope = gen-scope.lib`),
+    # so this oracle keeps constructing the same library the hub publishes rather than a variant.
+    scope = gen-scope.lib;
   };
   genAlgebra = import "${gen-algebra}/lib";
 

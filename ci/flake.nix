@@ -121,6 +121,7 @@
           gen-types
           gen-merge
           gen-memo
+          gen-scope
           gen-algebra
           gen-schema
           ;
@@ -919,6 +920,7 @@
               "gen-types" = "${genInputs.gen-types}";
               "gen-merge" = "${genInputs.gen-merge}";
               "gen-memo" = "${genInputs.gen-memo}";
+              "gen-scope" = "${genInputs.gen-scope}";
               "gen-algebra" = "${genInputs.gen-algebra}";
               "gen-identity" = "${genInputs.gen-identity}";
               "gen-schema" = "${genInputs.gen-schema}";

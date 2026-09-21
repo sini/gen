@@ -100,6 +100,7 @@ flowchart TD
   gen_memo --> gen_prelude
   gen_merge --> gen_memo
   gen_merge --> gen_prelude
+  gen_merge --> gen_scope
   gen_merge --> gen_types
   gen_product --> gen_prelude
   gen_program --> gen_prelude

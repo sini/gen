@@ -362,7 +362,10 @@ let
     inspect = "f7d77bca2538837379cb3fe80c22a12a48e2e008d68625491dd8beff1b93875c";
     link = "90b36cc605f281fd7dd1d2dcf9af76c2fcf5cebdead79376b724ee2958e930a4";
     memo = "b7342e22fec4f96698e5a88a755635be782fb27e3f4c0f7868eb1a7cca2b6166";
-    merge = "053639722c1a3b00c17acfaebfea9ad8c130162b6e81895c424238786bd201bc";
+    # gen-merge 3aa6dacca9 → 7516886fcc (the lock-currency relock): the surface gained ONE name,
+    # `declaredOptions`, the declared-option reader over an evaluated module tree. Nothing was
+    # removed and no other member moved.
+    merge = "03a3ffc0d9aeff53ad9c81ca35d7723671c74cdecf293205e7976d2be51ab69a";
     prelude = "b70720c17dc31dc59889bcd30aa2e1bd4e9abc1eb397c018fb4038c04c387271";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";

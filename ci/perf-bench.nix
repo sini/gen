@@ -22,7 +22,7 @@
 # (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
   stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm")
   workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm"
   n,
@@ -38,6 +38,7 @@ let
     inherit prelude;
     types = genTypes;
     memo = import "${srcs.gen-memo}" { inherit prelude; }; # gen-memo's standalone entry defaults graph from its own lock
+    scope = import "${srcs.gen-scope}" { inherit prelude; }; # same standalone form: graph and identity default from its own lock
   };
   genAlgebra = import "${srcs.gen-algebra}/lib";
   genSchemaNew = import "${srcs.gen-schema}/lib" {
