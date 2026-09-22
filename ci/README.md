@@ -218,6 +218,18 @@ smaller of the two, truncated down to three places.
 | wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |  1.3 |
 | wideFreeform  | 8000 | alloc   |  0.806 | 0.000154 | 0.000090 |  0.000 | **0.806** | 0.90 |
 
+★ **Three of the twelve bounds are INTERIM, and this states what ends them.** `scalar` thunks
+**0.912**, `schemaHosts` thunks **1.210** and `schemaHosts` alloc **1.023** are the three that
+loosened; they encode an **accepted, carried regression**, and they are the ceiling this project has
+agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
+anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for
+exactly this purpose. **The marking ends when those three gated counters return toward the `fdbf140`
+anchors and these three bounds are tightened back**; `den-hoag-restore-perf-promises-xzchx` owes that
+restoration and `den-hoag-fvphc` §4 Q1 carries the unrepaired cost itself. The other nine bounds
+TIGHTEN and are not interim. **This is a separate debt from the stale publication**: `BENCHMARKS.md`'s
+2026-07-04 composition-plane table is also wrong, for reasons this isolation does not account for, and
+restoring the perf promises would not repair it.
+
 **What every bound still catches, as one claim:** a regression costing half of the cheaper of the
 two constructions this engine change is calibrated on, on that row and that counter. Half rather
 than all of it is not decoration — it is what keeps the gate's own RED state testable, and the
