@@ -14,8 +14,9 @@
 #
 # Gates (rationale + baselines: ci/README.md) — every gate reads a DETERMINISTIC evaluator counter:
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
-#   ratio     — at the largest size per workload: pure thunks/alloc ≤ 0.90×ref
-#               (wideFreeform exception: only ALLOC keeps the default gate; THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX)
+#   ratio     — at the largest size per workload: pure thunks/alloc ≤ that row's OWN derived bound
+#               (ROW_THUNKS_MAX / ROW_ALLOC_MAX below; COUNTER_RATIO_MAX only for an underived
+#               workload; wideFreeform's THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX)
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×)
 #
 # cpu is measured, reported, and GATED BY NOTHING. Every gated axis above is a function of the
@@ -53,7 +54,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
-# (only alloc default-gated; thunks band ≤ WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
+# (alloc on its own derived bound; thunks band ≤ WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
 # noref = PURE-ONLY row: no reference cell is measured, so it carries no parity/ratio verdict and is
 # reported apart from the pure/ref table. A pure/ref gate is only meaningful where a frozen reference
 # can track its subject; the aspect grammar moves by design ruling, so no frozen aspect stack can (see
@@ -76,8 +77,71 @@ MATRIX=(
 )
 
 REPS=3
+# The DEFAULT ratio ceiling — for a ratio-gated workload whose own bound has never been derived,
+# i.e. the "new den shapes should be added to perf-bench.nix" path in ci/README.md. Every workload
+# that HAS been derived carries its own bound in ROW_THUNKS_MAX / ROW_ALLOC_MAX below and never
+# reads this one. Nothing in the matrix reads it today.
 COUNTER_RATIO_MAX=0.90
 GROWTH_MAX=5.5
+
+# ── per-row ratio bounds — DERIVED, not chosen ────────────────────────────────
+# ADR-0032 ruling 5: the number is derived at implementation from the measured cost curve,
+# recorded with its derivation, and re-derived when the engine changes. The licensing rule is
+# ci/README.md §"Updating thresholds / workloads"; the derivation record is its 2026-09-21
+# baseline block. Regenerate every figure below with `nix run ./ci#perf-bench`.
+#
+# ANCHOR — the measured pure/ref ratio at 2026-09-21, Nix 2.34.8, gen-merge `7516886` (the rev
+# this hub pins; its lib/modules.nix is byte-identical to gen-merge main `275953b`, one relock
+# commit ahead, which moves lock files only). Read at the precision the gate compares at:
+# ratio() prints %.3f before lte(), so a bound of 1.210 admits a printed 1.210 and refuses 1.211.
+#
+# MARGIN — half the ratio-delta of the SMALLER of the two constructions the one-engine
+# consolidation (gen-merge `564ad1c`) introduced, measured on THAT row and THAT counter,
+# truncated down to three places. The two are ① `declarationGuard` (ADR-0033's refusal-by-name)
+# and ② `driveKnot` (ADR-0006's one evaluator); each was re-measured per row at this pin by
+# neutralising it in a throwaway tree. This is NOT a noise allowance: the gated counters have
+# ZERO spread here (byte-identical across reps and across arms), so a margin buys exactly one
+# thing — how much unattributed drift the project absorbs before it hears about it.
+#
+# WHAT EVERY BOUND BELOW STILL CATCHES, as one claim: a regression costing half of the cheaper
+# of the two constructions this engine change is calibrated on, on that row and counter. Half
+# rather than all of it is what keeps the gate's own red state testable — a cost seeded strictly
+# between the margin and ②'s delta must red, and that is the acceptance cell this bound shipped
+# with.
+#
+# Four of the twelve come out at margin 0.000, because ② is ~free on that row (`driveKnot` costs
+# 147 thunks on scalar n=8000 — 0.0002 of ratio). A 0.000 margin is admissible on a deterministic
+# counter and it is the tightest honest reading: the row holds AT its anchor and any move of 0.001
+# is reported.
+#
+# THIS RE-BASELINE LOOSENS EXACTLY THREE OF THE TWELVE — scalar thunks, schemaHosts thunks,
+# schemaHosts alloc — and each of the three is the attributed move (ci/README.md's 2026-09-21
+# block carries all five licensing items). The other NINE tighten, most of them sharply: the old
+# shared 0.90 was absorbing a silent +57% pure-side regression on deepSubmodule and +16% on
+# registry/lazyRegistry with no gate firing at all.
+declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
+# scalar n=8000 — anchors 0.912 / 0.756; ① 0.037994 / 0.054458, ② 0.000174 / 0.000083 (~free).
+ROW_THUNKS_MAX[scalar,8000]=0.912
+ROW_ALLOC_MAX[scalar,8000]=0.756
+# registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
+ROW_THUNKS_MAX[registry,2000]=0.808
+ROW_ALLOC_MAX[registry,2000]=0.654
+# lazyRegistry n=2000 — anchors 0.777 / 0.632; ① 0.108440 / 0.101548, ② 0.064373 / 0.046891.
+ROW_THUNKS_MAX[lazyRegistry,2000]=0.809
+ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
+# schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
+# The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
+# stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
+# the project's PUBLIC claim moves with it is an open owner item recorded in BENCHMARKS.md.
+ROW_THUNKS_MAX[schemaHosts,1600]=1.210
+ROW_ALLOC_MAX[schemaHosts,1600]=1.023
+# deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.495
+# wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
+# per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
+# bound is WIDEFREEFORM_RATIO_MAX below, which carries that row's own claim.
+ROW_ALLOC_MAX[wideFreeform,8000]=0.806
 
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
@@ -94,9 +158,14 @@ CLASSSHARE_RATIO_MAX=0.30
 # Freeform absorption is THUNK-parity with nixpkgs, not a pure win on that counter: unknown sibling keys
 # route through the root freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib
 # performs (the pure engine's thunk win is on DECLARED option paths — see scalar/registry/aspects). So
-# the THUNK ratio rides a band; only ALLOC stays on the default win-gate.
-# Deterministic anchors (2026-07-05, Nix 2.34.7, gen-merge fdbf140) at n=8000: thunks 1.099, alloc 0.821.
-# The thunk ceiling 1.3 = measured 1.099 + ~18% headroom. The real teeth are LINEARITY (the O(n^2)
+# the THUNK ratio rides a band while ALLOC stays a win-gate — two claims, two bounds.
+# Deterministic anchor (2026-09-21, Nix 2.34.8, gen-merge 7516886) at n=8000: thunks 1.096, alloc 0.806
+# (the 2026-07-05 fdbf140 reading was 1.099 / 0.821). The thunk ceiling is the anchor itself: under the
+# per-row derivation above, this row's margin is 0.000 because BOTH constructions of the one-engine
+# consolidation are ~free on it (① 0.000154, ② 0.000090 of ratio) — freeform absorption rides the
+# per-key type merges, not the declaration spine. The former 1.3 was measured + ~18% headroom and was
+# absorbing a silent +19% pure-side regression on this row; a band at the anchor keeps the parity claim
+# and reports the next move instead of swallowing it. The real teeth are LINEARITY (the O(n^2)
 # freeform blowup this workload was built to catch — pre-fix n=8000 thunks were 468×ref, gated at
 # GROWTH_MAX over a 4x step) + the thunk band + the deterministic counters. This cell also used to carry
 # a cpu band of its own; it was the thinnest-margin cpu gate in the matrix (0.914 measured against a 0.95
@@ -105,7 +174,7 @@ CLASSSHARE_RATIO_MAX=0.30
 # blocked A-then-B protocol this script no longer runs, and a figure a blocked protocol produced on this
 # host is not evidence about the subject. The same reasoning, with these figures, is written out in
 # ci/README.md's wideFreeform section; regenerate via `nix run ./ci#perf-bench`.
-WIDEFREEFORM_RATIO_MAX=1.3
+WIDEFREEFORM_RATIO_MAX=1.096
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -278,12 +347,19 @@ for row in "${MATRIX[@]}"; do
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
   # CR is computed and reported but never gated — see the cpu note in the header.
+  # Each gated assertion reads its OWN derived bound, falling back to the default for a workload
+  # nobody has derived yet. The fallback is what keeps "new den shapes should be added" a live path;
+  # it is not reached by anything in the matrix today.
   if has_tag "$tags" r; then
-    lte "${TR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $COUNTER_RATIO_MAX")
-    lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
+    tmax=${ROW_THUNKS_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
+    amax=${ROW_ALLOC_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
+    lte "${TR[$w,$n]}" "$tmax" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $tmax")
+    lte "${AR[$w,$n]}" "$amax" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $amax")
   elif has_tag "$tags" rb; then
-    # wideFreeform: only ALLOC keeps the DEFAULT win-gate; THUNKS ride their own parity band.
-    lte "${AR[$w,$n]}" "$COUNTER_RATIO_MAX" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $COUNTER_RATIO_MAX")
+    # wideFreeform: ALLOC is a win-gate, THUNKS ride a parity band — two different CLAIMS, which is
+    # why the band keeps its own named constant and its own failure wording.
+    amax=${ROW_ALLOC_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
+    lte "${AR[$w,$n]}" "$amax" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $amax")
     lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
   fi
 done
@@ -382,7 +458,7 @@ emit_report() {
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
-  printf '> wideFreeform thunks ride a parity band (gate ≤ %s, not the 0.90 win-gate — freeform absorption is thunk-parity with nixpkgs); only alloc keeps the default win-gate. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$REPS"
+  printf '> Every ratio-gated row carries its OWN bound, derived from its measured anchor plus a margin smaller than the cheaper of the two constructions the one-engine consolidation introduced on it (the derivation is in perf-bench.sh beside each constant, the record in ci/README.md). wideFreeform thunks ride a parity band (gate ≤ %s) rather than a win-gate, because freeform absorption is thunk-parity with nixpkgs. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$REPS"
   echo
   echo "### pure-only workloads (no reference arm; report-only counters, gated on linearity below)"
   echo
