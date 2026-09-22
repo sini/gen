@@ -252,20 +252,39 @@ is why the run below is a precondition rather than a citation** (item 5 under "U
 1. **Isolation.** The move is attributed to gen-merge `564ad1c` by a two-arm measurement carrying a
    complement arm: the arm holding the other eight members at tip reads byte-identical to the
    all-green anchor. *(Carrier row `den-hoag-perfbench-564ad1c-jvkvp`, isolation block.)*
+
 2. **A named construction.** `declarationGuard` and `driveKnot`, both bound in
    `gen-merge:lib/modules.nix` and both re-measured per row above — not "the release".
+
 3. **A cited ruled property.** `declarationGuard` buys **ADR-0033**'s refusal-by-name;
    `driveKnot` buys **ADR-0006**'s one evaluator.
+
 4. **Measured irreducibility.** The two are 97.6% of the gate's entire headroom — deleting *both*
    clears the binding gate by only 2.40%. Two independent passes refuted the one property-preserving
    optimisation proposed for ①, so verified property-preserving headroom is **zero**.
-5. **The member's property run, by rev.** gen-merge at `7516886`, both suites, exits read unpiped:
+
+5. **The member's property runs, by rev — BOTH suites, because they reach different axes.**
+   gen-merge at `7516886`, exits read unpiped:
    `nix-unit --flake ./ci#tests` ⇒ **482/482, rc 0**; `nix-unit --flake ./ci#testsError` ⇒
    **89/89, rc 0**. Driven RED in the same run by the archetypal property-deleting patch (force the
    declaration stratum's `declEntries` spine only): `./ci#tests` ⇒ 481/482, rc 1, ☢️ on
-   `one-evaluator.test-the-declaration-stratum-admits-value-reads-and-refuses-declaration-reads`
-   (the refusal escapes `tryEval` instead of being contained), and `./ci#testsError` ⇒ 88/89, rc 1,
-   ❌ on `one-evaluator.test-a-config-dependent-option-key-set-refuses-at-the-fold`.
+   `one-evaluator.test-the-declaration-stratum-admits-value-reads-and-refuses-declaration-reads`,
+   and `./ci#testsError` ⇒ 88/89, rc 1, ❌ on
+   `one-evaluator.test-a-config-dependent-option-key-set-refuses-at-the-fold`.
+
+   ★ **The two suites are not redundant, and running only the first is a test on one axis.**
+   `./ci#tests` reaches **containment**: a refusal that escapes `tryEval` takes the evaluation down,
+   so the cell aborts and nix-unit reports ☢️ — an escape is not invisible there, it is maximally
+   visible, which is exactly how the red arm above fires. It does **not** reach refusal **TYPE**,
+   and it does not carry the input that breaks: measured at this pin, `ci/tests/one-evaluator.nix`
+   has `expectedError` ⇒ **0 LINES** (live control `expr` ⇒ 6 LINES) and `misdeclare` ⇒ **0 LINES**
+   (live control `mkOption` ⇒ 16 LINES), while `ci/tests-error.nix` has `expectedError` ⇒ **65
+   LINES** and `misdeclare` ⇒ **6 LINES** (control ⇒ 46 LINES). ⇒ **a candidate not run against
+   `./ci#testsError` has not been tested on the TYPE axis at all.** gen-merge's own CI says the
+   same in its own words: `.github/workflows/ci.yml` carries a dedicated
+   `nix develop --command nix-unit --flake .#testsError` step because *"`nix flake check` covers
+   the `tests` output ONLY … the error-assertion cells live on `testsError`, so without this step
+   they never run here."*
 
 **The 2026-08-13 sitting declined this same arm**, with the reason *"it records the regression as
 the new normal"* (`den-hoag-gtma`, `den-hoag-erls`). The 2026-09-21 ruling supersedes it, and what
@@ -424,14 +443,21 @@ of its own the first time someone measures what its cost is made of.
 3. **A cited ruled property** — that construction buys something an ADR rules, by number.
 4. **Measured irreducibility** — a partial optimisation cannot reach the standing bound, with the
    shortfall stated as a figure.
-5. **The member's property run, cited by rev** — the suite asserting the property item 3 names, run
-   at the rev this hub pins, quoted with its unpiped exits, and shown RED in the same run on a patch
-   that deletes the property. This item exists because **nothing in `perf-bench` can stand in for
-   it**: the bench gates a digest of SUCCESSFUL evaluations plus deterministic counters, so a patch
-   that deletes a refusal on inputs the corpus never evaluates moves neither — it moves the counters
+5. **The member's property runs, cited by rev — BOTH of its suites, named with the axis each
+   reaches.** Run at the rev this hub pins, quoted with their unpiped exits, and shown RED in the
+   same run on a patch that deletes the property. **`#tests` reaches CONTAINMENT** — an uncontained
+   refusal takes the evaluation down, so the cell aborts and is reported. **Only `#testsError`
+   reaches refusal TYPE**, because only that file carries `expectedError` and the misdeclared input
+   that provokes one (measured per row in the 2026-09-21 block above, with live controls). ⇒ **one
+   command is a test on one axis**; a candidate run against `#tests` alone has not been tested on
+   the other. This item exists at all because **nothing in `perf-bench` can stand in for either**:
+   the bench gates a digest of SUCCESSFUL evaluations plus deterministic counters, so a patch that
+   deletes a refusal on inputs the corpus never evaluates moves neither — it moves the counters
    *down*, and every gate here is an upper bound. Items 1–4 are reports about a cost; **item 5 is
-   the only one of the five that can refuse.** The oracle is a person today; mechanising the
-   cross-repository conjunction is filed, not built.
+   the only one of the five that can refuse.** The oracle is a person today, and deliberately: a
+   landing in THIS repository runs neither of the member's suites and neither of its hooks, so the
+   deferred mechanisation of the cross-repository conjunction leaves **two** unmechanised arms, not
+   one.
 
 **The rule is one-sided on purpose.** It licenses a bound to move UP; a bound moving DOWN is a
 tightening and needs no licence. Note what that does and does not cover: it governs the BOUND, not
