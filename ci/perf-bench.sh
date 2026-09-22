@@ -2,15 +2,26 @@
 # nix-instantiate + NIX_SHOW_STATS, checks regression gates, prints a markdown report.
 #
 # Usage:
-#   gen-perf-bench                     — report to stdout, enforce gates (exit 1 on regression;
-#                                        exit 3 if a workload cell's eval dies, with its stderr)
+#   gen-perf-bench                     — report to stdout, enforce gates
+#   gen-perf-bench --at K=SOURCE ...   — measure a COMBINATION: overlay member K onto the baseline,
+#                                        SOURCE being rev:<sha> | ref:<branch> | path:<dir>.
+#                                        Repeatable. Nothing is written and no lock is touched.
 #   gen-perf-bench --update FILE.md    — same, and splice the report into FILE.md's
 #                                        <!-- BEGIN PERF-BENCH --> / <!-- END PERF-BENCH --> block
-#                                        (the live BENCHMARKS.md section)
+#                                        (the live BENCHMARKS.md section). Refuses a non-empty overlay.
+#
+# Exits: 0 all gates passed · 1 PERF REGRESSION (the published combination) · 2 the --update target
+# is unusable, or the arguments are · 3 a dead cell (die_cell) · 4 COMBINATION UNRESOLVED · 5
+# SUPPLY/DEMAND RESIDUE · 6 CANDIDATE OVER BOUND. 4/5/6 are separate codes on purpose: an
+# unresolvable sibling used to exit 1, the same code as a performance regression, so no caller could
+# tell "gen got slower" from "the network was down"; and a candidate breaching a bound derived at the
+# baseline anchor is a fact about a combination the repository has NOT adopted, which is a different
+# claim from "the published combination regressed".
 #
 # Injected by the flake app wrapper:
-#   PERF_WORKLOADS — store path of the workload corpus (ci/perf-bench.nix)
-#   PERF_SRCS      — store path of a .nix attrset mapping lib names → source store paths
+#   PERF_WORKLOADS    — store path of the workload corpus (ci/perf-bench.nix)
+#   PERF_SRCS         — store path of a .nix attrset mapping lib names → source store paths (BASELINE)
+#   PERF_COMBINATION  — store path of a .json map: key → { store, rev, flakeref, axis }
 #
 # Gates (rationale + baselines: ci/README.md) — every gate reads a DETERMINISTIC evaluator counter:
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
@@ -38,9 +49,58 @@
 # each in turn, never as separate blocks (see run_row). thunk/alloc counters are deterministic per
 # nix version, taken from the last rep.
 
+# ── the combination under test ────────────────────────────────────────────────
+# `--at <member>=<source>` overlays ONE member of the pure-side source set onto the baseline. The
+# baseline is `ci/flake.lock` via PERF_SRCS as it has always been, an EMPTY overlay passes it through
+# untouched, and NOTHING is ever written: a combination is a value this run TAKES and NAMES, never
+# state the repository must first adopt. Every run echoes the whole combination — all twelve keys,
+# their revisions, and each one's LEAK set — into the report, so the artefact records the population
+# it measured instead of leaving the reader to infer it from a lock file.
+#
+# The two REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
+# float, a moved ratio is unattributable — you cannot tell whether gen got worse or nixpkgs got
+# better — and the ci/README.md rejection of an absolute pure-counter ratchet rests on `ref` being
+# byte-identical across arms.
 UPDATE_FILE=""
-if [[ "${1:-}" == "--update" ]]; then
-  UPDATE_FILE=${2:?--update needs a file path}
+declare -A AT_SRC AT_STORE AT_REV
+AT_ORDER=()
+UNRESOLVED=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --update)
+      UPDATE_FILE=${2:?--update needs a file path}
+      shift 2
+      ;;
+    --at)
+      at_spec=${2:-}
+      at_key=${at_spec%%=*}
+      at_src=${at_spec#*=}
+      if [[ "$at_spec" != *=* || -z "$at_key" || -z "$at_src" ]]; then
+        UNRESOLVED+=("--at ${at_spec:-<no value>} — not of the form <member>=<source>")
+      elif [[ -n "${AT_SRC[$at_key]:-}" ]]; then
+        UNRESOLVED+=("$at_key — named twice by --at (${AT_SRC[$at_key]}, then $at_src)")
+      else
+        AT_SRC[$at_key]=$at_src
+        AT_ORDER+=("$at_key")
+      fi
+      shift 2 || shift
+      ;;
+    *)
+      echo "perf-bench: unknown argument '$1' — expected --at <member>=<source> or --update FILE.md" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -n "$UPDATE_FILE" ]]; then
+  # A candidate's numbers may not enter the published block. The live block in BENCHMARKS.md is the
+  # project's claim about the combination it PUBLISHES, and splicing a candidate there certifies a
+  # combination no consumer is on — this bench's founding defect, one surface over.
+  if [[ ${#AT_ORDER[@]} -gt 0 ]]; then
+    echo "perf-bench: --update refuses a non-empty overlay (${#AT_ORDER[@]} entry/entries) — $UPDATE_FILE publishes the ADOPTED combination, and a candidate's numbers there would certify a combination no consumer is on" >&2
+    exit 2
+  fi
   # Require both splice markers up front (before the ~2-min measurement): a missing END would let
   # the awk truncate the file at the splice (tail data loss); a missing BEGIN would silently no-op.
   if ! grep -q '<!-- BEGIN PERF-BENCH -->' "$UPDATE_FILE" 2>/dev/null \
@@ -52,6 +112,93 @@ fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# ── resolve the overlay, WHOLE-CLASS, before anything is collected (exit 4) ────
+# Every entry is validated and fetched here and EVERY failure is named in one message: a partial
+# matrix over a combination that could not be assembled is the confident-green shape this capability
+# exists to remove. An unresolvable entry NEVER degrades to the baseline — a refusal is not a
+# downgrade — and the default path touches no network at all, so an outage cannot red the hub's CI.
+for at_key in ${AT_ORDER[@]+"${AT_ORDER[@]}"}; do
+  at_src=${AT_SRC[$at_key]}
+  at_axis=$(jq -r --arg k "$at_key" '.[$k].axis // "unknown"' "$PERF_COMBINATION")
+  if [[ "$at_axis" == "unknown" ]]; then
+    UNRESOLVED+=("$at_key=$at_src — not a key of the bench's source set")
+    continue
+  fi
+  if [[ "$at_axis" == "reference" ]]; then
+    UNRESOLVED+=("$at_key=$at_src — REFERENCE arm, which does not decouple: a floating denominator makes a moved ratio unattributable")
+    continue
+  fi
+  case "$at_src" in
+    path:*)
+      at_dir=${at_src#path:}
+      if [[ -d "$at_dir" ]]; then
+        AT_STORE[$at_key]=$(readlink -f "$at_dir")
+        AT_REV[$at_key]="(path — UNPINNED)"
+      else
+        UNRESOLVED+=("$at_key=$at_src — no such directory")
+      fi
+      ;;
+    rev:* | ref:*)
+      at_ref="$(jq -r --arg k "$at_key" '.[$k].flakeref' "$PERF_COMBINATION")/${at_src#*:}"
+      at_json=""
+      at_st=0
+      at_json=$(nix flake prefetch --json "$at_ref" 2>"$tmp/at-$at_key.err") || at_st=$?
+      if [[ $at_st -ne 0 ]]; then
+        UNRESOLVED+=("$at_key=$at_src — $at_ref did not resolve (nix exit $at_st): $(tr -s '[:space:]' ' ' <"$tmp/at-$at_key.err")")
+      else
+        at_store=$(printf '%s' "$at_json" | jq -er '.storePath | strings | select(. != "")') || at_store=""
+        at_rev=$(printf '%s' "$at_json" | jq -er '.locked.rev | strings | select(. != "")') || at_rev=""
+        if [[ -z "$at_store" ]]; then
+          # exit 0 with nothing in it is the failure this whole block exists to refuse: a fetch that
+          # reported nothing is not the same reading as a source with nothing to fetch.
+          UNRESOLVED+=("$at_key=$at_src — $at_ref returned exit 0 but carries no storePath; the fetch is UNMEASURED, not empty")
+        else
+          AT_STORE[$at_key]=$at_store
+          AT_REV[$at_key]=${at_rev:-"(resolved, no revision)"}
+        fi
+      fi
+      ;;
+    *)
+      UNRESOLVED+=("$at_key=$at_src — a source is rev:<sha>, ref:<branch> or path:<dir>")
+      ;;
+  esac
+done
+
+if [[ ${#UNRESOLVED[@]} -gt 0 ]]; then
+  {
+    echo "perf-bench: COMBINATION UNRESOLVED — ${#UNRESOLVED[@]} overlay entry/entries could not be resolved; NO cells collected"
+    printf '  - %s\n' "${UNRESOLVED[@]}"
+  } >&2
+  exit 4
+fi
+
+# The source set this whole run reads. With no overlay it IS $PERF_SRCS, byte for byte.
+SRCS=$PERF_SRCS
+if [[ ${#AT_ORDER[@]} -gt 0 ]]; then
+  {
+    printf '(import %s) // {\n' "$PERF_SRCS"
+    for at_key in "${AT_ORDER[@]}"; do
+      printf '  "%s" = "%s";\n' "$at_key" "${AT_STORE[$at_key]}"
+    done
+    printf '}\n'
+  } >"$tmp/srcs.nix"
+  SRCS=$tmp/srcs.nix
+fi
+
+# The baseline half of the echo, read from the resolved lock rather than re-derived here.
+declare -A BASE_STORE BASE_REV BASE_AXIS
+COMB_KEYS=()
+while IFS=$'\t' read -r bk ba br bs; do
+  BASE_AXIS[$bk]=$ba
+  BASE_REV[$bk]=$br
+  BASE_STORE[$bk]=$bs
+  COMB_KEYS+=("$bk")
+done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.axis)\t\(.value.rev)\t\(.value.store)"' "$PERF_COMBINATION")
+if [[ ${#COMB_KEYS[@]} -eq 0 ]]; then
+  echo "perf-bench: the combination record at $PERF_COMBINATION carries no keys — the population is UNREADABLE, not empty" >&2
+  exit 4
+fi
 
 # "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
 # (alloc on its own derived bound; thunks band ≤ WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
@@ -260,7 +407,7 @@ sample_cell() {
   # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
   status=0
   out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
-    "$PERF_WORKLOADS" --arg srcs "import $PERF_SRCS" \
+    "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
   CELL_ERRF=$errf
   CELL_OUT=$out
@@ -319,6 +466,49 @@ run_row() {
 ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
 lte() { awk "BEGIN{exit !(($1) <= ($2))}"; }
 has_tag() { [[ ",$1," == *",$2,"* ]]; }
+
+# ── pre-flight: the formals residue of THIS combination, before any cell ──────
+# Each member's entry object is applied with exactly the formals IT declares, read live with
+# `builtins.functionArgs` at the path the call site imports. This census reads those lambdas without
+# applying them, so one pass names EVERY member the combination cannot satisfy. The evaluator can
+# only ever report the first offender a workload happens to force — and most workloads force none,
+# which is how a combination that cannot be constructed collects and gates a full matrix and says
+# nothing at all. A census that could not RUN is reported as UNMEASURED, never as an empty residue:
+# an error consumed as an empty value is this bench's own die_cell doctrine one layer up.
+PREFLIGHT=""
+pf_status=0
+PREFLIGHT=$(nix-instantiate --eval --strict --json "$PERF_WORKLOADS" \
+  --arg srcs "import $SRCS" --argstr stack pure --argstr workload preflight --arg n 1 \
+  2>"$tmp/preflight.err") || pf_status=$?
+if [[ $pf_status -ne 0 ]]; then
+  {
+    echo "perf-bench: PRE-FLIGHT CENSUS FAILED exit=$pf_status — the residue is UNMEASURED, not empty; NO cells collected"
+    cat "$tmp/preflight.err"
+  } >&2
+  exit 5
+fi
+PF_RESIDUE=$(printf '%s' "$PREFLIGHT" | jq -er '.residue | length | numbers') || PF_RESIDUE=""
+if [[ -z "$PF_RESIDUE" ]]; then
+  {
+    echo "perf-bench: PRE-FLIGHT CENSUS UNREADABLE — it evaluated but carries no .residue; UNMEASURED, not empty"
+    printf '%s\n' "$PREFLIGHT" | head -c 2000
+  } >&2
+  exit 5
+fi
+PF_ARMING=$(printf '%s' "$PREFLIGHT" | jq -r '"striking \"\(.arming.strike)\" from the environment fires on \(.arming.fires) of \(.arming.of) applied entries"')
+PF_UNAPPLIED=$(printf '%s' "$PREFLIGHT" | jq -r '.unappliedEntries | join(", ")')
+declare -A PF_LEAK
+while IFS=$'\t' read -r lk lv; do PF_LEAK[$lk]=$lv; done < <(
+  printf '%s' "$PREFLIGHT" | jq -r '.leaks[] | "\(.member)\t\(.leak | join(", "))"'
+)
+if [[ "$PF_RESIDUE" -ne 0 ]]; then
+  {
+    echo "perf-bench: SUPPLY/DEMAND RESIDUE — $PF_RESIDUE member(s) require a formal no key in this source set can name; NO cells collected"
+    printf '%s' "$PREFLIGHT" | jq -r '.residue[] | "  - \(.member) (\(.entry)) UNSAT=[\(.unsat | join(", "))]"'
+    echo "  arming, same predicate: $PF_ARMING — so an empty residue on another run is a reading, not a dead check"
+  } >&2
+  exit 5
+fi
 
 # ── measure ──────────────────────────────────────────────────────────────────
 echo "collecting: ${#MATRIX[@]} cells (pure) + the ref arm of every non-noref row × $REPS reps ..." >&2
@@ -449,6 +639,31 @@ emit_report() {
   echo
   echo "## gen module-system perf bench (pure vs pinned nixpkgs.lib stack)"
   echo
+  # ── the combination block: the population, printed BEFORE the matrix that reads it ──
+  # Without this the report says what it measured but never which sources it measured it over, and
+  # an overlay that resolved to the baseline would be indistinguishable from one that applied. An
+  # entry that changes nothing is announced as `no-op` rather than quietly accepted.
+  echo "### combination under test"
+  echo
+  echo "| key | axis | source | rev / path | leak |"
+  echo "|---|---|---|---|---|"
+  for ck in "${COMB_KEYS[@]}"; do
+    csrc="baseline (ci/flake.lock)"
+    crev="${BASE_REV[$ck]:0:12}"
+    if [[ -n "${AT_STORE[$ck]:-}" ]]; then
+      crev="${AT_REV[$ck]}"
+      if [[ "${AT_STORE[$ck]}" == "${BASE_STORE[$ck]}" ]]; then
+        csrc="overlay \`${AT_SRC[$ck]}\` — **no-op**, it resolves to the baseline source"
+      else
+        csrc="overlay \`${AT_SRC[$ck]}\`"
+      fi
+    fi
+    printf '| %s | %s | %s | %s | %s |\n' "$ck" "${BASE_AXIS[$ck]}" "$csrc" "$crev" "${PF_LEAK[$ck]:-—}"
+  done
+  echo
+  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The two reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
+    "$PF_ARMING" "$PF_UNAPPLIED"
+  echo
   echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
   echo "|---|---:|---:|---:|---:|---:|---:|---|"
   for row in "${MATRIX[@]}"; do
@@ -513,6 +728,9 @@ emit_report() {
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"
+  elif [[ ${#AT_ORDER[@]} -gt 0 ]]; then
+    echo "CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on the CANDIDATE combination above, which this repository has not adopted:"
+    printf '  - %s\n' "${FAILURES[@]}"
   else
     echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed:"
     printf '  - %s\n' "${FAILURES[@]}"
@@ -538,6 +756,13 @@ if [[ -n "$UPDATE_FILE" ]]; then
 fi
 
 if [[ ${#FAILURES[@]} -ne 0 ]]; then
+  # The bounds are derived at the BASELINE anchor, so a candidate breaching one is a real,
+  # reportable fact about a combination the repository has not adopted — a different claim from
+  # "the published combination regressed", and it gets its own code rather than being folded in.
+  if [[ ${#AT_ORDER[@]} -gt 0 ]]; then
+    echo "perf-bench: CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on a candidate combination (see report above)" >&2
+    exit 6
+  fi
   echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed (see report above)" >&2
   exit 1
 fi

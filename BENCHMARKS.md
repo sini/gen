@@ -17,7 +17,7 @@ The wins reported here are on the **composition plane** — den registry/aspect/
 
 ### The 2026-07-04 audit reading — retained as the record, and it no longer reproduces
 
-Post-fix pure-gen vs the nixpkgs reference stack, median cpu on den composition shapes (from the 2026-07-04 module-system audit). **This table is a dated citation, kept verbatim as the record.** Of its six rows, `aspects` — its largest published win — has no reference arm in the current harness and cannot be compared at all; of the remaining five, **every counter cell that can be re-derived reads less favourably than published**, and `schemaHosts` thunks is inverted outright. The live reading is the next subsection, and where the two disagree the live reading governs. Its `nixpkgs`, `pure-gen` and `speedup` columns are **cpu**, which the methodology above rules carries across neither machines nor moments: treat all three as **non-reproducible**, not merely stale — and on `startup` the *direction* did not survive either: published here as **1.5× faster**, it reads **cpu p/r 10.560** in the live report below, pure ≈ 10× *slower* at the current pins. Nothing in this table is gated.
+Post-fix pure-gen vs the nixpkgs reference stack, median cpu on den composition shapes (from the 2026-07-04 module-system audit). **This table is a dated citation, kept verbatim as the record.** Of its six rows, `aspects` — its largest published win — has no reference arm in the current harness and cannot be compared at all; of the remaining five, **every counter cell that can be re-derived reads less favourably than published**, and `schemaHosts` thunks is inverted outright. The live reading is the next subsection, and where the two disagree the live reading governs. Its `nixpkgs`, `pure-gen` and `speedup` columns are **cpu**, which the methodology above rules carries across neither machines nor moments: treat all three as **non-reproducible**, not merely stale — and on `startup` the *direction* did not survive either: published here as **1.5× faster**, the live report below reads **cpu p/r ≈ 10**, pure an order of magnitude *slower* at the current pins. (One significant digit on purpose: that is a cpu ratio, which this page's own methodology rules non-reproducible, and every re-splice of the live block moves it — the previous wording quoted `10.560` and the very next re-splice falsified it.) Nothing in this table is gated.
 
 | workload     |     n | nixpkgs | pure-gen | speedup | thunks× | alloc× |
 | ------------ | ----: | ------: | -------: | ------: | ------: | -----: |
@@ -73,7 +73,7 @@ The dedicated **`overrideWarm`** workload (also in the live report) measures gen
 
 ### Engine cost — the always-on provenance channel
 
-The pure-side counter ratios carry one deliberate, measured overhead. The always-on lazy **provenance channel** (gen-merge `11b39d7`) forces declared-record defs to WHNF so `compose`/`diff` can report which module set each option, at what priority — an observability surface the nixpkgs reference does not carry, and therefore does not pay for. Measured pre/post that commit, it costs **+3.7–6.3% pure-side thunks** across the workload set: scalar thunks ÷ ref moved 0.844 → 0.882 (+4.5%), registry 0.493 → 0.524 (+6.3%) — both inside the shared 0.90 win-gate of the day. That shared gate was retired on 2026-09-21: every ratio-gated row now carries its own derived bound, and the headroom sentence this paragraph used to carry (*"~0.018 remains"* against 0.90) was exactly the silent-absorption reading the re-baseline removed — scalar's live anchor is 0.912 and its bound is 0.912, so there is no headroom to quote. The *post* values are the live table below; the *pre* values reproduce by pin-swapping gen-merge to a pre-`11b39d7` rev (`--override-input gen-merge …` then `nix run ./ci#perf-bench`), not a single hub command. The warm-path machinery (`classifyModule`) is **not** in this cost: it is allocated lazily and never forced on the cold path — a flat, n-independent **+40 thunks** across the whole pin (the `fdbf140` investigation), so classify + warm add ~zero cold-path cost. Observability is a channel paid for once, up front, not per item.
+The pure-side counter ratios carry one deliberate, measured overhead. The always-on lazy **provenance channel** (gen-merge `11b39d7`) forces declared-record defs to WHNF so `compose`/`diff` can report which module set each option, at what priority — an observability surface the nixpkgs reference does not carry, and therefore does not pay for. Measured pre/post that commit, it costs **+3.7–6.3% pure-side thunks** across the workload set: scalar thunks ÷ ref moved 0.844 → 0.882 (+4.5%), registry 0.493 → 0.524 (+6.3%) — both inside the shared 0.90 win-gate of the day. That shared gate was retired on 2026-09-21: every ratio-gated row now carries its own derived bound, and the headroom sentence this paragraph used to carry (*"~0.018 remains"* against 0.90) was exactly the silent-absorption reading the re-baseline removed — scalar's live anchor is 0.912 and its bound is 0.912, so there is no headroom to quote. The *post* values are the live table below; the *pre* values reproduce in **one hub command** — `nix run ./ci#perf-bench -- --at gen-merge=rev:<a pre-11b39d7 sha>` — which evaluates that combination without the repository adopting it and prints the combination it measured at the head of its own report. (This paragraph used to say `--override-input gen-merge …`. That form is **measured to change nothing**: read from `./ci` the input's address is `gen/gen-merge`, so the bare name matches no input; nix warns twice on stderr, neither warning reaches the report body, and the run exits **0** with `ALL GATES PASSED` over the *default* combination — a published reproduction route whose failure mode is a confident green.) The warm-path machinery (`classifyModule`) is **not** in this cost: it is allocated lazily and never forced on the cold path — a flat, n-independent **+40 thunks** across the whole pin (the `fdbf140` investigation), so classify + warm add ~zero cold-path cost. Observability is a channel paid for once, up front, not per item.
 
 ## Compat mode
 
@@ -263,20 +263,39 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 ## gen module-system perf bench (pure vs pinned nixpkgs.lib stack)
 
+### combination under test
+
+| key             | axis      | source                   | rev / path   | leak  |
+| --------------- | --------- | ------------------------ | ------------ | ----- |
+| gen-algebra     | member    | baseline (ci/flake.lock) | 57b12aa948be | —     |
+| gen-aspects     | member    | baseline (ci/flake.lock) | 8fca7bd100f7 | —     |
+| gen-class       | member    | baseline (ci/flake.lock) | 8bd9ba8af016 | —     |
+| gen-identity    | member    | baseline (ci/flake.lock) | cc367de0526e | —     |
+| gen-memo        | member    | baseline (ci/flake.lock) | c08125d06a92 | graph |
+| gen-merge       | member    | baseline (ci/flake.lock) | ce193e0139a8 | —     |
+| gen-prelude     | member    | baseline (ci/flake.lock) | ffea6a9681ca | —     |
+| gen-schema      | member    | baseline (ci/flake.lock) | 5da15b1b42db | —     |
+| gen-schema-orig | reference | baseline (ci/flake.lock) | 2b7c2d39ad30 | —     |
+| gen-scope       | member    | baseline (ci/flake.lock) | ac56cb85efc2 | graph |
+| gen-types       | member    | baseline (ci/flake.lock) | d01507be8d85 | —     |
+| nixpkgs-lib     | reference | baseline (ci/flake.lock) | db3f255737b9 | —     |
+
+> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member's OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: striking "prelude" from the environment fires on 5 of 8 applied entries. Entries that are not functions, so they declare no formals to read: gen-algebra, gen-identity, gen-prelude, nixpkgs-lib. The two reference keys do not take --at, because a ratio's denominator is its control.
+
 | workload      |    n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 | ------------- | ---: | ----------: | -----------: | ------: | ---------: | --------: | ------ |
-| startup       |    1 |       0.011 |        0.117 |  10.560 |      0.971 |     1.563 | ok     |
-| scalar        | 2000 |       0.031 |        0.132 |   4.325 |      0.912 |     0.761 | ok     |
-| scalar        | 8000 |       0.090 |        0.176 |   1.954 |      0.912 |     0.756 | ok     |
-| registry      |  500 |       0.051 |        0.141 |   2.778 |      0.777 |     0.633 | ok     |
-| registry      | 2000 |       0.165 |        0.236 |   1.429 |      0.776 |     0.631 | ok     |
-| lazyRegistry  | 2000 |       0.159 |        0.236 |   1.488 |      0.777 |     0.632 | ok     |
-| schemaHosts   |  400 |       0.067 |        0.183 |   2.727 |      1.170 |     0.995 | ok     |
-| schemaHosts   | 1600 |       0.225 |        0.355 |   1.575 |      1.171 |     0.995 | ok     |
-| wideFreeform  | 2000 |       0.025 |        0.131 |   5.321 |      1.095 |     0.810 | ok     |
-| wideFreeform  | 8000 |       0.082 |        0.181 |   2.209 |      1.096 |     0.806 | ok     |
-| deepSubmodule |  400 |       0.199 |        0.211 |   1.060 |      0.576 |     0.463 | ok     |
-| deepSubmodule | 1600 |       1.543 |        0.528 |   0.342 |      0.575 |     0.463 | ok     |
+| startup       |    1 |       0.009 |        0.087 |   9.579 |      0.976 |     1.578 | ok     |
+| scalar        | 2000 |       0.031 |        0.103 |   3.278 |      0.912 |     0.761 | ok     |
+| scalar        | 8000 |       0.103 |        0.151 |   1.473 |      0.912 |     0.756 | ok     |
+| registry      |  500 |       0.048 |        0.112 |   2.327 |      0.777 |     0.633 | ok     |
+| registry      | 2000 |       0.165 |        0.207 |   1.257 |      0.776 |     0.630 | ok     |
+| lazyRegistry  | 2000 |       0.171 |        0.205 |   1.201 |      0.777 |     0.631 | ok     |
+| schemaHosts   |  400 |       0.065 |        0.155 |   2.402 |      1.170 |     0.995 | ok     |
+| schemaHosts   | 1600 |       0.233 |        0.339 |   1.457 |      1.171 |     0.995 | ok     |
+| wideFreeform  | 2000 |       0.028 |        0.108 |   3.848 |      1.095 |     0.810 | ok     |
+| wideFreeform  | 8000 |       0.079 |        0.150 |   1.888 |      1.096 |     0.806 | ok     |
+| deepSubmodule |  400 |       0.207 |        0.193 |   0.935 |      0.576 |     0.463 | ok     |
+| deepSubmodule | 1600 |       1.617 |        0.502 |   0.310 |      0.575 |     0.463 | ok     |
 
 > Every ratio-gated row carries its OWN bound, derived from its measured anchor plus a margin smaller than the cheaper of the two constructions the one-engine consolidation introduced on it (the derivation is in perf-bench.sh beside each constant, the record in ci/README.md). wideFreeform thunks ride a parity band (gate ≤ 1.096) rather than a win-gate, because freeform absorption is thunk-parity with nixpkgs. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of 3 interleaved samples). See ci/README.md.
 
@@ -284,8 +303,8 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload |    n | pure cpu (s) | pure thunks | pure alloc |
 | -------- | ---: | -----------: | ----------: | ---------: |
-| aspects  |  400 |        0.191 |     1031233 |   49413808 |
-| aspects  | 1600 |        0.406 |     4115533 |  196901504 |
+| aspects  |  400 |        0.158 |     1031297 |   49416528 |
+| aspects  | 1600 |        0.384 |     4115597 |  196912416 |
 
 > These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
 > track a grammar that moves by design ruling, so such a gate would red on ruled improvements
@@ -295,28 +314,28 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload      | sizes       | thunk growth | alloc growth |
 | ------------- | ----------- | -----------: | -----------: |
-| scalar        | 2000 → 8000 |        3.971 |        3.953 |
+| scalar        | 2000 → 8000 |        3.970 |        3.954 |
 | registry      | 500 → 2000  |        3.985 |        3.970 |
 | schemaHosts   | 400 → 1600  |        3.985 |        3.979 |
 | aspects       | 400 → 1600  |        3.991 |        3.985 |
-| wideFreeform  | 2000 → 8000 |        3.965 |        3.950 |
+| wideFreeform  | 2000 → 8000 |        3.964 |        3.949 |
 | deepSubmodule | 400 → 1600  |        3.996 |        3.992 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
 
 | n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 | ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
-| 400  |     2006373 |       343903 |      0.171 |     0.175 |   0.587 | ok        |
-| 1600 |     8008773 |      1359703 |      0.170 |     0.173 |   0.335 | ok        |
+| 400  |     2006428 |       343963 |      0.171 |     0.175 |   0.490 | ok        |
+| 1600 |     8008828 |      1359763 |      0.170 |     0.173 |   0.312 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): pure-full 3.992×, pure-fixed 3.954× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): pure-full 3.992×, pure-fixed 3.953× (gate ≤ 5.5)
 
 ### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ 0.30 on thunks + alloc)
 
 | n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
 | ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
-| 400  |     2029143 |      489484 |      0.241 |     0.252 |   0.617 | ok        |
-| 1600 |     8097543 |     1927684 |      0.238 |     0.248 |   0.418 | ok        |
+| 400  |     2029198 |      489544 |      0.241 |     0.252 |   0.583 | ok        |
+| 1600 |     8097598 |     1927744 |      0.238 |     0.248 |   0.395 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): cold 3.991×, warm 3.938× (gate ≤ 5.5)
 

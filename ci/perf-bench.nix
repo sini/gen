@@ -24,46 +24,141 @@
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
   stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm"
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "preflight"
   n,
 }:
 let
-  prelude = import "${srcs.gen-prelude}/lib";
-  genIdentity = import "${srcs.gen-identity}/lib";
-  genTypes = import "${srcs.gen-types}/lib" {
-    inherit prelude;
-    identity = genIdentity;
+  # ── the combination's construction, DEMAND-DRIVEN ─────────────────────────────
+  # Every member is applied with exactly the formals ITS OWN entry object declares, read live with
+  # `builtins.functionArgs` at the path this file imports. A hand-written argument set per call site
+  # is the shape ci/hub-substrate.nix's header names — "comparing SUPPLY against DEMAND read from
+  # this file's own hand-written copy would be `x == x`" — and its failure mode is not cosmetic: a
+  # member that gains or loses a formal is then reported by the EVALUATOR, which aborts on the first
+  # offender a workload happens to force, and most workloads force none. `preflight` below reports
+  # the whole residue in one pass instead.
+  #
+  # Two things here cannot be read off the source set and are therefore written down: which object a
+  # call site imports, and which name the environment publishes it under.
+  entryPath = {
+    "gen-prelude" = "/lib";
+    "gen-identity" = "/lib";
+    "gen-types" = "/lib";
+    "gen-merge" = "/lib";
+    # gen-memo and gen-scope are applied at their repository ROOT, not at /lib — a DIFFERENT value
+    # with different formals (at /lib both make `graph` REQUIRED; at the root every formal carries a
+    # default). A census over /lib for these two reads a demand the call site never has to satisfy.
+    "gen-memo" = "";
+    "gen-scope" = "";
+    "gen-algebra" = "/lib";
+    "gen-schema" = "/lib";
+    "gen-aspects" = "/lib";
+    "gen-class" = "/lib"; # tier 2: the injected gen-merge kernel is what enables `applyCoreFixed`
+    "gen-schema-orig" = "/lib";
+    "nixpkgs-lib" = "/lib";
   };
-  genMerge = import "${srcs.gen-merge}/lib" {
-    inherit prelude;
-    types = genTypes;
-    memo = import "${srcs.gen-memo}" { inherit prelude; }; # gen-memo's standalone entry defaults graph from its own lock
-    scope = import "${srcs.gen-scope}" { inherit prelude; }; # same standalone form: graph and identity default from its own lock
+  envName = {
+    "gen-prelude" = "prelude";
+    "gen-identity" = "identity";
+    "gen-types" = "types";
+    "gen-merge" = "merge";
+    "gen-memo" = "memo";
+    "gen-scope" = "scope";
+    "gen-algebra" = "algebra";
+    "gen-schema" = "schema";
+    "gen-aspects" = "aspects";
+    "gen-class" = "class";
+    "gen-schema-orig" = "schemaOrig";
+    "nixpkgs-lib" = "lib";
   };
-  genAlgebra = import "${srcs.gen-algebra}/lib";
-  genSchemaNew = import "${srcs.gen-schema}/lib" {
-    inherit prelude;
-    merge = genMerge;
-    algebra = genAlgebra;
-    identity = genIdentity;
-  };
-  genAspectsNew = import "${srcs.gen-aspects}/lib" {
-    inherit prelude;
-    merge = genMerge;
-    schema = genSchemaNew;
-    identity = genIdentity;
-  };
-  # gen-class wired for tier 2 (the injected gen-merge kernel enables `applyCoreFixed`). Only the
-  # `classShare` workload touches this; every pure/ref cell ignores it.
-  genClass = import "${srcs.gen-class}/lib" {
-    inherit prelude;
-    merge = genMerge;
-  };
+  memberKeys = builtins.attrNames entryPath;
 
-  lib = import "${srcs.nixpkgs-lib}/lib";
-  genSchemaOld = import "${srcs.gen-schema-orig}/lib" {
-    inherit lib;
-    algebra = genAlgebra;
+  # The member's flake/resolver seam (ci/hub-substrate.nix:56-61) — never hub-suppliable, so it is
+  # never an environment key and always lands "not nameable". Struck where DEFAULTED; left to refuse
+  # where REQUIRED, because a member asking the hub for a resolver it does not have must not be
+  # filtered out of the census, pass the pre-flight, and then abort at cell time.
+  seamFormals = [
+    "inputs"
+    "src"
+    "dep"
+    "wire"
+  ];
+
+  entryOf = k: import "${srcs.${k}}${entryPath.${k}}";
+  isApplied = k: builtins.isFunction (entryOf k); # ci/hub-substrate.nix:63 — functionArgs throws otherwise
+  formalsOf = k: builtins.functionArgs (entryOf k); # { formal -> carries-a-default }
+
+  # `env` is a FIXPOINT, not an ordered list: each member is applied with values drawn from `env`
+  # itself and Nix's laziness resolves the construction order. The well-formedness condition is
+  # therefore ACYCLICITY, not lexical position — `memo` and `scope` are nameable for `gen-merge`
+  # even though the old hand-written form constructed them inside gen-merge's own argset. A genuine
+  # cycle is an `infinite recursion` refusal, never a silent mis-supply. `env`'s SPINE is computable
+  # without forcing any member (the names come from `envName`), which is what makes `intersectAttrs`
+  # against it safe while `env` is being built.
+  env = builtins.listToAttrs (
+    map (k: {
+      name = envName.${k};
+      value =
+        if isApplied k then
+          # SUPPLIED ∪ PINNED in one builtin: every declared formal the environment can name, and
+          # nothing else. A formal the environment cannot name is either UNSAT (required — refused
+          # by the pre-flight) or a LEAK (defaulted — declared in the combination block, and it
+          # resolves from the member's OWN lock rather than from the combination you asked for).
+          entryOf k (builtins.intersectAttrs (formalsOf k) env)
+        else
+          entryOf k;
+    }) memberKeys
+  );
+
+  inherit (env) prelude lib;
+  genIdentity = env.identity;
+  genTypes = env.types;
+  genMerge = env.merge;
+  genAlgebra = env.algebra;
+  genSchemaNew = env.schema;
+  genAspectsNew = env.aspects;
+  genClass = env.class;
+  genSchemaOld = env.schemaOrig;
+
+  # ── the pre-flight census (`--argstr workload preflight`) ─────────────────────
+  # Forces NO member body: `builtins.functionArgs` evaluates the lambda and never applies it, so this
+  # names every offending member in ONE pass where application aborts at one and, on most cells, at
+  # none. `strike` is the arming knob — the identical predicate against the environment with a name
+  # removed — so every run prints a seeded delta beside its live reading.
+  envKeysOn = strike: builtins.filter (f: !(builtins.elem f strike)) (builtins.attrValues envName);
+  nameableOn = strike: f: builtins.elem f (envKeysOn strike);
+  isSeam = f: builtins.elem f seamFormals;
+  namesWhere = p: k: builtins.filter (f: p (formalsOf k).${f}) (builtins.attrNames (formalsOf k));
+  requiredOf = namesWhere (hasDefault: !hasDefault);
+  defaultedOf = namesWhere (hasDefault: hasDefault);
+  appliedKeys = builtins.filter isApplied memberKeys;
+
+  censusOn =
+    strike:
+    map (k: {
+      member = k;
+      entry = if entryPath.${k} == "" then "ROOT" else "/lib";
+      required = requiredOf k;
+      defaulted = defaultedOf k;
+      supplied = builtins.filter (nameableOn strike) ((requiredOf k) ++ (defaultedOf k));
+      unsat = builtins.filter (f: !(nameableOn strike f)) (requiredOf k);
+      leak = builtins.filter (f: !(nameableOn strike f) && !(isSeam f)) (defaultedOf k);
+    }) appliedKeys;
+  residueOn = strike: builtins.filter (r: r.unsat != [ ]) (censusOn strike);
+
+  # The arming strike. `prelude` is the name the largest number of entries make REQUIRED, so it is
+  # the sharpest single-name seed available; its delta is reported, never its absolute.
+  armingStrike = "prelude";
+  preflight = {
+    rows = censusOn [ ];
+    residue = residueOn [ ];
+    leaks = builtins.filter (r: r.leak != [ ]) (censusOn [ ]);
+    unappliedEntries = builtins.filter (k: !(isApplied k)) memberKeys;
+    arming = {
+      strike = armingStrike;
+      fires = builtins.length (residueOn [ armingStrike ]);
+      members = map (r: r.member) (residueOn [ armingStrike ]);
+      of = builtins.length appliedKeys;
+    };
   };
 
   pureP = {
@@ -716,7 +811,9 @@ let
     ) ovIdx;
 
   projection =
-    if workload == "classShare" then
+    if workload == "preflight" then
+      preflight
+    else if workload == "classShare" then
       classShare
     else if workload == "overrideWarm" then
       overrideWarm
@@ -724,7 +821,14 @@ let
       workloads.${workload} P;
   json = builtins.toJSON projection;
 in
-{
-  digest = builtins.hashString "sha256" json;
-  count = builtins.stringLength json;
-}
+# The census is READ, not digested: ci/perf-bench.sh parses the residue and the leaks out of it, and
+# a digest would hide exactly the thing it exists to report. `json` stays a thunk on this branch, so
+# no member body is forced; `preflight` stays a thunk on every other branch, so the gated counters
+# are untouched by its presence.
+if workload == "preflight" then
+  projection
+else
+  {
+    digest = builtins.hashString "sha256" json;
+    count = builtins.stringLength json;
+  }

@@ -942,6 +942,81 @@
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';
+          # ── the combination the bench TAKES, NAMES and ECHOES (`--at`, and the block in the report) ──
+          # `perfSrcs` above stays the BASELINE and nothing else, so an EMPTY overlay passes it
+          # through untouched and the CI job is the run this file has always produced. What the app
+          # additionally needs in order to NAME a combination is, per key, the revision the baseline
+          # resolved to and the upstream flake ref an `--at <k>=rev:…/ref:…` must fetch from. Neither
+          # is recoverable from a store path and `genInputs.gen-X` does not carry its own URL, so
+          # both are read out of THIS flake's own lock — resolved BY PATH from the root, never by
+          # node label, because the lock carries duplicate-named nodes (`gen-merge_4`). The `axis`
+          # field is what lets the app refuse `--at` on the two REFERENCE keys by name: a ratio's
+          # denominator is its control, and if both arms float a moved ratio is unattributable.
+          ciLock = builtins.fromJSON (builtins.readFile ./flake.lock);
+          lockNodeAt =
+            segs:
+            builtins.foldl' (
+              node: seg:
+              let
+                v = ciLock.nodes.${node}.inputs.${seg};
+              in
+              # a `follows` edge is a segment path walked from the root, not a node key
+              if builtins.isList v then lockNodeAt v else v
+            ) "root" segs;
+          perfMemberKeys = [
+            "gen-prelude"
+            "gen-types"
+            "gen-merge"
+            "gen-memo"
+            "gen-scope"
+            "gen-algebra"
+            "gen-identity"
+            "gen-schema"
+            "gen-aspects"
+            "gen-class"
+          ];
+          perfRefKeys = [
+            "gen-schema-orig"
+            "nixpkgs-lib"
+          ];
+          perfNodeOf =
+            k:
+            ciLock.nodes.${
+              lockNodeAt (
+                if builtins.elem k perfRefKeys then
+                  [ k ]
+                else
+                  [
+                    "gen"
+                    k
+                  ]
+              )
+            };
+          perfFlakeRefOf =
+            k:
+            let
+              o = (perfNodeOf k).original;
+            in
+            if o.type or "" == "github" then
+              "github:${o.owner}/${o.repo}"
+            else
+              o.url
+                or (throw "ci/flake.nix: perf-bench cannot address '${k}' — its lock `original` names neither a github owner/repo nor a url");
+          perfCombination = pkgs.writeText "perf-combination.json" (
+            builtins.toJSON (
+              builtins.listToAttrs (
+                map (k: {
+                  name = k;
+                  value = {
+                    store = if builtins.elem k perfRefKeys then "${inputs.${k}}" else "${genInputs.${k}}";
+                    rev = (perfNodeOf k).locked.rev or "";
+                    flakeref = perfFlakeRefOf k;
+                    axis = if builtins.elem k perfRefKeys then "reference" else "member";
+                  };
+                }) (perfMemberKeys ++ perfRefKeys)
+              )
+            )
+          );
           perfBench = pkgs.writeShellApplication {
             name = "gen-perf-bench";
             runtimeInputs = [
@@ -952,6 +1027,7 @@
             text = ''
               export PERF_WORKLOADS=${./perf-bench.nix}
               export PERF_SRCS=${perfSrcs}
+              export PERF_COMBINATION=${perfCombination}
             ''
             + builtins.readFile ./perf-bench.sh;
           };
