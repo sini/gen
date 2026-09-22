@@ -121,7 +121,7 @@ GROWTH_MAX=5.5
 # registry/lazyRegistry with no gate firing at all.
 declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
 # scalar n=8000 — anchors 0.912 / 0.756; ① 0.037994 / 0.054458, ② 0.000174 / 0.000083 (~free).
-ROW_THUNKS_MAX[scalar,8000]=0.912
+ROW_THUNKS_MAX[scalar,8000]=0.912 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 ROW_ALLOC_MAX[scalar,8000]=0.756
 # registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
 ROW_THUNKS_MAX[registry,2000]=0.808
@@ -132,9 +132,10 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
 # The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
 # stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
-# the project's PUBLIC claim moves with it is an open owner item recorded in BENCHMARKS.md.
-ROW_THUNKS_MAX[schemaHosts,1600]=1.210
-ROW_ALLOC_MAX[schemaHosts,1600]=1.023
+# the project's PUBLIC claim moved with it was decided on 2026-09-21 — it did: BENCHMARKS.md's
+# composition-plane claim is amended to this band and cites this bound back here.
+ROW_THUNKS_MAX[schemaHosts,1600]=1.210 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+ROW_ALLOC_MAX[schemaHosts,1600]=1.023  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.495

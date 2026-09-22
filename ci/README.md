@@ -192,7 +192,7 @@ them):
 | deepSubmodule |  400 |  0.198s |   0.225s |      0.576 |     0.463 |
 | deepSubmodule | 1600 |  1.555s |   0.533s |  **0.575** | **0.463** |
 
-Linearity is 3.97–4.00× on every workload (gate ≤ 5.5), parity `ok` on every cell, and the
+Linearity is 3.95–4.00× on every workload and both counters (gate ≤ 5.5), parity `ok` on every cell, and the
 `classShare` / `overrideWarm` sections are unmoved (0.170–0.171 and 0.238–0.241 against their 0.30
 ceilings). Bold = the gated size, i.e. the twelve assertions the bounds below govern.
 
