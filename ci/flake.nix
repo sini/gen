@@ -632,23 +632,32 @@
           # Build the lock-agreement check (den-hoag-0moiy): prints the two-edge report and the
           # in-cell arming, and names every disagreeing edge with BOTH revisions and BOTH lock paths.
           #
-          # ★★★ `gating` IS THE ONE LINE THAT IS THE OWNER'S, AND IT IS THE ONLY ARM-DEPENDENT OBJECT
-          # IN THIS CELL. Whether pin coherence between the root lock and ci's is a GATING red or an
-          # OBSERVATION was routed to the owner by `specs/2026-09-01-gen-ci-lock-observation-spec.md`
-          # §4.1.1 and is UNANSWERED at this write. The predicate, the domain, the traversal, the
-          # `follows` limb, the floor and this message are IDENTICAL under both arms; only the exit
-          # status of a pin disagreement differs, and only here.
-          #   OBSERVE-ONLY, shipped:  a pin disagreement PRINTS and the build passes.
-          #   GATING, one edit:       gating = failed != [ ];
-          # ★ An ARMING failure exits 1 under BOTH arms. A guard that can no longer fire is not a
-          # passing guard in either disposition, and that is not the question the owner was asked.
+          # ★★★ GATING, shipped: a pin disagreement EXITS 1. Whether pin coherence between the root
+          # lock and ci's is a GATING red or an OBSERVATION was routed to the owner by
+          # `specs/2026-09-01-gen-ci-lock-observation-spec.md` §4.1.1, and den-hoag-6fmmb ANSWERS it:
+          # a check whose red is cleared by a RULING must not gate, one cleared by a FIX should. A
+          # `locks-agree` red is FIX-cleared, and by this repository alone — the fix is the remedy
+          # this cell already prints below. Driven in a copy of the hub against one seeded root pin:
+          # that remedy exits 0, moves exactly the one node in `ci/flake.lock`, and returns
+          # `locks-agree` to true WITH THE SEED STILL IN THE ROOT LOCK, so the red is disposed of
+          # rather than undone.
+          # ★ AND THE OBSERVE-ONLY ARM DID NOT OBSERVE. Over that same live disagreement,
+          # `nix flake check ./ci --keep-going` exits 0 with an EMPTY stdout and not one occurrence
+          # of this cell's refusal anywhere in stderr: nix hides a builder's log at exit 0 and
+          # `.github/workflows/ci.yml` passes no `-L`, while `nix log` on the same drv prints it once.
+          # The shipped choice was never gate-versus-observe; it was gate-versus-silence.
+          # ★ Defaulted, reversible (den-hoag-6fmmb): the reversal is `gating = armingFailed != [ ]`,
+          # and it is warranted only if a `locks-agree` red is shown NOT to be clearable here.
+          # ★ An ARMING failure exits 1 as it always did, and `armingFailed` survives the change: the
+          # ARMING message below names a guard that stopped firing, and a mere pin disagreement —
+          # which the guard caught exactly as designed — must not print it.
           mkLockAgreementCheck =
             name: s:
             let
               allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
               failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
               armingFailed = builtins.filter (k: k != "locks-agree") failed;
-              gating = armingFailed != [ ];
+              gating = failed != [ ];
 
               report = builtins.toJSON ({ inherit allOk failed; } // s.report);
               disagreeing = s.report.differs ++ s.report.missing ++ s.report.unlocked;
@@ -686,10 +695,11 @@
           # Build the hub-entry check (L4): prints the entry's own member-to-path map with the node
           # and repository each path resolves to, and names any member wired to another repository.
           #
-          # GATING, unlike its two lock-reading neighbours. Their readings are observe-only because
-          # the states they describe are TRUE of the ecosystem today and not satisfiable by this
-          # repository alone. This one is a property of a file in THIS repository, it holds now, and
-          # nothing outside the hub has to move for it to keep holding.
+          # GATING, like `lock-agreement` and unlike `pin-coherence`'s two readings. Those readings
+          # are observe-only because the states they describe are TRUE of the ecosystem today and
+          # not satisfiable by this repository alone; a `locks-agree` red is neither, which is why it
+          # gates (den-hoag-6fmmb). This one is a property of a file in THIS repository, it holds
+          # now, and nothing outside the hub has to move for it to keep holding.
           mkHubEntryCheck =
             name: s:
             let
@@ -770,9 +780,11 @@
           # today (9 of the 10 nodes that can disagree), and hub-root agreement is NOT SATISFIABLE
           # while the member→member ci edge graph holds a cycle — `gen-merge/ci` pins `gen-memo` and
           # `gen-memo/ci` pins `gen-merge`, so each would have to name a commit of the other that
-          # names it back. This is `mkLockAgreementCheck`'s shipped disposition verbatim and for the
-          # same reason: the predicate, the domain, the traversal and this message are IDENTICAL
-          # under both arms, and only the exit status of a reading differs.
+          # names it back. `mkLockAgreementCheck` NO LONGER SHARES this disposition — its red is
+          # fix-cleared from this repository and it gates (den-hoag-6fmmb), while these two readings
+          # are cleared by neither a ruling nor a fix available here. The predicate, the domain, the
+          # traversal and this message are IDENTICAL under both arms, and only the exit status of a
+          # reading differs.
           #   OBSERVE-ONLY, shipped:  an incoherent pin PRINTS and the build passes.
           #   GATING, one edit:       gating = failed != [ ];
           # ★ An ARMING failure exits 1 under BOTH arms. A guard that can no longer fire is not a
