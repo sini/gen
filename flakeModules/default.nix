@@ -24,8 +24,8 @@
 # now gen-delivery's own `project`, which reads the DECLARATION — so this module takes one, the new
 # `gen.aspectCnf` option, and refuses by name when it is absent rather than degrading to shape. Two
 # sentences of the carried header below are stale by that change and are left as source provenance
-# like the two named further down: SYSTEMS' "from compose's `hosts` projection" (:75) and "from ONE
-# `compose`" (:67) — the SYSTEMS half now takes a second input, the declaration.
+# like the two named further down: SYSTEMS' "from compose's `hosts` projection" (:84) and "from ONE
+# `compose`" (:75) — the SYSTEMS half now takes a second input, the declaration.
 #
 # AND AT THE UNIT-5 RE-POINT, WHICH RETIRED THE LAST gen-flake READS. This module now consumes NO
 # gen-flake surface:
@@ -66,7 +66,7 @@
 #
 #     imports = [ gen-flake.flakeModules.default ];
 #     gen.tree = ./gen-modules;                       # a directory of gen definition modules
-#     gen.extraModules.<host> = [ ./hardware.nix ];   # per-host platform/base modules
+#     gen.extraModules.<node> = [ ./hardware.nix ];   # per-node platform/base modules
 #     gen.terminals.<class> = <terminal>;             # extra class terminals (a `nixos` one defaults
 #                                                     #   in from `gen.nixpkgs`); map others off
 #                                                     #   `gen.realized.<class>`
@@ -86,7 +86,7 @@
 #               gen-bind's wrap core). A host with no `nixos` content is not built (class-major); a
 #               registry with no `nixos` class at all yields the empty `or { }`.
 #   * TERMINALS — `gen.terminals` is the class-keyed registry `realize` consumes; `gen.realized` is the
-#               full class-major result (`{ <class>.<host> = artifact; }`), so a consumer wires
+#               full class-major result (`{ <class>.<node> = artifact; }`), so a consumer wires
 #               non-nixos classes into their own flake outputs off `gen.realized.<class>`.
 #
 # This file is the FLAKE-PARTS / TERMINAL side of gen-flake. Unlike the pure core
@@ -286,8 +286,8 @@ let
       );
     };
 
-  # The class-major realize result (`{ <class>.<host> = artifact; }`) — gen-delivery's layered fold
-  # over the `project` result above. Reads only `projected`, the terminals above, and per-host
+  # The class-major realize result (`{ <class>.<node> = artifact; }`) — gen-delivery's layered fold
+  # over the `project` result above. Reads only `projected`, the terminals above, and per-node
   # extras — never the injected/built config below, so no cycle. Shared by the `gen.realized` handle
   # and `flake.nixosConfigurations`. The hub passes no `bindings`/`refinements`/`layerOrder`: the
   # interim module grows no contract, and a consumer wanting the layered surface uses gen-delivery
@@ -421,7 +421,7 @@ in
       default = inputs.nixpkgs or null;
       defaultText = lib.literalExpression "inputs.nixpkgs or null";
       description = ''
-        The nixpkgs used to BUILD the per-host NixOS systems (the default `nixos` terminal). Defaults
+        The nixpkgs used to BUILD the per-node NixOS systems (the default `nixos` terminal). Defaults
         to the consumer's own `inputs.nixpkgs`, so systems pin to the consumer's nixpkgs, not
         gen-flake's. `null` (or a consumer-supplied `terminals.nixos`) suppresses the default `nixos`
         terminal.
@@ -454,8 +454,8 @@ in
       type = types.attrsOf (types.listOf types.deferredModule);
       default = { };
       description = ''
-        Per-host extra NixOS modules appended to each built system, e.g.
-        `{ <host> = [ ./hardware.nix { system.stateVersion = "24.05"; } ]; }`.
+        Per-node extra NixOS modules appended to each built system, keyed by node name, e.g.
+        `{ <node> = [ ./hardware.nix { system.stateVersion = "24.05"; } ]; }`.
       '';
     };
 
@@ -475,7 +475,7 @@ in
       default = realized;
       defaultText = lib.literalExpression "genDelivery.realize { projected = <genDelivery.project { values; cnf = config.gen.aspectCnf; }>; inherit terminals; extraModules = config.gen.extraModules; }";
       description = ''
-        The full class-major realize result (`{ <class>.<host> = artifact; }`) over `gen.terminals`.
+        The full class-major realize result (`{ <class>.<node> = artifact; }`) over `gen.terminals`.
         `flake.nixosConfigurations` is `realized.nixos or { }`; a consumer maps any other class off
         `realized.<class>`. Internal read handle.
       '';
