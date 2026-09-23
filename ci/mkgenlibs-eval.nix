@@ -389,7 +389,10 @@ let
     scope = "9784f1f1148c623fa04a6d1ee4191f3d43bbab322825894ded52f0ce2dad63ca";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
-    types = "41ddedce3dcf0628fd06dd634ca0c2a4a3b14319e0c422590e64841ccdfc7438";
+    # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
+    # surface gained ONE name, `identityGuard`, the step-indexed guard that bounds type nesting for
+    # identity. Nothing was removed and no other member moved.
+    types = "c65360ca4734e07b2e5a8992fad8237f4358400633f4a202e89ef26c5ba41754";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
