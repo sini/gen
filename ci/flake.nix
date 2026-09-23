@@ -286,6 +286,13 @@
         inherit lib;
       };
 
+      # ── hub-entry-agreement — the two entry paths answer one query alike ──
+      # `hub-entry` reads the standalone entry's WIRING hermetically; this FORCES both entry paths on
+      # gen-inspect's published fleet and compares the answers, so it fetches and is kept apart.
+      # `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that MUST be
+      # `true`.
+      hubEntryAgreement = import ./hub-entry-agreement.nix { inherit (inputs) gen; };
+
       # L3: the substrate the hub hands the three roster members whose flake `.lib` is published
       # unapplied. `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that
       # MUST be `true`.
@@ -337,6 +344,8 @@
       flake.lib.pinCoherence = pinCoherence;
       #   nix eval ./ci#lib.hubEntry.report --json | jq   (rows / misdirected / arming)
       flake.lib.hubEntry = hubEntry;
+      #   nix eval ./ci#lib.hubEntryAgreement.report --json | jq   (answers / arming)
+      flake.lib.hubEntryAgreement = hubEntryAgreement;
       #   nix eval ./ci#lib.hubSubstrate.report --json | jq   (rows / underSupplied / text / arming)
       flake.lib.hubSubstrate = hubSubstrate;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
@@ -733,6 +742,29 @@
                 ''}
                 ${lib.optionalString (failed != [ ]) ''
                   echo "HUB ENTRY -- readings that did not hold: ${lib.concatStringsSep " " failed}. Read report.arming above: every arm is a DELTA against the live reading, printed beside it" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
+          # Build the hub-entry-agreement check: prints both entry paths' answers and each seeded
+          # arm's, GATING for the same reason `mkHubEntryCheck` does — a property of this tree.
+          mkHubEntryAgreementCheck =
+            name: s:
+            let
+              failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
+              report = builtins.toJSON ({ inherit failed; } // s.report);
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "-- ${name} --"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (failed != [ ]) ''
+                  echo "HUB ENTRY PATHS DISAGREE -- readings that did not hold: ${lib.concatStringsSep " " failed}. Read report.answers and report.arming above" >&2
                   exit 1
                 ''}
                 cp "$reportPath" "$out"
@@ -1137,6 +1169,7 @@
             lock-agreement = mkLockAgreementCheck "lock-agreement" lockAgreement;
             pin-coherence = mkPinCoherenceCheck "pin-coherence" pinCoherence;
             hub-entry = mkHubEntryCheck "hub-entry" hubEntry;
+            hub-entry-agreement = mkHubEntryAgreementCheck "hub-entry-agreement" hubEntryAgreement;
             hub-substrate = mkHubSubstrateCheck "hub-substrate" hubSubstrate;
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it

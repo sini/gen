@@ -81,9 +81,9 @@
 # revision from any comparison: every non-path site is compared exactly as before, and two members
 # naming two revisions of one repository are still named however either of them reaches it. A `path:`
 # pin has no revision to hide behind. Reading the prohibition to cover this type would make the check
-# unable to coexist with the self-input invariant (den-hoag-c0wc1) that `gen-inspect` and `gen-memo`
-# hold by following their own node onto the tree under test — which is what makes THAT invariant
-# testable, is CI-green in both members, and is not this check's to undo.
+# unable to coexist with the self-input invariant (den-hoag-c0wc1), one of whose repairs is a member
+# following its own node onto the tree under test by `path:` — which is what makes THAT invariant
+# testable, and is not this check's to undo.
 #
 # ★ AND THE BROKEN-INSTRUMENT CASE SURVIVES INTACT. A node with NO `locked.rev` that is NOT a path —
 # a tarball, a `file:`, a node this walk failed to resolve — still REFUSES by name, because there
@@ -577,9 +577,10 @@ let
 
   # ★ WHAT PROVES THE PARTITION IS KEYED ON THE PLANE rather than on "a path node anywhere" is a RED
   # DRIVE, not an arm here: pointing `rootLockPathOf` at `ci/flake.lock` reds
-  # `root-plane-refuses-path` on the LIVE corpus, because `gen-inspect` and `gen-memo`'s legitimate
-  # self-references become violations. An in-cell arm for it would have to read the root plane over a
-  # world whose CI lock was seeded — and the root locks are untouched there, so both sides would be
+  # `root-plane-refuses-path` wherever a member's ci lock holds a legitimate `path:` self-reference,
+  # which then becomes a violation. No roster member's ci lock holds one (den-hoag-mxbv4 removed the
+  # last), so the drive needs such a lock planted to read red. An in-cell arm for it would have to
+  # read the root plane over a world whose CI lock was seeded — and the root locks are untouched there, so both sides would be
   # the live reading. That arm cannot fail, and an arm that cannot fail is not a control.
 
   seededNoGenEdges = coherenceOf memberNames following (seedMemberLock {
