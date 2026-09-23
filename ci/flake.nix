@@ -1392,7 +1392,7 @@
               }
               {
                 name = "relock";
-                help = "Bump this repository's locks, root then ci [relock [<input>|--hub]]";
+                help = "Bump this repository's locks, root then ci [relock [<input>]]";
                 # The same binary every member's devshell carries, built here from the published
                 # builder rather than inherited from a module this repository cannot take. It
                 # resolves `$FLAKE_ROOT` itself and refuses to leave a self-input violation behind.
