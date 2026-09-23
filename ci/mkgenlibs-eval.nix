@@ -347,7 +347,9 @@ let
   # regeneration route above.
   expectedSurface = {
     algebra = "3a484271b71a218419181bc5ce55cf593ab814e9abeab0914c5658532995bf86";
-    aspects = "a51fb019bf402c246739f034649e1d09e890757f01cc8f6a12857753b2a2f107";
+    # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
+    # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
+    aspects = "5c3122bd668746dffa2e5e7e30aaac4978f54c5be4d74feadfa14c9375c07106";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";

@@ -167,7 +167,7 @@ let
   # No shape test can fix that, because the two are the SAME SHAPE and differ only in what was
   # DECLARED. So the projection is gen-delivery's `project` (`deliveryClassesOf`: declared
   # `category = "class"` AND content present, shape never consulted) rather than a second predicate
-  # here that can drift from it. `bindings.node` is the resolved instance and `selectHosts` is built
+  # here that can drift from it. `bindings.node` is the resolved instance and `selectNodes` is built
   # from `gen.nodeRegistryPath` — the CONSUMER'S word for its own registry. It used to take
   # gen-delivery's `values.hosts or { }` default, which baked the den word `hosts` into this
   # framework's published surface (ADR-0035: gen names no domain entity) and projected `{ }` with no
@@ -227,7 +227,7 @@ let
   projected = genDelivery.project {
     values = composedCore.values;
     cnf = cfg.aspectCnf;
-    selectHosts = selectNodeRegistry;
+    selectNodes = selectNodeRegistry;
   };
 
   composed = composedCore // {
@@ -364,7 +364,7 @@ in
         `mkMerge`, never `//`, whose right-wins silently drops a node declared in both — and names
         that path here. The union is then a named value in `composed.values`, reachable by every
         query, which an in-substrate union would not be (ADR-0012 rule 2, ADR-0019). Where the
-        selection is not a plain path, `gen-delivery.project`'s `selectHosts` is the direct-call
+        selection is not a plain path, `gen-delivery.project`'s `selectNodes` is the direct-call
         door.
       '';
     };

@@ -268,8 +268,10 @@ GROWTH_MAX=5.5
 # registry/lazyRegistry with no gate firing at all.
 declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
 # scalar n=8000 — anchors 0.912 / 0.756; ① 0.037994 / 0.054458, ② 0.000174 / 0.000083 (~free).
-ROW_THUNKS_MAX[scalar,8000]=0.912 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
-ROW_ALLOC_MAX[scalar,8000]=0.756
+# RATCHETED to the figures gen-merge d84ba687 lands (0.902 / 0.754, down from the pre-channel
+# figure 0.912 / 0.756), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
+ROW_THUNKS_MAX[scalar,8000]=0.902 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+ROW_ALLOC_MAX[scalar,8000]=0.754
 # registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
 ROW_THUNKS_MAX[registry,2000]=0.808
 ROW_ALLOC_MAX[registry,2000]=0.654
@@ -281,8 +283,10 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
 # the project's PUBLIC claim moved with it was decided on 2026-09-21 — it did: BENCHMARKS.md's
 # composition-plane claim is amended to this band and cites this bound back here.
-ROW_THUNKS_MAX[schemaHosts,1600]=1.210 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
-ROW_ALLOC_MAX[schemaHosts,1600]=1.023  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+# RATCHETED to the figures read at the gen-merge d84ba687 pin (1.207 / 1.018, down from the
+# 1.210 / 1.023 band), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
+ROW_THUNKS_MAX[schemaHosts,1600]=1.207 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+ROW_ALLOC_MAX[schemaHosts,1600]=1.018  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.495

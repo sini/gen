@@ -203,23 +203,30 @@ re-measured **on this row** by neutralising it in a throwaway gen-merge tree at 
 re-running the cell; the figure is that construction's share of the row's ratio. MARGIN is half the
 smaller of the two, truncated down to three places.
 
-| row           |    n | counter | anchor |        ① |        ② | margin |     bound |  was |
-| ------------- | ---: | ------- | -----: | -------: | -------: | -----: | --------: | ---: |
-| scalar        | 8000 | thunks  |  0.912 | 0.037994 | 0.000174 |  0.000 | **0.912** | 0.90 |
-| scalar        | 8000 | alloc   |  0.756 | 0.054458 | 0.000083 |  0.000 | **0.756** | 0.90 |
-| registry      | 2000 | thunks  |  0.776 | 0.108340 | 0.064314 |  0.032 | **0.808** | 0.90 |
-| registry      | 2000 | alloc   |  0.631 | 0.101395 | 0.046820 |  0.023 | **0.654** | 0.90 |
-| lazyRegistry  | 2000 | thunks  |  0.777 | 0.108440 | 0.064373 |  0.032 | **0.809** | 0.90 |
-| lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** | 0.90 |
-| schemaHosts   | 1600 | thunks  |  1.171 | 0.197886 | 0.079462 |  0.039 | **1.210** | 0.90 |
-| schemaHosts   | 1600 | alloc   |  0.995 | 0.187996 | 0.057494 |  0.028 | **1.023** | 0.90 |
-| deepSubmodule | 1600 | thunks  |  0.575 | 0.105358 | 0.087229 |  0.043 | **0.618** | 0.90 |
-| deepSubmodule | 1600 | alloc   |  0.463 | 0.090347 | 0.065271 |  0.032 | **0.495** | 0.90 |
-| wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |  1.3 |
-| wideFreeform  | 8000 | alloc   |  0.806 | 0.000154 | 0.000090 |  0.000 | **0.806** | 0.90 |
+| row           |    n | counter | anchor |        ① |        ② | margin |     bound |   was |
+| ------------- | ---: | ------- | -----: | -------: | -------: | -----: | --------: | ----: |
+| scalar        | 8000 | thunks  |  0.902 | 0.037994 | 0.000174 |  0.000 | **0.902** | 0.912 |
+| scalar        | 8000 | alloc   |  0.754 | 0.054458 | 0.000083 |  0.000 | **0.754** | 0.756 |
+| registry      | 2000 | thunks  |  0.776 | 0.108340 | 0.064314 |  0.032 | **0.808** |  0.90 |
+| registry      | 2000 | alloc   |  0.631 | 0.101395 | 0.046820 |  0.023 | **0.654** |  0.90 |
+| lazyRegistry  | 2000 | thunks  |  0.777 | 0.108440 | 0.064373 |  0.032 | **0.809** |  0.90 |
+| lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** |  0.90 |
+| schemaHosts   | 1600 | thunks  |  1.207 | 0.197886 | 0.079462 |  0.000 | **1.207** | 1.210 |
+| schemaHosts   | 1600 | alloc   |  1.018 | 0.187996 | 0.057494 |  0.000 | **1.018** | 1.023 |
+| deepSubmodule | 1600 | thunks  |  0.575 | 0.105358 | 0.087229 |  0.043 | **0.618** |  0.90 |
+| deepSubmodule | 1600 | alloc   |  0.463 | 0.090347 | 0.065271 |  0.032 | **0.495** |  0.90 |
+| wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |   1.3 |
+| wideFreeform  | 8000 | alloc   |  0.806 | 0.000154 | 0.000090 |  0.000 | **0.806** |  0.90 |
+
+**The four `scalar` / `schemaHosts` rows are RATCHETED** (the lock-currency relock onto gen-merge
+`d84ba687`): each bound is the figure read at that pin, at margin 0.000, and WAS is the bound it
+replaces. `scalar` moves down from the pre-channel figure 0.912 / 0.756 to 0.902 / 0.754, and
+`schemaHosts` from its 1.210 / 1.023 band to 1.207 / 1.018. A bound moving down is a tightening and
+needs no licence (below). ① and ② on those rows are the 7516886 measurements and are not re-derived;
+the other eight rows are unchanged.
 
 ★ **Three of the twelve bounds are INTERIM, and this states what ends them.** `scalar` thunks
-**0.912**, `schemaHosts` thunks **1.210** and `schemaHosts` alloc **1.023** are the three that
+**0.902**, `schemaHosts` thunks **1.207** and `schemaHosts` alloc **1.018** are the three that
 loosened; they encode an **accepted, carried regression**, and they are the ceiling this project has
 agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
 anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for

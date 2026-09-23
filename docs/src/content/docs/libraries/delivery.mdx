@@ -17,7 +17,7 @@ gen-delivery is built to avoid.
 
 | surface | what it does |
 |---|---|
-| `project { values, cnf, selectHosts? }` | the flat aspect registry + the per-node build projection |
+| `project { values, cnf, selectNodes? }` | the flat aspect registry + the per-node build projection |
 | `realize { projected, terminals, bindings?, refinements?, layerOrder?, extraModules? }` | class-major artifacts, `{ <class>.<node> = artifact; }` |
 | `defaultLayerOrder` | `[ "projection" "global" "refinement" ]`, readable and overridable |
 
