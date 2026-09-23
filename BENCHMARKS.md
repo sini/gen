@@ -85,7 +85,7 @@ A `hybrid` stack — the gen-merge engine driven with **real** nixpkgs `lib.type
 | registry (attrsOf submodule) |  2000 |           0.96 |         0.44 |
 | lazyRegistry                 |  2000 |           0.97 |         0.46 |
 
-**Boundary:** leaf-type shims are free (the engine does the merging; a nixpkgs leaf `.merge` is trivial), but structural-type shims give the whole win back — nixpkgs `submodule.merge` runs `lib.evalModules` per instance, dragging the nixpkgs engine into every subtree. Compat mode is an opt-in migration/escape hatch (bring a custom `mkOptionType` along during a port), not a way to run the ecosystem fast.
+**Boundary:** the table's cpu columns are a citation of the 2026-07-04 audit, gated by nothing, and every gap in them lies inside this page's own published cpu noise band, so the boundary rests on the mechanism instead: a leaf-type shim adds no merge work of its own (the engine does the merging; a nixpkgs leaf `.merge` is trivial), while a structural-type shim hands the merge back to nixpkgs — `submodule.merge` runs `lib.evalModules` per instance, dragging the nixpkgs engine into every subtree. Compat mode is an opt-in migration/escape hatch (bring a custom `mkOptionType` along during a port), not a way to run the ecosystem fast.
 
 ## Context: adios-flake / flake-parts
 
