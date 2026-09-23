@@ -145,7 +145,7 @@ let
   # The ONE compose for this flake — driven by the consumer's `gen.tree`/`gen.modules`. Pure
   # (gen-merge's byte-mode evalModuleTree); reads only `tree`/`modules`/`specialArgs`, never any of
   # the injected/built config below, so it introduces no fixpoint cycle. The successor result
-  # carries `values`/`provenance`/`override`; the `aspects`/`hosts` projections this module's
+  # carries `values`/`provenance`/`override`; the `aspects`/`nodes` projections this module's
   # SYSTEMS half consumes are re-attached below, by gen-delivery's `project`.
   composedCore = compose {
     modules = treeModules ++ cfg.modules;
@@ -182,7 +182,7 @@ let
   # gen-delivery's `requireCnf` refusal BY NAME — never a fallback to shape.
   #
   # One shape delta, stated: `gen.composed`'s `override` handle returns the SUCCESSOR projection (no
-  # aspects/hosts re-attach on a re-compose); this module reads only the base compose.
+  # aspects/nodes re-attach on a re-compose); this module reads only the base compose.
   showKeys = v: lib.concatStringsSep ", " (builtins.attrNames v);
   showPath = p: "[ " + lib.concatStringsSep " " (map (x: "\"${x}\"") p) + " ]";
 
@@ -231,8 +231,7 @@ let
   };
 
   composed = composedCore // {
-    inherit (projected) aspects;
-    hosts = projected.nodes;
+    inherit (projected) aspects nodes;
   };
 
   # ── THE TERMINAL BRIDGE (INTERIM — dies with this module at the ADR-0027 replacement) ─────
@@ -466,7 +465,7 @@ in
       internal = true;
       default = composed;
       defaultText = lib.literalExpression "compose { inherit (config.gen) tree modules specialArgs; }";
-      description = "The single `compose` result (`values` / `aspects` / `hosts`). Internal read handle.";
+      description = "The single `compose` result (`values` / `aspects` / `nodes`). Internal read handle.";
     };
 
     realized = mkOption {
