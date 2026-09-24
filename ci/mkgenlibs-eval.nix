@@ -355,7 +355,11 @@ let
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
     delivery = "8b0f007d723a6023c14af50860e247cf9f5aef7a51cd5c7f2cdf654add84f8ab";
     dispatch = "b6b0c94a150ba0aadad4a22c85c8f189b542592710ea51201f3d9151f8d00cc2";
-    graph = "bc24315b9783c2f1a6db815bb1668b6d3f0135c87c181af99161abcecad133cf";
+    # gen-graph cfc2a90d7b → 00fe4bf4e9 (den-hoag-lock-currency-ruling-ez1yq, taken by the
+    # lock-currency relock): the surface gained ONE name, `lowlink`, a third SCC-partition arm
+    # (Tarjan's DFS iterated over a persistent trie) published beside `fbNode` and `fbWork`.
+    # Nothing was removed and no other member moved.
+    graph = "9946fde84fe482a80a4237de91d842b9f874f37070a354201c8d1b14e9d6de2b";
     identity = "ae39363fd50eb2100013362d3d43563146bf24fe8539675c8e8a944d62eaa201";
     # gen-inspect, the roster's 22nd member and the 4th at `framework`: the library that
     # interrogates a materialized graph. Its surface is 13 names — the IR construction and its
