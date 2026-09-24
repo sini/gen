@@ -101,6 +101,7 @@
     gen-inspect.inputs.gen-graph.follows = "gen-graph";
     gen-inspect.inputs.gen-select.follows = "gen-select";
     gen-inspect.inputs.gen-scope.follows = "gen-scope";
+    gen-inspect.inputs.gen-program.follows = "gen-program";
 
     gen-program.url = "github:sini/gen-program";
     gen-delivery.url = "github:sini/gen-delivery";
@@ -161,11 +162,15 @@
         view = inputs.gen-view.lib;
       };
 
-      substrateArgs = import ./lib/hubSubstrate.nix members;
-
-      roster = import ./. (
-        members // builtins.mapAttrs (k: args: inputs."gen-${k}".lib args) substrateArgs
+      # THE FOLD IS SELF-REFERENTIAL: `hubSubstrate.nix` reads `members // applied`, so an unapplied
+      # member (gen-inspect) can take another unapplied member (gen-program) APPLIED, and each is
+      # applied exactly once. `mapAttrs` needs only the file's key set, which its attrset literal
+      # supplies without forcing `members // applied`. See that file for the cycle hazard.
+      applied = builtins.mapAttrs (k: args: inputs."gen-${k}".lib args) (
+        import ./lib/hubSubstrate.nix (members // applied)
       );
+
+      roster = import ./. (members // applied);
 
       # The PUBLISHED two-stage surface, kept exactly as its consumers call it. Stage 2's argument
       # was always vestigial — every caller passes `{ }`, `{ inherit lib; }` or `{ lib = null; }` and

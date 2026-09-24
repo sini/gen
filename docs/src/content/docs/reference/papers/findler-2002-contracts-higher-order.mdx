@@ -70,7 +70,7 @@ The `mkMergeValidator` function (`merge-strategy.nix`) constructs a validator th
 
 **Lazy contract wrapping (S5, cf. also Chitil 2012).** gen-bind's `contract.mk` creates assertion wrappers that fire on demand, not at wrap time. This mirrors the `wrap` function's structure (Figure 9): for a flat contract, test the predicate and blame the positive party on failure. The key difference from Findler's system is that gen-bind operates in a lazy language (Nix), so the "deferred" nature is provided by Nix's evaluation strategy rather than by explicit wrapper lambdas. Functions: `contract.mk`, `contract.hasFields`, `contract.isType`, `contract.nonEmpty`, `contract.apply` in `contract.nix`.
 
-**Signatures as contract interfaces (S3-4, cf. also Cardelli 1997).** gen-bind's `buildSignature` produces a static record of `{ requires, bound, unsatisfied, mergeStrategies }` — a lightweight analogue of the obligation expression's contract component. The signature declares what values a module expects (its contract domain) and what was provided (bound). Unsatisfied entries are potential blame targets. Implementation: `signature.nix`.
+**Signatures as contract interfaces (S3-4, cf. also Cardelli 1997).** gen-bind's `buildSignature` produces a static record of `{ requires, bound, unsatisfied, declaredMergeStrategies }` — a lightweight analogue of the obligation expression's contract component. The signature declares what values a module expects (its contract domain) and what was provided (bound). Unsatisfied entries are potential blame targets. Implementation: `signature.nix`.
 
 #### gen-schema (MAJOR)
 

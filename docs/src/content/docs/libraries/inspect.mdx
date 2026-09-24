@@ -16,13 +16,12 @@ gen-scope.
 
 It sits in the framework stratum: above the stack rather than a layer inside it, defining no
 substrate vocabulary of its own. It takes gen-graph, gen-prelude, gen-scope and gen-select as
-substrate from this hub — four of the five it declares. The fifth, gen-program, cannot be supplied
-here, and the reason is structural rather than an oversight: this file is a function of the roster
-entries whose `.lib` is published already applied, and gen-program is one of the three that is not.
-It is produced by the fold this very file feeds. So gen-inspect declares four formals at this gate
-and takes gen-program at the one that builds its program route:
+substrate from this hub, and gen-program as well — the fifth it declares, and the one its
+reachability questions compile onto. gen-program is itself published unapplied, so the hub's fold is
+self-referential: this file reads the applied roster entries together with the unapplied members the
+same fold produces, and gen-program is applied once and shared by gen-inspect and the roster:
 
-```nix file=<rootDir>/lib/hubSubstrate.nix#L15-L22
+```nix file=<rootDir>/lib/hubSubstrate.nix#L18-L26
 
 ```
 

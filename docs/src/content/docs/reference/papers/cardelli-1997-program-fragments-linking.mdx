@@ -65,7 +65,7 @@ gen-bind is the primary implementation site. Three features trace directly to Ca
 
 **1. Signatures as lightweight linksets (Section 5, Definition 5-1)**
 
-`signature.nix`: `buildSignature` computes `{ requires, bound, unsatisfied, mergeStrategies }` for each wrapped module. This is a direct analog of Cardelli's linkset structure:
+`signature.nix`: `buildSignature` computes `{ requires, bound, unsatisfied, declaredMergeStrategies }` for each wrapped module. This is a direct analog of Cardelli's linkset structure:
 
 - `bound` corresponds to `exp(L)` — the names this fragment provides (bindings injected).
 - `requires` corresponds to `imp(L)` — the names still needed (formal args not satisfied by bindings, expected from `evalModules`).

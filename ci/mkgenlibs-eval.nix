@@ -310,9 +310,9 @@ let
   # Hand-maintained on the SAME contract as `expectedKeys`: bump the moved member's line in the same
   # commit as the pin bump that moved it, so this stays a tripwire rather than silent drift. A member
   # with no entry drifts by construction (`or null`) — a new roster member is pinned or it is named,
-  # never defaulted into agreement. Regenerate through THIS flake — the arm compares what the ci
-  # subflake's own `gen-*` nodes resolve to, and a command run against the root flake reads a
-  # different lock:
+  # never defaulted into agreement. Regenerate through THIS flake, which resolves every member from
+  # the root `flake.lock`. The per-member value is `surfaceHashes.<key>`; the aggregate
+  # `surfaceHash` is a different quantity and never belongs on a line here:
   #   nix eval ./ci#lib.mkGenLibsEval.surfaceHashes --raw --apply \
   #     'h: builtins.concatStringsSep "\n" (map (k: "    ${k} = \"${h.${k}}\";") (builtins.attrNames h))'
   #
@@ -386,7 +386,11 @@ let
     schema = "9b63cf6bf2d3e7655868bd35a30452ffa26a3fd34b751e56535e62a2e5a753db";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
-    scope = "9784f1f1148c623fa04a6d1ee4191f3d43bbab322825894ded52f0ce2dad63ca";
+    #
+    # gen-scope e64c00719a → e355bb866a (den-hoag-n6dh7 Unit 1, the recursive NTA channel): the
+    # surface gained FOUR names, `childDepth`, `decodeNta`, `flattenChildren` and `mintNtaId`.
+    # Nothing was removed and no other member moved.
+    scope = "09a4a0e6afa73fb847dca869add3572755a190edfae37a8641ae26eb8bbfe1c7";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the

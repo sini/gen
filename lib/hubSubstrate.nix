@@ -1,23 +1,27 @@
-# The substrate the hub hands the three members whose flake `.lib` is published UNAPPLIED. A FUNCTION
-# OF THE HUB'S OWN `members` BINDINGS — never of `inputs` — so there is one expression per member in
-# this flake and this file re-derives none of them. `inherit` binds without forcing, so a reader
-# taking `attrNames` never forces a leaf, which is what lets `ci/` read the supplied key sets
-# hermetically, the same direction `ci/hub-entry.nix` takes on the standalone root.
+# The substrate the hub hands the four members whose flake `.lib` is published UNAPPLIED. A FUNCTION
+# OF THE HUB'S OWN BINDINGS — never of `inputs` — so there is one expression per member in this flake
+# and this file re-derives none of them. Its argument is `members // applied`: the eighteen APPLIED
+# roster entries plus the applied values of the unapplied members this file's own fold produces.
+# `inherit` binds without forcing, so a reader taking `attrNames` never forces a leaf, which is what
+# lets `ci/` read the supplied key sets hermetically, the same direction `ci/hub-entry.nix` takes on
+# the standalone root.
 members: {
   assemble = { inherit (members) prelude scope algebra; };
   delivery = { inherit (members) algebra aspects; };
-  # ★ gen-inspect's fifth declared dependency, gen-program, is NOT here and cannot be: this file is a
-  # function of `members`, which holds exactly the eighteen roster entries whose `.lib` is published
-  # APPLIED, and `program` is one of the three UNAPPLIED members the fold over this very attrset
-  # produces. gen-inspect therefore declares four formals at this gate and takes gen-program at the
-  # gate that builds its program route, when the fold this file feeds is rewritten to be
-  # self-referential or the dependency arrives another way.
+  # ★★ THE FOLD IS WELL-FOUNDED ONLY WHILE THE UNAPPLIED MEMBERS' DEPENDENCIES ARE ACYCLIC. The
+  # order is `inspect → program → {prelude, scope}`, and `program` is applied once and shared by
+  # gen-inspect and the roster. A key here naming an unapplied member that (transitively) names
+  # this one back is a CYCLE, and it is LOUD BUT UNNAMED: every hub consumer — not only the member
+  # involved — dies with `infinite recursion encountered`, because `default.nix`'s eager boundary
+  # force reaches the fold. A fold over `members` alone cannot form a cycle, and a stratified
+  # two-pass fold would keep that guarantee, at the cost of a second pass.
   inspect = {
     inherit (members)
       prelude
       graph
       select
       scope
+      program
       ;
   };
   program = { inherit (members) prelude scope; };

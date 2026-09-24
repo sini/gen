@@ -87,6 +87,7 @@ flowchart TD
   gen_graph --> gen_prelude
   gen_inspect --> gen_graph
   gen_inspect --> gen_prelude
+  gen_inspect --> gen_program
   gen_inspect --> gen_scope
   gen_inspect --> gen_select
   gen_link --> gen_algebra

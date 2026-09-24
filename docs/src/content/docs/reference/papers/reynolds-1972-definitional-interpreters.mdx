@@ -87,7 +87,7 @@ gen-bind's `wrap` function performs partial application: given a module function
 
 `builtins.functionArgs` serves as Nix's analogue to Reynolds' formal parameter reflection. In a definitional interpreter, the interpreter knows the parameter names of each lambda form because it processes the abstract syntax tree. In Nix, `builtins.functionArgs` exposes the same information at runtime, enabling gen-bind to inspect a function's interface without calling it. This is a limited but native form of the inspectability that defunctionalization provides by construction.
 
-The `signature` record (`{ requires, bound, unsatisfied, mergeStrategies }`) is the first-order representation of a module's binding state -- analogous to the environment record in a defunctionalized closure, but tracking which variables are bound vs. still free.
+The `signature` record (`{ requires, bound, unsatisfied, declaredMergeStrategies }`) is the first-order representation of a module's binding state -- analogous to the environment record in a defunctionalized closure, but tracking which variables are bound vs. still free.
 
 **Key files**: `gen-bind/nix/lib/wrap.nix` (core wrapping via `builtins.functionArgs` introspection), `gen-bind/nix/lib/signature.nix` (module signature inference).
 
