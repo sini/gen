@@ -9,9 +9,10 @@
 # locks — it does not already hold the answer, it holds the only lever.
 #
 # ── THE SUBJECT IS THE MEMBERS' CI LOCKS, NOT THE HUB'S OWN TWO ──
-# `ci/lock-agreement.nix` (den-hoag-0moiy) is the hub's own root-vs-ci predicate and this check sits
-# BESIDE it, never over it: that one compares two locks of ONE repository at the hub's direct edges,
-# this one compares ONE edge class across TWENTY-TWO repositories. Neither subsumes the other.
+# The hub's own root-vs-ci question is closed by construction: `gen` is the root flake read at `self`,
+# so ci resolves members through the root lock and holds no copy of it (den-hoag-lbtnv D1 retired
+# `lock-agreement`, which gated that copy). This one compares ONE edge class across TWENTY-TWO
+# repositories, which no construction in the hub closes.
 #
 # ── THE TWO READINGS, AND WHY THEY ARE SEPARATE KEYS ──
 # (1) CROSS-MEMBER coherence — for each shared node, all members pinning it name ONE revision. This
@@ -99,7 +100,7 @@ let
   roster = gen.lib.mkGenLibs { };
 
   # `strata` is an attribute of the roster and not a member of it — the same meta-key filter
-  # `ci/lock-agreement.nix` and `ci/sole-evaluator.nix` apply, for the same reason.
+  # `ci/sole-evaluator.nix` applies, for the same reason.
   rosterMetaKeys = [ "strata" ];
   rosterKeys = builtins.filter (k: !(builtins.elem k rosterMetaKeys)) (builtins.attrNames roster);
 
@@ -141,7 +142,7 @@ let
   hubRootLock = readLock ../flake.lock;
 
   # ── THE TRAVERSAL ──
-  # `ci/lock-agreement.nix`'s `following` rule, one dimension over. A direct edge IS the node key; a
+  # Nix's own `follows` rule, one dimension over. A direct edge IS the node key; a
   # `follows` value is a PATH LIST resolved segment by segment from that lock's own root.
   #
   # ★ `lock.nodes.<label>` IS NEVER INDEXED BY NAME. A lock routinely carries `X` and `X_2` for one
@@ -427,7 +428,7 @@ let
   # and the live reading has NINE incoherent nodes today. An absolute list (`incoherent == [x]`) is
   # red on all of them; a set difference collapses to empty when a live divergence lands on the seed's
   # own node. The ROW carries the SEEDED REVISION, a value no live lock can produce, so these arms are
-  # immune to both. `ci/lock-agreement.nix` meets the same problem and answers it the same way.
+  # immune to both.
   seedRev = "0000000000000000000000000000000000000000";
   seedNodeAtRev = {
     locked = {

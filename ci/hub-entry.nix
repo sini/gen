@@ -20,7 +20,7 @@
 # ── DIRECTION, STATED SO IT IS NOT DISCOVERED ──
 # HERMETIC. The entry's defaults are read as DATA — the paths they declare and the nodes those paths
 # resolve to in `flake.lock` — and never forced, so nothing here fetches. That is the same direction
-# `lock-agreement` and `pin-coherence` take and for the same reason: a cell that fetches 21
+# `pin-coherence` takes and for the same reason: a cell that fetches 21
 # repositories to answer a question about wiring has bought nothing and made the gate non-hermetic.
 # What that leaves outside: this cell does not force a member, so it is silent about whether a
 # resolved node BUILDS. The flake path's force is `mkgenlibs-eval`'s, and the hub root's `roster`
@@ -132,8 +132,9 @@ let
   # hub's 13 sibling ci pins in favour of a `gen` self-pin and no member was a root input. This lock
   # carries no `gen` self-pin at all, so the hub-scoped form reaches 0 of 21 and the member-scoped
   # form reaches 21 of 21. Both halves are asserted: a cell reading only the zero would also pass on
-  # an empty roster. erls still governs `ci/flake.lock`, which is why the form is REJECTED here rather
-  # than forgotten — if the entry's pin source ever moved back, this arm is what would stop holding.
+  # an empty roster. `ci/flake.lock` no longer carries a `gen` node either (den-hoag-lbtnv D1: ci
+  # reads the root flake at `self`), so no lock in this repository holds the hub-scoped shape; the
+  # form stays REJECTED here rather than forgotten — if one ever did, this arm would stop holding.
   # Membership, NEVER a resolution attempt: `following` selects `inputs.<name>` bare, and a missing
   # attribute is an UNCATCHABLE abort that `tryEval` does not convert — so a probe that tried to
   # resolve either form would take the whole evaluation down instead of reading 0.

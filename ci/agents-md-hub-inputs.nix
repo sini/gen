@@ -9,9 +9,8 @@
 # tables — concern rows, the retired register, the sibling register (`<!-- gen-roster:begin/end -->`)
 # — the stratum assignment (`<!-- gen-strata:begin/end -->`) and the Drift-check's recorded output
 # (`<!-- gen-drift:begin/end -->`). Each is a DECLARED WINDOW whose content this check re-derives
-# from the flake: the input set through `genInputs` (the root flake's own input SET, resolved at
-# `ci/flake.lock`'s copy of its pins — the route every check in ci/flake.nix uses except
-# `lock-agreement`, which reads both lock files directly because comparing them is its subject);
+# from the flake: the input set through `genInputs` (the root flake's own input SET, resolved at the
+# root `flake.lock`'s pins — the route every check in ci/flake.nix uses);
 # each member's description from `(import "${genInputs.<name>}/flake.nix").description` (plain data,
 # ADR-0014); the partition from `(gen.lib.mkGenLibs { }).strata`; the root-flake shape from `gen`
 # itself. Never by re-shelling the sheet's own `nix eval --impure` command from inside a pure eval.
@@ -33,11 +32,11 @@
 # window, and counts in prose (the sheet carries none of the first two; the counts were deleted, not
 # checked — ADR-0015).
 #
-# ★ WHICH PINS: the live set and the descriptions are read at `ci/flake.lock`'s copy of the `gen`
-# node's inputs (den-hoag-y21zz), so a root-input removal is silent here until the ci relock that
-# `ci/lock-agreement.nix` already requires.
+# ★ WHICH PINS: the live set and the descriptions are read at the root `flake.lock`'s pins, because
+# `gen` is the root flake read at `self` (den-hoag-lbtnv D1; den-hoag-y21zz read them at ci's copy),
+# so a root-input change is seen here in the same commit, with no ci relock between.
 {
-  gen, # the hub itself (`path:..`): the roster of record and the root-flake shape
+  gen, # the hub itself (its root flake, read at `self`): the roster of record and the root-flake shape
   genInputs,
   lib,
 }:

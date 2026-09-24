@@ -26,8 +26,8 @@
 # `flakeModules.default` is a PATH the hub exports; only a consumer's flake-parts eval runs its
 # body, so nothing here would notice the call losing its declaration input, or reverting to a local
 # predicate. gen-delivery's own suite covers the predicate; this one covers the HUB — the pinned
-# `gen.lib.mkGenLibs` roster as `ci/flake.lock` resolves it (which is the roster a consumer gets
-# only while that lock agrees with the root's — `ci/lock-agreement.nix` is what gates that), wired
+# `gen.lib.mkGenLibs` roster as the root `flake.lock` resolves it (the roster a consumer gets, by
+# construction: `gen` is the root flake read at `self`, den-hoag-lbtnv D1), wired
 # the way the module wires it, plus a lexical arm over the shipped module source for the two facts a
 # value cannot express.
 #

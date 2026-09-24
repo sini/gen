@@ -17,16 +17,12 @@
 # byte-identical; a behaviour change under an unchanged export surface is outside this arm by
 # construction, and the AGREEMENT arm above is what covers value identity.
 #
-# `gen` is the hub itself (`path:..`) — a subflake that is its own store root can't `import ../lib`,
-# so it reaches the root lib through an input, exactly like den-hoag's ci reaches den-hoag. (The
-# unscoped form of that sentence is false: 28 sibling `ci/` flakes do read their parent directly, and
-# two checks beside this one read `../AGENTS.md` and `../flake.lock`.)
+# `gen` is the hub itself: its root flake, read at `self`'s own locked identity (ci/flake.nix), so
+# its inputs are the root flake's resolved from the root `flake.lock`.
 #
-# ★ WHICH PINS THIS CHECK OBSERVES, corrected: `ci/flake.lock`'s copy of the `gen` node's inputs —
-# NOT the root `flake.lock`'s. `inputs.gen.inputs.gen-X` resolves through ci's own lock, so this
-# fingerprints the surface at CI'S pins, which is the surface consumers get only while the two locks
-# agree. They are gated into agreement by `ci/lock-agreement.nix` (den-hoag-0moiy), which is the one
-# check here that reads both locks.
+# ★ WHICH PINS THIS CHECK OBSERVES: the root `flake.lock`'s. `gen.inputs.gen-X` resolves through the
+# root lock a consumer resolves, and ci holds no copy of it, so this fingerprints the surface
+# consumers get by construction (den-hoag-lbtnv D1; the retired `lock-agreement` gated the copy).
 { gen }:
 let
   genLibs = gen.lib.mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)

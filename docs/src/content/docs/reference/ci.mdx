@@ -39,7 +39,7 @@ And the trust-surface job:
 | Job | What it runs | Disposition |
 |---|---|---|
 | `format` | `nix fmt -- --ci` in `ci/` | **Gates** — fails on unformatted code |
-| `checks` | `nix flake check` (root), then `nix flake check ./ci --keep-going` | **Gates** — every one of the 18 named checks below |
+| `checks` | `nix flake check` (root), then `nix flake check ./ci --keep-going` | **Gates** — every one of the 20 named checks below |
 | `perf-bench` | `nix run ./ci#perf-bench` | **Partial** — gates on parity, ratio, and linearity; cpu is measured and reported, gated by nothing |
 | `sole-evaluator-report` | `nix run ./ci#sole-evaluator-report` | **Reported, gated by nothing** — deliberately |
 | `fleet-consistency` | `nix run ./ci#fleet-consistency` | **Gates** — 9 arithmetic-consistency checks over committed baseline JSON, no live fleet evaluation |
@@ -48,25 +48,29 @@ The `checks` job runs the root flake's own check first — its only relevant out
 binding that forces the roster to depth, so an unhealthy member reds it — and then every check
 declared in `ci/flake.nix`.
 
-## The 18 checks
+## The 20 checks
 
-All 18 are ordinary Nix derivations picked up by `nix flake check ./ci`, so a non-zero build exit
+All 20 are ordinary Nix derivations picked up by `nix flake check ./ci`, so a non-zero build exit
 fails the job for every one of them:
 
 `agents-md-citations` · `agents-md-hub-inputs` · `architecture-library-graph` ·
-`ci-plane-coverage` · `declared-content` · `direction-of-dependence` · `hub-entry` ·
-`hub-substrate` · `inject-payload` · `lock-agreement` · `mdformat-plugins` · `mkgenlibs-eval` ·
-`pin-coherence` · `publication-coverage` · `readme-audience` · `readme-figures` ·
-`rehost-den-parity` · `treefmt-tree-root`
+`ci-declares-no-member` · `ci-plane-coverage` · `ci-self-input` · `declared-content` ·
+`direction-of-dependence` · `hub-entry` · `hub-entry-agreement` · `hub-substrate` ·
+`inject-payload` · `mdformat-plugins` · `mkgenlibs-eval` · `pin-coherence` ·
+`publication-coverage` · `readme-audience` · `readme-figures` · `rehost-den-parity` ·
+`treefmt-tree-root`
 
-<Aside type="caution" title="Two of the eighteen gate on less than they look like they do">
-`lock-agreement` and `pin-coherence` are checks, not apps, and a non-zero exit from either still
-fails the build — but only on their own arming. Each is a self-test that must run correctly, and
-does fail the build if it can't. On their **primary finding** — an actual pin or lock disagreement
-— both are currently **observe-only**: the disagreement prints, but does not fail the build. Which
-way that primary-finding disposition should go is an open question the hub has not settled yet.
-Treat it as unresolved rather than as gated either way.
+<Aside type="caution" title="One of the twenty gates on less than it looks like it does">
+`pin-coherence` is a check, not an app, and a non-zero exit from it still fails the build — but
+only on its own arming. It is a self-test that must run correctly, and does fail the build if it
+can't. On its **primary finding** — an incoherent pin across the members' ci locks — it is
+**observe-only**: the disagreement prints, but does not fail the build, because that state is true
+of the ecosystem today and not satisfiable from the hub alone.
 </Aside>
+
+The ci subflake reaches the hub's own root flake by reading it at its own locked identity, not
+through a `path:..` input, so the members it checks are pinned by the root `flake.lock` alone —
+there is no second copy of those pins for a check to compare.
 
 ## The 4 apps
 

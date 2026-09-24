@@ -111,8 +111,8 @@ let
   # property is member-scoped; this one's is not. A true claim at the source, false at the
   # destination.
   #
-  # ★★ AND THE HUB'S SOURCE IS `self.sourceInfo.outPath`, NOT THE `gen` INPUT'S. Measured 2026-09-05:
-  # the hub enters `ci/flake.lock` as `path:..`, and the PATH fetcher copies the raw directory —
+  # ★★ AND THE HUB'S SOURCE IS `self.sourceInfo.outPath`, NOT A PATH INPUT'S. Measured 2026-09-05,
+  # when the hub entered `ci/flake.lock` as `path:..`: the PATH fetcher copies the raw directory —
   # `.git`, `.direnv`, `result` symlinks and any `.worktrees/` checkout come with it. A reader over
   # that outPath read 222 files where the tracked tree publishes 217, five of them a second checkout
   # of this very repository, and the figure moved with a developer's local state rather than with the
@@ -899,8 +899,10 @@ let
     );
 
   # ── THE TRIPWIRE: `domain-total` ──
-  # RESOLVED is read from `ci/flake.lock` — the gen-shaped ROOT inputs together with the gen-shaped
-  # inputs of its `gen` node, which is what `mkGenLibs`'s `genInputs.gen-X` reaches. Deeper
+  # RESOLVED is read from BOTH locks — the gen-shaped root inputs of `ci/flake.lock`, together with
+  # the gen-shaped root inputs of the ROOT `flake.lock`, which is what `mkGenLibs`'s `genInputs.gen-X`
+  # reaches now that `gen` is the root flake read at `self` (den-hoag-lbtnv D1) — plus `gen` itself,
+  # the tree this flake sits in, which is reached as `self` and is never a lock node. Deeper
   # transitive revisions of the same repository are not separately readable and are not members.
   #
   # ★★ THAT IS THE LOCK AS A TRIPWIRE, NOT AS THE DOMAIN, and the distinction is the whole point. The
@@ -920,9 +922,11 @@ let
     if lock.nodes ? ${node} && lock.nodes.${node} ? inputs then lock.nodes.${node}.inputs else { };
   genShaped = builtins.filter (n: n == "gen" || lib.hasPrefix "gen-" n);
   rootInputs = lockInputsOf lock.root;
+  hubLock = builtins.fromJSON (builtins.readFile ../flake.lock);
   resolved = lib.unique (
     genShaped (builtins.attrNames rootInputs)
-    ++ genShaped (builtins.attrNames (lockInputsOf (rootInputs.gen or "")))
+    ++ genShaped (builtins.attrNames (hubLock.nodes.${hubLock.root}.inputs or { }))
+    ++ [ "gen" ]
   );
 
   sorted = builtins.sort (a: b: a < b);

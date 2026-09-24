@@ -51,7 +51,7 @@
 
 # ── the combination under test ────────────────────────────────────────────────
 # `--at <member>=<source>` overlays ONE member of the pure-side source set onto the baseline. The
-# baseline is `ci/flake.lock` via PERF_SRCS as it has always been, an EMPTY overlay passes it through
+# baseline is the pinned locks via PERF_SRCS (members: the root flake.lock; references: ci/flake.lock), an EMPTY overlay passes it through
 # untouched, and NOTHING is ever written: a combination is a value this run TAKES and NAMES, never
 # state the repository must first adopt. Every run echoes the whole combination — all twelve keys,
 # their revisions, and each one's LEAK set — into the report, so the artefact records the population
@@ -652,7 +652,9 @@ emit_report() {
   echo "| key | axis | source | rev / path | leak |"
   echo "|---|---|---|---|---|"
   for ck in "${COMB_KEYS[@]}"; do
-    csrc="baseline (ci/flake.lock)"
+    # A member is pinned by the root flake.lock (the hub's ci reads the root flake at `self`); a
+    # reference key is ci's own declaration, pinned by ci/flake.lock.
+    if [[ "${BASE_AXIS[$ck]}" == reference ]]; then csrc="baseline (ci/flake.lock)"; else csrc="baseline (flake.lock)"; fi
     crev="${BASE_REV[$ck]:0:12}"
     if [[ -n "${AT_STORE[$ck]:-}" ]]; then
       crev="${AT_REV[$ck]}"

@@ -33,10 +33,10 @@
 # The HUB'S PINNED REVISIONS, not the working clones. A library whose working tree has drifted from
 # its pin is governed at the pin, and the drift becomes visible when the pin moves.
 #
-# ★ AND THE PINS ARE `ci/flake.lock`'s, NOT the root `flake.lock`'s: `inputs.gen.inputs.gen-X`
-# resolves through this subflake's own lock, which holds a COPY of the root's taken at ci lock time.
-# So "the surface consumers actually get" holds only while the two locks agree — which is what
-# ci/lock-agreement.nix gates, and it is the one check here that reads both.
+# ★ AND THE PINS ARE THE ROOT `flake.lock`'s: `gen` is this tree's own root flake read at `self`, so
+# `gen.inputs.gen-X` resolves through the root lock a consumer resolves, and ci holds no copy of it.
+# "The surface consumers actually get" holds by construction (den-hoag-lbtnv D1; the retired
+# `lock-agreement` gated the copy that no longer exists).
 #
 # ── THE DOMAIN ──
 # The roster of record, `gen/lib/mkGenLibs.nix`, never a count. Two consequences follow by

@@ -23,14 +23,15 @@
 # ★★ THE MEMBERS ARE ROOT INPUTS OF THIS LOCK, AND THE PATHS BELOW SAY SO. `flake.lock` declares all
 # 21 roster members directly under its root, so every default is `dep [ "gen-X" ]` — ONE segment,
 # entered at the member's own name, which makes this shim structurally identical to every member's.
-# `ci/flake.lock` is the lock that declares NO roster member as a root input: all 21 hang under its
-# `gen` node, `{ "path": "..", "type": "path" }` with no rev and no narHash. That remains a landed
-# decision rather than drift — den-hoag-erls retired the hub's 13 sibling ci pins in favour of that
-# self-pin, and the hub's own ci still reaches members through it (`genInputs = inputs.gen.inputs` in
-# `ci/flake.nix`, with `ci/direction-of-dependence.nix` and `ci/mkgenlibs-eval.nix` stating the rule
-# in terms). erls governs the TEST graph and is untouched here; what moved is which lock THIS file
-# reads. Re-adding the 21 members to `ci/flake.nix` is still the REJECTED alternative — it reverses
-# erls and gives the hub two independent pin sets for one edge.
+# `ci/flake.lock` declares NO roster member at all, and holds no copy of them: the hub's ci reaches
+# them through `gen`, this repository's own root flake read at `self`'s locked identity
+# (`builtins.getFlake` in `ci/flake.nix`), so `genInputs = inputs.gen.inputs` resolves through THIS
+# lock. That is den-hoag-erls's self-pin carried further, not reversed — erls retired the hub's 13
+# sibling ci pins in favour of reaching members through the hub; since den-hoag-lbtnv D1 (Lix refuses
+# the `path:..` node that self-pin was) there is ONE pin set for the edge, not a root lock and a ci
+# copy of it. `ci/direction-of-dependence.nix` and `ci/mkgenlibs-eval.nix` state the rule in terms.
+# Re-adding the 21 members to `ci/flake.nix` is still the REJECTED alternative — it reverses erls and
+# gives the hub two independent pin sets for one edge; `ci-declares-no-member` refuses it.
 #
 # `src` AND `dep` ARE FORMALS, NOT `let` BINDINGS, AND THAT IS THE INJECTABLE RESOLVER SEAM. `src` is
 # the only expression here that fetches; everything else reads the lock as data. A caller supplying

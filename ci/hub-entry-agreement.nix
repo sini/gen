@@ -6,7 +6,7 @@
 # reaches. They are two SUPPLIERS of one construction, so a library answering differently through
 # them is the failure itself (`den-hoag-hub-entry-paths-disagree-silently-oii6u`). The subject is a
 # property of THIS tree's two entry paths, which is why the cell lives in this ci: it takes the tree
-# as `gen = path:..` and adds no edge. It lived in gen-inspect's ci, which had to declare the hub to
+# as `gen`, its own root flake read at `self`, and adds no edge. It lived in gen-inspect's ci, which had to declare the hub to
 # reach both paths while the hub pins gen-inspect — an oracle-graph cycle ADR-0037 forbids
 # (den-hoag-mxbv4).
 #
@@ -25,13 +25,14 @@
 #
 # ── REACH, STATED SO IT IS NOT OVER-READ ──
 # ONE-QUERY WITNESS. It asserts that the ANSWERS agree, never that the two closures do.
-# The flake arm reaches every sibling at `ci/flake.lock`'s COPY of the root pins; it is the PUBLISHED
-# flake path only where `lock-agreement` holds, and that cell gates direct edges only. Given a green
-# `lock-agreement`, every change to either arm's value is a change to this hub commit.
+# The flake arm reaches every sibling at the ROOT `flake.lock`'s pins: `gen` is this tree's own root
+# flake read at `self`, so there is no ci-side copy of the pins and the flake arm IS the published
+# flake path by construction (den-hoag-lbtnv D1; the retired `lock-agreement` gated that copy). Every
+# change to either arm's value is a change to this hub commit.
 # SILENT on a dependency divergence that leaves this query's answer unchanged: seeding gen-scope
 # `ab21984` or gen-graph `6208e89` into both hub locks reads green here, correctly — the answers agree.
-# A seed of `gen/gen-program` into `ci/flake.lock` alone reds this check as a crash; that is ci-copy
-# drift, which `lock-agreement` also refuses, and not oii6u's mechanism.
+# A seed of `gen/gen-program` into `ci/flake.lock` alone once red this check as a crash; that was
+# ci-copy drift, a state that no longer exists, and not oii6u's mechanism.
 # The fixture is a published example of the PINNED gen-inspect, so a change to its formals reds here
 # at the next relock, as a crash.
 #
@@ -149,7 +150,7 @@ in
   report = {
     governs = "the hub's two published entry paths: `import <gen> { }` and `(getFlake <gen>).lib.mkGenLibs { }`";
     property = "gen-inspect's published fleet, applied per path to that path's own `inspect` and `program`, answers one query identically on both";
-    direction = "ONE-QUERY WITNESS: the answers agree, never the closures. The flake arm is the published flake path only where `lock-agreement` holds (direct edges). SILENT on dependency divergences that leave this query's answer unchanged";
+    direction = "ONE-QUERY WITNESS: the answers agree, never the closures. The flake arm is the published flake path by construction: it resolves through the root flake.lock. SILENT on dependency divergences that leave this query's answer unchanged";
     inherit (live) answers;
     arming = {
       silencedFlake = seededSilencedFlake.answers;
