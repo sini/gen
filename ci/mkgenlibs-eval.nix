@@ -342,7 +342,11 @@ let
   # intermediate state (pin moved, line stale) must not exist in history, exactly like the
   # regeneration route above.
   expectedSurface = {
-    algebra = "3a484271b71a218419181bc5ce55cf593ab814e9abeab0914c5658532995bf86";
+    # gen-algebra cacf36e81f → 3940d61654 (den-hoag-markof-partial-preimage-znfjq): the surface
+    # gained FOUR names, `componentsPreimage`, `preimageTagOf`, `sealedCollisionEq` and
+    # `sealedMarker`, a composite's per-component preimage tags and its by-name sealed-collision
+    # refusal. Nothing was removed.
+    algebra = "ca9874ebd9bccd2c1e385a2e3c453d24d1aebb9f4d6e49add1572a80ae695dfb";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
     aspects = "5c3122bd668746dffa2e5e7e30aaac4978f54c5be4d74feadfa14c9375c07106";
@@ -383,7 +387,11 @@ let
     # name, `evalSchema` (lib/eval-schema.nix, the staged pass that resolves kind `inherits` by
     # name against the frozen output of a strictly earlier pass). Nothing was removed and no other
     # member moved.
-    schema = "9b63cf6bf2d3e7655868bd35a30452ffa26a3fd34b751e56535e62a2e5a753db";
+    #
+    # gen-schema f207b53 → 8fb5b42 (den-hoag-markof-partial-preimage-znfjq): the surface gained
+    # ONE name, `kindEq`, the kind comparison that refuses a sealed-only collision by name.
+    # Nothing was removed.
+    schema = "773f477dec4a53c4c5f9aee08520feb0594535144388adb7266f74c8e6b62c64";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
     #
