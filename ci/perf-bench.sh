@@ -57,7 +57,7 @@
 # their revisions, and each one's LEAK set — into the report, so the artefact records the population
 # it measured instead of leaving the reader to infer it from a lock file.
 #
-# The two REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
+# The three REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
 # float, a moved ratio is unattributable — you cannot tell whether gen got worse or nixpkgs got
 # better — and the ci/README.md rejection of an absolute pure-counter ratchet rests on `ref` being
 # byte-identical across arms.
@@ -351,36 +351,66 @@ OVERRIDEWARM_RATIO_MAX=0.30
 # (gen-schema's lazy `__mint.minted`) and every reader holds a shared reference, so the mint is paid
 # once per KIND. The class this row exists for is the per-NODE recompute — each node re-deriving its
 # kind and forcing a fresh digest — which is LINEAR (measured 3.99× over a 4× step), so GROWTH_MAX
-# can never see it; only a ratio against a same-n denominator can. Stacks, both single-engine:
-# `attrs` (the denominator: the same union and context matched with `sel.attrs`) and `kind`.
+# can never see it; only a ratio against a same-n denominator can.
 #
-# THREE GATES. (1) BYTE: kind's projection equals attrs' — the n/2 A instances. A name key that
-# conflates the two same-name kinds returns all n, so this gate also reds the conflation itself.
-# (2) RATIO, thunks AND alloc (classShare's pair: a per-node primop recompute over a cached preimage
-# costs ~1 thunk but allocates), kind/attrs ≤ the bound, at both sizes. (3) LINEARITY on both stacks.
+# STACKS. The numerator is `kind` (`sel.kind A` through the LIVE gen-select). The denominator is
+# `attrs-ref`: the same union and context matched with `sel.attrs` through a FROZEN gen-select
+# (`gen-select-orig`, rev-pinned at `9285b5b` in ci/flake.nix, so no relock moves it). A denominator
+# that runs the code under test does not cancel a cost both stacks pay in it, but it DILUTES it by
+# the ratio: with the live `sel.attrs` as denominator, +3 thunks/node in the shared `matches` read
+# exactly at the bounds and passed (den-hoag-l0y landing gate, plant C). TWO FIXTURES: `migrated`
+# (the kind's sealed map is empty) and `sealed` (stacks `attrs-ref-sealed` / `kind-sealed`: `addr` is
+# typed by nixpkgs `lib.types.str`, so a matching node reaches `sealedCollisionEq`'s non-empty arm,
+# the unmigrated kinds den declares today). Without the second fixture a cost confined to that arm
+# is invisible here (plant S3, same gate).
 #
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000. ANCHOR — the measured kind/attrs ratio at the landing: hub
-# `perf-bench` app, Nix 2.34.8, gen-select `28a0968`, gen-schema `a90bc54`. MARGIN — zero, because
-# the counters are deterministic (zero spread across reps and across evaluator runs) and the owner
-# ruled any regression a defect. ratio() prints %.3f, so the headroom left under each bound is the
-# distance from the exact anchor to the next printed step: 67 thunks at n=400 and 214 at n=1600
-# (21,799 B and 59,384 B of alloc). WHAT IT CATCHES, derived from that headroom: a per-node cost on
-# the kind-read path of a fraction of one thunk per node — the planted recompute costs ~4,400 — and
-# any rise of more than ~34 thunks in either kind's mint price, since the two mints are in the
-# numerator too (so a gen-schema change to `markOf`'s cost moves this row, as it should). The arming
-# control below re-proves the first on every run. WHAT IT CANNOT SEE: per-node cost in the instance
-# data plane, which both stacks force and which therefore cancels in the ratio; and anything that
-# makes the kind path CHEAPER (the ratio gates are one-sided). Re-derive with
-# `nix run ./ci#perf-bench`.
+# THREE GATES per fixture. (1) BYTE: kind's projection equals attrs-ref's — the n/2 A instances. A
+# name key that conflates the two same-name kinds returns all n, so this gate also reds the
+# conflation itself. (2) RATIO, thunks AND alloc (classShare's pair: a per-node primop recompute over
+# a cached preimage costs ~1 thunk but allocates), kind/attrs-ref ≤ the bound, at both sizes.
+# (3) LINEARITY on every stack.
+#
+# BOUND = ANCHOR + MARGIN, MARGIN 0.000. ANCHOR — the measured ratio at the landing: hub `perf-bench`
+# app, Nix 2.34.8, gen-select `2cd8c5d` (lib/ identical to `28a0968`), frozen gen-select `9285b5b`,
+# gen-schema `a90bc54`. MARGIN — zero, because the thunk counters are deterministic and the owner
+# ruled any regression a defect. ratio() prints %.3f, so the headroom under each bound is the distance
+# from the exact anchor to the next printed step: thunks 63 / 211 (migrated, n=400 / 1600) and
+# 159 / 1,373 (sealed); alloc 21,799 / 63,415 B and 20,482 / 13,244 B. Allocation carries a ~2.5 KB
+# run-to-run jitter and moves a few KB between environments, which is inside every alloc headroom.
+#
+# STOCK, stated: the anchor is NOT the pre-landing cost. Stock gen-select `9285b5b` as the numerator
+# costs 398,207 / 1,573,607 thunks on the migrated fixture, and its projection fails the byte gate
+# (a name key selects all n). The landed construction is +11,155 / +28,555 over it: +14.5 thunks
+# per node plus ≈5.4k constant (the two mints). About 8.5 per node of that is C-1's
+# `sealedCollisionEq` on the matching half; the rest is the per-node kind-key projection and its
+# admission read (den-hoag-l0y build and landing-gate reports). The bound holds that price; it
+# does not claim the price is zero.
+#
+# WHAT IT CATCHES, derived from the headroom: any per-node cost the live gen-select adds to a
+# `sel.kind` match above ~0.16 thunk/node on the migrated fixture (~0.4 on the sealed one at n=400),
+# including cost in the matcher every selector shares, because the frozen denominator does not pay
+# it; and any rise of more than ~30 thunks in either kind's mint price, since the two mints
+# are in the numerator (so a gen-schema change to `markOf`'s cost moves this row, as it should). The
+# arming control below re-proves the per-node recompute on every run. WHAT IT CANNOT SEE: cost in the
+# instance data plane (gen-merge, gen-schema), which both stacks still pay through the live members
+# and which the ratio therefore dilutes, not cancels — the pure/ref rows gate that plane; a cost in the
+# live gen-select below the headroom; and anything that makes the kind path CHEAPER (the ratio gates
+# are one-sided). Re-derive with `nix run ./ci#perf-bench`.
 KINDMATCH_SMALL=400
 KINDMATCH_BIG=1600
 declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
-# n=400  — anchors 0.972 / 0.991 (409,350 / 420,994 thunks; 21,893,920 / 22,103,600 B).
-KINDMATCH_THUNKS_MAX[400]=0.972
-KINDMATCH_ALLOC_MAX[400]=0.991
-# n=1600 — anchors 0.962 / 0.976 (1,602,150 / 1,664,794 thunks; 85,046,528 / 87,154,032 B).
-KINDMATCH_THUNKS_MAX[1600]=0.962
-KINDMATCH_ALLOC_MAX[1600]=0.976
+# migrated, n=400  — anchors 0.972 / 0.991 (409,362 / 421,003 thunks; 21,893,984 / 22,103,664 B).
+KINDMATCH_THUNKS_MAX[migrated,400]=0.972
+KINDMATCH_ALLOC_MAX[migrated,400]=0.991
+# migrated, n=1600 — anchors 0.962 / 0.976 (1,602,162 / 1,664,803 thunks; 85,042,560 / 87,154,096 B).
+KINDMATCH_THUNKS_MAX[migrated,1600]=0.962
+KINDMATCH_ALLOC_MAX[migrated,1600]=0.976
+# sealed, n=400    — anchors 0.966 / 0.984 (409,945 / 424,319 thunks; 21,910,240 / 22,276,000 B).
+KINDMATCH_THUNKS_MAX[sealed,400]=0.966
+KINDMATCH_ALLOC_MAX[sealed,400]=0.984
+# sealed, n=1600   — anchors 0.957 / 0.969 (1,602,745 / 1,675,319 thunks; 85,058,752 / 87,748,320 B).
+KINDMATCH_THUNKS_MAX[sealed,1600]=0.957
+KINDMATCH_ALLOC_MAX[sealed,1600]=0.969
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
@@ -393,9 +423,7 @@ CS_LIN_FIXED=""
 declare -A OW_TR OW_AR OW_CR OW_BG
 OW_LIN_COLD=""
 OW_LIN_WARM=""
-declare -A KM_TR KM_AR KM_CR KM_BG
-KM_LIN_ATTRS=""
-KM_LIN_KIND=""
+declare -A KM_TR KM_AR KM_CR KM_BG KM_LIN
 KM_PLANT_TR=""
 KM_PLANT_AR=""
 FAILURES=()
@@ -683,40 +711,48 @@ lte "$OW_LIN_WARM" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
 
 # ── kindMatch — kind identity at scale (den-hoag-l0y; the gate derivation is beside the constants) ──
-# DEDICATED section (classShare precedent): the two stacks are attrs / kind, both the pure engine.
-for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
-  run_row kindMatch "$n" attrs kind
-  # BYTE GATE: sel.kind A selects exactly the A instances, as the attrs match on A's value does.
-  if [[ -n "${DIG[kindMatch,$n,attrs]}" && "${DIG[kindMatch,$n,attrs]}" == "${DIG[kindMatch,$n,kind]}" ]]; then
-    KM_BG[$n]="ok"
-  else
-    KM_BG[$n]="MISMATCH"
-    FAILURES+=("kindMatch byte gate: n=$n expected(attrs)=${DIG[kindMatch,$n,attrs]:-<none>} actual(kind)=${DIG[kindMatch,$n,kind]:-<none>} — sel.kind selected a different node set (a name key conflating two same-name kinds selects all n)")
-  fi
-  KM_TR[$n]=$(ratio "${THUNKS[kindMatch,$n,kind]}" "${THUNKS[kindMatch,$n,attrs]}")
-  KM_AR[$n]=$(ratio "${ALLOC[kindMatch,$n,kind]}" "${ALLOC[kindMatch,$n,attrs]}")
-  KM_CR[$n]=$(ratio "${CPU[kindMatch,$n,kind]}" "${CPU[kindMatch,$n,attrs]}")
-  lte "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}" \
-    || FAILURES+=("kindMatch ratio: n=$n kind/attrs thunks expected≤${KINDMATCH_THUNKS_MAX[$n]} actual=${KM_TR[$n]} delta=$(delta "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}") — the kind-identity path costs more per node")
-  lte "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}" \
-    || FAILURES+=("kindMatch ratio: n=$n kind/attrs alloc expected≤${KINDMATCH_ALLOC_MAX[$n]} actual=${KM_AR[$n]} delta=$(delta "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}") — the kind-identity path allocates more per node")
+# DEDICATED section (classShare precedent). Per fixture, the stacks are attrs-ref (the FROZEN
+# gen-select's `sel.attrs`, the denominator) and kind (the live `sel.kind`); the sealed fixture's
+# stacks carry the `-sealed` suffix.
+for fx in migrated sealed; do
+  sfx=""
+  [[ "$fx" == sealed ]] && sfx="-sealed"
+  for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
+    run_row kindMatch "$n" "attrs-ref$sfx" "kind$sfx"
+    den="${DIG[kindMatch,$n,attrs-ref$sfx]}"
+    num="${DIG[kindMatch,$n,kind$sfx]}"
+    # BYTE GATE: sel.kind A selects exactly the A instances, as the attrs match on A's value does.
+    if [[ -n "$den" && "$den" == "$num" ]]; then
+      KM_BG[$fx,$n]="ok"
+    else
+      KM_BG[$fx,$n]="MISMATCH"
+      FAILURES+=("kindMatch byte gate ($fx): n=$n expected(attrs-ref)=${den:-<none>} actual(kind)=${num:-<none>} — sel.kind selected a different node set (a name key conflating two same-name kinds selects all n)")
+    fi
+    KM_TR[$fx,$n]=$(ratio "${THUNKS[kindMatch,$n,kind$sfx]}" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}")
+    KM_AR[$fx,$n]=$(ratio "${ALLOC[kindMatch,$n,kind$sfx]}" "${ALLOC[kindMatch,$n,attrs-ref$sfx]}")
+    KM_CR[$fx,$n]=$(ratio "${CPU[kindMatch,$n,kind$sfx]}" "${CPU[kindMatch,$n,attrs-ref$sfx]}")
+    lte "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}" \
+      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref thunks expected≤${KINDMATCH_THUNKS_MAX[$fx,$n]} actual=${KM_TR[$fx,$n]} delta=$(delta "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}") — the live gen-select's kind path costs more per node")
+    lte "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}" \
+      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref alloc expected≤${KINDMATCH_ALLOC_MAX[$fx,$n]} actual=${KM_AR[$fx,$n]} delta=$(delta "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}") — the live gen-select's kind path allocates more per node")
+  done
+  for s in "attrs-ref$sfx" "kind$sfx"; do
+    KM_LIN[$s]=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,$s]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,$s]}")
+    lte "${KM_LIN[$s]}" "$GROWTH_MAX" \
+      || FAILURES+=("kindMatch linearity: $s thunks expected≤$GROWTH_MAX actual=${KM_LIN[$s]}× delta=$(delta "${KM_LIN[$s]}" "$GROWTH_MAX") over a 4× size step")
+  done
 done
-KM_LIN_ATTRS=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,attrs]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,attrs]}")
-KM_LIN_KIND=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,kind]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind]}")
-lte "$KM_LIN_ATTRS" "$GROWTH_MAX" \
-  || FAILURES+=("kindMatch linearity: attrs thunks expected≤$GROWTH_MAX actual=${KM_LIN_ATTRS}× delta=$(delta "$KM_LIN_ATTRS" "$GROWTH_MAX") over a 4× size step")
-lte "$KM_LIN_KIND" "$GROWTH_MAX" \
-  || FAILURES+=("kindMatch linearity: kind thunks expected≤$GROWTH_MAX actual=${KM_LIN_KIND}× delta=$(delta "$KM_LIN_KIND" "$GROWTH_MAX") over a 4× size step")
 # ARMING, every run: the planted per-node recompute (`kind-plant`: kindFor re-derives each node's
-# kind) at the small size. It selects the same nodes, so its byte gate must hold, and the thunk
-# bound must refuse it; a plant the bound admits means the row cannot see the class it exists for.
+# kind) at the small size, on the migrated fixture. It selects the same nodes, so its byte gate must
+# hold, and the thunk bound must refuse it; a plant the bound admits means the row cannot see the
+# class it exists for.
 sample_cell kindMatch "$KINDMATCH_SMALL" kind-plant 1
-KM_PLANT_TR=$(ratio "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,attrs]}")
-KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[kindMatch,$KINDMATCH_SMALL,attrs]}")
-[[ "${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}" == "${DIG[kindMatch,$KINDMATCH_SMALL,attrs]}" ]] \
+KM_PLANT_TR=$(ratio "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,attrs-ref]}")
+KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[kindMatch,$KINDMATCH_SMALL,attrs-ref]}")
+[[ "${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}" == "${DIG[kindMatch,$KINDMATCH_SMALL,attrs-ref]}" ]] \
   || FAILURES+=("kindMatch arming: the planted per-node recompute selected a different node set (${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}) — the plant no longer isolates cost")
-if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]}"; then
-  FAILURES+=("kindMatch arming: the planted per-node recompute read kind/attrs thunks $KM_PLANT_TR ≤ ${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]} — the bound cannot see the class this row exists for")
+if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"; then
+  FAILURES+=("kindMatch arming: the planted per-node recompute read kind/attrs-ref thunks $KM_PLANT_TR ≤ ${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]} — the bound cannot see the class this row exists for")
 fi
 
 # ── report (pure printing from the computed values above) ──────────────────────
@@ -748,7 +784,7 @@ emit_report() {
     printf '| %s | %s | %s | %s | %s |\n' "$ck" "${BASE_AXIS[$ck]}" "$csrc" "$crev" "${PF_LEAK[$ck]:-—}"
   done
   echo
-  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The two reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
+  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The three reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
     "$PF_ARMING" "$PF_UNAPPLIED"
   echo
   echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
@@ -813,20 +849,24 @@ emit_report() {
   printf 'thunk linearity (%s → %s, ×4 step): cold %s×, warm %s× (gate ≤ %s)\n' \
     "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" "$OW_LIN_COLD" "$OW_LIN_WARM" "$GROWTH_MAX"
   echo
-  echo "### kindMatch (kind identity at scale, den-hoag-l0y; attrs vs kind, per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo "### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
   echo
-  echo "| n | attrs thunks | kind thunks | thunks k/a (≤) | alloc k/a (≤) | cpu k/a | byte gate |"
-  echo "|---|---:|---:|---:|---:|---:|---|"
-  for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
-    printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
-      "$n" "${THUNKS[kindMatch,$n,attrs]}" "${THUNKS[kindMatch,$n,kind]}" \
-      "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}" "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}" "${KM_CR[$n]}" "${KM_BG[$n]}"
+  echo "| fixture | n | attrs-ref thunks | kind thunks | thunks k/a (≤) | alloc k/a (≤) | cpu k/a | byte gate |"
+  echo "|---|---|---:|---:|---:|---:|---:|---|"
+  for fx in migrated sealed; do
+    sfx=""
+    [[ "$fx" == sealed ]] && sfx="-sealed"
+    for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
+      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}" "${THUNKS[kindMatch,$n,kind$sfx]}" \
+        "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}" "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}" "${KM_CR[$fx,$n]}" "${KM_BG[$fx,$n]}"
+    done
   done
   echo
-  printf 'thunk linearity (%s → %s, ×4 step): attrs %s×, kind %s× (gate ≤ %s)\n' \
-    "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "$KM_LIN_ATTRS" "$KM_LIN_KIND" "$GROWTH_MAX"
-  printf 'arming (planted per-node recompute, n=%s): kind/attrs thunks %s, alloc %s — must exceed %s\n' \
-    "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]}"
+  printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, kind %s×, attrs-ref-sealed %s×, kind-sealed %s× (gate ≤ %s)\n' \
+    "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "${KM_LIN[attrs-ref]}" "${KM_LIN[kind]}" "${KM_LIN[attrs-ref-sealed]}" "${KM_LIN[kind-sealed]}" "$GROWTH_MAX"
+  printf 'arming (planted per-node recompute, n=%s): kind/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
+    "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"

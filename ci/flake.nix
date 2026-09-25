@@ -69,6 +69,19 @@
     # byte-for-byte), and `id_hash` is held by a teeth arm on the PURE engine instead of against the
     # frozen witness. ci/rehost-den-parity.nix states the exclusion and the arm at the arms.
     gen-schema-orig.url = "github:sini/gen-schema/2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6";
+    # ── REFERENCE side for perf-bench `kindMatch`: FROZEN gen-select (den-hoag-l0y) ──
+    # The row's denominator. `9285b5b` is the last gen-select before U1 keyed kinds by minted
+    # identity, so the gated ratio reads the LIVE gen-select against a gen-select no relock moves. A
+    # denominator that is the code under test cancels nothing but dilutes any cost both stacks pay in
+    # it: +3 thunks/node in the shared `matches` passed every ratio gate at the bounds when the
+    # denominator was the live `sel.attrs` (den-hoag-l0y landing gate, plant C). Only its `sel.attrs`
+    # path is read, so its pre-U1 kind keying never enters a projection. A PERMANENT pin like the
+    # one above: do NOT sweep it forward. `flake = false` because the bench imports `/lib` with the
+    # environment's own `algebra`, as it does `gen-schema-orig`, so its lock closure is never read.
+    gen-select-orig = {
+      url = "github:sini/gen-select/9285b5b8264a779894dd79e00fa0fe7683a9ffaf";
+      flake = false;
+    };
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
     # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
     nixpkgs-lib.url = "github:nix-community/nixpkgs.lib/db3f255737b94216eb71cce308e2912cf6bc2d7c";
@@ -910,6 +923,7 @@
               "gen-select" = "${genInputs.gen-select}";
               "gen-class" = "${genInputs.gen-class}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
+              "gen-select-orig" = "${inputs.gen-select-orig}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';
@@ -921,7 +935,7 @@
           # is recoverable from a store path and `genInputs.gen-X` does not carry its own URL, so
           # both are read out of the lock that pinned them — resolved BY PATH from the root, never by
           # node label, because a lock carries duplicate-named nodes (`gen-merge_4`). The `axis`
-          # field is what lets the app refuse `--at` on the two REFERENCE keys by name: a ratio's
+          # field is what lets the app refuse `--at` on the three REFERENCE keys by name: a ratio's
           # denominator is its control, and if both arms float a moved ratio is unattributable.
           ciLock = builtins.fromJSON (builtins.readFile ./flake.lock);
           perfMemberKeys = [
@@ -939,6 +953,7 @@
           ];
           perfRefKeys = [
             "gen-schema-orig"
+            "gen-select-orig"
             "nixpkgs-lib"
           ];
           # A MEMBER is read from the ROOT lock, the pin set `gen` resolves through; a REFERENCE key

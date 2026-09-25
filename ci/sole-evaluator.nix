@@ -157,7 +157,7 @@ let
   # ★ THE THREE WIDTHS ARE PINNED TO DIFFERENT AUTHORITIES. The exception set's is pinned to a RULING
   # (opened empty; 8 as of the 2026-09-08 graph ruling, den-hoag-1n3tw) and the exclusion's to a
   # RULING. THE REGISTER'S IS PINNED TO A MEASUREMENT — it
-  # is 2 because 2 is what the lock resolves outside the roster today, and `domain-total` exists
+  # is 3 because 3 is what the lock resolves outside the roster today, and `domain-total` exists
   # precisely so that number can move when the lock moves. A register entry appearing or leaving is a
   # LOCK event, not a ruling event, and the width assertion on it is a NOTIFICATION rather than a
   # gate.
@@ -248,8 +248,13 @@ let
       cause = "a FROZEN PRIOR REVISION of roster member `schema`, held as the golden witness for the re-host parity comparison. Scanning it would read one library twice, the second time at a revision no consumer gets";
       carrier = "ci/rehost-den-parity.nix's stated exclusion";
     }
+    {
+      resolved = "gen-select-orig";
+      cause = "a FROZEN PRIOR REVISION of roster member `select`, held as the perf-bench kindMatch row's denominator so the gated ratio reads the live gen-select against a fixed baseline. Scanning it would read one library twice, the second time at a revision no consumer gets";
+      carrier = "the gen-select-orig declaration in ci/flake.nix";
+    }
   ];
-  registerWidth = 2;
+  registerWidth = 3;
   mkRegister = mkRuledSet {
     label = "out-of-domain register";
     keyField = "resolved";

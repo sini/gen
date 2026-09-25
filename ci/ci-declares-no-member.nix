@@ -12,8 +12,9 @@
 # ── REACH, STATED SO IT IS NOT OVER-READ ──
 # By INPUT NAME, over `(import ./flake.nix).inputs`, against `gen` plus `gen-<key>` for every key of
 # the roster of record, `gen.lib.mkGenLibs { }` minus `strata`. It does not read URLs: a member
-# re-declared under another name is outside its reach, and `gen-schema-orig` — the frozen golden
-# reference pin of gen-schema, which is a different revision by design — is outside it on purpose.
+# re-declared under another name is outside its reach, and `gen-schema-orig` and `gen-select-orig` —
+# the frozen reference pins of gen-schema and gen-select, each a different revision by design — are
+# outside it on purpose.
 # Input names are also what `relock-plan` reads its ordering edges from, so this guards the same
 # surface the planner sees.
 #

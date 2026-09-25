@@ -22,8 +22,8 @@
 # (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs" | "kind" | "kind-plant")
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-select-orig, gen-class, nixpkgs-lib } — store paths as strings
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant")
   workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "preflight"
   n,
 }:
@@ -55,6 +55,7 @@ let
     "gen-select" = "/lib"; # kindMatch: `sel.kind` keyed by minted kind identity (den-hoag-l0y)
     "gen-class" = "/lib"; # tier 2: the injected gen-merge kernel is what enables `applyCoreFixed`
     "gen-schema-orig" = "/lib";
+    "gen-select-orig" = "/lib"; # kindMatch's frozen denominator (ci/flake.nix)
     "nixpkgs-lib" = "/lib";
   };
   envName = {
@@ -70,6 +71,7 @@ let
     "gen-select" = "select";
     "gen-class" = "class";
     "gen-schema-orig" = "schemaOrig";
+    "gen-select-orig" = "selectOrig";
     "nixpkgs-lib" = "lib";
   };
   memberKeys = builtins.attrNames entryPath;
@@ -120,6 +122,7 @@ let
   genAspectsNew = env.aspects;
   genClass = env.class;
   genSelect = env.select;
+  genSelectOrig = env.selectOrig;
   genSchemaOld = env.schemaOrig;
 
   # ── the pre-flight census (`--argstr workload preflight`) ─────────────────────
@@ -817,12 +820,22 @@ let
   # Two kinds sharing ONE name (`host`), from two `evalSchema` calls whose declarations differ by a
   # non-key option, so gen-schema's `kindEq` calls them two kinds. n/2 instances in each registry;
   # one registry-adapter context over the union, whose per-id `kindFor` hands back each node's
-  # SHARED kind value. Single-engine, two stacks, classShare's pattern:
+  # SHARED kind value. Single-engine, classShare's pattern, over TWO fixtures:
   #
-  #   attrs      : `sel.attrs { addr = <A's value>; }` — the per-node matching machinery with no kind
-  #                identity read. The DENOMINATOR.
-  #   kind       : `sel.kind A` — the path under test. Its projection must equal attrs' byte for byte
-  #                (the A instances, n/2 of them): a name key conflating A with B returns all n.
+  #   migrated (bare stack name) : `addr` typed by gen-merge, so the kind's sealed map is EMPTY and a
+  #                                matching node leaves the sealed-collision helper on its empty arm.
+  #   sealed   (`-sealed` suffix) : `addr` typed by nixpkgs `lib.types.str`, a SEALED component (a
+  #                                 value gen-schema cannot key), so a matching node reaches
+  #                                 `sealedCollisionEq`'s non-empty arm: the unmigrated kinds den
+  #                                 declares today.
+  #
+  #   attrs-ref  : `sel.attrs { addr = <A's value>; }` through the FROZEN gen-select (`gen-select-orig`,
+  #                ci/flake.nix): the per-node matching machinery with no kind identity read, at a
+  #                revision no relock moves. The DENOMINATOR. A live-gen-select denominator dilutes
+  #                every cost both stacks pay in the shared matcher instead of reporting it.
+  #   kind       : `sel.kind A` through the LIVE gen-select — the path under test. Its projection must
+  #                equal attrs-ref's byte for byte (the A instances, n/2 of them): a name key
+  #                conflating A with B returns all n.
   #   kind-plant : `kind` with `kindFor` RE-DERIVING the node's kind per call, so every node forces a
   #                fresh digest — the per-node recompute the owner's cost answer was conditional on
   #                not happening. Byte-identical to `kind` by construction (the re-derived kind mints
@@ -830,13 +843,24 @@ let
   #                the row's arming control, never as a gated arm.
   #
   # The digest lives on the kind value, gen-schema's lazy `__mint.minted`; every reader holds a
-  # shared reference and none re-derives it, so the construction pays the mint once per KIND.
+  # shared reference and none re-derives it, so the construction pays the mint once per KIND. The
+  # instance data plane (gen-merge, gen-schema) is still the LIVE code on both stacks, so a cost there
+  # is diluted by the ratio; the rows that gate that plane are the pure/ref matrix above.
   kindMatch =
     let
       S = genSchemaNew;
       M = genMerge;
+      sealed = builtins.elem stack [
+        "attrs-ref-sealed"
+        "kind-sealed"
+      ];
+      isRef = builtins.elem stack [
+        "attrs-ref"
+        "attrs-ref-sealed"
+      ];
+      sel = if isRef then genSelectOrig else genSelect;
       declA = {
-        addr = M.mkOption { type = M.types.str; };
+        addr = M.mkOption { type = if sealed then lib.types.str else M.types.str; };
       };
       declB = declA // {
         tags = M.mkOption {
@@ -870,7 +894,7 @@ let
           }
         ];
       };
-      ctx = genSelect.adapters.registry.mkContext {
+      ctx = sel.adapters.registry.mkContext {
         inherit nodes;
         data = id: if isA id then ev.config.hostsA.${id} else ev.config.hostsB.${id};
         parent = _: null;
@@ -880,9 +904,9 @@ let
           else
             (id: if isA id then kA else kB);
       };
-      selector = if stack == "attrs" then genSelect.attrs { addr = "10.0.0.1"; } else genSelect.kind kA;
+      selector = if isRef then sel.attrs { addr = "10.0.0.1"; } else sel.kind kA;
     in
-    builtins.filter (id: genSelect.matches selector id ctx) nodes;
+    builtins.filter (id: sel.matches selector id ctx) nodes;
 
   projection =
     if workload == "preflight" then

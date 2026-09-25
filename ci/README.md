@@ -103,11 +103,18 @@ evaluates the base once and reuses it via `warmFrom`/`editedModules`, so the reg
 a kind is keyed by its MINTED identity, and any regression is a defect. Two kinds share one name
 (`host`) but are two declarations (gen-schema's `kindEq` says so); n/2 instances sit in each registry
 behind one gen-select registry-adapter context whose per-id `kindFor` returns each node's shared kind
-value. Its stacks are `attrs` (the denominator: the same context matched with `sel.attrs`) and
-`kind` (`sel.kind A`). A third, `kind-plant`, re-derives each node's kind per call so every node
-forces a fresh digest: the per-node recompute the owner's cost answer was conditional on not
-happening. It selects the same nodes, so only a counter can see it, and the harness runs it as the
-row's arming control on every run rather than as a gated arm.
+value. Its numerator is `kind` (`sel.kind A`, the live gen-select); its denominator is `attrs-ref`,
+the same context matched with `sel.attrs` through a FROZEN gen-select (`gen-select-orig`, rev-pinned
+at `9285b5b` in `ci/flake.nix`, which no relock moves). The denominator is frozen because a
+denominator running the code under test dilutes every cost both stacks pay in it: with the live
+`sel.attrs` there, +3 thunks/node in the shared matcher passed at the bounds. The row runs two
+fixtures, `migrated` (the kind's sealed map is empty) and `sealed` (`attrs-ref-sealed` /
+`kind-sealed`: `addr` typed by nixpkgs `lib.types.str`, so a matching node reaches the
+sealed-collision helper's non-empty arm, as den's unmigrated kinds do). A third stack, `kind-plant`,
+re-derives each node's kind per call so every node forces a fresh digest: the per-node recompute the
+owner's cost answer was conditional on not happening. It selects the same nodes, so only a counter
+can see it, and the harness runs it as the row's arming control on every run rather than as a gated
+arm.
 
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
@@ -179,21 +186,27 @@ The `overrideWarm` section adds its own gates (own threshold, not the pure/ref o
   (6 overrides amortising one base merge ≈ 1/6). Plus its own thunk linearity check (both stacks ≤
   `GROWTH_MAX` over the 4× step).
 
-The `kindMatch` section adds its own gates:
+The `kindMatch` section adds its own gates, per fixture:
 
-- **byte gate** — `kind` and `attrs` must select the same nodes at every size. A name key that
+- **byte gate** — `kind` and `attrs-ref` must select the same nodes at every size. A name key that
   conflates the two same-name kinds selects all n and reds here.
-- **ratio**, thunks AND alloc — `kind`/`attrs` ≤ `KINDMATCH_THUNKS_MAX[n]` / `KINDMATCH_ALLOC_MAX[n]`
-  at both sizes, each the measured anchor with margin 0.000 (anchors 0.972 / 0.991 at n=400 and
-  0.962 / 0.976 at n=1600; Nix 2.34.8, gen-select `28a0968`, gen-schema `a90bc54`). The headroom
-  under each is the distance to the next printed step — 67 and 214 thunks — so a per-node cost on
-  the kind-read path of a fraction of a thunk per node reds it, as does a rise of more than ~34
-  thunks in either kind's mint price. It cannot see per-node cost in the instance data plane, which
-  both stacks pay, nor a cheaper kind path.
-- **arming** — the `kind-plant` stack at n=400 must breach the thunk bound (measured 5.120 against
-  0.972) while selecting the same nodes. Plus thunk linearity on both stacks, which is kept for the
-  quadratic class: the planted recompute is linear (3.99× over the 4× step), so linearity alone
-  never sees it.
+- **ratio**, thunks AND alloc — `kind`/`attrs-ref` ≤ `KINDMATCH_THUNKS_MAX[fixture,n]` /
+  `KINDMATCH_ALLOC_MAX[fixture,n]` at both sizes, each the measured anchor with margin 0.000 (migrated
+  0.972 / 0.991 at n=400 and 0.962 / 0.976 at n=1600; sealed 0.966 / 0.984 and 0.957 / 0.969; Nix
+  2.34.8, gen-select `2cd8c5d`, frozen gen-select `9285b5b`, gen-schema `a90bc54`). The thunk
+  headroom under each is the distance to the next printed step — 63 / 211 migrated, 159 / 1,373
+  sealed — so a per-node cost the live gen-select adds to a `sel.kind` match reds it above ~0.16
+  thunk/node (migrated), including cost in the matcher every selector shares, as does a rise of more
+  than ~30 thunks in either kind's mint price. The anchor is not the pre-landing cost: stock
+  gen-select `9285b5b` as the numerator costs 14.5 thunks/node plus ≈5.4k less and fails the byte
+  gate; the bound holds that price. The row cannot see per-node cost in the instance data plane
+  (gen-merge, gen-schema), which both stacks pay through the live members and which the ratio
+  therefore dilutes rather than cancels — the pure/ref rows gate that plane — nor a cheaper kind
+  path.
+- **arming** — the `kind-plant` stack at n=400 must breach the migrated thunk bound (measured 5.122
+  against 0.972) while selecting the same nodes. Plus thunk linearity on every stack, which is kept
+  for the quadratic class: the planted recompute is linear (3.99× over the 4× step), so linearity
+  alone never sees it.
 
 ### Baseline (2026-09-21, Nix 2.34.8, gen-merge `7516886`) — the live anchor
 

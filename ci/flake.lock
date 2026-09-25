@@ -141,6 +141,23 @@
         "type": "github"
       }
     },
+    "gen-select-orig": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790329439,
+        "narHash": "sha256-snYAGw7B0cEIZoZUtXXjIvN+b9nwHgdls1JmnqQxJNQ=",
+        "owner": "sini",
+        "repo": "gen-select",
+        "rev": "9285b5b8264a779894dd79e00fa0fe7683a9ffaf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-select",
+        "rev": "9285b5b8264a779894dd79e00fa0fe7683a9ffaf",
+        "type": "github"
+      }
+    },
     "git-hooks-nix": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -290,6 +307,7 @@
         "flake-root": "flake-root",
         "gen-harness": "gen-harness",
         "gen-schema-orig": "gen-schema-orig",
+        "gen-select-orig": "gen-select-orig",
         "git-hooks-nix": "git-hooks-nix",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-lib": "nixpkgs-lib_2",
