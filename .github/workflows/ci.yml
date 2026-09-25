@@ -4,42 +4,36 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # A negative test runs on a scratch branch with no pull request: `gh workflow run ci.yml --ref <branch>`.
+  workflow_dispatch:
 
 jobs:
-  format:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ci
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix fmt -- --ci
-
+  # The three-evaluator matrix (upstream Nix, Determinate, Lix) from gen-harness. The ref is the
+  # gen-harness rev locked in ci/flake.lock, so one harness identity governs the run; `relock`
+  # rewrites it when that lock moves. Its `fmt` job is the former `format` job (`nix fmt -- --ci`
+  # in ci/), and each column runs what the former `checks` job ran, under its own evaluator.
+  #
   # Validation: re-host byte-parity oracles (pure stack == frozen nixpkgs stack over the instance
   # key sets and every non-identity field). `id_hash` is the ADR-0016 excluded axis — no forward
   # golden pin can carry the new encoding, so it is held by a teeth arm on the PURE engine instead.
-  checks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      # The ROOT flake, spelled bare as every member repository spells it. Its `roster` output is
-      # what carries the check — forcing the roster to names depth reds on an unhealthy member —
-      # and without this step that oracle is landed and never run (den-hoag-z5wsg).
-      - run: nix flake check
-      - run: nix flake check ./ci --keep-going
+  evaluators:
+    uses: sini/gen-harness/.github/workflows/evaluators.yml@7a1e718c4652bfedd707c9a261fa03ee7e002195
+    with:
+      # `.` is the ROOT flake, the bare `nix flake check` every member repository runs. Its `roster`
+      # output is what carries the check — forcing the roster to names depth reds on an unhealthy
+      # member — and without this line that oracle is landed and never run (den-hoag-z5wsg).
+      flake-checks: |
+        .
+        ./ci --keep-going
       # compose-parity's one cell whose green is an abort `tryEval` cannot catch, so it is read
-      # across a process boundary, by this job's evaluator (ci/compose-parity.nix, `overflowPin`).
+      # across a process boundary, by each column's evaluator (ci/compose-parity.nix, `overflowPin`).
       # Green is the eval failing on a stack overflow; a value or any other error is red.
-      - run: |
-          if nix eval ./ci#lib.composeParity.overflowPin 2> overflow.err; then
-            echo "compose-parity overflowPin evaluated to a value: the mutual same-tag cycle no longer overflows, or the overflow was caught" >&2
-            exit 1
-          fi
-          grep -q 'stack overflow' overflow.err || { cat overflow.err >&2; exit 1; }
+      extra-run: |
+        if nix eval ./ci#lib.composeParity.overflowPin 2> overflow.err; then
+          echo "compose-parity overflowPin evaluated to a value: the mutual same-tag cycle no longer overflows, or the overflow was caught" >&2
+          exit 1
+        fi
+        grep -q 'stack overflow' overflow.err || { cat overflow.err >&2; exit 1; }
 
   # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
   # thunk/alloc ratios + linearity). cpu is reported but gated by nothing — see ci/README.md.

@@ -1198,6 +1198,9 @@
               name = "gen";
               root = self.sourceInfo.outPath;
               testsError = { };
+              # The harness THIS ci is locked to, so the caller's `evaluators.yml@<sha>` is held to
+              # it — the value gen-harness's flake module hands every mkCi consumer.
+              harnessRev = inputs.gen-harness.sourceInfo.rev or null;
             };
 
             # readme-audience — a public README carries no internal decision-record reference.
