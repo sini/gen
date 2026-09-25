@@ -182,7 +182,8 @@ nix run ./ci#flake-compare     # 3-way drvPath equivalence (15/15)
 nix run ./ci#fleet-consistency # cited fleet numbers vs their own arithmetic
 ```
 
-Per library — clone the repo and, from its root, `nix flake check ./ci` for the gate or
-`nix develop ./ci -c nix-unit --flake ./ci#tests` for the count. A single sub-proof runs directly, e.g.
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. The full library set with revisions and test
+Per library — clone the repo and, from its root, `nix develop ./ci --command ci` for the guarded
+suite and its count. A single sub-proof runs directly, e.g. `nix develop ./ci --command ci purity`.
+The bare forms — `nix flake check ./ci`, `nix develop ./ci -c nix-unit --flake ./ci#tests` — are
+unguarded, blind to an untracked cell: they read a git-filtered copy of the tree. The full library set with revisions and test
 counts is [VALIDATION §2](VALIDATION.md#2-per-library-unit-suites).

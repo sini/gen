@@ -158,7 +158,9 @@ it fails — is [TRUST.md](TRUST.md).
 
 **Every roster library is nixpkgs-lib-free.** Enforced per repo by a source scanner,
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
-`nix develop ./ci -c nix-unit --flake ./ci#tests.purity`. All 22 roster libraries carry it, including
+`nix develop ./ci --command ci purity` (guarded; the bare
+`nix develop ./ci -c nix-unit --flake ./ci#tests.purity` is unguarded, blind to an untracked cell).
+All 22 roster libraries carry it, including
 gen-prelude — it declares no flake inputs at all, so nothing transitive can enter its lock, and its own
 scanner still checks the source directly.
 
@@ -179,8 +181,10 @@ evaluation at its first consumer. All 22 library flakes declare it today.
 
 **Every library gates on its own CI.** All 22 library repos build their `ci/flake.nix` on
 `gen-harness.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes
-a gate the moment it lands, with no registration step. `nix flake check ./ci` from any repo root runs
-the suite, and every roster library carries a GitHub Actions workflow that runs it on push and pull
+a gate the moment it lands, with no registration step. `nix develop ./ci --command ci` from any repo
+root runs the suite guarded: it refuses on any untracked file under a declared read root, and the
+remedy is `git add` or move. The bare `nix flake check ./ci` also runs it but is unguarded, blind to
+an untracked cell, because it reads a git-filtered copy of the tree. Every roster library carries a GitHub Actions workflow that runs it on push and pull
 request. This hub is not among them: it exposes flake `checks` and a perf `app` rather than a
 nix-unit `tests` output, so it consumes the harness's check builders directly instead of its module —
 the repository that ships a gate is gated by it.

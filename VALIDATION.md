@@ -280,9 +280,11 @@ nix-unit prints — i.e. every listed test **executed and passed** — at the re
 | gen-vars                                                      | `56d1911` |       47 | `ci/tests/`                |
 | **total**                                                     |           | **1988** |                            |
 
-- **Command (gate):** clone the repo, then from its root `nix flake check ./ci`.
-- **Command (count):** `nix develop ./ci -c nix-unit --flake ./ci#tests` prints the `N/N successful`
-  figure — this is what produced the numbers above.
+- **Command:** clone the repo, then from its root `nix develop ./ci --command ci`, which refuses on
+  any untracked file under a declared read root and otherwise prints the `N/N successful` figure.
+- **Unguarded forms:** `nix flake check ./ci` (gate) and
+  `nix develop ./ci -c nix-unit --flake ./ci#tests` (count, what produced the numbers above) read a
+  git-filtered copy of the tree, so they are blind to an untracked cell.
 - **Failure looks like:** nix-unit prints the failing `suite.test-name` with `got` vs `expected`
   and exits non-zero; `nix flake check ./ci` fails the same way through the shared CI module.
 
@@ -329,10 +331,10 @@ module system — so its suite is the densest correctness surface in the ecosyst
   loc untouched and no edited module carries a lying `pureModule` marker — any dirty contributor or a
   `config`-reading module re-merges (the standing byte oracle is the tooth). The full byte-mode
   boundary list lives in the gen-merge README.
-- **Command:** from the gen-merge repo, `nix flake check ./ci`, or
-  `ulimit -s unlimited; nix develop ./ci -c nix-unit --flake ./ci#tests` for the count (the CLI may
-  need the raised stack; `nix flake check` does not). A single suite: e.g.
-  `nix develop ./ci -c nix-unit --flake ./ci#tests.warm`.
+- **Command:** from the gen-merge repo, `ulimit -s unlimited; nix develop ./ci --command ci` for the
+  guarded suite and its count (the CLI may need the raised stack; `nix flake check` does not). A
+  single suite: e.g. `nix develop ./ci --command ci warm`. The bare `nix flake check ./ci` and
+  `nix develop ./ci -c nix-unit --flake ./ci#tests` are unguarded, blind to an untracked cell.
 
 ### gen-flake — the terminal (89 tests, `88f639c`) — ORPHANED AS REFERENCE (ADR-0031 F3)
 
@@ -463,8 +465,9 @@ injected resolved values into a consumer's nixpkgs eval and built NixOS systems;
   diverges from the deferred terminal value (`host.port = 8080` → `8081`), so the deferral changes
   the answer and is load-bearing; the `osConfig` thunk genuinely cannot resolve mid-pipeline. The
   reference (nixpkgs) side carries the identical teeth.
-- **Command:** `nix develop ./ci -c nix-unit --flake ./ci#tests.deferral` in the gen-merge repo
-  (12/12), or the whole `nix flake check ./ci`.
+- **Command:** `nix develop ./ci --command ci deferral` in the gen-merge repo (12/12), guarded; the
+  bare `nix develop ./ci -c nix-unit --flake ./ci#tests.deferral` and `nix flake check ./ci` are
+  unguarded, blind to an untracked cell.
 - **Failure looks like:** a premature force surfaces as a `forced too early` throw; a divergence
   from the nixpkgs reference fails `test-terminal-resolves-byte-identical` with `got` vs `expected`.
 
@@ -649,19 +652,22 @@ nix run ./ci#fleet-consistency
 Per library — clone the repo (e.g. `github:sini/gen-schema`) and from its root:
 
 ```bash
-nix flake check ./ci                                  # the suite + purity as a gate
-nix develop ./ci -c nix-unit --flake ./ci#tests       # the N/N count, running every test
+nix develop ./ci --command ci                         # guarded: the N/N count, running every test
+nix flake check ./ci                                  # the suite + purity as a gate; unguarded
+nix develop ./ci -c nix-unit --flake ./ci#tests       # the N/N count; unguarded
 ```
 
-Or run a single sub-proof directly:
+The two bare forms read a git-filtered copy of the tree, so they are blind to an untracked cell; the
+guarded `ci` refuses on any untracked file under a declared read root, and the remedy is `git add` or
+move. Or run a single sub-proof directly, guarded:
 
 ```bash
-# purity scanner (any pure lib; gen-types uses .types-purity)
-nix develop ./ci -c nix-unit --flake ./ci#tests.purity
+# purity scanner (any pure lib; gen-types uses types-purity)
+nix develop ./ci --command ci purity
 # the config-thunk deferral regression (in the gen-merge repo)
-nix develop ./ci -c nix-unit --flake ./ci#tests.deferral
+nix develop ./ci --command ci deferral
 # the warm re-eval byte oracles (in the gen-merge repo)
-nix develop ./ci -c nix-unit --flake ./ci#tests.warm
+nix develop ./ci --command ci warm
 ```
 
 The full library set — each with its revision and test count — is the table in
