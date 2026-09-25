@@ -31,6 +31,15 @@ jobs:
       # and without this step that oracle is landed and never run (den-hoag-z5wsg).
       - run: nix flake check
       - run: nix flake check ./ci --keep-going
+      # compose-parity's one cell whose green is an abort `tryEval` cannot catch, so it is read
+      # across a process boundary, by this job's evaluator (ci/compose-parity.nix, `overflowPin`).
+      # Green is the eval failing on a stack overflow; a value or any other error is red.
+      - run: |
+          if nix eval ./ci#lib.composeParity.overflowPin 2> overflow.err; then
+            echo "compose-parity overflowPin evaluated to a value: the mutual same-tag cycle no longer overflows, or the overflow was caught" >&2
+            exit 1
+          fi
+          grep -q 'stack overflow' overflow.err || { cat overflow.err >&2; exit 1; }
 
   # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
   # thunk/alloc ratios + linearity). cpu is reported but gated by nothing — see ci/README.md.

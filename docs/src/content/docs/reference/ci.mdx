@@ -39,7 +39,7 @@ And the trust-surface job:
 | Job | What it runs | Disposition |
 |---|---|---|
 | `format` | `nix fmt -- --ci` in `ci/` | **Gates** — fails on unformatted code |
-| `checks` | `nix flake check` (root), then `nix flake check ./ci --keep-going` | **Gates** — every one of the 20 named checks below |
+| `checks` | `nix flake check` (root), then `nix flake check ./ci --keep-going` | **Gates** — every one of the 21 named checks below; one further step reads compose-parity's overflow pin |
 | `perf-bench` | `nix run ./ci#perf-bench` | **Partial** — gates on parity, ratio, and linearity; cpu is measured and reported, gated by nothing |
 | `sole-evaluator-report` | `nix run ./ci#sole-evaluator-report` | **Reported, gated by nothing** — deliberately |
 | `fleet-consistency` | `nix run ./ci#fleet-consistency` | **Gates** — 9 arithmetic-consistency checks over committed baseline JSON, no live fleet evaluation |
@@ -48,19 +48,20 @@ The `checks` job runs the root flake's own check first — its only relevant out
 binding that forces the roster to depth, so an unhealthy member reds it — and then every check
 declared in `ci/flake.nix`.
 
-## The 20 checks
+## The 21 checks
 
-All 20 are ordinary Nix derivations picked up by `nix flake check ./ci`, so a non-zero build exit
+All 21 are ordinary Nix derivations picked up by `nix flake check ./ci`, so a non-zero build exit
 fails the job for every one of them:
 
 `agents-md-citations` · `agents-md-hub-inputs` · `architecture-library-graph` ·
-`ci-declares-no-member` · `ci-plane-coverage` · `ci-self-input` · `declared-content` ·
-`direction-of-dependence` · `hub-entry` · `hub-entry-agreement` · `hub-substrate` ·
+`ci-declares-no-member` · `ci-plane-coverage` · `ci-self-input` · `compose-parity` ·
+`declared-content` · `direction-of-dependence` · `hub-entry` · `hub-entry-agreement` ·
+`hub-substrate` ·
 `inject-payload` · `mdformat-plugins` · `mkgenlibs-eval` · `pin-coherence` ·
 `publication-coverage` · `readme-audience` · `readme-figures` · `rehost-den-parity` ·
 `treefmt-tree-root`
 
-<Aside type="caution" title="One of the twenty gates on less than it looks like it does">
+<Aside type="caution" title="One of the twenty-one gates on less than it looks like it does">
 `pin-coherence` is a check, not an app, and a non-zero exit from it still fails the build — but
 only on its own arming. It is a self-test that must run correctly, and does fail the build if it
 can't. On its **primary finding** — an incoherent pin across the members' ci locks — it is

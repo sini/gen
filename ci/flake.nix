@@ -289,6 +289,11 @@
       # `true`.
       hubEntryAgreement = import ./hub-entry-agreement.nix { inherit (inputs) gen; };
 
+      # The compose-parity oracle (den-hoag-i34de): warm ≡ cold through `gen.lib.compose`, at the
+      # root lock's gen-merge and gen-memo. `.gate` is the per-cell record; `.overflowPin` is the one
+      # cell whose green is an uncatchable abort, read by the `checks` job (see the file header).
+      composeParity = import ./compose-parity.nix { inherit (inputs) gen; };
+
       # L3: the substrate the hub hands the three roster members whose flake `.lib` is published
       # unapplied. `.gate` is the per-arm record incl. the in-cell arming; `.gateKeys` the keys that
       # MUST be `true`.
@@ -346,6 +351,8 @@
       flake.lib.hubSubstrate = hubSubstrate;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
       flake.lib.architectureLibraryGraph = architectureLibraryGraph;
+      #   nix eval ./ci#lib.composeParity.gate --json | jq
+      flake.lib.composeParity = composeParity;
 
       perSystem =
         {
@@ -1120,6 +1127,25 @@
                 '';
             hub-entry-agreement = mkHubEntryAgreementCheck "hub-entry-agreement" hubEntryAgreement;
             hub-substrate = mkHubSubstrateCheck "hub-substrate" hubSubstrate;
+            compose-parity =
+              let
+                failed = builtins.filter (k: composeParity.gate.${k} != true) composeParity.gateKeys;
+              in
+              pkgs.runCommand "compose-parity"
+                {
+                  report = builtins.toJSON ({ inherit failed; } // composeParity.report);
+                  passAsFile = [ "report" ];
+                }
+                ''
+                  echo "── compose-parity ──"
+                  cat "$reportPath"
+                  echo
+                  ${lib.optionalString (failed != [ ]) ''
+                    echo ${lib.escapeShellArg "COMPOSE PARITY BROKEN — warm and cold composes disagree, or a control went blind: ${lib.concatStringsSep " " failed}"} >&2
+                    exit 1
+                  ''}
+                  cp "$reportPath" "$out"
+                '';
             # The hub is gated by the same tree-root oracle gen-harness ships to its consumers —
             # the repository that ships a gate is gated by it, and now by the one instance of it
             # rather than by a second copy that has to be kept in agreement.

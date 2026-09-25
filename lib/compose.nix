@@ -151,6 +151,6 @@ in
 {
   # The public entry: a base compose — no warm context, no `trace`. `override` re-enters with the
   # warm decision, so the warm path lands behind the standing byte-for-byte cold-parity oracle
-  # (warm ≡ cold on `values` AND `provenance`; gen-memo `ci/tests/compose-parity.nix`).
+  # (warm ≡ cold on `values` AND `provenance`; this hub's `ci/compose-parity.nix`).
   compose = composeAt { };
 }

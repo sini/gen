@@ -38,6 +38,15 @@ on every axis but identity — `id_hash` is minted and forced on both engines, a
 `teeth-mutation-pure` on the pure side rather than against the frozen witness (ADR-0016).
 Gate keys are listed in `flake.nix`; any `false` fails the check derivation.
 
+`compose-parity.nix` — the successor compose as published (`gen.lib.compose`) evaluated warm and
+cold over one fixture must agree byte-for-byte on `values` AND `provenance`, at the root lock's
+gen-merge and gen-memo, whose revisions the report records. Beside the two arms it carries the
+comparator's own controls (the cycle cut fires, functions are nulled, each half moves under its own
+seed, the function-valued blind class reads green), the admission key's refusing half, the
+engineArgs collision guard per owned key, and the cycle-walk cells. One cell cannot be a gate: its
+green is a stack overflow that `tryEval` does not catch, so the `checks` job reads
+`lib.composeParity.overflowPin` in a separate step and requires the eval to fail on it.
+
 ## Architecture — the direction-of-dependence lint
 
 `direction-of-dependence.nix` — ADR-0015's enforcement half. No roster member may declare a root
