@@ -23,7 +23,7 @@
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-select-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant"; entityMatch: "attrs-ref" | "entity" | "entity-plant")
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant"; entityMatch: "attrs-ref" | "entity" | "attrs-ref-sealed" | "entity-sealed" | "entity-plant")
   workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "entityMatch" | "preflight"
   n,
 }:
@@ -922,25 +922,32 @@ let
   #                  matcher. With the live gen-schema in the denominator, a cost both stacks pay in it
   #                  LOWERS a ratio above 1, so the one-sided gate reads a regression as an improvement.
   #                  No stamp is read. Projection: both halves, `[ "a:h0" "b:h0" ]`.
-  #   entity       : `sel.entity hostsA.h0` through the LIVE gen-select over LIVE gen-schema instances:
-  #                  forces all n stamps. Projection: `[ "a:h0" ]`; a name-keyed stamp gives both halves.
+  #   entity       : `sel.entity kA hostsA.h0` through the LIVE gen-select over LIVE gen-schema
+  #                  instances: forces all n stamps. Projection: `[ "a:h0" ]`; a name-keyed stamp gives
+  #                  both halves.
   #   entity-plant : `entity` with every node's instance evaluated under a kind RE-DERIVED for that
   #                  node, so each stamp forces a fresh mark — the per-instance recompute. Byte-identical
   #                  to `entity`, so only the counter gate can see it; perf-bench.sh runs it as the row's
   #                  arming control, never as a gated arm.
+  #   attrs-ref-sealed / entity-sealed : the SEALED fixture (den-hoag-l0y (β); kindMatch's precedent).
+  #                  `addr` is typed by nixpkgs `lib.types.str`, so both kinds carry a sealed component
+  #                  and the one matching node reaches `sel.entity`'s sealed arm (the node's kind key,
+  #                  then `kindEq`). Without it, a cost confined to that arm, such as reading every
+  #                  node's kind before the stamp decides, is invisible here.
   #
   # Both engines carry `mkSchemaOption`, and `gen-schema-orig` predates `evalSchema`, so the kinds are
   # frozen in their own prior pass in the in-module declaration form on BOTH stacks (schemaHosts'
   # precedent), which keeps the two arms one shape.
   entityMatch =
     let
-      isRef = stack == "attrs-ref";
+      isRef = stack == "attrs-ref" || stack == "attrs-ref-sealed";
+      sealedE = stack == "attrs-ref-sealed" || stack == "entity-sealed";
       sel = if isRef then genSelectOrig else genSelect;
       S = if isRef then genSchemaOld else genSchemaNew;
       O = if isRef then lib else genMerge;
       eval = if isRef then lib.evalModules else genMerge.evalModuleTree;
       declA = {
-        addr = O.mkOption { type = O.types.str; };
+        addr = O.mkOption { type = if sealedE then lib.types.str else O.types.str; };
       };
       declB = declA // {
         tags = O.mkOption {
@@ -1013,7 +1020,7 @@ let
             name = "h0";
           }
         else
-          sel.entity ev.config.hostsA.h0;
+          sel.entity kA ev.config.hostsA.h0;
     in
     builtins.filter (id: sel.matches selector id ctx) nodes;
 

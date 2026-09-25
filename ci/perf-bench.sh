@@ -418,7 +418,7 @@ KINDMATCH_ALLOC_MAX[sealed,1600]=0.969
 # that stamp: the registry adapter's `entryFor` tests the stamp's PRESENCE and never forces its value.
 # This row reads every node's stamp through `sel.entity`.
 #
-# STACKS. The numerator is `entity` (`sel.entity hostsA.h0` through the LIVE gen-select over LIVE
+# STACKS. The numerator is `entity` (`sel.entity kA hostsA.h0` through the LIVE gen-select over LIVE
 # gen-schema instances). The denominator is `attrs-ref`, and it runs NO library under test: the
 # frozen gen-schema (`gen-schema-orig`) on the pinned nixpkgs `lib.evalModules`, matched with
 # `sel.attrs` through the frozen gen-select (`gen-select-orig`). Both frozen pins are rev-pinned in
@@ -430,13 +430,26 @@ KINDMATCH_ALLOC_MAX[sealed,1600]=0.969
 # THREE GATES. (1) PROJECTION: entity selects exactly `[ "a:h0" ]` (its digest is pinned below); a
 # stamp keyed by the kind NAME selects both halves, `[ "a:h0" "b:h0" ]`, which is attrs-ref's
 # projection and is pinned as the control. (2) RATIO, thunks AND alloc, entity/attrs-ref ≤ the bound,
-# at both sizes. (3) LINEARITY on both stacks.
+# at both sizes. (3) LINEARITY on every stack.
+#
+# TWO FIXTURES (den-hoag-l0y (β); kindMatch's precedent). `migrated` (the kinds' sealed maps are
+# empty, so `sel.entity` decides on the stamp alone) and `sealed` (stacks `attrs-ref-sealed` /
+# `entity-sealed`: `addr` is typed by nixpkgs `lib.types.str`, so the one matching node reaches the
+# sealed arm, reading the node's kind key and deciding through `kindEq`). Without the second fixture a
+# cost confined to that arm is invisible here: a gen-select that reads every node's kind before the
+# stamp decides (+6 thunks/node, the (β) landing's plant, driven through `--at gen-select=path:`)
+# reads 1.310 / 1.304 against the sealed bounds 1.305 / 1.300 and reds, while its migrated ratios and
+# both projections are unchanged. The two denominators are the same frozen stack (the frozen side's
+# `str` is nixpkgs' already), so each fixture's ratio is read against its own paired cell.
 #
 # BOUND = ANCHOR + MARGIN, MARGIN 0.000 (xzchx: any regression is a defect). ANCHOR — the measured
-# ratio at the landing: hub `perf-bench` app, Nix 2.34.8, gen-schema `9289268`, gen-select `9791baf`,
-# frozen gen-schema `2b7c2d3`, frozen gen-select `9285b5b`. ratio() prints %.3f, so the headroom is the
-# distance from the exact anchor to the next printed step: thunks 400 / 1,983 (n=400 / 1600; ~1.0 / 1.2 per node), alloc
-# 24,798 / 60,871 B.
+# ratio at the landing: Nix 2.34.8, gen-schema `9289268`, gen-select `410f517`, frozen gen-schema
+# `2b7c2d3`, frozen gen-select `9285b5b`. ratio() prints %.3f, so the headroom is the distance from the
+# exact anchor to the next printed step: migrated thunks 390 / 1,972 (n=400 / 1600), alloc 20,702 /
+# 60,871 B; sealed thunks 10 / 629, alloc 23,439 / 131,663 B. ★ The sealed n=400 thunk headroom is
+# TEN thunks: any constant added to the sealed entity path reds it, by the margin law, not by noise.
+# (β)'s own price over `9791baf`: +12 thunks constant on the migrated fixture (the kind key the
+# selector now carries); the sealed arm adds the node's kind key and one `kindEq` on the one match.
 #
 # THE PRICE, stated: the stamp's kind component costs +24.0 thunks per instance (one more
 # ⟨label, value⟩ pair through the canonical encoder) plus the mark once per kind, which the stamp now
@@ -455,12 +468,18 @@ ENTITYMATCH_BIG=1600
 ENTITYMATCH_DIGEST_ENTITY=6b6d42a882aa4068cc0009757746a29fd06a3ee757c08a55f179af91c2e88055
 ENTITYMATCH_DIGEST_REF=b4d8cf97c0d1bfa8fe91136ed4d1fe56610ae23dadb1a30ecfd6df7f31a796a1
 declare -A ENTITYMATCH_THUNKS_MAX ENTITYMATCH_ALLOC_MAX
-# n=400  — anchors 1.300 / 1.114 (746,592 / 574,389 thunks; 37,447,616 / 33,622,624 B).
-ENTITYMATCH_THUNKS_MAX[400]=1.300
-ENTITYMATCH_ALLOC_MAX[400]=1.114
-# n=1600 — anchors 1.296 / 1.105 (2,950,392 / 2,277,189 thunks; 147,246,544 / 133,249,584 B).
-ENTITYMATCH_THUNKS_MAX[1600]=1.296
-ENTITYMATCH_ALLOC_MAX[1600]=1.105
+# migrated, n=400  — anchors 1.300 / 1.114 (746,604 / 574,390 thunks; 37,451,712 / 33,622,624 B).
+ENTITYMATCH_THUNKS_MAX[migrated,400]=1.300
+ENTITYMATCH_ALLOC_MAX[migrated,400]=1.114
+# migrated, n=1600 — anchors 1.296 / 1.105 (2,950,404 / 2,277,190 thunks; 147,246,544 / 133,249,584 B).
+ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.296
+ENTITYMATCH_ALLOC_MAX[migrated,1600]=1.105
+# sealed, n=400    — anchors 1.305 / 1.119 (749,856 / 574,390 thunks; 37,617,088 / 33,622,624 B).
+ENTITYMATCH_THUNKS_MAX[sealed,400]=1.305
+ENTITYMATCH_ALLOC_MAX[sealed,400]=1.119
+# sealed, n=1600   — anchors 1.300 / 1.110 (2,960,856 / 2,277,190 thunks; 147,842,000 / 133,249,584 B).
+ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.300
+ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.110
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
@@ -807,29 +826,33 @@ if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"; then
 fi
 
 # ── entityMatch — instance identity at scale (den-hoag-l0y U2; the gate derivation is beside the constants) ──
-for n in "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG"; do
-  run_row entityMatch "$n" attrs-ref entity
-  den="${DIG[entityMatch,$n,attrs-ref]}"
-  num="${DIG[entityMatch,$n,entity]}"
-  # PROJECTION GATE: the entity selects its own half's `h0` alone; the control selects both halves.
-  if [[ "$num" == "$ENTITYMATCH_DIGEST_ENTITY" && "$den" == "$ENTITYMATCH_DIGEST_REF" ]]; then
-    EM_BG[$n]="ok"
-  else
-    EM_BG[$n]="MISMATCH"
-    FAILURES+=("entityMatch projection gate: n=$n expected entity=$ENTITYMATCH_DIGEST_ENTITY attrs-ref=$ENTITYMATCH_DIGEST_REF actual entity=${num:-<none>} attrs-ref=${den:-<none>} — a stamp keyed by the kind name selects both same-name halves")
-  fi
-  EM_TR[$n]=$(ratio "${THUNKS[entityMatch,$n,entity]}" "${THUNKS[entityMatch,$n,attrs-ref]}")
-  EM_AR[$n]=$(ratio "${ALLOC[entityMatch,$n,entity]}" "${ALLOC[entityMatch,$n,attrs-ref]}")
-  EM_CR[$n]=$(ratio "${CPU[entityMatch,$n,entity]}" "${CPU[entityMatch,$n,attrs-ref]}")
-  lte "${EM_TR[$n]}" "${ENTITYMATCH_THUNKS_MAX[$n]}" \
-    || FAILURES+=("entityMatch ratio: n=$n entity/attrs-ref thunks expected≤${ENTITYMATCH_THUNKS_MAX[$n]} actual=${EM_TR[$n]} delta=$(delta "${EM_TR[$n]}" "${ENTITYMATCH_THUNKS_MAX[$n]}") — the instance stamp costs more per node")
-  lte "${EM_AR[$n]}" "${ENTITYMATCH_ALLOC_MAX[$n]}" \
-    || FAILURES+=("entityMatch ratio: n=$n entity/attrs-ref alloc expected≤${ENTITYMATCH_ALLOC_MAX[$n]} actual=${EM_AR[$n]} delta=$(delta "${EM_AR[$n]}" "${ENTITYMATCH_ALLOC_MAX[$n]}") — the instance stamp allocates more per node")
-done
-for s in attrs-ref entity; do
-  EM_LIN[$s]=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_BIG,$s]}" "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,$s]}")
-  lte "${EM_LIN[$s]}" "$GROWTH_MAX" \
-    || FAILURES+=("entityMatch linearity: $s thunks expected≤$GROWTH_MAX actual=${EM_LIN[$s]}× delta=$(delta "${EM_LIN[$s]}" "$GROWTH_MAX") over a 4× size step")
+for fx in migrated sealed; do
+  sfx=""
+  [[ "$fx" == sealed ]] && sfx="-sealed"
+  for n in "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG"; do
+    run_row entityMatch "$n" "attrs-ref$sfx" "entity$sfx"
+    den="${DIG[entityMatch,$n,attrs-ref$sfx]}"
+    num="${DIG[entityMatch,$n,entity$sfx]}"
+    # PROJECTION GATE: the entity selects its own half's `h0` alone; the control selects both halves.
+    if [[ "$num" == "$ENTITYMATCH_DIGEST_ENTITY" && "$den" == "$ENTITYMATCH_DIGEST_REF" ]]; then
+      EM_BG[$fx,$n]="ok"
+    else
+      EM_BG[$fx,$n]="MISMATCH"
+      FAILURES+=("entityMatch projection gate ($fx): n=$n expected entity=$ENTITYMATCH_DIGEST_ENTITY attrs-ref=$ENTITYMATCH_DIGEST_REF actual entity=${num:-<none>} attrs-ref=${den:-<none>} — a stamp keyed by the kind name selects both same-name halves")
+    fi
+    EM_TR[$fx,$n]=$(ratio "${THUNKS[entityMatch,$n,entity$sfx]}" "${THUNKS[entityMatch,$n,attrs-ref$sfx]}")
+    EM_AR[$fx,$n]=$(ratio "${ALLOC[entityMatch,$n,entity$sfx]}" "${ALLOC[entityMatch,$n,attrs-ref$sfx]}")
+    EM_CR[$fx,$n]=$(ratio "${CPU[entityMatch,$n,entity$sfx]}" "${CPU[entityMatch,$n,attrs-ref$sfx]}")
+    lte "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}" \
+      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref thunks expected≤${ENTITYMATCH_THUNKS_MAX[$fx,$n]} actual=${EM_TR[$fx,$n]} delta=$(delta "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}") — the entity path costs more per node")
+    lte "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}" \
+      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref alloc expected≤${ENTITYMATCH_ALLOC_MAX[$fx,$n]} actual=${EM_AR[$fx,$n]} delta=$(delta "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}") — the entity path allocates more per node")
+  done
+  for s in "attrs-ref$sfx" "entity$sfx"; do
+    EM_LIN[$s]=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_BIG,$s]}" "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,$s]}")
+    lte "${EM_LIN[$s]}" "$GROWTH_MAX" \
+      || FAILURES+=("entityMatch linearity: $s thunks expected≤$GROWTH_MAX actual=${EM_LIN[$s]}× delta=$(delta "${EM_LIN[$s]}" "$GROWTH_MAX") over a 4× size step")
+  done
 done
 # ARMING, every run: the planted per-instance kind re-derivation (`entity-plant`) at the small size.
 # It selects the same node, so its projection must hold, and the thunk bound must refuse it.
@@ -838,8 +861,8 @@ EM_PLANT_TR=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${
 EM_PLANT_AR=$(ratio "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,attrs-ref]}")
 [[ "${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" == "$ENTITYMATCH_DIGEST_ENTITY" ]] \
   || FAILURES+=("entityMatch arming: the planted per-instance re-derivation selected a different node set (${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}) — the plant no longer isolates cost")
-if lte "$EM_PLANT_TR" "${ENTITYMATCH_THUNKS_MAX[$ENTITYMATCH_SMALL]}"; then
-  FAILURES+=("entityMatch arming: the planted per-instance re-derivation read entity/attrs-ref thunks $EM_PLANT_TR ≤ ${ENTITYMATCH_THUNKS_MAX[$ENTITYMATCH_SMALL]} — the bound cannot see the class this row exists for")
+if lte "$EM_PLANT_TR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"; then
+  FAILURES+=("entityMatch arming: the planted per-instance re-derivation read entity/attrs-ref thunks $EM_PLANT_TR ≤ ${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]} — the bound cannot see the class this row exists for")
 fi
 
 # ── report (pure printing from the computed values above) ──────────────────────
@@ -955,20 +978,24 @@ emit_report() {
   printf 'arming (planted per-node recompute, n=%s): kind/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
     "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"
   echo
-  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2; frozen gen-schema + gen-select attrs-ref vs live entity, per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
   echo
-  echo "| n | attrs-ref thunks | entity thunks | thunks e/a (≤) | alloc e/a (≤) | cpu e/a | projection |"
-  echo "|---|---:|---:|---:|---:|---:|---|"
-  for n in "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG"; do
-    printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
-      "$n" "${THUNKS[entityMatch,$n,attrs-ref]}" "${THUNKS[entityMatch,$n,entity]}" \
-      "${EM_TR[$n]}" "${ENTITYMATCH_THUNKS_MAX[$n]}" "${EM_AR[$n]}" "${ENTITYMATCH_ALLOC_MAX[$n]}" "${EM_CR[$n]}" "${EM_BG[$n]}"
+  echo "| fixture | n | attrs-ref thunks | entity thunks | thunks e/a (≤) | alloc e/a (≤) | cpu e/a | projection |"
+  echo "|---|---|---:|---:|---:|---:|---:|---|"
+  for fx in migrated sealed; do
+    sfx=""
+    [[ "$fx" == sealed ]] && sfx="-sealed"
+    for n in "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG"; do
+      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[entityMatch,$n,attrs-ref$sfx]}" "${THUNKS[entityMatch,$n,entity$sfx]}" \
+        "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}" "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}" "${EM_CR[$fx,$n]}" "${EM_BG[$fx,$n]}"
+    done
   done
   echo
-  printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, entity %s× (gate ≤ %s)\n' \
-    "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "${EM_LIN[attrs-ref]}" "${EM_LIN[entity]}" "$GROWTH_MAX"
+  printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, entity %s×, attrs-ref-sealed %s×, entity-sealed %s× (gate ≤ %s)\n' \
+    "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "${EM_LIN[attrs-ref]}" "${EM_LIN[entity]}" "${EM_LIN[attrs-ref-sealed]}" "${EM_LIN[entity-sealed]}" "$GROWTH_MAX"
   printf 'arming (planted per-instance kind re-derivation, n=%s): entity/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
-    "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "${ENTITYMATCH_THUNKS_MAX[$ENTITYMATCH_SMALL]}"
+    "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"
