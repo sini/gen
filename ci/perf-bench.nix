@@ -22,9 +22,9 @@
 # (which routes only "pure" ↔ pureP) and builds its engines from `srcs` directly — see the dispatch at
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
-  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "preflight"
+  srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-class, nixpkgs-lib } — store paths as strings
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs" | "kind" | "kind-plant")
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "preflight"
   n,
 }:
 let
@@ -52,6 +52,7 @@ let
     "gen-algebra" = "/lib";
     "gen-schema" = "/lib";
     "gen-aspects" = "/lib";
+    "gen-select" = "/lib"; # kindMatch: `sel.kind` keyed by minted kind identity (den-hoag-l0y)
     "gen-class" = "/lib"; # tier 2: the injected gen-merge kernel is what enables `applyCoreFixed`
     "gen-schema-orig" = "/lib";
     "nixpkgs-lib" = "/lib";
@@ -66,6 +67,7 @@ let
     "gen-algebra" = "algebra";
     "gen-schema" = "schema";
     "gen-aspects" = "aspects";
+    "gen-select" = "select";
     "gen-class" = "class";
     "gen-schema-orig" = "schemaOrig";
     "nixpkgs-lib" = "lib";
@@ -117,6 +119,7 @@ let
   genSchemaNew = env.schema;
   genAspectsNew = env.aspects;
   genClass = env.class;
+  genSelect = env.select;
   genSchemaOld = env.schemaOrig;
 
   # ── the pre-flight census (`--argstr workload preflight`) ─────────────────────
@@ -810,6 +813,77 @@ let
       }
     ) ovIdx;
 
+  # ── kindMatch — kind identity at scale (den-hoag-l0y; the owner's landing gate on ruling (a)) ──
+  # Two kinds sharing ONE name (`host`), from two `evalSchema` calls whose declarations differ by a
+  # non-key option, so gen-schema's `kindEq` calls them two kinds. n/2 instances in each registry;
+  # one registry-adapter context over the union, whose per-id `kindFor` hands back each node's
+  # SHARED kind value. Single-engine, two stacks, classShare's pattern:
+  #
+  #   attrs      : `sel.attrs { addr = <A's value>; }` — the per-node matching machinery with no kind
+  #                identity read. The DENOMINATOR.
+  #   kind       : `sel.kind A` — the path under test. Its projection must equal attrs' byte for byte
+  #                (the A instances, n/2 of them): a name key conflating A with B returns all n.
+  #   kind-plant : `kind` with `kindFor` RE-DERIVING the node's kind per call, so every node forces a
+  #                fresh digest — the per-node recompute the owner's cost answer was conditional on
+  #                not happening. Byte-identical to `kind` by construction (the re-derived kind mints
+  #                the same identity), so ONLY the counter gate can see it; perf-bench.sh runs it as
+  #                the row's arming control, never as a gated arm.
+  #
+  # The digest lives on the kind value, gen-schema's lazy `__mint.minted`; every reader holds a
+  # shared reference and none re-derives it, so the construction pays the mint once per KIND.
+  kindMatch =
+    let
+      S = genSchemaNew;
+      M = genMerge;
+      declA = {
+        addr = M.mkOption { type = M.types.str; };
+      };
+      declB = declA // {
+        tags = M.mkOption {
+          type = M.types.listOf M.types.str;
+          default = [ ];
+        };
+      };
+      mkHost = d: (S.evalSchema { modules = [ { config.schema.host.options = d; } ]; }).host;
+      kA = mkHost declA;
+      kB = mkHost declB;
+      names = p: builtins.genList (i: "${p}${toString i}") (n / 2);
+      nodes = names "a" ++ names "b";
+      isA = id: builtins.substring 0 1 id == "a";
+      ev = M.evalModuleTree {
+        modules = [
+          {
+            options.hostsA = S.mkInstanceRegistry kA { };
+            options.hostsB = S.mkInstanceRegistry kB { };
+            config.hostsA = builtins.listToAttrs (
+              map (x: {
+                name = x;
+                value.addr = "10.0.0.1";
+              }) (names "a")
+            );
+            config.hostsB = builtins.listToAttrs (
+              map (x: {
+                name = x;
+                value.addr = "10.0.0.2";
+              }) (names "b")
+            );
+          }
+        ];
+      };
+      ctx = genSelect.adapters.registry.mkContext {
+        inherit nodes;
+        data = id: if isA id then ev.config.hostsA.${id} else ev.config.hostsB.${id};
+        parent = _: null;
+        kindFor =
+          if stack == "kind-plant" then
+            (id: if isA id then mkHost declA else mkHost declB)
+          else
+            (id: if isA id then kA else kB);
+      };
+      selector = if stack == "attrs" then genSelect.attrs { addr = "10.0.0.1"; } else genSelect.kind kA;
+    in
+    builtins.filter (id: genSelect.matches selector id ctx) nodes;
+
   projection =
     if workload == "preflight" then
       preflight
@@ -817,6 +891,8 @@ let
       classShare
     else if workload == "overrideWarm" then
       overrideWarm
+    else if workload == "kindMatch" then
+      kindMatch
     else
       workloads.${workload} P;
   json = builtins.toJSON projection;

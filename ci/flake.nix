@@ -907,6 +907,7 @@
               "gen-identity" = "${genInputs.gen-identity}";
               "gen-schema" = "${genInputs.gen-schema}";
               "gen-aspects" = "${genInputs.gen-aspects}";
+              "gen-select" = "${genInputs.gen-select}";
               "gen-class" = "${genInputs.gen-class}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
@@ -933,6 +934,7 @@
             "gen-identity"
             "gen-schema"
             "gen-aspects"
+            "gen-select"
             "gen-class"
           ];
           perfRefKeys = [

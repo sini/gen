@@ -345,6 +345,43 @@ OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
 OVERRIDEWARM_RATIO_MAX=0.30
 
+# ── kindMatch (kind identity at scale; den-hoag-l0y) — the owner's landing gate on ruling (a) ──
+# Ruling (a) keys every kind by its MINTED identity, and the owner's condition on it was that the hub
+# bench gates the landing and ANY regression is a defect (xzchx). The digest lives on the kind value
+# (gen-schema's lazy `__mint.minted`) and every reader holds a shared reference, so the mint is paid
+# once per KIND. The class this row exists for is the per-NODE recompute — each node re-deriving its
+# kind and forcing a fresh digest — which is LINEAR (measured 3.99× over a 4× step), so GROWTH_MAX
+# can never see it; only a ratio against a same-n denominator can. Stacks, both single-engine:
+# `attrs` (the denominator: the same union and context matched with `sel.attrs`) and `kind`.
+#
+# THREE GATES. (1) BYTE: kind's projection equals attrs' — the n/2 A instances. A name key that
+# conflates the two same-name kinds returns all n, so this gate also reds the conflation itself.
+# (2) RATIO, thunks AND alloc (classShare's pair: a per-node primop recompute over a cached preimage
+# costs ~1 thunk but allocates), kind/attrs ≤ the bound, at both sizes. (3) LINEARITY on both stacks.
+#
+# BOUND = ANCHOR + MARGIN, MARGIN 0.000. ANCHOR — the measured kind/attrs ratio at the landing: hub
+# `perf-bench` app, Nix 2.34.8, gen-select `28a0968`, gen-schema `a90bc54`. MARGIN — zero, because
+# the counters are deterministic (zero spread across reps and across evaluator runs) and the owner
+# ruled any regression a defect. ratio() prints %.3f, so the headroom left under each bound is the
+# distance from the exact anchor to the next printed step: 67 thunks at n=400 and 214 at n=1600
+# (21,799 B and 59,384 B of alloc). WHAT IT CATCHES, derived from that headroom: a per-node cost on
+# the kind-read path of a fraction of one thunk per node — the planted recompute costs ~4,400 — and
+# any rise of more than ~34 thunks in either kind's mint price, since the two mints are in the
+# numerator too (so a gen-schema change to `markOf`'s cost moves this row, as it should). The arming
+# control below re-proves the first on every run. WHAT IT CANNOT SEE: per-node cost in the instance
+# data plane, which both stacks force and which therefore cancels in the ratio; and anything that
+# makes the kind path CHEAPER (the ratio gates are one-sided). Re-derive with
+# `nix run ./ci#perf-bench`.
+KINDMATCH_SMALL=400
+KINDMATCH_BIG=1600
+declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
+# n=400  — anchors 0.972 / 0.991 (409,350 / 420,994 thunks; 21,893,920 / 22,103,600 B).
+KINDMATCH_THUNKS_MAX[400]=0.972
+KINDMATCH_ALLOC_MAX[400]=0.991
+# n=1600 — anchors 0.962 / 0.976 (1,602,150 / 1,664,794 thunks; 85,046,528 / 87,154,032 B).
+KINDMATCH_THUNKS_MAX[1600]=0.962
+KINDMATCH_ALLOC_MAX[1600]=0.976
+
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
 CELL_ERRF=""
@@ -356,6 +393,11 @@ CS_LIN_FIXED=""
 declare -A OW_TR OW_AR OW_CR OW_BG
 OW_LIN_COLD=""
 OW_LIN_WARM=""
+declare -A KM_TR KM_AR KM_CR KM_BG
+KM_LIN_ATTRS=""
+KM_LIN_KIND=""
+KM_PLANT_TR=""
+KM_PLANT_AR=""
 FAILURES=()
 CELL=""
 
@@ -640,6 +682,43 @@ lte "$OW_LIN_COLD" "$GROWTH_MAX" \
 lte "$OW_LIN_WARM" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
 
+# ── kindMatch — kind identity at scale (den-hoag-l0y; the gate derivation is beside the constants) ──
+# DEDICATED section (classShare precedent): the two stacks are attrs / kind, both the pure engine.
+for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
+  run_row kindMatch "$n" attrs kind
+  # BYTE GATE: sel.kind A selects exactly the A instances, as the attrs match on A's value does.
+  if [[ -n "${DIG[kindMatch,$n,attrs]}" && "${DIG[kindMatch,$n,attrs]}" == "${DIG[kindMatch,$n,kind]}" ]]; then
+    KM_BG[$n]="ok"
+  else
+    KM_BG[$n]="MISMATCH"
+    FAILURES+=("kindMatch byte gate: n=$n expected(attrs)=${DIG[kindMatch,$n,attrs]:-<none>} actual(kind)=${DIG[kindMatch,$n,kind]:-<none>} — sel.kind selected a different node set (a name key conflating two same-name kinds selects all n)")
+  fi
+  KM_TR[$n]=$(ratio "${THUNKS[kindMatch,$n,kind]}" "${THUNKS[kindMatch,$n,attrs]}")
+  KM_AR[$n]=$(ratio "${ALLOC[kindMatch,$n,kind]}" "${ALLOC[kindMatch,$n,attrs]}")
+  KM_CR[$n]=$(ratio "${CPU[kindMatch,$n,kind]}" "${CPU[kindMatch,$n,attrs]}")
+  lte "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}" \
+    || FAILURES+=("kindMatch ratio: n=$n kind/attrs thunks expected≤${KINDMATCH_THUNKS_MAX[$n]} actual=${KM_TR[$n]} delta=$(delta "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}") — the kind-identity path costs more per node")
+  lte "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}" \
+    || FAILURES+=("kindMatch ratio: n=$n kind/attrs alloc expected≤${KINDMATCH_ALLOC_MAX[$n]} actual=${KM_AR[$n]} delta=$(delta "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}") — the kind-identity path allocates more per node")
+done
+KM_LIN_ATTRS=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,attrs]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,attrs]}")
+KM_LIN_KIND=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,kind]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind]}")
+lte "$KM_LIN_ATTRS" "$GROWTH_MAX" \
+  || FAILURES+=("kindMatch linearity: attrs thunks expected≤$GROWTH_MAX actual=${KM_LIN_ATTRS}× delta=$(delta "$KM_LIN_ATTRS" "$GROWTH_MAX") over a 4× size step")
+lte "$KM_LIN_KIND" "$GROWTH_MAX" \
+  || FAILURES+=("kindMatch linearity: kind thunks expected≤$GROWTH_MAX actual=${KM_LIN_KIND}× delta=$(delta "$KM_LIN_KIND" "$GROWTH_MAX") over a 4× size step")
+# ARMING, every run: the planted per-node recompute (`kind-plant`: kindFor re-derives each node's
+# kind) at the small size. It selects the same nodes, so its byte gate must hold, and the thunk
+# bound must refuse it; a plant the bound admits means the row cannot see the class it exists for.
+sample_cell kindMatch "$KINDMATCH_SMALL" kind-plant 1
+KM_PLANT_TR=$(ratio "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,attrs]}")
+KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[kindMatch,$KINDMATCH_SMALL,attrs]}")
+[[ "${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}" == "${DIG[kindMatch,$KINDMATCH_SMALL,attrs]}" ]] \
+  || FAILURES+=("kindMatch arming: the planted per-node recompute selected a different node set (${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}) — the plant no longer isolates cost")
+if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]}"; then
+  FAILURES+=("kindMatch arming: the planted per-node recompute read kind/attrs thunks $KM_PLANT_TR ≤ ${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]} — the bound cannot see the class this row exists for")
+fi
+
 # ── report (pure printing from the computed values above) ──────────────────────
 emit_report() {
   echo
@@ -733,6 +812,21 @@ emit_report() {
   echo
   printf 'thunk linearity (%s → %s, ×4 step): cold %s×, warm %s× (gate ≤ %s)\n' \
     "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" "$OW_LIN_COLD" "$OW_LIN_WARM" "$GROWTH_MAX"
+  echo
+  echo "### kindMatch (kind identity at scale, den-hoag-l0y; attrs vs kind, per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo
+  echo "| n | attrs thunks | kind thunks | thunks k/a (≤) | alloc k/a (≤) | cpu k/a | byte gate |"
+  echo "|---|---:|---:|---:|---:|---:|---|"
+  for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
+    printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
+      "$n" "${THUNKS[kindMatch,$n,attrs]}" "${THUNKS[kindMatch,$n,kind]}" \
+      "${KM_TR[$n]}" "${KINDMATCH_THUNKS_MAX[$n]}" "${KM_AR[$n]}" "${KINDMATCH_ALLOC_MAX[$n]}" "${KM_CR[$n]}" "${KM_BG[$n]}"
+  done
+  echo
+  printf 'thunk linearity (%s → %s, ×4 step): attrs %s×, kind %s× (gate ≤ %s)\n' \
+    "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "$KM_LIN_ATTRS" "$KM_LIN_KIND" "$GROWTH_MAX"
+  printf 'arming (planted per-node recompute, n=%s): kind/attrs thunks %s, alloc %s — must exceed %s\n' \
+    "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${KINDMATCH_THUNKS_MAX[$KINDMATCH_SMALL]}"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"

@@ -99,6 +99,16 @@ evaluates the base once and reuses it via `warmFrom`/`editedModules`, so the reg
 1-module edit's dirty footprint — splices byte-for-byte and only the edited `nodeId` and the dirty
 `summary` re-merge. Both return the same projections byte-identically.
 
+`kindMatch` is the third dedicated workload, and the owner's landing gate on den-hoag-l0y ruling (a):
+a kind is keyed by its MINTED identity, and any regression is a defect. Two kinds share one name
+(`host`) but are two declarations (gen-schema's `kindEq` says so); n/2 instances sit in each registry
+behind one gen-select registry-adapter context whose per-id `kindFor` returns each node's shared kind
+value. Its stacks are `attrs` (the denominator: the same context matched with `sel.attrs`) and
+`kind` (`sel.kind A`). A third, `kind-plant`, re-derives each node's kind per call so every node
+forces a fresh digest: the per-node recompute the owner's cost answer was conditional on not
+happening. It selects the same nodes, so only a counter can see it, and the harness runs it as the
+row's arming control on every run rather than as a gated arm.
+
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
@@ -168,6 +178,22 @@ The `overrideWarm` section adds its own gates (own threshold, not the pure/ref o
   size, i.e. the warm re-eval must build ≤ 30% of the cold from-scratch class's thunk graph / allocation
   (6 overrides amortising one base merge ≈ 1/6). Plus its own thunk linearity check (both stacks ≤
   `GROWTH_MAX` over the 4× step).
+
+The `kindMatch` section adds its own gates:
+
+- **byte gate** — `kind` and `attrs` must select the same nodes at every size. A name key that
+  conflates the two same-name kinds selects all n and reds here.
+- **ratio**, thunks AND alloc — `kind`/`attrs` ≤ `KINDMATCH_THUNKS_MAX[n]` / `KINDMATCH_ALLOC_MAX[n]`
+  at both sizes, each the measured anchor with margin 0.000 (anchors 0.972 / 0.991 at n=400 and
+  0.962 / 0.976 at n=1600; Nix 2.34.8, gen-select `28a0968`, gen-schema `a90bc54`). The headroom
+  under each is the distance to the next printed step — 67 and 214 thunks — so a per-node cost on
+  the kind-read path of a fraction of a thunk per node reds it, as does a rise of more than ~34
+  thunks in either kind's mint price. It cannot see per-node cost in the instance data plane, which
+  both stacks pay, nor a cheaper kind path.
+- **arming** — the `kind-plant` stack at n=400 must breach the thunk bound (measured 5.120 against
+  0.972) while selecting the same nodes. Plus thunk linearity on both stacks, which is kept for the
+  quadratic class: the planted recompute is linear (3.99× over the 4× step), so linearity alone
+  never sees it.
 
 ### Baseline (2026-09-21, Nix 2.34.8, gen-merge `7516886`) — the live anchor
 
