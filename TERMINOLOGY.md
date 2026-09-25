@@ -80,14 +80,10 @@ The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of 
 
 ### gen-algebra — Pure Primitives
 
-Foundation library. **Fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. The old module tier (identity/strict/ref constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema. Exports record, search, either, intensional identity.
+Foundation library. **Fully pure** — a single `lib` tier (the former `pure` tier, renamed), zero dependencies, not even nixpkgs. The old module tier (identity/strict/ref constructs that needed `lib.types`/`evalModules`) was relocated into gen-schema. Exports record, either, intensional identity. Its former `search` namespace (Palmer §3 Search monad, `converge`) is retired: gen-scope is the sole evaluator (ADR-0008 §1).
 
 | Term                      | Definition                                                                                                                                                          | Provenance                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| **Search**                | Indexed state monad for monotonic data accumulation with continuation-driven convergence.                                                                           | Palmer 2024 §3                                             |
-| **Index**                 | Key-value store within search state. Values accumulate via append.                                                                                                  | Palmer 2024 §3                                             |
-| **Continuations**         | Registered callbacks that fire when an index key has unprocessed values during `converge`.                                                                          | Palmer 2024 §3                                             |
-| **Converge**              | Fixed-point loop: fire all continuations on unprocessed values, repeat until stable. Safety guard at 1000 iterations.                                               | Palmer 2024 §3                                             |
 | **Intensional Functions** | Callable attrsets with `name` for identity comparison and inspectable `closure`.                                                                                    | Palmer 2024 §2.2-2.3                                       |
 | **Intensional Equality**  | gen-algebra's `conservativeEq`: minted digests where both mint, else the reified value minus `__id`. Never `name` alone — Fig. 5 conjoins identity AND closure.     | Palmer 2024 §2.3, §5.3, Fig. 5                             |
 | **Record**                | Attrset-with-shadow-stack representation supporting scoped labels. O(1) select.                                                                                     | Leijen 2005                                                |
@@ -542,7 +538,7 @@ Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-d
 
 | Library      | Creates                                              | Compares                                                                | Uses                                |
 | ------------ | ---------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------- |
-| gen-algebra  | `mkIntensional hashIdentity registry ctor args`      | `conservativeEq a b`                                                    | Search continuation dedup           |
+| gen-algebra  | `mkIntensional hashIdentity registry ctor args`      | `conservativeEq a b`                                                    | Function identity comparison        |
 | gen-aspects  | `key`, `aspectPath`, `pathKey`                       | —                                                                       | Diamond dedup in fold-based collect |
 | gen-dispatch | `fromFunction` detects `mkIntensional`               | Rule identity dedup across loop iterations (loop driven by gen-resolve) | Convergent dispatch                 |
 | gen-select   | `sel.when` detects intensional via three-field check | `selectorEq` dispatches on the `__mint` regime                          | Selector equality                   |
@@ -551,12 +547,11 @@ Consistent across gen-algebra (foundation), gen-aspects (aspect identity), gen-d
 
 Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 
-| Library              | Entry point                                   | Monotonicity                         | Dedup                                                        |
-| -------------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
-| gen-algebra (search) | `converge`                                    | Index keys grow monotonically        | Intensional continuation dedup                               |
-| gen-graph            | `fixpoint { seed, step }`                     | Edge count must not shrink (throws)  | Edge map equality                                            |
-| gen-scope            | `circular { init, f, eq }`                    | Attribute values converge under `eq` | `_eval` memoization                                          |
-| gen-resolve          | `gen-scope.circular` over one-shot `dispatch` | Context widens monotonically         | Actions are a function of the converged context (confluence) |
+| Library     | Entry point                                   | Monotonicity                         | Dedup                                                        |
+| ----------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
+| gen-graph   | `fixpoint { seed, step }`                     | Edge count must not shrink (throws)  | Edge map equality                                            |
+| gen-scope   | `circular { init, f, eq }`                    | Attribute values converge under `eq` | `_eval` memoization                                          |
+| gen-resolve | `gen-scope.circular` over one-shot `dispatch` | Context widens monotonically         | Actions are a function of the converged context (confluence) |
 
 ### Lazy Evaluation Contracts
 
@@ -596,7 +591,7 @@ Fixpoint loops appear at several levels, each with domain-appropriate semantics:
 | Arntzenius & Krishnaswami       | 2016 | Datafun                                                                       | Monotonic fixpoint with typed guarantees (gen-dispatch, gen-graph); group stratification inspired by classical Datalog                                                                                                                       |
 | Mokhov                          | 2017 | Algebraic graphs with class                                                   | Graph construction primitives (gen-scope); algebraic foundation for gen-graph                                                                                                                                                                |
 | van Antwerpen et al.            | 2018 | Scopes as types (introduces Statix)                                           | Custom edge labels, structural subtyping, Statix DSL (gen-scope)                                                                                                                                                                             |
-| Palmer et al.                   | 2024 | Intensional functions                                                         | Program-point identity, conservative equality, search monad (gen-algebra, gen-aspects, gen-dispatch, gen-select)                                                                                                                             |
+| Palmer et al.                   | 2024 | Intensional functions                                                         | Program-point identity, conservative equality (gen-algebra, gen-aspects, gen-dispatch, gen-select)                                                                                                                                           |
 | Lorenzen et al.                 | 2025 | First-order laziness                                                          | Lazy constructors inspectable before forcing, §1-2.3 (gen-aspects/gen-merge deferredModule)                                                                                                                                                  |
 | Tarr et al.                     | 1999 | N degrees of separation                                                       | Multi-dimensional separation of concerns (the class axis as one dimension; classes are units)                                                                                                                                                |
 | Kiczales et al.                 | 1997 | Aspect-oriented programming                                                   | Cross-cutting concerns, aspect weaving (conceptual ancestor; "pointcut"/"advice" terminology from later AspectJ)                                                                                                                             |

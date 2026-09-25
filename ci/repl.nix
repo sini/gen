@@ -33,7 +33,6 @@ in
     conservativeEq
     either
     record
-    search
     ;
   inherit (genSchema) mkValidator; # relocated from gen-algebra 2026-06-26
 }

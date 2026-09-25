@@ -346,7 +346,10 @@ let
     # gained FOUR names, `componentsPreimage`, `preimageTagOf`, `sealedCollisionEq` and
     # `sealedMarker`, a composite's per-component preimage tags and its by-name sealed-collision
     # refusal. Nothing was removed.
-    algebra = "ca9874ebd9bccd2c1e385a2e3c453d24d1aebb9f4d6e49add1572a80ae695dfb";
+    # gen-algebra d017bc30b2 → 5a8d8d5362 (den-hoag-b7u1v): the surface LOST one name, `search`,
+    # the retired Search-monad namespace (gen-scope is the sole evaluator, ADR-0008 §1). Nothing
+    # was added.
+    algebra = "574bd0dc735f14d4df6386d1928d9c9cc6cc3380445f4b5ce803e7c7b56e69d3";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
     aspects = "5c3122bd668746dffa2e5e7e30aaac4978f54c5be4d74feadfa14c9375c07106";
