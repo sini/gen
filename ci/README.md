@@ -116,6 +116,21 @@ owner's cost answer was conditional on not happening. It selects the same nodes,
 can see it, and the harness runs it as the row's arming control on every run rather than as a gated
 arm.
 
+`entityMatch` is the fourth, the row that FORCES an instance's `id_hash` (den-hoag-l0y U2).
+gen-schema's stamp carries the kind's minted identity beside the key values, so two same-name
+kinds that are different declarations mint different identities; `kindMatch` cannot meter that
+stamp, because the registry adapter tests its presence and never forces its value. The fixture is
+kindMatch's two same-name kinds, with registries A and B holding the SAME instance names (`h0`..)
+at the SAME key values, so only the kind can separate the halves. Its numerator is `entity`
+(`sel.entity hostsA.h0` through the live gen-select over live gen-schema instances, forcing all n
+stamps). Its denominator, `attrs-ref`, runs NO library under test: the frozen gen-schema
+(`gen-schema-orig`) on the pinned nixpkgs `lib.evalModules`, matched with `sel.attrs` through the
+frozen gen-select. A denominator running the live gen-schema lowers a ratio above 1 whenever both
+stacks pay a cost, so the one-sided gate would read a regression as an improvement: measured, the
+identity module built per instance (+6 thunks/node) passed that way. `entity-plant` evaluates each
+node's instance under a kind re-derived for that node — the per-instance recompute — and is the
+row's arming control on every run.
+
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
@@ -207,6 +222,22 @@ The `kindMatch` section adds its own gates, per fixture:
   against 0.972) while selecting the same nodes. Plus thunk linearity on every stack, which is kept
   for the quadratic class: the planted recompute is linear (3.99× over the 4× step), so linearity
   alone never sees it.
+
+The `entityMatch` section adds its own:
+
+- **projection** — `entity` selects exactly `[ "a:h0" ]` and `attrs-ref` both halves
+  (`[ "a:h0" "b:h0" ]`); both digests are pinned. A stamp keyed by the kind name selects both halves
+  and reds here, which is what stock gen-schema `cfec60d` does.
+- **ratio**, thunks AND alloc — `entity`/`attrs-ref` ≤ `ENTITYMATCH_THUNKS_MAX[n]` /
+  `ENTITYMATCH_ALLOC_MAX[n]`, the measured anchor with margin 0.000 (1.300 / 1.114 at n=400,
+  1.296 / 1.105 at n=1600; Nix 2.34.8, gen-schema `9289268`, gen-select `9791baf`, frozen gen-schema
+  `2b7c2d3`, frozen gen-select `9285b5b`). The thunk headroom is 400 / 1,983 (~1 thunk/node), so the
+  identity module built per instance (+6 thunks/node) reds it (1.304 / 1.300 through
+  `--at gen-schema=path:`, exit 6). The price the anchor holds: +24.0 thunks per instance for the
+  stamp's kind component, plus the mark once per kind (≈3.3k on this row's one-option kind, and more
+  on a larger declaration, since every option attribute is a component of the mark).
+- **arming** — `entity-plant` at n=400 must breach the thunk bound (measured 6.905 against 1.300)
+  while selecting the same node. Plus thunk linearity on both stacks.
 
 ### Baseline (2026-09-21, Nix 2.34.8, gen-merge `7516886`) — the live anchor
 

@@ -23,8 +23,8 @@
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-select-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "preflight"
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant"; entityMatch: "attrs-ref" | "entity" | "entity-plant")
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "entityMatch" | "preflight"
   n,
 }:
 let
@@ -908,6 +908,115 @@ let
     in
     builtins.filter (id: sel.matches selector id ctx) nodes;
 
+  # ── entityMatch — INSTANCE identity at scale (den-hoag-l0y U2): the stack that FORCES `id_hash` ──
+  # kindMatch never forces an instance's `id_hash` (the registry adapter's `entryFor` tests presence
+  # only), so a per-instance cost in gen-schema's stamp is invisible there. This row reads every
+  # node's stamp through `sel.entity`. Two kinds share ONE name (`host`) and differ by a non-key
+  # option, so `kindEq` calls them two kinds; registries A and B hold the SAME instance names
+  # (`h0`..) at the SAME key values, so only the kind can separate the two halves.
+  #
+  #   attrs-ref    : THE DENOMINATOR, and it runs NO library under test. The frozen gen-schema
+  #                  (`gen-schema-orig`) on the pinned nixpkgs `lib.evalModules`, matched with
+  #                  `sel.attrs { addr; name = "h0"; }` through the frozen gen-select
+  #                  (`gen-select-orig`) — schemaHosts' `ref` stack joined to kindMatch's frozen
+  #                  matcher. With the live gen-schema in the denominator, a cost both stacks pay in it
+  #                  LOWERS a ratio above 1, so the one-sided gate reads a regression as an improvement.
+  #                  No stamp is read. Projection: both halves, `[ "a:h0" "b:h0" ]`.
+  #   entity       : `sel.entity hostsA.h0` through the LIVE gen-select over LIVE gen-schema instances:
+  #                  forces all n stamps. Projection: `[ "a:h0" ]`; a name-keyed stamp gives both halves.
+  #   entity-plant : `entity` with every node's instance evaluated under a kind RE-DERIVED for that
+  #                  node, so each stamp forces a fresh mark — the per-instance recompute. Byte-identical
+  #                  to `entity`, so only the counter gate can see it; perf-bench.sh runs it as the row's
+  #                  arming control, never as a gated arm.
+  #
+  # Both engines carry `mkSchemaOption`, and `gen-schema-orig` predates `evalSchema`, so the kinds are
+  # frozen in their own prior pass in the in-module declaration form on BOTH stacks (schemaHosts'
+  # precedent), which keeps the two arms one shape.
+  entityMatch =
+    let
+      isRef = stack == "attrs-ref";
+      sel = if isRef then genSelectOrig else genSelect;
+      S = if isRef then genSchemaOld else genSchemaNew;
+      O = if isRef then lib else genMerge;
+      eval = if isRef then lib.evalModules else genMerge.evalModuleTree;
+      declA = {
+        addr = O.mkOption { type = O.types.str; };
+      };
+      declB = declA // {
+        tags = O.mkOption {
+          type = O.types.listOf O.types.str;
+          default = [ ];
+        };
+      };
+      mkHost =
+        d:
+        (eval {
+          modules = [
+            {
+              options.schema = S.mkSchemaOption { };
+              config.schema.host.options = d;
+            }
+          ];
+        }).config.schema.host;
+      kA = mkHost declA;
+      kB = mkHost declB;
+      half = builtins.genList (i: "h${toString i}") (n / 2);
+      nodes = map (x: "a:${x}") half ++ map (x: "b:${x}") half;
+      isA = id: builtins.substring 0 2 id == "a:";
+      inst = id: builtins.substring 2 (builtins.stringLength id - 2) id;
+      regOf =
+        xs:
+        builtins.listToAttrs (
+          map (x: {
+            name = x;
+            value.addr = "10.0.0.1";
+          }) xs
+        );
+      ev = eval {
+        modules = [
+          {
+            options.hostsA = S.mkInstanceRegistry kA { };
+            options.hostsB = S.mkInstanceRegistry kB { };
+            config.hostsA = regOf half;
+            config.hostsB = regOf half;
+          }
+        ];
+      };
+      planted = stack == "entity-plant";
+      evOne =
+        id:
+        (eval {
+          modules = [
+            {
+              options.h = S.mkInstanceRegistry (mkHost (if isA id then declA else declB)) { };
+              config.h.${inst id}.addr = "10.0.0.1";
+            }
+          ];
+        }).config.h.${inst id};
+      ctx = sel.adapters.registry.mkContext {
+        inherit nodes;
+        data =
+          id:
+          if planted then
+            evOne id
+          else if isA id then
+            ev.config.hostsA.${inst id}
+          else
+            ev.config.hostsB.${inst id};
+        parent = _: null;
+        kindFor = id: if isA id then kA else kB;
+      };
+      selector =
+        if isRef then
+          sel.attrs {
+            addr = "10.0.0.1";
+            name = "h0";
+          }
+        else
+          sel.entity ev.config.hostsA.h0;
+    in
+    builtins.filter (id: sel.matches selector id ctx) nodes;
+
   projection =
     if workload == "preflight" then
       preflight
@@ -917,6 +1026,8 @@ let
       overrideWarm
     else if workload == "kindMatch" then
       kindMatch
+    else if workload == "entityMatch" then
+      entityMatch
     else
       workloads.${workload} P;
   json = builtins.toJSON projection;
