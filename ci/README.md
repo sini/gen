@@ -214,7 +214,7 @@ smaller of the two, truncated down to three places.
 
 | row           |    n | counter | anchor |        ① |        ② | margin |     bound |   was |
 | ------------- | ---: | ------- | -----: | -------: | -------: | -----: | --------: | ----: |
-| scalar        | 8000 | thunks  |  0.902 | 0.037994 | 0.000174 |  0.000 | **0.902** | 0.912 |
+| scalar        | 8000 | thunks  |  0.883 | 0.037994 | 0.000174 |      — | **0.900** | 0.902 |
 | scalar        | 8000 | alloc   |  0.754 | 0.054458 | 0.000083 |  0.000 | **0.754** | 0.756 |
 | registry      | 2000 | thunks  |  0.776 | 0.108340 | 0.064314 |  0.032 | **0.808** |  0.90 |
 | registry      | 2000 | alloc   |  0.631 | 0.101395 | 0.046820 |  0.023 | **0.654** |  0.90 |
@@ -234,13 +234,18 @@ replaces. `scalar` moves down from the pre-channel figure 0.912 / 0.756 to 0.902
 needs no licence (below). ① and ② on those rows are the 7516886 measurements and are not re-derived;
 the other eight rows are unchanged.
 
-★ **Three of the twelve bounds are INTERIM, and this states what ends them.** `scalar` thunks
-**0.902**, `schemaHosts` thunks **1.207** and `schemaHosts` alloc **1.018** are the three that
-loosened; they encode an **accepted, carried regression**, and they are the ceiling this project has
+★ **`scalar` thunks is RESTORED to the original 0.90.** gen-merge `63ae058` forces the declaration
+spine with a path-free walk instead of materialising every leaf path, and the row reads **0.883** at
+gen-merge `d37deb6`; the bound returns to the promise rather than to anchor plus margin, so its
+margin column is empty.
+
+★ **Two of the twelve bounds are INTERIM, and this states what ends them.** `schemaHosts` thunks
+**1.207** and `schemaHosts` alloc **1.018** are what remains of the three that loosened (`scalar`
+thunks **0.902** was the third); they encode an **accepted, carried regression**, and they are the ceiling this project has
 agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
 anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for
-exactly this purpose. **The marking ends when those three gated counters return toward the `fdbf140`
-anchors and these three bounds are tightened back**; `den-hoag-restore-perf-promises-xzchx` owes that
+exactly this purpose. **The marking ends when those two gated counters return toward the `fdbf140`
+anchors and these two bounds are tightened back**; `den-hoag-restore-perf-promises-xzchx` owes that
 restoration and `den-hoag-fvphc` §4 Q1 carries the unrepaired cost itself. The other nine bounds
 TIGHTEN and are not interim. **This is a separate debt from the stale publication**: `BENCHMARKS.md`'s
 2026-07-04 composition-plane table is also wrong, for reasons this isolation does not account for, and

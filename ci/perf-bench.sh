@@ -270,7 +270,9 @@ declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
 # scalar n=8000 — anchors 0.912 / 0.756; ① 0.037994 / 0.054458, ② 0.000174 / 0.000083 (~free).
 # RATCHETED to the figures gen-merge d84ba687 lands (0.902 / 0.754, down from the pre-channel
 # figure 0.912 / 0.756), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
-ROW_THUNKS_MAX[scalar,8000]=0.902 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+# RESTORED to the original 0.90 (xzchx arm A, gen-merge 63ae058's path-free declaration walk):
+# 0.883 at gen-merge d37deb6. A tightening; the thunk bound is no longer interim.
+ROW_THUNKS_MAX[scalar,8000]=0.90
 ROW_ALLOC_MAX[scalar,8000]=0.754
 # registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
 ROW_THUNKS_MAX[registry,2000]=0.808
