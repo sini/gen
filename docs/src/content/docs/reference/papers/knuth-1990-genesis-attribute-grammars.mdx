@@ -58,7 +58,7 @@ Knuth's inherited/synthesized attribute dichotomy is the conceptual bedrock of t
 
 **gen-aspects** encodes aspect content as attribute values on scope graph nodes. Class keys (nixos, darwin, homeManager) are *terminal synthesized attributes* — the final output of the grammar, what Knuth called "the translation." Nested keys create sub-nodes, extending the tree structure. Guard functions are inherited-attribute consumers: they receive context (host, user) from above and produce class content below.
 
-**gen-algebra**'s search monad implements convergent fixpoint computation, which is the evaluation strategy for circular attribute grammars (an extension Knuth anticipated but left to successors). The `converge` function iterates until stability — the same quiescence condition that AG evaluators use for circular attributes.
+**gen-algebra** implemented convergent fixpoint computation via a `search` namespace (Palmer §3's Search monad and a `converge` runner), which is the evaluation strategy for circular attribute grammars (an extension Knuth anticipated but left to successors) — the runner iterated until stability, the same quiescence condition that AG evaluators use for circular attributes. The namespace is **retired**: gen-scope is the sole evaluator (ADR-0008 §1).
 
 **gen-derive**'s stratified phases mirror the evaluation scheduling problem Knuth identified. Rules fire in dependency order determined by phase DAGs, analogous to how AG evaluators schedule attribute computations in dependency order.
 
