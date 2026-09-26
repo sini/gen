@@ -412,10 +412,14 @@ declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
 # +275 thunks, a CONSTANT at both sizes, which moves the two n=400 thunk ratios one printed step
 # (0.972 → 0.973, 0.966 → 0.967; kind 408,851 / 409,422 against attrs-ref 420,215 / 423,531 thunks at
 # the relock, headroom 228 / 344). The cost is gen-identity's per-mint price (+12 thunks and +7 calls
-# per two-label mint), not gen-select's: gen-select's lib is unmoved. The other bounds print unchanged,
-# except sealed n=1600 alloc, NOT moved here: it reads 0.970 only when gen-identity (+16,368 B on
-# kind-sealed) and gen-merge `aea02d1` (+126,512 / +122,416 B on kind-sealed / attrs-ref-sealed)
-# combine, and each alone reads 0.969 — so it is not gen-identity's price alone (den-hoag-ez1yq).
+# per two-label mint), not gen-select's: gen-select's lib is unmoved. The other bounds print unchanged.
+# sealed n=1600 alloc RE-ANCHORED 0.969 → 0.970, margin 0.000 (relock26, den-hoag-ez1yq; raw bytes at
+# reports/den-hoag-ez1yq-relock26-v0.md §0.1): it reads 0.970 only when gen-identity `410261b`
+# (+16,368 B on kind-sealed, alone 0.96948) and gen-merge `aea02d1` (+126,512 B kind-sealed /
+# +122,416 B attrs-ref-sealed, alone 0.96939) combine (0.96957) — neither reds this gate alone, and
+# the sum crosses one printed step jointly. Both are correctness landings (xvww's attribution;
+# gen-merge's w1k40/jzatq/2f4gm). Priced and re-anchored under owner sitting item R8's default
+# (den-hoag-xwhq4): a correctness fix's stated, re-anchored price is not an xzchx regression.
 # migrated, n=400  — anchors 0.973 / 0.991.
 KINDMATCH_THUNKS_MAX[migrated,400]=0.973
 KINDMATCH_ALLOC_MAX[migrated,400]=0.991
@@ -425,9 +429,9 @@ KINDMATCH_ALLOC_MAX[migrated,1600]=0.976
 # sealed, n=400    — anchors 0.967 / 0.984.
 KINDMATCH_THUNKS_MAX[sealed,400]=0.967
 KINDMATCH_ALLOC_MAX[sealed,400]=0.984
-# sealed, n=1600   — anchors 0.957 / 0.969 (1,602,745 / 1,675,319 thunks; 85,058,752 / 87,748,320 B).
+# sealed, n=1600   — anchors 0.957 / 0.970 (1,602,745 / 1,675,319 thunks; 85,050,064 / 87,719,184 B).
 KINDMATCH_THUNKS_MAX[sealed,1600]=0.957
-KINDMATCH_ALLOC_MAX[sealed,1600]=0.969
+KINDMATCH_ALLOC_MAX[sealed,1600]=0.970
 
 # ── entityMatch (INSTANCE identity at scale; den-hoag-l0y U2) — the row that FORCES `id_hash` ──
 # gen-schema's instance stamp carries the kind's minted identity beside the key values, so two
