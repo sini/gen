@@ -15,7 +15,7 @@
 # `attempt to call something which is not a function but a set` and
 # `expected a set but found a function`. Taking VALUES dissolves it: whoever supplies a member
 # resolves it, and ONE construction then serves both suppliers — `flake.nix` from the hub's own
-# inputs under `follows`, `../default.nix` from `ci/flake.lock`.
+# inputs under `follows`, `../default.nix` from the root `flake.lock`.
 #
 # A MISSING MEMBER IS LOUD BY CONSTRUCTION, which is what retired the old `input` helper. That
 # helper existed to turn an uncatchable missing-attribute abort into a named, catchable `throw`. A
