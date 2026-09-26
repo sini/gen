@@ -95,10 +95,16 @@ let
       cause = "a deliberate throwing tombstone for a retired constructor (gen-scope lib/build-nodes.nix, `── THE RETIRED NAME ──`). `buildRoots` returns `{ nodes, nodeOrder }` where this returned a bare node map, so a silent redirect would let every enumerating read answer `[ \"nodeOrder\" \"nodes\" ]` with no error: refusing the name means the call cannot be WRITTEN rather than being detected after it is";
       carrier = "OQ-1 of specs/2026-09-05-gen-hub-relock-migration-spec.md, ruled 2026-09-08";
     }
+    {
+      member = "schema";
+      binding = "ref";
+      cause = "a deliberate throwing tombstone for a renamed type constructor (gen-schema lib/ref.nix, `── THE RETIRED NAME ──`). The type's values are declarations and `ref` names the use side, inverting Neron et al. 2015, so the constructor is `declarationOf` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (TERM ruling 2026-09-25, refused-by-name alias)";
+    }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 1;
+  retirementWidth = 2;
 
   ruledRetirement =
     let
@@ -402,7 +408,11 @@ let
     # `constructionRelation` (the merge relation of a type built per construction) and
     # `keySemanticsRecords` (the record positions its keySemantics grammar fixes). Nothing was
     # removed.
-    schema = "630c922c7753e554ef4ca06509214d5eec179d89cc2b29f41e05921dc0d1bd39";
+    #
+    # gen-schema f99df45 → f7ecf39 (den-hoag-2zjg1): the surface gained ONE name,
+    # `declarationOf`; `ref` became a registered tombstone (retirementEntries above), so it is still
+    # a published name and nothing was removed.
+    schema = "cf7c7e72e8c194661233bf5f755ba40b972149301765930fcf2c39903f5786f0";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
     #
