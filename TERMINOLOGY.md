@@ -39,7 +39,7 @@ A consistent vocabulary grounded in academic literature, spanning the gen librar
 4. **The graph vocabulary (nodes, edges, constraints) is the structural substrate.** Everything else operates ON the graph.
 5. **Prefix conventions are consistent across the ecosystem:**
    - `_key` on module-system configs = internal computed/read-only options (e.g., `_topology`, `_strict`, `_module`)
-   - `__key` on plain attrsets = framework markers and pipeline internals (e.g., `__functor`, `__isWrappedFn`, `__sel`)
+   - `__key` on plain attrsets = a tag kept disjoint from the caller's keys beside it (e.g., `__sel`, `__mint`, `__keyRef`). A `__key` one library writes and another reads is a stated contract: one line in its owning library's AGENTS.md naming the writer, the reader and the meaning, in the form `` - `__key` — writer `…`, reader `…` …: meaning `` (gen-product's `__cells` is the model). Nix's own protocol keys (`__functor`, `__toString`, `__functionArgs`) are outside the rule.
 6. **No wasted work, by construction (Lévy 1978).** Laziness discharges Lévy's type-1 obligation (never evaluate a discarded subexpression) for free (Barendregt 1987); first-order acyclic scope/attribute evaluation never instantiates Lévy's type-2 (interior-sharing) problem. So no optimal-reduction engine is needed — `_eval`/dedup is Wadsworth DAG sharing, not interior sharing.
 
 ---
