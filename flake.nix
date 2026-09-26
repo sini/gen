@@ -19,6 +19,8 @@
     #
     # The list is DERIVED: each line mirrors an edge the sibling's own flake declares. A sibling
     # that grows an input needs its line here, or that one input re-forks while the rest converge.
+    # `flake.nix` cannot compute its `inputs`, so the list stays hand-kept and `ci/pin-coherence.nix`
+    # `hub-root-follows-complete` is what names a missing line, literally (den-hoag-4dfsv).
     gen-prelude.url = "github:sini/gen-prelude";
     gen-identity.url = "github:sini/gen-identity";
     gen-algebra.url = "github:sini/gen-algebra";
@@ -30,6 +32,7 @@
     gen-merge.url = "github:sini/gen-merge";
     gen-merge.inputs.gen-memo.follows = "gen-memo";
     gen-merge.inputs.gen-prelude.follows = "gen-prelude";
+    gen-merge.inputs.gen-scope.follows = "gen-scope";
     gen-merge.inputs.gen-types.follows = "gen-types";
 
     gen-schema.url = "github:sini/gen-schema";
@@ -67,6 +70,7 @@
     gen-dispatch.inputs.gen-prelude.follows = "gen-prelude";
 
     gen-class.url = "github:sini/gen-class";
+    gen-class.inputs.gen-merge.follows = "gen-merge";
     gen-class.inputs.gen-prelude.follows = "gen-prelude";
 
     gen-product.url = "github:sini/gen-product";
@@ -91,6 +95,9 @@
     gen-link.inputs.gen-view.follows = "gen-view";
 
     gen-assemble.url = "github:sini/gen-assemble";
+    gen-assemble.inputs.gen-algebra.follows = "gen-algebra";
+    gen-assemble.inputs.gen-prelude.follows = "gen-prelude";
+    gen-assemble.inputs.gen-scope.follows = "gen-scope";
 
     gen-view.url = "github:sini/gen-view";
     gen-view.inputs.gen-graph.follows = "gen-graph";
@@ -104,7 +111,12 @@
     gen-inspect.inputs.gen-program.follows = "gen-program";
 
     gen-program.url = "github:sini/gen-program";
+    gen-program.inputs.gen-prelude.follows = "gen-prelude";
+    gen-program.inputs.gen-scope.follows = "gen-scope";
+
     gen-delivery.url = "github:sini/gen-delivery";
+    gen-delivery.inputs.gen-algebra.follows = "gen-algebra";
+    gen-delivery.inputs.gen-aspects.follows = "gen-aspects";
 
     # The import-tree FORK (nixpkgs-lib-free; `(addPath dir).files` yields a bare path list the
     # engine imports natively). It is a TOOL input, not a roster member: the tree-loading line is
@@ -121,12 +133,12 @@
       # CONSUMER of the same pattern every member follows"). There is ONE construction of the roster
       # and `./default.nix` is it; the two entry paths differ only in WHO supplies the members. Here
       # the flake supplies them, so `follows` governs every one; the standalone path falls back to
-      # `ci/flake.lock`. Before this, `./default.nix` did not exist and the hub was flake-only.
+      # the root `flake.lock`. Before this, `./default.nix` did not exist and the hub was flake-only.
       #
       # ★★ THE THREE UNAPPLIED `.lib`s ARE L3's SECOND ARM ARRIVING, NOT AN EXCEPTION LIST.
-      # gen-program, gen-delivery and gen-assemble declare NO gen input, so their OWN flakes have
-      # nothing to pass and publish `lib = import ./.` UNAPPLIED; the other 18 publish an applied
-      # set. What is written here is therefore the member's own L3 arm read off its published
+      # gen-program, gen-delivery and gen-assemble publish `lib = import ./.` UNAPPLIED, although
+      # each declares gen inputs (followed above): the substrate they need is the consumer's to
+      # supply, not their own flake's; the other 18 publish an applied set. What is written here is therefore the member's own L3 arm read off its published
       # surface, and it is LOUD if that arm ever changes — applying an already-applied set is
       # `attempt to call something which is not a function but a set`, and a member that went the
       # other way arrives as a function and reds the `roster` output's own force below. The rejected

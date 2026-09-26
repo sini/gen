@@ -21,25 +21,38 @@
 # (2) HUB-ROOT agreement — every member pin equals the hub ROOT lock's `follows`-resolved revision
 #     for that node. The spec names this as L7's reference and the bump's target.
 #
-# ★★★ (2) IS NOT SATISFIABLE WHILE THE MEMBER→MEMBER CI EDGE GRAPH HOLDS A CYCLE, AND IT DOES.
-# The hub root pins member M at a COMMIT of M. For member N's ci lock to name that commit, N must be
-# relocked after it — which makes a new commit of N, which M's ci lock must then name. Measured at
-# gen `bd57c06`: `gen-merge/ci/flake.nix` declares `gen-memo.url` and `gen-memo/ci/flake.nix`
-# declares `gen-merge.url`, both deliberately (each file says why), so `content(r_merge)` would have
-# to contain `r_memo = H(content(r_memo))` and `content(r_memo)` contain `r_merge = H(content(r_merge))`.
-# 14 of the 21 members sit in that cyclic component; the 7 outside it (gen-identity, gen-algebra,
-# gen-prelude, gen-bind, gen-graph, gen-product, gen-types) are orderable and CAN reach it.
-# ★★ And the live control says the same thing from the other side. Re-derived at gen `f274abd`:
-# `gen-harness` is the one node that IS roster-wide coherent, its 22 pins all name `27b54422`, and
-# `gen-harness`'s own HEAD is `a150fead` — the ecosystem's only instance of the property is coherent
-# WITH ITSELF and not with any HEAD. `gen-harness` is also not a hub root input at all, so under
-# reading (2) the only live positive control is out of domain.
-# ⇒ BOTH readings are COMPUTED and PRINTED; neither GATES, pending the owner's disposition. That is
-# `mkLockAgreementCheck`'s shipped arm verbatim (`ci/flake.nix`, `gating`) and for the same reason:
-# the predicate, the domain, the traversal and the message are identical under either disposition and
-# only the exit status differs. Everything BELOW the readings — the domain floor, the live control,
-# the arming and the refusals — gates under both arms, because a guard that can no longer fire is not
-# a passing guard in either.
+# BOTH ARE COMPUTED AND PRINTED; NEITHER GATES. They meter the TEST graph (ADR-0037), which may drift.
+# (2) was once argued unsatisfiable under a member→member ci edge cycle (gen-merge/ci ⇄ gen-memo/ci,
+# measured at gen `bd57c06`); gen-memo's ci no longer declares gen-merge, and both readings are true at
+# gen `2eb2e48`. Kept observe-only (den-hoag-4dfsv spec OQ3, defaulted). Everything BELOW the readings —
+# the domain floor, the live control, the arming and the refusals — gates, because a guard that can no
+# longer fire is not a passing guard.
+#
+# ── ROOT-PLANE COHERENCE: R1 AND R2, AND BOTH GATE (owner-ruled 2026-09-25, den-hoag-4dfsv §4.1(b)) ──
+# The standalone path resolves through ROOT locks (`default.nix` reads `./flake.lock`), not ci locks,
+# so the ruled property lives there:
+# R1 `root-plane-coherent` — ONE REVISION per repository over the hub's root lock plus every member's
+#     root lock at this hub's pin, every node reachable BY NODE PATH (not root edges only: a stale
+#     nested copy in a hand-edited member lock is invisible to a root-edge reader). Identity is read
+#     from `locked` and NORMALISED — github owner/repo lowercased, a `git`/`tarball` URL on
+#     `github.com/<o>/<r>` parsed to the same key — and EVERY keyable identity is compared, roster or
+#     not. Price, ruled: same REVISION, not same INSTANCE — a member imported twice standalone is
+#     evaluated twice. Consequence, ruled: a targeted partial hub relock is no longer publishable
+#     (reverses den-hoag-kx1d3's verdict); leaf-first `relock-all` is what keeps R1 green.
+# R2 `hub-root-follows-complete` — ONE NODE per repository in the hub's root lock: each keyable
+#     identity a hub root input resolves to is reached at that input's node only. This is the flake
+#     path's INSTANCE property (ADR-0008 §1, "a single instance can be used"), and it is arm 1, a
+#     lock-reading cell, of den-hoag-jzofm's three-arm stop-and-promote (arm 2 a names-only
+#     follows-bound cell, arm 3 publishing the edges as a value). jzofm's "expose deps" half is NOT
+#     discharged here. The red prints each missing `follows` line literally, nested where the stray
+#     sits under a non-root-pinned intermediary.
+#   ★ R2 CANNOT SEE a second instance of an UNKEYABLE root: the hub's `nixpkgs` is a release tarball
+#     whose URL embeds the release, so no second nixpkgs node ever shares its identity. The uncovered
+#     roots are named in `report.hubFollows.uncoveredRoots` and on every run.
+# Together they discharge den-hoag-hub-entry-paths-disagree-silently-oii6u AT REVISION: both entry
+# paths resolve one revision per roster member. Not at instance on the standalone path — the ruled price.
+# A member with no root lock (`lockAbsent`) is converged by construction only if its `flake.nix`
+# declares no inputs, and `root-plane-domain-floor` evaluates that rather than assuming it.
 #
 # ── THE DOMAIN IS THE ROSTER OF RECORD, MAPPED INTO THE INPUT NAMESPACE ──
 # ADR-0015: `mkGenLibs` is the roster of record. The member keys are BARE (`prelude`, not
@@ -418,6 +431,397 @@ let
   live = coherenceOf memberNames following liveLocks hubRootLock;
   liveRootPlane = rootPlaneOf memberNames following liveRootLocks;
 
+  # ── THE ROOT-PLANE CLOSURE: readings R1 and R2 (den-hoag-4dfsv §4.1(b), owner-ruled 2026-09-25) ──
+  # See the header's ROOT-PLANE COHERENCE block for what each reading claims and what it does not.
+  #
+  # IDENTITY IS READ FROM `locked`, NEVER FROM AN INPUT NAME OR A NODE LABEL, AND IT IS NORMALISED.
+  # `fetchTree` accepts any type, so `sini/gen-x`, `Sini/gen-x` and `git+https://github.com/sini/gen-x`
+  # load the same repository; keyed apart, two revisions of it would read as two coherent
+  # repositories. Unkeyable sites (a release tarball, a `path:` tree) are NAMED in `outOfDomain`.
+  githubUrl =
+    u: builtins.match "(git\\+)?(https?|ssh)://([^@/]*@)?github\\.com/([^/]+)/([^/?#]+).*" u;
+  identityOf =
+    lk:
+    let
+      m = if builtins.isString (lk.url or null) then githubUrl lk.url else null;
+      key = o: r: "github:${lib.toLower o}/${lib.toLower (lib.removeSuffix ".git" r)}";
+    in
+    if (lk.type or null) == "github" then
+      key lk.owner lk.repo
+    else if m != null then
+      key (builtins.elemAt m 3) (builtins.elemAt m 4)
+    else
+      null;
+
+  # Every node reachable from `lock.root` BY NODE PATH, each with the first path that reached it and
+  # the node keys along it. `expand` decides which entries are walked through: everything for R1,
+  # depth ≤ 1 for its root-edge control, stray-free for R2's repair lines. One traversal, three
+  # restrictions — as `directOnly` is to `following`, never a second implementation.
+  # ★ An edge `following` cannot resolve becomes an UNRESOLVED entry, never a dropped one.
+  closureOf =
+    expand: lock:
+    builtins.genericClosure {
+      startSet = [
+        {
+          key = lock.root;
+          path = [ ];
+        }
+      ];
+      operator =
+        n:
+        if !(lock.nodes ? ${n.key}) || !(expand n) then
+          [ ]
+        else
+          map (
+            i:
+            let
+              t = following lock n.key i;
+              p = n.path ++ [ i ];
+            in
+            {
+              key = if t == null then "<unresolved>/${lib.concatStringsSep "/" p}" else t;
+              path = p;
+            }
+          ) (builtins.attrNames (inputsOf lock n.key));
+    };
+  walkAll = _: true;
+  walkRootEdges = n: n.path == [ ];
+
+  sitesIn =
+    expand: label: lock:
+    map (
+      n:
+      let
+        lk = lock.nodes.${n.key}.locked or { };
+      in
+      {
+        inherit (n) path;
+        node = n.key;
+        site = "${label}:${lib.concatStringsSep "/" n.path}";
+        resolved = lock.nodes ? ${n.key};
+        identity = identityOf lk;
+        rev = lk.rev or null;
+      }
+    ) (builtins.filter (n: n.key != lock.root) (closureOf expand lock));
+
+  # R1 — ONE REVISION PER REPOSITORY over the hub's root lock and every member's root lock at this
+  # hub's pin. Every keyable identity is compared, roster or not.
+  rootCoherenceOf =
+    expand: hubLock: rootLocks:
+    let
+      population = {
+        gen = hubLock;
+      }
+      // lib.filterAttrs (_: l: l != null) rootLocks;
+      all = builtins.concatMap (l: sitesIn expand l population.${l}) (builtins.attrNames population);
+      unresolved = sorted (map (s: s.site) (builtins.filter (s: !s.resolved) all));
+      keyed = builtins.filter (s: s.resolved && s.identity != null) all;
+      outOfDomain = sorted (map (s: s.site) (builtins.filter (s: s.resolved && s.identity == null) all));
+      revOf = s: if s.rev == null then "<unlocked>" else s.rev;
+      rows = lib.mapAttrsToList (identity: ss: {
+        inherit identity;
+        sites = builtins.length ss;
+        revs = map (r: {
+          rev = r;
+          sites = sorted (map (s: s.site) (builtins.filter (s: revOf s == r) ss));
+        }) (sorted (unique (map revOf ss)));
+      }) (builtins.groupBy (s: s.identity) keyed);
+      incoherentRows = builtins.filter (r: builtins.length r.revs > 1) rows;
+      unlocked = sorted (unique (map (s: s.identity) (builtins.filter (s: s.rev == null) keyed)));
+    in
+    {
+      inherit
+        rows
+        incoherentRows
+        unlocked
+        unresolved
+        outOfDomain
+        ;
+      locks = builtins.attrNames population;
+      incoherent = map (r: r.identity) incoherentRows;
+      siteCount = builtins.length keyed;
+      identityCount = builtins.length rows;
+      holds = incoherentRows == [ ] && unlocked == [ ] && unresolved == [ ];
+    };
+
+  # R2 — ONE NODE PER REPOSITORY in the hub's root lock: every keyable identity a hub root input
+  # resolves to is reached at exactly that input's node. Any other node of it is a STRAY, and the
+  # repair is a `follows` line, printed literally. Lines come from the edges of the STRAY-FREE
+  # closure into a stray, so a stray under a non-root-pinned intermediary gets its full nested line,
+  # and one reachable only through another stray is subsumed by that stray's line.
+  hubFollowsOf =
+    lock:
+    let
+      rootInputs = sorted (builtins.attrNames (inputsOf lock lock.root));
+      nodeOf = i: following lock lock.root i;
+      idOfNode =
+        k: if k != null && lock.nodes ? ${k} then identityOf (lock.nodes.${k}.locked or { }) else null;
+      # `listToAttrs` keeps the FIRST binding, so of two root inputs of one repository the
+      # alphabetically first is the reference and the other reads as a stray of it.
+      rootPins = builtins.listToAttrs (
+        builtins.concatMap (
+          i:
+          let
+            id = idOfNode (nodeOf i);
+          in
+          lib.optional (id != null) (
+            lib.nameValuePair id {
+              input = i;
+              node = nodeOf i;
+            }
+          )
+        ) rootInputs
+      );
+      isStray =
+        k:
+        let
+          id = idOfNode k;
+        in
+        id != null && rootPins ? ${id} && rootPins.${id}.node != k;
+      strays = builtins.filter (n: isStray n.key) (closureOf walkAll lock);
+      missingFollows = sorted (
+        unique (
+          builtins.concatMap (
+            n:
+            builtins.concatMap (
+              j:
+              let
+                t = following lock n.key j;
+              in
+              lib.optional (t != null && isStray t)
+                "${
+                  lib.concatMapStrings (s: s + ".inputs.") n.path
+                }${j}.follows = \"${rootPins.${idOfNode t}.input}\";"
+            ) (builtins.attrNames (inputsOf lock n.key))
+          ) (builtins.filter (n: !(isStray n.key)) (closureOf (n: !(isStray n.key)) lock))
+        )
+      );
+    in
+    {
+      inherit missingFollows;
+      nodeCount = builtins.length (builtins.attrNames lock.nodes);
+      strayCount = builtins.length strays;
+      strayRepos = sorted (unique (map (n: idOfNode n.key) strays));
+      rootPinCount = builtins.length (builtins.attrNames rootPins);
+      # C2: roots R2 cannot key, so a second instance of them is invisible to it — NAMED, not counted.
+      uncoveredRoots = builtins.filter (i: idOfNode (nodeOf i) == null) rootInputs;
+      holds = strays == [ ];
+    };
+
+  liveR1 = rootCoherenceOf walkAll hubRootLock liveRootLocks;
+  liveR1RootEdges = rootCoherenceOf walkRootEdges hubRootLock liveRootLocks;
+  liveR2 = hubFollowsOf hubRootLock;
+
+  # P5: a lockless member is converged by construction ONLY if it really declares no inputs.
+  lockAbsentDeclaring = builtins.filter (
+    m: (import "${gen.inputs.${m}.outPath}/flake.nix").inputs or { } != { }
+  ) liveRootPlane.lockAbsent;
+
+  # ── THE ROOT-PLANE SEEDS, their sites DERIVED from the live locks (never a hard-coded node) ──
+  setNode =
+    lock: key: f:
+    lock
+    // {
+      nodes = lock.nodes // {
+        ${key} = f lock.nodes.${key};
+      };
+    };
+  # The first member root lock (sorted) with a github-typed root edge, and that edge. A world
+  # without one leaves `r1Seed = null`, and every R1 arm reads false by name rather than aborting.
+  r1Seed = lib.findFirst (s: s != null) null (
+    map (
+      m:
+      let
+        lock = liveRootLocks.${m} or null;
+        edge =
+          if lock == null then
+            null
+          else
+            lib.findFirst (e: (lock.nodes.${following lock lock.root e}.locked.type or null) == "github") null (
+              sorted (builtins.attrNames (inputsOf lock lock.root))
+            );
+      in
+      if edge == null then
+        null
+      else
+        rec {
+          member = m;
+          inherit edge;
+          node = following lock lock.root edge;
+          locked = lock.nodes.${node}.locked;
+          identity = identityOf locked;
+          site = "${m}:${edge}";
+        }
+    ) memberNames
+  );
+  r1SeedWorld =
+    f:
+    if r1Seed == null then
+      null
+    else
+      rootCoherenceOf walkAll hubRootLock (
+        liveRootLocks // { ${r1Seed.member} = f liveRootLocks.${r1Seed.member}; }
+      );
+  # Does `world` carry `seedRev` for `identity`, at `site`? Read AT THE ROW, never as a set difference.
+  seedAt =
+    world: identity: site:
+    world != null
+    && builtins.any (
+      r:
+      r.identity == identity
+      && builtins.any (p: p.rev == seedRev && builtins.elem site p.sites) r.revs
+      && builtins.elem identity world.incoherent
+    ) world.rows;
+  relock = f: lock: setNode lock r1Seed.node (n: n // { locked = f n.locked; });
+
+  # s2 — the seed edge's node moved to `seedRev`, in place: the site count cannot move.
+  seededRootIncoherence = r1SeedWorld (relock (lk: lk // { rev = seedRev; }));
+  # s5 — owner spelled in another case: the same repository.
+  seededRootOwnerCase = r1SeedWorld (
+    relock (
+      lk:
+      lk
+      // {
+        owner = lib.toUpper lk.owner;
+        rev = seedRev;
+      }
+    )
+  );
+  # s8 — the same repository reached by a `git+https` URL.
+  seededRootGitUrl = r1SeedWorld (
+    relock (_: {
+      type = "git";
+      url = "git+https://github.com/${r1Seed.locked.owner}/${r1Seed.locked.repo}.git";
+      rev = seedRev;
+    })
+  );
+  # s3 — a copy at `seedRev` planted ONLY at depth 2, under the seed edge's node. The root-edge
+  # restriction of the same walk must NOT see it: that pair is what the closure is for.
+  nestedAt =
+    lock:
+    seedLockIn { ${r1Seed.member} = lock; } {
+      member = r1Seed.member;
+      nodes = {
+        "seed-nested".locked = r1Seed.locked // {
+          rev = seedRev;
+        };
+        ${r1Seed.node} = lock.nodes.${r1Seed.node} // {
+          inputs = inputsOf lock r1Seed.node // {
+            "seed-nested" = "seed-nested";
+          };
+        };
+      };
+    };
+  nestedSite = "${r1Seed.site}/seed-nested";
+  seededRootNested = r1SeedWorld (l: (nestedAt l).${r1Seed.member});
+  seededRootNestedRootEdges =
+    if r1Seed == null then
+      null
+    else
+      rootCoherenceOf walkRootEdges hubRootLock (
+        liveRootLocks // (nestedAt liveRootLocks.${r1Seed.member})
+      );
+  # s6 — a NON-roster `sini/gen-*` repository at two revisions in two members' root locks.
+  nonRosterRepo = "gen-harness";
+  nonRosterIdentity = "github:${lib.toLower r1Seed.locked.owner}/${nonRosterRepo}";
+  seedNonRosterAt =
+    rev: m:
+    (seedLockIn liveRootLocks {
+      member = m;
+      nodes."seed-nonroster".locked = {
+        type = "github";
+        owner = r1Seed.locked.owner;
+        repo = nonRosterRepo;
+        inherit rev;
+      };
+      rootInputs = i: i // { "seed-nonroster" = "seed-nonroster"; };
+    }).${m};
+  nonRosterMembers = lib.take 2 (builtins.filter (m: liveRootLocks.${m} or null != null) memberNames);
+  seededRootNonRoster =
+    if builtins.length nonRosterMembers < 2 then
+      null
+    else
+      rootCoherenceOf walkAll hubRootLock (
+        liveRootLocks
+        // lib.genAttrs [ (builtins.elemAt nonRosterMembers 0) ] (seedNonRosterAt controlBaseRev)
+        // lib.genAttrs [ (builtins.elemAt nonRosterMembers 1) ] (seedNonRosterAt seedRev)
+      );
+
+  # The hub seeds: the first root input (sorted) whose node has an input resolving to a ROOT-PINNED
+  # node, and that input. s1 re-points it at a fresh copy of that node (same revision); s7 plants the
+  # copy one level deeper, under a non-root-pinned intermediary.
+  hubRootNodes = map (i: following hubRootLock hubRootLock.root i) (
+    builtins.attrNames (inputsOf hubRootLock hubRootLock.root)
+  );
+  r2Seed = lib.findFirst (s: s != null) null (
+    map (
+      i:
+      let
+        node = following hubRootLock hubRootLock.root i;
+        j = lib.findFirst (j: builtins.elem (following hubRootLock node j) hubRootNodes) null (
+          sorted (builtins.attrNames (inputsOf hubRootLock node))
+        );
+      in
+      if j == null then
+        null
+      else
+        rec {
+          input = i;
+          inherit node j;
+          target = following hubRootLock node j;
+          targetInput = lib.findFirst (r: following hubRootLock hubRootLock.root r == target) null (
+            sorted (builtins.attrNames (inputsOf hubRootLock hubRootLock.root))
+          );
+          line = "${i}.inputs.${j}.follows = \"${targetInput}\";";
+          nestedLine = "${i}.inputs.seed-intermediary.inputs.${j}.follows = \"${targetInput}\";";
+        }
+    ) (sorted (builtins.attrNames (inputsOf hubRootLock hubRootLock.root)))
+  );
+  hubSeedWith =
+    extra: setNode hubRootLock r2Seed.node (n: n // { inputs = (n.inputs or { }) // extra; });
+  withCopy =
+    lock:
+    lock
+    // {
+      nodes = lock.nodes // {
+        "seed-copy" = hubRootLock.nodes.${r2Seed.target};
+      };
+    };
+  seededHubStray =
+    if r2Seed == null then
+      null
+    else
+      withCopy (hubSeedWith {
+        ${r2Seed.j} = "seed-copy";
+      });
+  seededHubNested =
+    if r2Seed == null then
+      null
+    else
+      let
+        l = withCopy (hubSeedWith {
+          "seed-intermediary" = "seed-intermediary";
+        });
+      in
+      l
+      // {
+        nodes = l.nodes // {
+          "seed-intermediary" = {
+            locked = {
+              type = "github";
+              owner = "sini";
+              repo = "seed-intermediary";
+              rev = seedRev;
+            };
+            inputs.${r2Seed.j} = "seed-copy";
+          };
+        };
+      };
+  seededHubStrayR2 = if seededHubStray == null then null else hubFollowsOf seededHubStray;
+  seededHubStrayR1 =
+    if seededHubStray == null then null else rootCoherenceOf walkAll seededHubStray liveRootLocks;
+  seededHubNestedR2 = if seededHubNested == null then null else hubFollowsOf seededHubNested;
+
   # ── THE ARMING ──
   # `crossMemberCoherent == true` is an ABSENCE CLAIM, so it travels with seeds that FIRE in the same
   # run and the same instrument. Every seed below is a member LOCK VALUE handed to the comparator
@@ -789,10 +1193,8 @@ let
   # hand-kept list beside it: a second register would let an arm be added here and left out of the
   # enforced set — an unchecked arm that reads exactly like a passing one.
   gate = {
-    # ★★★ THE TWO READINGS — OWNER-OPEN, AND THE ONLY ARM-DEPENDENT OBJECTS IN THIS CELL. See the
-    # header: reading (2) is not satisfiable while the member ci edge graph holds a cycle, and
-    # reading (1) is false of the tree today (9 of the 10 nodes that can disagree). Both are
-    # COMPUTED and PRINTED; whether either exits 1 is one line in `mkPinCoherenceCheck`.
+    # ★★★ THE TWO ci-PLANE READINGS — OBSERVE-ONLY (header). Both are COMPUTED and PRINTED; whether
+    # either exits 1 is one line in `mkPinCoherenceCheck`.
     #   OBSERVE-ONLY, shipped:  an incoherent pin PRINTS and the build passes.
     #   GATING, one edit:       gating = failed != [ ];
     # ★ An ARMING failure exits 1 under BOTH arms.
@@ -926,6 +1328,64 @@ let
     # (53 `gen-*` root edges, all `github`, measured 2026-09-18): a walk that opened nothing would
     # also report no violations. The member partition must be TOTAL — every member either read or
     # named as having no root lock — and the edge count non-zero.
+    # ★★★ R1 — ONE REVISION PER REPOSITORY over the root plane, closure by node path (owner-ruled
+    # 2026-09-25, den-hoag-4dfsv §4.1(b)). GATES. Header: ROOT-PLANE COHERENCE.
+    root-plane-coherent = liveR1.holds;
+    # ★★★ R2 — ONE NODE PER REPOSITORY in the hub root lock. GATES; the red prints the lines to add.
+    hub-root-follows-complete = liveR2.holds;
+
+    # s2 — the seed edge's node at `seedRev`, IN PLACE: R1 names it at its site, the count unmoved.
+    arming-root-plane-incoherence =
+      r1Seed != null
+      && seedAt seededRootIncoherence r1Seed.identity r1Seed.site
+      && seededRootIncoherence.siteCount == liveR1.siteCount
+      && !seededRootIncoherence.holds;
+    # s3 — a depth-2-only copy at `seedRev`: the closure names it, the root-edge restriction of the
+    # same walk does not. That pair is the closure's reason to exist.
+    arming-root-plane-nested =
+      r1Seed != null
+      && seedAt seededRootNested r1Seed.identity nestedSite
+      && !builtins.any (
+        r: r.identity == r1Seed.identity && builtins.any (p: p.rev == seedRev) r.revs
+      ) seededRootNestedRootEdges.rows;
+    # C1 — the identity is normalised and the domain is not roster-filtered. Each seed loads two
+    # revisions of one repository on the standalone path and must read false.
+    arming-root-plane-owner-case =
+      r1Seed != null && seedAt seededRootOwnerCase r1Seed.identity r1Seed.site;
+    arming-root-plane-git-url = r1Seed != null && seedAt seededRootGitUrl r1Seed.identity r1Seed.site;
+    arming-root-plane-non-roster =
+      seededRootNonRoster != null
+      && !(builtins.elem nonRosterRepo memberNames)
+      && builtins.elem nonRosterIdentity seededRootNonRoster.incoherent;
+
+    # s1 — one member's edge re-pointed at a fresh copy of a root-pinned node, SAME revision: R2 names
+    # exactly that line while R1 is unmoved. Instance and revision come apart, permanently shown.
+    arming-hub-follows =
+      seededHubStrayR2 != null
+      && !seededHubStrayR2.holds
+      && builtins.elem r2Seed.line seededHubStrayR2.missingFollows
+      && seededHubStrayR1.incoherent == liveR1.incoherent;
+    # s7 (C3) — the copy under a non-root-pinned intermediary: the NESTED line is printed, and the
+    # depth-2 line it would otherwise be confused with is not.
+    arming-hub-follows-nested =
+      seededHubNestedR2 != null
+      && !seededHubNestedR2.holds
+      && builtins.elem r2Seed.nestedLine seededHubNestedR2.missingFollows
+      && !(builtins.elem r2Seed.line seededHubNestedR2.missingFollows);
+
+    # The floor under both readings, because both are ABSENCE claims: every member root lock read
+    # or named lockless, the lockless ones really declaring no inputs (P5), sites reached by the
+    # closure and by its root-edge restriction, an unkeyable site named (the hub's nixpkgs tarball),
+    # and at least one hub root pin R2 can key.
+    root-plane-domain-floor =
+      builtins.length liveR1.locks == 1 + liveRootPlane.readCount
+      && liveRootPlane.readCount + builtins.length liveRootPlane.lockAbsent == live.memberCount
+      && lockAbsentDeclaring == [ ]
+      && liveR1.siteCount > 0
+      && liveR1RootEdges.siteCount > 0
+      && liveR1.outOfDomain != [ ]
+      && liveR2.rootPinCount > 0;
+
     root-plane-refuses-path =
       arming.rootPlane.clean
       && arming.rootPlane.pathSites == [ ]
@@ -970,7 +1430,7 @@ in
         violations
         ;
     };
-    hubReference = "the hub ROOT `flake.lock`'s `follows`-resolved revision per node. NOT SATISFIABLE while the member ci edge graph holds a cycle (header) — reported, not gated";
+    hubReference = "the hub ROOT `flake.lock`'s `follows`-resolved revision per node — reported, not gated (header)";
 
     inherit (live)
       rows
@@ -995,6 +1455,40 @@ in
       crossMemberCoherent
       matchesHubRoot
       ;
+
+    rootCoherence = {
+      governs = "R1: one REVISION per repository over the hub root `flake.lock` and every member root `flake.lock` at this hub's pin, every node reachable by node path (owner-ruled 2026-09-25, den-hoag-4dfsv §4.1(b))";
+      inherit (liveR1)
+        locks
+        siteCount
+        identityCount
+        incoherent
+        incoherentRows
+        unlocked
+        unresolved
+        outOfDomain
+        ;
+      rootEdgesIncoherent = liveR1RootEdges.incoherent;
+      inherit lockAbsentDeclaring;
+    };
+    hubFollows = {
+      governs = "R2: one NODE per repository in the hub root `flake.lock` — every keyable identity a hub root input resolves to is reached at that input's node only";
+      inherit (liveR2)
+        nodeCount
+        strayCount
+        strayRepos
+        rootPinCount
+        uncoveredRoots
+        missingFollows
+        ;
+    };
+    rootPlaneArming = {
+      inherit r1Seed r2Seed nestedSite;
+      nonRoster = {
+        identity = nonRosterIdentity;
+        members = nonRosterMembers;
+      };
+    };
 
     inherit arming;
   };

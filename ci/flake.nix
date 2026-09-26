@@ -657,9 +657,8 @@
           # Build the hub-entry check (L4): prints the entry's own member-to-path map with the node
           # and repository each path resolves to, and names any member wired to another repository.
           #
-          # GATING, unlike `pin-coherence`'s two readings. Those readings are observe-only because
-          # the states they describe are TRUE of the ecosystem today and not satisfiable by this
-          # repository alone (den-hoag-6fmmb). This one is a property of a file in THIS repository,
+          # GATING, unlike `pin-coherence`'s two ci-plane readings, which meter the TEST graph and
+          # are observe-only (den-hoag-6fmmb). This one is a property of a file in THIS repository,
           # it holds now, and nothing outside the hub has to move for it to keep holding.
           mkHubEntryCheck =
             name: s:
@@ -759,15 +758,11 @@
           # ci locks and names every node pinned at more than one revision, with the members behind
           # each revision.
           #
-          # ★★★ THE TWO READINGS ARE OBSERVE-ONLY AND THE REASON IS IN `ci/pin-coherence.nix`'s
-          # HEADER, NOT HERE. In one line each: cross-member coherence is FALSE of the ecosystem
-          # today (9 of the 10 nodes that can disagree), and hub-root agreement is NOT SATISFIABLE
-          # while the member→member ci edge graph holds a cycle — `gen-merge/ci` pins `gen-memo` and
-          # `gen-memo/ci` pins `gen-merge`, so each would have to name a commit of the other that
-          # names it back. These two readings are cleared by neither a ruling nor a fix available
-          # here (den-hoag-6fmmb). The predicate, the domain, the
-          # traversal and this message are IDENTICAL under both arms, and only the exit status of a
-          # reading differs.
+          # ★★★ THE TWO ci-PLANE READINGS ARE OBSERVE-ONLY AND THE REASON IS IN
+          # `ci/pin-coherence.nix`'s HEADER, NOT HERE: they meter the TEST graph, which ADR-0037
+          # lets drift. The ROOT-plane readings R1/R2 GATE (owner-ruled 2026-09-25, den-hoag-4dfsv).
+          # The predicate, the domain, the traversal and this message are IDENTICAL under both arms,
+          # and only the exit status of a reading differs.
           #   OBSERVE-ONLY, shipped:  an incoherent pin PRINTS and the build passes.
           #   GATING, one edit:       gating = failed != [ ];
           # ★ An ARMING failure exits 1 under BOTH arms. A guard that can no longer fire is not a
@@ -781,8 +776,20 @@
               ];
               allOk = builtins.all (k: s.gate.${k} == true) s.gateKeys;
               failed = builtins.filter (k: s.gate.${k} != true) s.gateKeys;
-              armingFailed = builtins.filter (k: !(builtins.elem k readings)) failed;
-              gating = armingFailed != [ ];
+              # R1/R2 (den-hoag-4dfsv §4.1(b)) GATE, and print their own message rather than ARMING's.
+              rootReadings = [
+                "root-plane-coherent"
+                "hub-root-follows-complete"
+              ];
+              rootFailed = builtins.filter (k: builtins.elem k rootReadings) failed;
+              armingFailed = builtins.filter (k: !(builtins.elem k (readings ++ rootReadings))) failed;
+              gating = armingFailed != [ ] || rootFailed != [ ];
+              rc = s.report.rootCoherence;
+              hf = s.report.hubFollows;
+              rootRow =
+                r:
+                "    ${r.identity}"
+                + lib.concatMapStrings (p: "\n        ${p.rev}  ${lib.concatStringsSep " " p.sites}") r.revs;
 
               report = builtins.toJSON ({ inherit allOk failed; } // s.report);
               nodeLine =
@@ -827,6 +834,20 @@
                     toString (s.report.siteCount + s.report.pathSiteCount)
                   } enumerated sites pin a TREE rather than a publication, so they carry no revision to agree or disagree about and are outside this relation BY TYPE (ci/pin-coherence.nix header). NOT a narrowing of the kind forbidden above: that forbids hiding a real disagreement about a real REVISION, and a path input has none to hide. A revless NON-path node still refuses, by name, one message up."
                   ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    ${r}"}") s.report.exclusions}
+                ''}
+                echo "ROOT-PLANE COHERENCE (R1): ${toString rc.siteCount} sites of ${toString rc.identityCount} repositories over ${toString (builtins.length rc.locks)} root locks (the hub + every member root lock at this hub's pin), every node reachable by node path; ${toString (builtins.length rc.incoherent)} repositories at more than one revision. Out of domain (unkeyable): ${lib.concatStringsSep " " rc.outOfDomain}"
+                echo "HUB FOLLOWS (R2): ${toString hf.nodeCount} nodes in the hub root lock, ${toString hf.strayCount} strays over ${toString (builtins.length hf.strayRepos)} repositories. Root inputs R2 cannot key, so a second instance of them is NOT seen: ${lib.concatStringsSep " " hf.uncoveredRoots}"
+                ${lib.optionalString (builtins.elem "root-plane-coherent" rootFailed) ''
+                  echo "ROOT-PLANE INCOHERENCE — one repository at more than one revision across the root plane, so the standalone path loads it twice (owner-ruled 2026-09-25):" >&2
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg (rootRow r)} >&2") rc.incoherentRows}
+                  ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    REFUSED: ${r}"} >&2") (
+                    map (i: "${i} pinned without a rev") rc.unlocked ++ map (x: "${x} unresolvable edge") rc.unresolved
+                  )}
+                  echo "Disposed of by relocking leaf-first until every root lock names ONE revision per repository (relock-all) — never by narrowing this reading's domain." >&2
+                ''}
+                ${lib.optionalString (builtins.elem "hub-root-follows-complete" rootFailed) ''
+                  echo "HUB FOLLOWS INCOMPLETE — a member's input re-forks a repository the hub already pins, so the flake path builds a second instance of it. Add to gen/flake.nix, then nix flake lock:" >&2
+                  ${lib.concatMapStringsSep "\n" (l: "echo ${lib.escapeShellArg "    ${l}"} >&2") hf.missingFollows}
                 ''}
                 ${lib.optionalString (armingFailed != [ ]) ''
                   echo "PIN COHERENCE ARMING — a seeded incoherence this cell exists to name went unnamed, or the domain floor stopped discriminating: ${lib.concatStringsSep " " armingFailed}. Read report.arming above: every arm reads its seed AT THE ROW, carrying a revision no live lock can produce" >&2
