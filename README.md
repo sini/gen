@@ -122,7 +122,7 @@ surface, rehomed when gen-flake dissolved; the settled framework interface arriv
 
   gen.tree = ./gen-modules;                     # a directory of gen definition modules
   gen.aspectCnf = import ./gen-modules/_aspect-cnf.nix; # the SAME arg the tree's mkAspectSchema takes
-  gen.extraModules.myhost = [ ./hardware.nix ]; # per-host platform/base NixOS modules
+  gen.extraModules.myhost = [ ./hardware.nix ]; # per-host NixOS modules; reach the nixos system only
 }
 ```
 

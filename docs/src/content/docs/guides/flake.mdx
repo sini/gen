@@ -62,7 +62,9 @@ Wiring `inputs.gen.flakeModules.default` gets you three options and one module a
   gen.aspectCnf = import ./gen-modules/_aspect-cnf.nix;
   ```
 - **`gen.extraModules.<name>`** — per-node platform modules (hardware configuration, the
-  base NixOS profile) that ride alongside what the tree composes.
+  base NixOS profile) that ride alongside what the tree composes. They reach the `nixos` system
+  only, and a node with no NixOS content of its own is refused by name rather than silently
+  skipped. Key them from your own node list, not from `nixosConfigurations`, which would loop.
 - **`genValues`** — the module argument your ordinary NixOS modules read the resolved
   graph through:
 

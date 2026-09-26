@@ -202,6 +202,12 @@
       # `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
       declaredContent = import ./declared-content.nix { inherit (inputs) gen; };
 
+      # ── extra-modules-address — the PERMANENT cell over the hub's ADDRESSED extras inlet ──────
+      # gen-delivery's `realize` takes extras class-major (den-hoag-9vkq); the hub addresses
+      # `gen.extraModules` to `nixos`. Value arm over the pinned roster, wired the way the module
+      # wires it, plus a lexical arm over the shipped call site. `.gate` / `.gateKeys` as above.
+      extraModulesAddress = import ./extra-modules-address.nix { inherit (inputs) gen; };
+
       # ── direction-of-dependence lint ──
       # ADR-0015's enforcement half: no roster member may declare an input on a HIGHER stratum than
       # its own, under the chain substrate < modules < aspects < framework, save the closed
@@ -885,6 +891,35 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the extra-modules-address check (den-hoag-9vkq): prints the per-key gate and FAILS
+          # the build if any key is not `true`. A failing key is the hub's extras reaching a class or
+          # node they were not addressed to, an address that does not realize going silent, the call
+          # site losing its `nixos` address, or a control gone blind.
+          mkExtraModulesAddressCheck =
+            name: g:
+            let
+              allOk = builtins.all (k: g.gate.${k} == true) g.gateKeys;
+              failed = builtins.filter (k: g.gate.${k} != true) g.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                results = g.gate;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "EXTRAS INLET REGRESSION — the hub's gen.extraModules reach a class or node they were not addressed to, an address that does not realize went silent, or a control went blind (den-hoag-9vkq)" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # Build the declared-content check (den-hoag-jwm8 / den-hoag-t3q9): prints the per-key
           # gate and FAILS the build if any key is not `true`. A failing key is the hub realizing a
           # key ADR-0028's Rider excludes — a declared-but-contentless class, or a non-class
@@ -1136,6 +1171,7 @@
             agents-md-hub-inputs = mkHubInputSheetCheck "agents-md-hub-inputs" hubInputSheet;
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
+            extra-modules-address = mkExtraModulesAddressCheck "extra-modules-address" extraModulesAddress;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
             architecture-library-graph = mkArchitectureGraphCheck "architecture-library-graph" architectureLibraryGraph;
             readme-figures = mkReadmeFiguresCheck "readme-figures" readmeFigures;

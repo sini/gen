@@ -288,13 +288,22 @@ let
 
   # The class-major realize result (`{ <class>.<node> = artifact; }`) — gen-delivery's layered fold
   # over the `project` result above. Reads only `projected`, the terminals above, and per-node
-  # extras — never the injected/built config below, so no cycle. Shared by the `gen.realized` handle
+  # extras — never the injected/built config below, so no cycle of the hub's own. A consumer can
+  # still close one: gen-delivery checks every extras address before the realization is observable,
+  # so a `gen.extraModules` derived from `gen.realized` or `flake.nixosConfigurations` diverges
+  # (the option's description states it).
+  #
+  # The extras are ADDRESSED to the `nixos` class — gen-delivery's inlet is class-major — which is
+  # the reach `gen.extraModules`' description promises: NixOS modules handed to the nixos terminal,
+  # never to a peer class's. Shared by the `gen.realized` handle
   # and `flake.nixosConfigurations`. The hub passes no `bindings`/`refinements`/`layerOrder`: the
   # interim module grows no contract, and a consumer wanting the layered surface uses gen-delivery
   # directly.
   realized = genDelivery.realize {
     inherit projected terminals;
-    extraModules = cfg.extraModules;
+    extraModules = {
+      nixos = cfg.extraModules;
+    };
   };
 in
 {
@@ -456,6 +465,17 @@ in
       description = ''
         Per-node extra NixOS modules appended to each built system, keyed by node name, e.g.
         `{ <node> = [ ./hardware.nix { system.stateVersion = "24.05"; } ]; }`.
+
+        They reach the `nixos` terminal ONLY — never another class in `gen.terminals` — and are
+        handed to gen-delivery's `realize` as `extraModules.nixos.<node>`, the path its refusals
+        name. They supplement a built system and never create one, so a node with no declared
+        `nixos` content, a node the projection does not carry, or a missing `nixos` terminal
+        (`gen.nixpkgs = null` with no `gen.terminals.nixos`) is refused by name, e.g.
+        `extraModules.nixos.<node> addresses a node with no declared nixos content`.
+
+        Must not be derived from `gen.realized` or `flake.nixosConfigurations`: every address is
+        checked before the realization can be observed, so a self-derived set diverges with an
+        uncatchable infinite recursion. Key it from your own node list.
       '';
     };
 
@@ -473,7 +493,7 @@ in
       readOnly = true;
       internal = true;
       default = realized;
-      defaultText = lib.literalExpression "genDelivery.realize { projected = <genDelivery.project { values; cnf = config.gen.aspectCnf; }>; inherit terminals; extraModules = config.gen.extraModules; }";
+      defaultText = lib.literalExpression "genDelivery.realize { projected = <genDelivery.project { values; cnf = config.gen.aspectCnf; }>; inherit terminals; extraModules = { nixos = config.gen.extraModules; }; }";
       description = ''
         The full class-major realize result (`{ <class>.<node> = artifact; }`) over `gen.terminals`.
         `flake.nixosConfigurations` is `realized.nixos or { }`; a consumer maps any other class off

@@ -21,6 +21,14 @@ gen-delivery is built to avoid.
 | `realize { projected, terminals, bindings?, refinements?, layerOrder?, extraModules? }` | class-major artifacts, `{ <class>.<node> = artifact; }` |
 | `defaultLayerOrder` | `[ "projection" "global" "refinement" ]`, readable and overridable |
 
+`extraModules` is addressed by class, then node — `{ <class>.<node> = [ module ]; }` — so a
+terminal receives only the extras addressed to its own class at its own node. They supplement a
+realization and never create one: an address naming a class with no terminal, a node the projection
+does not carry, or a node with no declared content for that class refuses by name, and so does the
+old node-keyed `{ <node> = [ module ]; }` shape. Derive the addresses from the projection, never from
+`realize`'s own output: the check reads every address before the realization is observable, so a
+self-derived set diverges.
+
 The contribution order is total in both directions: naming a layer that doesn't exist refuses, and
 so does omitting one. It takes gen-algebra and gen-aspects as substrate, supplied directly at the
 `.lib` call:
