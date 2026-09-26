@@ -378,7 +378,10 @@ let
     # gen-merge 0e6340fdfa → 888872807c (den-hoag-u92up, taken by the lock-currency relock): the
     # surface gained ONE name, `mergeTypes`, the engine's type-merge relation published for a
     # consumer holding two types it did not build. Nothing was removed and no other member moved.
-    merge = "88a91a98440cdb2c9c503415386809cc96606823ee3e58b9aa4e887289bac7ae";
+    #
+    # gen-merge 88919f8 → 50250c1 (den-hoag-bfc0k): the surface gained ONE name, `closuresFirst`,
+    # the comparison subject of a value that can carry a type record. Nothing was removed.
+    merge = "fc9aa174dc8be63b816fe6a7ec1487ed839b14fcf8dd007aff55a2e7e013b54f";
     prelude = "b8cbf955917bd58ef8cfc78720762b88e704a9ba43623e603155cd7e128e400c";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
@@ -394,7 +397,12 @@ let
     # gen-schema f207b53 → 8fb5b42 (den-hoag-markof-partial-preimage-znfjq): the surface gained
     # ONE name, `kindEq`, the kind comparison that refuses a sealed-only collision by name.
     # Nothing was removed.
-    schema = "773f477dec4a53c4c5f9aee08520feb0594535144388adb7266f74c8e6b62c64";
+    #
+    # gen-schema c9c5cc9 → 4b4244a (den-hoag-bfc0k): the surface gained TWO names,
+    # `constructionRelation` (the merge relation of a type built per construction) and
+    # `keySemanticsRecords` (the record positions its keySemantics grammar fixes). Nothing was
+    # removed.
+    schema = "630c922c7753e554ef4ca06509214d5eec179d89cc2b29f41e05921dc0d1bd39";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
     #

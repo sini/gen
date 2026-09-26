@@ -301,8 +301,8 @@ smaller of the two, truncated down to three places.
 | registry      | 2000 | alloc   |  0.631 | 0.101395 | 0.046820 |  0.023 | **0.654** |  0.90 |
 | lazyRegistry  | 2000 | thunks  |  0.777 | 0.108440 | 0.064373 |  0.032 | **0.809** |  0.90 |
 | lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** |  0.90 |
-| schemaHosts   | 1600 | thunks  |  1.146 | 0.197886 | 0.079462 |  0.000 | **1.146** | 1.207 |
-| schemaHosts   | 1600 | alloc   |  0.982 | 0.187996 | 0.057494 |  0.000 | **0.982** | 1.018 |
+| schemaHosts   | 1600 | thunks  |  1.157 | 0.197886 | 0.079462 |  0.000 | **1.157** | 1.146 |
+| schemaHosts   | 1600 | alloc   |  0.991 | 0.187996 | 0.057494 |  0.000 | **0.991** | 0.982 |
 | deepSubmodule | 1600 | thunks  |  0.575 | 0.105358 | 0.087229 |  0.043 | **0.618** |  0.90 |
 | deepSubmodule | 1600 | alloc   |  0.463 | 0.090347 | 0.065271 |  0.032 | **0.495** |  0.90 |
 | wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |   1.3 |
@@ -328,8 +328,21 @@ adds +24,112 B on the pure arm, the last printed alloc step. The bound moves to 
 margin 0.000, a tightening. A +1-thunk-per-mint plant in gen-identity does not red this row (1.146 /
 0.982); it reds four `entityMatch` gates, which are the per-mint guard.
 
+★ **`schemaHosts`, `entityMatch` (all eight) and three `kindMatch` n=1600 gates are RE-ANCHORED at
+the den-hoag-bfc0k / den-hoag-5xio7 relock** (gen-merge `50250c1`, gen-schema `4b4244a`,
+gen-aspects `25c6f86`), margin 0.000, under owner sitting item R8's default (a correctness fix's
+stated price; defaulted, reversible). Bisected by root-lock arm on hub `cb6953a`, host and
+Determinate agreeing: gen-merge `e332998`/`0943b2a` alone (5xio7's `callD` operand swap and
+`slotsDiffer`) reds the four `entityMatch` alloc gates by +0.001 each, so the 5xio7 spec's "nil"
+price for that swap is false; adding gen-schema `fa26749` (`constructionRelation`, the relation every
+per-construction schema type now states) takes `schemaHosts` to 1.155 / 0.990, `kindMatch` migrated
+n=1600 thunks to 0.963 and `entityMatch` thunks up about +0.012; the full landing reads
+`schemaHosts` 1.157 / 0.991, `kindMatch` migrated n=1600 0.963 / 0.977 and sealed n=1600 thunks
+0.958, `entityMatch` migrated 1.326 / 1.137 (n=400) and 1.321 / 1.128 (n=1600), sealed 1.331 / 1.142
+and 1.326 / 1.133. Every other bound is unchanged. ① and ② in the table are not re-derived.
+
 ★ **Two of the twelve bounds are INTERIM, and this states what ends them.** `schemaHosts` thunks
-and alloc (**1.207** / **1.018** when marked, **1.146** / **0.982** now) are what remains of the three that loosened (`scalar`
+and alloc (**1.207** / **1.018** when marked, **1.157** / **0.991** now) are what remains of the three that loosened (`scalar`
 thunks **0.902** was the third); they encode an **accepted, carried regression**, and they are the ceiling this project has
 agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
 anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for
