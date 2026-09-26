@@ -301,9 +301,11 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # Bisect by root-lock arm on hub cb6953a, host and Determinate agreeing: gen-merge e332998/0943b2a
 # (5xio7 alone, + export) does not red this row; + gen-schema fa26749 (`constructionRelation`, the
 # per-construction merge relation every schema entry type now states) reads 1.155 / 0.990; the full
-# landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86) reads 1.157 / 0.991.
+# landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86) reads 1.157 / 0.991 locally
+# (Nix 2.34.8 and Determinate 3.22.5) and 1.157 / 0.992 on the CI runner's Determinate (hub CI run
+# 36228440647 on fcb8a69); the alloc bound is the larger measured figure, still margin 0.000.
 ROW_THUNKS_MAX[schemaHosts,1600]=1.157 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
-ROW_ALLOC_MAX[schemaHosts,1600]=0.991  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+ROW_ALLOC_MAX[schemaHosts,1600]=0.992  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.495
