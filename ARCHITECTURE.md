@@ -107,6 +107,7 @@ flowchart TD
   gen_program --> gen_prelude
   gen_program --> gen_scope
   gen_schema --> gen_algebra
+  gen_schema --> gen_graph
   gen_schema --> gen_identity
   gen_schema --> gen_merge
   gen_schema --> gen_prelude

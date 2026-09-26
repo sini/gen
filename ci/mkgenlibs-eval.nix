@@ -684,12 +684,6 @@ let
       word = "systems";
       clause = "HELD: as `crossing.mkFlakeTerminal` (den-hoag-52hn7)";
     }
-    {
-      member = "graph";
-      at = "fixtures.serviceGraph";
-      word = "service";
-      clause = "HELD: gen-graph 28fc4c4 renames it `attributed`; the hub takes that pin at the next leaf-first relock, because `pin-coherence` refuses a targeted one while every member's nested gen-graph node is older. Strike this entry in the commit that moves the pin (den-hoag-52hn7)";
-    }
   ];
 
   vocabularySurface = builtins.removeAttrs genLibs [ declKey ] // {

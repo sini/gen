@@ -40,6 +40,7 @@
     gen-schema.inputs.gen-identity.follows = "gen-identity";
     gen-schema.inputs.gen-merge.follows = "gen-merge";
     gen-schema.inputs.gen-prelude.follows = "gen-prelude";
+    gen-schema.inputs.gen-graph.follows = "gen-graph";
 
     gen-aspects.url = "github:sini/gen-aspects";
     gen-aspects.inputs.gen-identity.follows = "gen-identity";

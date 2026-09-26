@@ -30,6 +30,7 @@
   gen-memo, # the incremental plane gen-merge's warm decision now consults (den-hoag-stmv6)
   gen-scope, # the sole evaluator gen-merge's module-tree pass runs on (ADR-0006)
   gen-algebra,
+  gen-graph,
   gen-schema, # PURE re-host (published main)
   gen-schema-orig, # ORIGINAL nixpkgs-signature { lib, algebra } (pre-re-host pin)
   lib, # pinned nixpkgs.lib
@@ -60,6 +61,7 @@ let
     merge = genMerge;
     algebra = genAlgebra;
     identity = genIdentity;
+    graph = import "${gen-graph}/lib" { inherit prelude; };
   };
   genSchemaOld = import "${gen-schema-orig}/lib" {
     inherit lib;

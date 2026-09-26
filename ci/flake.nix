@@ -142,6 +142,7 @@
           gen-scope
           gen-algebra
           gen-schema
+          gen-graph
           ;
         inherit (inputs) gen-schema-orig;
         lib = inputs.nixpkgs-lib.lib;
@@ -982,6 +983,7 @@
               "gen-aspects" = "${genInputs.gen-aspects}";
               "gen-select" = "${genInputs.gen-select}";
               "gen-class" = "${genInputs.gen-class}";
+              "gen-graph" = "${genInputs.gen-graph}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
               "gen-select-orig" = "${inputs.gen-select-orig}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
@@ -1010,6 +1012,7 @@
             "gen-aspects"
             "gen-select"
             "gen-class"
+            "gen-graph"
           ];
           perfRefKeys = [
             "gen-schema-orig"

@@ -54,6 +54,7 @@ let
     "gen-aspects" = "/lib";
     "gen-select" = "/lib"; # kindMatch: `sel.kind` keyed by minted kind identity (den-hoag-l0y)
     "gen-class" = "/lib"; # tier 2: the injected gen-merge kernel is what enables `applyCoreFixed`
+    "gen-graph" = "/lib";
     "gen-schema-orig" = "/lib";
     "gen-select-orig" = "/lib"; # kindMatch's frozen denominator (ci/flake.nix)
     "nixpkgs-lib" = "/lib";
@@ -70,6 +71,7 @@ let
     "gen-aspects" = "aspects";
     "gen-select" = "select";
     "gen-class" = "class";
+    "gen-graph" = "graph";
     "gen-schema-orig" = "schemaOrig";
     "gen-select-orig" = "selectOrig";
     "nixpkgs-lib" = "lib";
