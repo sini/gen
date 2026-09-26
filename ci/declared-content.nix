@@ -200,6 +200,11 @@ let
     hub-passes-the-registry-selector = occurs "selectNodes =";
     hub-declares-the-registry-option = occurs "nodeRegistryPath = mkOption";
     hub-carries-no-local-class-predicate = !(occurs "isList v\\.imports");
+    # ADR-0035 — the default terminal is gen-bind's under its renamed export, and the retired name
+    # appears nowhere in the module. A consumer's flake-parts eval is what EVALUATES the call; this
+    # arm only catches the hub publishing a module that still spells the name gen-bind removed.
+    hub-calls-the-hosted-terminal = occurs "crossing\\.mkHostedTerminal";
+    hub-names-no-retired-terminal = !(occurs "mkSystemTerminal");
     # CONTROL, same instrument, same run — a token that IS in the file, so the absence above is a
     # predicate that is gone and not a `readFile`/`split` that reads everything as empty.
     lexical-instrument-fires = occurs "flake\\.nixosConfigurations";

@@ -446,6 +446,10 @@
                   surfaceDriftNames
                   arming
                   pinDomain
+                  vocabularyUnregistered
+                  vocabularyStale
+                  vocabularyRegister
+                  vocabularyArming
                   ;
               };
             in

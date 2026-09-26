@@ -527,6 +527,210 @@ let
   # strata/rank/exception/edge set, which restructures the entry and gives every sibling arm a seeded
   # twin. That is an OPEN FORK (OQ-1 of
   # specs/2026-09-12-gen-arming-control-headroom-spec.md, den-hoag-l2yh0), not a decision taken here.
+
+  # ── the published vocabulary ──
+  #
+  # ADR-0035: no host, user, system, machine, service, cluster or their synonyms appear in gen's
+  # types, kinds, labels, options, error text or documentation as anything but an example a
+  # framework might declare. `surface-pinned` cannot see this class: it hashes each member's
+  # top-level names, and a den word sits as readily in a nested export (`crossing.*`, `fixtures.*`)
+  # or in a formal.
+  #
+  # THE POPULATION: every roster member plus the hub's own `compose`, walked through PLAIN attrsets
+  # (not `_type`, option-type or functor sets) to depth 4, and the attrset formals of every function
+  # met on that walk. ★ WHAT IT DOES NOT SEE, stated rather than left to be discovered: fields of a
+  # record a function RETURNS, curried and functor formals, sets inside lists, `_type` sets, `name`
+  # strings, error text, option descriptions and docs prose, and the hub flakeModule's option names.
+  # A clean read here is a claim about the population above and nothing wider.
+  #
+  # TWO PREDICATES over each name, both lifted to functions of their inputs (the `driftOf`
+  # construction) so the arming below runs THIS code:
+  #   TOKEN — split at case boundaries and at non-alphanumerics, lower-cased, a token EQUAL to a
+  #     word. Equality and not substring, because a substring cannot tell `hosted` or `hostKind`
+  #     (the hosting node, ADR-0008) from `host` (the fleet object); where spelling and meaning part,
+  #     the register below decides, never the tokenizer.
+  #   SUBSTRING — case-insensitive, over the words with no gen homonym. It catches what the token
+  #     split cannot: `NixOS` splits to `nix o s`, and a lower-case compound (`hostname`) is one
+  #     token. `home`, `den` and `cluster` stay token-only, for `homomorphism`, `hidden` and graph
+  #     clustering. A digit-suffixed word (`host1`) is one token and is not caught.
+  vocabularyWords = [
+    "host"
+    "hosts"
+    "user"
+    "users"
+    "system"
+    "systems"
+    "machine"
+    "machines"
+    "service"
+    "services"
+    "cluster"
+    "clusters"
+    "flake"
+    "flakes"
+    "nixos"
+    "darwin"
+    "home"
+    "den"
+    "fleet"
+  ];
+  vocabularySubstrings = [
+    "nixos"
+    "darwin"
+    "hostname"
+    "username"
+  ];
+  vocabularyDepth = 4;
+
+  chars = s: builtins.genList (i: builtins.substring i 1 s) (builtins.stringLength s);
+  lower = builtins.replaceStrings (chars "ABCDEFGHIJKLMNOPQRSTUVWXYZ") (
+    chars "abcdefghijklmnopqrstuvwxyz"
+  );
+  tokensOf =
+    name:
+    builtins.filter (t: builtins.isString t && t != "") (
+      builtins.split "[^a-z0-9]+" (
+        lower (
+          builtins.concatStringsSep "" (
+            map (p: if builtins.isList p then " " + builtins.head p else p) (builtins.split "([A-Z])" name)
+          )
+        )
+      )
+    );
+  wordsIn =
+    name:
+    builtins.filter (w: builtins.elem w vocabularyWords) (tokensOf name)
+    ++ builtins.filter (w: builtins.length (builtins.split w (lower name)) > 1) vocabularySubstrings;
+
+  vocabularyWalk =
+    member: depth: p: v:
+    let
+      t = builtins.tryEval (builtins.typeOf v);
+      kind = if t.success then t.value else "throws";
+      at = builtins.concatStringsSep "." p;
+      hits =
+        at': name:
+        map (word: {
+          inherit member word;
+          at = at';
+        }) (wordsIn name);
+      own = if p == [ ] then [ ] else hits at (builtins.elemAt p (builtins.length p - 1));
+      formals =
+        if kind == "lambda" then
+          builtins.concatMap (f: hits "${at}:${f}" f) (builtins.attrNames (builtins.functionArgs v))
+        else
+          [ ];
+      plain = kind == "set" && !(v ? _type) && !(v ? type && v ? check) && !(v ? __functor);
+      names = builtins.tryEval (builtins.attrNames v);
+      kids =
+        if plain && depth < vocabularyDepth && names.success then
+          builtins.concatMap (n: vocabularyWalk member (depth + 1) (p ++ [ n ]) v.${n}) names.value
+        else
+          [ ];
+    in
+    own ++ formals ++ kids;
+
+  # One offender per (member, locus, word): a name the two predicates both catch is listed once.
+  offendersOf =
+    surf:
+    builtins.attrValues (
+      builtins.listToAttrs (
+        map (o: {
+          name = "${o.member}.${o.at} [${o.word}]";
+          value = o;
+        }) (builtins.concatMap (m: vocabularyWalk m 0 [ ] surf.${m}) (builtins.attrNames surf))
+      )
+    );
+  admits = e: o: e.member == o.member && e.at == o.at && e.word == o.word;
+  unregisteredOf =
+    register: offenders: builtins.filter (o: !(builtins.any (e: admits e o) register)) offenders;
+  # The `retirementAt` rule one arm over: an entry with no live offender is STALE, so the register
+  # cannot outlive the name it admits.
+  staleOf =
+    register: offenders: builtins.filter (e: !(builtins.any (o: admits e o) offenders)) register;
+  showOffender = o: "${o.member}.${o.at} [${o.word}]";
+  showEntry = e: "${e.member}.${e.at} [${e.word}]";
+
+  # Each entry is ADMITTED BY A CLAUSE OF LAW, never by its spelling, and keys to the exact
+  # (member, locus, word): a later name sharing the word at any other locus is not admitted.
+  vocabularyRegister = [
+    {
+      member = "bind";
+      at = "mergeStrategy.systemWins";
+      word = "system";
+      clause = "meaning cut: the hosted module system's value wins (ADR-0027, amended 2026-09-17), not a fleet object (ADR-0035)";
+    }
+    {
+      member = "settings";
+      at = "assembleHost";
+      word = "host";
+      clause = "ADR-0017: `assembleHost` retires as a name, and the retirement's execution is deferred";
+    }
+    {
+      member = "bind";
+      at = "crossing.mkFlakeTerminal";
+      word = "flake";
+      clause = "HELD: the construction's disposition awaits the owner's re-affirmation of ADR-0027's agnosticism ruling and ADR-0031 F2 at this point of use (den-hoag-52hn7)";
+    }
+    {
+      member = "bind";
+      at = "crossing.mkFlakeTerminal:evalFlakeModule";
+      word = "flake";
+      clause = "HELD: as `crossing.mkFlakeTerminal` (den-hoag-52hn7)";
+    }
+    {
+      member = "bind";
+      at = "crossing.mkFlakeTerminal:systems";
+      word = "systems";
+      clause = "HELD: as `crossing.mkFlakeTerminal` (den-hoag-52hn7)";
+    }
+    {
+      member = "graph";
+      at = "fixtures.serviceGraph";
+      word = "service";
+      clause = "HELD: gen-graph 28fc4c4 renames it `attributed`; the hub takes that pin at the next leaf-first relock, because `pin-coherence` refuses a targeted one while every member's nested gen-graph node is older. Strike this entry in the commit that moves the pin (den-hoag-52hn7)";
+    }
+  ];
+
+  vocabularySurface = builtins.removeAttrs genLibs [ declKey ] // {
+    hub = {
+      inherit (gen.lib) compose;
+    };
+  };
+  vocabularyOffenders = offendersOf vocabularySurface;
+  vocabularyUnregistered = map showOffender (unregisteredOf vocabularyRegister vocabularyOffenders);
+  vocabularyStale = map showEntry (staleOf vocabularyRegister vocabularyOffenders);
+
+  # ── the vocabulary arming ── a synthetic fixture, disjoint from the live surface.
+  armVocab = {
+    alpha = {
+      mkHostThing = x: x;
+      g = { userName }: userName;
+      fromNixOS = 1;
+      hostname = 1;
+      ok = 1;
+    };
+  };
+  armVocabClean = {
+    alpha = {
+      mkNodeThing = x: x;
+      g = { nodeName }: nodeName;
+      ok = 1;
+    };
+  };
+  vocabularyArming = {
+    planted = map showOffender (unregisteredOf [ ] (offendersOf armVocab));
+    clean = map showOffender (unregisteredOf [ ] (offendersOf armVocabClean));
+    stale = map showEntry (
+      staleOf [
+        {
+          member = "alpha";
+          at = "gone";
+          word = "host";
+        }
+      ] (offendersOf armVocab)
+    );
+  };
 in
 {
   # Flat gate record for the check helper: each actual key → wiring-ok, plus the roster tripwire and
@@ -551,6 +755,21 @@ in
     # ARMING — the pin's DOMAIN, the half `surfaceDrift` cannot see.
     arming-pin-covers-roster = pinDomain == memberKeys;
     retired-refusing = retirementFailed == [ ];
+    # ADR-0035 over the published names; the register admits by clause.
+    surface-vocabulary = vocabularyUnregistered == [ ];
+    vocabulary-register-live = vocabularyStale == [ ];
+    # ARMING — the predicates themselves, over the synthetic fixture. The planted set carries one
+    # hit per route: a camel-case token, a formal, and the two the token split cannot see.
+    arming-vocabulary-names-planted =
+      vocabularyArming.planted == [
+        "alpha.fromNixOS [nixos]"
+        "alpha.g:userName [user]"
+        "alpha.g:userName [username]"
+        "alpha.hostname [hostname]"
+        "alpha.mkHostThing [host]"
+      ];
+    arming-vocabulary-silent-on-clean = vocabularyArming.clean == [ ];
+    arming-vocabulary-names-stale = vocabularyArming.stale == [ "alpha.gone [host]" ];
   };
   gateKeys = actualKeys ++ [
     "roster-ok"
@@ -569,6 +788,11 @@ in
     "arming-drift-names-unpinned"
     "arming-pin-covers-roster"
     "retired-refusing"
+    "surface-vocabulary"
+    "vocabulary-register-live"
+    "arming-vocabulary-names-planted"
+    "arming-vocabulary-silent-on-clean"
+    "arming-vocabulary-names-stale"
   ];
   # Raw, for `nix eval ./ci#lib.mkGenLibsEval --json | jq`.
   keyCount = builtins.length actualKeys;
@@ -598,7 +822,11 @@ in
     surfaceHashes
     surfaceDrift
     surfaceDriftNames
+    vocabularyUnregistered
+    vocabularyStale
+    vocabularyArming
     ;
+  vocabularyRegister = map (e: "${showEntry e}: ${e.clause}") vocabularyRegister;
   bucketCounts = builtins.listToAttrs (
     map (s: {
       name = s;

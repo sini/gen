@@ -36,7 +36,7 @@
 #     wrapping through a module here would re-introduce the wrapper the successor retired;
 #   * `realized` reads gen-delivery's `realize` (the layered fold; roster key `delivery`) over
 #     gen-delivery's own `project` result;
-#   * the default `nixos` terminal is gen-bind's `mkSystemTerminal` (crossing adapter set), bridged
+#   * the default `nixos` terminal is gen-bind's `mkHostedTerminal` (crossing adapter set), bridged
 #     to the fold's terminal contract by the hub-local `terminalOf` in the `let` — the owed
 #     consumer-side reconstruction of the retired `nixosSystem` sugar (corpus G1).
 # The body is otherwise the F1 carry.
@@ -278,7 +278,7 @@ let
     cfg.terminals
     // lib.optionalAttrs (cfg.nixpkgs != null && !(cfg.terminals ? nixos)) {
       nixos = terminalOf (
-        genBind.crossing.mkSystemTerminal {
+        genBind.crossing.mkHostedTerminal {
           evaluator = cfg.nixpkgs.lib.nixosSystem;
           locateConfig = a: a.config;
           class = "nixos";
@@ -450,7 +450,7 @@ in
         projection entry carries one — gen-delivery's projection never emits it).
         `bindings.node` is the resolved instance; `extent` is this class's realized set itself (a
         lazy cross-node accessor whose spine is the class's node keys). A default `nixos` terminal
-        (gen-bind's `mkSystemTerminal` over `config.gen.nixpkgs.lib.nixosSystem`, bridged to this
+        (gen-bind's `mkHostedTerminal` over `config.gen.nixpkgs.lib.nixosSystem`, bridged to this
         contract) is added unless `gen.nixpkgs` is null or this set already carries a `nixos`
         terminal. Read the realized artifacts back off `gen.realized.<class>` to wire non-nixos
         classes into flake outputs.
