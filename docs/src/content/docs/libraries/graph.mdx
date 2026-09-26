@@ -15,7 +15,7 @@ graph into a concrete data structure gen-graph controls. You keep your own repre
 just needs a way to ask it "what are this node's edges."
 
 It depends on nothing but gen-prelude. That makes it one of the roster's widest load-bearing
-libraries: gen-bind, gen-inspect, gen-memo, gen-scope, gen-settings, and gen-view all build on it
+libraries: gen-bind, gen-inspect, gen-memo, gen-schema, gen-scope, gen-settings, and gen-view all build on it
 directly, and gen-scope's well-founded engine consumes gen-graph's SCC partitioning rather than
 carrying a second one of its own.
 
