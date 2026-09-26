@@ -210,8 +210,10 @@ The `kindMatch` section adds its own gates, per fixture:
   conflates the two same-name kinds selects all n and reds here.
 - **ratio**, thunks AND alloc — `kind`/`attrs-ref` ≤ `KINDMATCH_THUNKS_MAX[fixture,n]` /
   `KINDMATCH_ALLOC_MAX[fixture,n]` at both sizes, each the measured anchor with margin 0.000 (migrated
-  0.972 / 0.991 at n=400 and 0.962 / 0.976 at n=1600; sealed 0.966 / 0.984 and 0.957 / 0.969; Nix
-  2.34.8, gen-select `2cd8c5d`, frozen gen-select `9285b5b`, gen-schema `a90bc54`). The thunk
+  0.973 / 0.991 at n=400 and 0.962 / 0.976 at n=1600; sealed 0.967 / 0.984 and 0.957 / 0.969; Nix
+  2.34.8, gen-select `2cd8c5d`, frozen gen-select `9285b5b`, gen-schema `a90bc54`; the two n=400
+  thunk bounds re-anchored at gen-identity `410261b`, whose per-mint refusal attribution costs the
+  two kinds' mints +275 thunks, a constant; den-hoag-xvww). The thunk
   headroom under each is the distance to the next printed step — 63 / 211 migrated, 159 / 1,373
   sealed — so a per-node cost the live gen-select adds to a `sel.kind` match reds it above ~0.16
   thunk/node (migrated), including cost in the matcher every selector shares, as does a rise of more
@@ -233,10 +235,13 @@ The `entityMatch` section adds its own:
   and reds here, which is what stock gen-schema `cfec60d` does.
 - **ratio**, thunks AND alloc, per fixture — `entity`/`attrs-ref` ≤
   `ENTITYMATCH_THUNKS_MAX[fixture,n]` / `ENTITYMATCH_ALLOC_MAX[fixture,n]`, the measured anchor with
-  margin 0.000 (migrated 1.300 / 1.114 at n=400, 1.296 / 1.105 at n=1600; sealed 1.305 / 1.119 and
-  1.300 / 1.110; Nix 2.34.8, gen-schema `9289268`, gen-select `410f517`, frozen gen-schema `2b7c2d3`,
-  frozen gen-select `9285b5b`). The migrated thunk headroom is 390 / 1,972 (~1 thunk/node), so the
-  identity module built per instance (+6 thunks/node) reds it (1.304 / 1.300 through
+  margin 0.000 (migrated 1.311 / 1.125 at n=400, 1.307 / 1.116 at n=1600; sealed 1.317 / 1.129 and
+  1.312 / 1.120; Nix 2.34.8, gen-identity `410261b`, gen-merge `aea02d1`, gen-schema `c4125d5`,
+  gen-select `410f517`, frozen gen-schema `2b7c2d3`, frozen gen-select `9285b5b`). The re-anchor holds
+  gen-identity's per-mint price (+16 thunks per instance for the stamp's three-label mint, plus a
+  constant; den-hoag-xvww); gen-merge `aea02d1` adds the last printed step of the migrated alloc
+  pair. The migrated thunk headroom is 31 / 1,144, so a +1-thunk-per-mint regression in gen-identity
+  reds it, as does the identity module built per instance (+6 thunks/node; 1.304 / 1.300 through
   `--at gen-schema=path:`, exit 6, measured at U2's anchor). The sealed thunk headroom is 10 / 629, so
   a gen-select that reads every node's kind before the stamp decides (+6 thunks/node) reds it (1.310 /
   1.304 through `--at gen-select=path:`), with both projections and the migrated ratios unchanged. The price the anchor holds: +24.0 thunks per instance for the
@@ -296,8 +301,8 @@ smaller of the two, truncated down to three places.
 | registry      | 2000 | alloc   |  0.631 | 0.101395 | 0.046820 |  0.023 | **0.654** |  0.90 |
 | lazyRegistry  | 2000 | thunks  |  0.777 | 0.108440 | 0.064373 |  0.032 | **0.809** |  0.90 |
 | lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** |  0.90 |
-| schemaHosts   | 1600 | thunks  |  1.207 | 0.197886 | 0.079462 |  0.000 | **1.207** | 1.210 |
-| schemaHosts   | 1600 | alloc   |  1.018 | 0.187996 | 0.057494 |  0.000 | **1.018** | 1.023 |
+| schemaHosts   | 1600 | thunks  |  1.146 | 0.197886 | 0.079462 |  0.000 | **1.146** | 1.207 |
+| schemaHosts   | 1600 | alloc   |  0.982 | 0.187996 | 0.057494 |  0.000 | **0.982** | 1.018 |
 | deepSubmodule | 1600 | thunks  |  0.575 | 0.105358 | 0.087229 |  0.043 | **0.618** |  0.90 |
 | deepSubmodule | 1600 | alloc   |  0.463 | 0.090347 | 0.065271 |  0.032 | **0.495** |  0.90 |
 | wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |   1.3 |
@@ -315,8 +320,16 @@ spine with a path-free walk instead of materialising every leaf path, and the ro
 gen-merge `d37deb6`; the bound returns to the promise rather than to anchor plus margin, so its
 margin column is empty.
 
+★ **`schemaHosts` is RE-ANCHORED at gen-identity `410261b`** (den-hoag-xvww): the row reads
+1.132 / 0.969 at the pre-relock pins and **1.146 / 0.982** at the relock that carries it. gen-identity
+alone reads 1.146 / 0.981: its mint names the kind and label in every refusal at +4 thunks per
+encoder instance, labels + 1 instances per mint, and nothing per value node; gen-merge `aea02d1`
+adds +24,112 B on the pure arm, the last printed alloc step. The bound moves to the landed figure at
+margin 0.000, a tightening. A +1-thunk-per-mint plant in gen-identity does not red this row (1.146 /
+0.982); it reds four `entityMatch` gates, which are the per-mint guard.
+
 ★ **Two of the twelve bounds are INTERIM, and this states what ends them.** `schemaHosts` thunks
-**1.207** and `schemaHosts` alloc **1.018** are what remains of the three that loosened (`scalar`
+and alloc (**1.207** / **1.018** when marked, **1.146** / **0.982** now) are what remains of the three that loosened (`scalar`
 thunks **0.902** was the third); they encode an **accepted, carried regression**, and they are the ceiling this project has
 agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
 anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for

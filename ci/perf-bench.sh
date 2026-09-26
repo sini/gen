@@ -287,8 +287,17 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # composition-plane claim is amended to this band and cites this bound back here.
 # RATCHETED to the figures read at the gen-merge d84ba687 pin (1.207 / 1.018, down from the
 # 1.210 / 1.023 band), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
-ROW_THUNKS_MAX[schemaHosts,1600]=1.207 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
-ROW_ALLOC_MAX[schemaHosts,1600]=1.018  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000: 1.132 / 0.969 at the
+# pre-relock pins, 1.146 / 0.982 at the relock that carries it. gen-identity names the kind and label
+# in every mint refusal, and its price is PER MINT, never per value node: +4 thunks per encoder
+# instance, labels + 1 instances per mint, so +12 thunks and +7 calls for a two-label mint. Measured
+# on this row, one member swapped at a time: gen-identity alone +38,563 thunks / +2,037,984 B on the
+# pure arm (0.981); gen-merge `aea02d1` +2 thunks / +24,112 B (0.00014, below a printed step), which
+# is what takes the alloc anchor to 0.982. A +1-thunk-per-mint plant in gen-identity reads 1.146 /
+# 0.982 here and does NOT red this row (measured at this re-anchor); entityMatch is the per-mint guard
+# (below). A tightening of the xzchx INTERIM 1.207 / 1.018, in the direction its return clause asks.
+ROW_THUNKS_MAX[schemaHosts,1600]=1.146 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+ROW_ALLOC_MAX[schemaHosts,1600]=0.982  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.495
@@ -399,14 +408,22 @@ OVERRIDEWARM_RATIO_MAX=0.30
 KINDMATCH_SMALL=400
 KINDMATCH_BIG=1600
 declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
-# migrated, n=400  — anchors 0.972 / 0.991 (409,362 / 421,003 thunks; 21,893,984 / 22,103,664 B).
-KINDMATCH_THUNKS_MAX[migrated,400]=0.972
+# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000: the two kinds' mints cost
+# +275 thunks, a CONSTANT at both sizes, which moves the two n=400 thunk ratios one printed step
+# (0.972 → 0.973, 0.966 → 0.967; kind 408,851 / 409,422 against attrs-ref 420,215 / 423,531 thunks at
+# the relock, headroom 228 / 344). The cost is gen-identity's per-mint price (+12 thunks and +7 calls
+# per two-label mint), not gen-select's: gen-select's lib is unmoved. The other bounds print unchanged,
+# except sealed n=1600 alloc, NOT moved here: it reads 0.970 only when gen-identity (+16,368 B on
+# kind-sealed) and gen-merge `aea02d1` (+126,512 / +122,416 B on kind-sealed / attrs-ref-sealed)
+# combine, and each alone reads 0.969 — so it is not gen-identity's price alone (den-hoag-ez1yq).
+# migrated, n=400  — anchors 0.973 / 0.991.
+KINDMATCH_THUNKS_MAX[migrated,400]=0.973
 KINDMATCH_ALLOC_MAX[migrated,400]=0.991
 # migrated, n=1600 — anchors 0.962 / 0.976 (1,602,162 / 1,664,803 thunks; 85,042,560 / 87,154,096 B).
 KINDMATCH_THUNKS_MAX[migrated,1600]=0.962
 KINDMATCH_ALLOC_MAX[migrated,1600]=0.976
-# sealed, n=400    — anchors 0.966 / 0.984 (409,945 / 424,319 thunks; 21,910,240 / 22,276,000 B).
-KINDMATCH_THUNKS_MAX[sealed,400]=0.966
+# sealed, n=400    — anchors 0.967 / 0.984.
+KINDMATCH_THUNKS_MAX[sealed,400]=0.967
 KINDMATCH_ALLOC_MAX[sealed,400]=0.984
 # sealed, n=1600   — anchors 0.957 / 0.969 (1,602,745 / 1,675,319 thunks; 85,058,752 / 87,748,320 B).
 KINDMATCH_THUNKS_MAX[sealed,1600]=0.957
@@ -446,8 +463,8 @@ KINDMATCH_ALLOC_MAX[sealed,1600]=0.969
 # ratio at the landing: Nix 2.34.8, gen-schema `9289268`, gen-select `410f517`, frozen gen-schema
 # `2b7c2d3`, frozen gen-select `9285b5b`. ratio() prints %.3f, so the headroom is the distance from the
 # exact anchor to the next printed step: migrated thunks 390 / 1,972 (n=400 / 1600), alloc 20,702 /
-# 60,871 B; sealed thunks 10 / 629, alloc 23,439 / 131,663 B. ★ The sealed n=400 thunk headroom is
-# TEN thunks: any constant added to the sealed entity path reds it, by the margin law, not by noise.
+# 60,871 B; sealed thunks 10 / 629, alloc 23,439 / 131,663 B (at (β); the gen-identity `410261b`
+# re-anchor below restates them).
 # (β)'s own price over `9791baf`: +12 thunks constant on the migrated fixture (the kind key the
 # selector now carries); the sealed arm adds the node's kind key and one `kindEq` on the one match.
 #
@@ -468,18 +485,29 @@ ENTITYMATCH_BIG=1600
 ENTITYMATCH_DIGEST_ENTITY=6b6d42a882aa4068cc0009757746a29fd06a3ee757c08a55f179af91c2e88055
 ENTITYMATCH_DIGEST_REF=b4d8cf97c0d1bfa8fe91136ed4d1fe56610ae23dadb1a30ecfd6df7f31a796a1
 declare -A ENTITYMATCH_THUNKS_MAX ENTITYMATCH_ALLOC_MAX
-# migrated, n=400  — anchors 1.300 / 1.114 (746,604 / 574,390 thunks; 37,451,712 / 33,622,624 B).
-ENTITYMATCH_THUNKS_MAX[migrated,400]=1.300
-ENTITYMATCH_ALLOC_MAX[migrated,400]=1.114
-# migrated, n=1600 — anchors 1.296 / 1.105 (2,950,404 / 2,277,190 thunks; 147,246,544 / 133,249,584 B).
-ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.296
-ENTITYMATCH_ALLOC_MAX[migrated,1600]=1.105
-# sealed, n=400    — anchors 1.305 / 1.119 (749,856 / 574,390 thunks; 37,617,088 / 33,622,624 B).
-ENTITYMATCH_THUNKS_MAX[sealed,400]=1.305
-ENTITYMATCH_ALLOC_MAX[sealed,400]=1.119
-# sealed, n=1600   — anchors 1.300 / 1.110 (2,960,856 / 2,277,190 thunks; 147,842,000 / 133,249,584 B).
-ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.300
-ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.110
+# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000. gen-identity names the kind
+# and label in every mint refusal; its price is PER MINT and never per value node: +4 thunks per
+# encoder instance, labels + 1 instances per mint, so +12 thunks and +7 calls for a two-label mint
+# and +16 thunks for the stamp's three-label one. Measured here, one member swapped at a time:
+# gen-identity alone moves entity +6,675 / +25,875 thunks (migrated) and +6,663 / +25,863 (sealed),
+# i.e. +16 per instance plus a constant, and attrs-ref (which runs no library under test) is
+# unmoved. Every other member of the relock together moves entity +2 thunks and +7,056 / +28,208 B
+# (migrated) — gen-merge `aea02d1` — which is below a printed step alone, and takes the migrated
+# alloc anchors from 1.124 / 1.115 (gen-identity alone) to 1.125 / 1.116. Headroom to the next
+# printed step: migrated thunks 31 / 1,144, sealed 237 / 2,090 — so a +1-thunk-per-mint regression
+# in gen-identity (+400 at n=400) reds the migrated fixture.
+# migrated, n=400  — anchors 1.311 / 1.125 (753,281 / 574,390 thunks; 37,814,800 / 33,622,624 B).
+ENTITYMATCH_THUNKS_MAX[migrated,400]=1.311
+ENTITYMATCH_ALLOC_MAX[migrated,400]=1.125
+# migrated, n=1600 — anchors 1.307 / 1.116 (2,976,281 / 2,277,190 thunks; 148,649,792 / 133,249,584 B).
+ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.307
+ENTITYMATCH_ALLOC_MAX[migrated,1600]=1.116
+# sealed, n=400    — anchors 1.317 / 1.129 (756,521 / 574,390 thunks; 37,976,080 / 33,622,624 B).
+ENTITYMATCH_THUNKS_MAX[sealed,400]=1.317
+ENTITYMATCH_ALLOC_MAX[sealed,400]=1.129
+# sealed, n=1600   — anchors 1.312 / 1.120 (2,986,721 / 2,277,190 thunks; 149,237,056 / 133,249,584 B).
+ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.312
+ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.120
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
@@ -802,9 +830,9 @@ for fx in migrated sealed; do
     KM_AR[$fx,$n]=$(ratio "${ALLOC[kindMatch,$n,kind$sfx]}" "${ALLOC[kindMatch,$n,attrs-ref$sfx]}")
     KM_CR[$fx,$n]=$(ratio "${CPU[kindMatch,$n,kind$sfx]}" "${CPU[kindMatch,$n,attrs-ref$sfx]}")
     lte "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}" \
-      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref thunks expected≤${KINDMATCH_THUNKS_MAX[$fx,$n]} actual=${KM_TR[$fx,$n]} delta=$(delta "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}") — the live gen-select's kind path costs more per node")
+      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref thunks expected≤${KINDMATCH_THUNKS_MAX[$fx,$n]} actual=${KM_TR[$fx,$n]} delta=$(delta "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}") — the kind path costs more: the live gen-select per node, or a kind's mint price (gen-schema's mark, gen-identity's mint)")
     lte "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}" \
-      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref alloc expected≤${KINDMATCH_ALLOC_MAX[$fx,$n]} actual=${KM_AR[$fx,$n]} delta=$(delta "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}") — the live gen-select's kind path allocates more per node")
+      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref alloc expected≤${KINDMATCH_ALLOC_MAX[$fx,$n]} actual=${KM_AR[$fx,$n]} delta=$(delta "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}") — the kind path allocates more: the live gen-select per node, or a kind's mint price (gen-schema's mark, gen-identity's mint)")
   done
   for s in "attrs-ref$sfx" "kind$sfx"; do
     KM_LIN[$s]=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,$s]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,$s]}")
@@ -844,9 +872,9 @@ for fx in migrated sealed; do
     EM_AR[$fx,$n]=$(ratio "${ALLOC[entityMatch,$n,entity$sfx]}" "${ALLOC[entityMatch,$n,attrs-ref$sfx]}")
     EM_CR[$fx,$n]=$(ratio "${CPU[entityMatch,$n,entity$sfx]}" "${CPU[entityMatch,$n,attrs-ref$sfx]}")
     lte "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}" \
-      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref thunks expected≤${ENTITYMATCH_THUNKS_MAX[$fx,$n]} actual=${EM_TR[$fx,$n]} delta=$(delta "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}") — the entity path costs more per node")
+      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref thunks expected≤${ENTITYMATCH_THUNKS_MAX[$fx,$n]} actual=${EM_TR[$fx,$n]} delta=$(delta "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}") — the entity path costs more per node (gen-schema's stamp, or gen-identity's per-mint price)")
     lte "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}" \
-      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref alloc expected≤${ENTITYMATCH_ALLOC_MAX[$fx,$n]} actual=${EM_AR[$fx,$n]} delta=$(delta "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}") — the entity path allocates more per node")
+      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref alloc expected≤${ENTITYMATCH_ALLOC_MAX[$fx,$n]} actual=${EM_AR[$fx,$n]} delta=$(delta "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}") — the entity path allocates more per node (gen-schema's stamp, or gen-identity's per-mint price)")
   done
   for s in "attrs-ref$sfx" "entity$sfx"; do
     EM_LIN[$s]=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_BIG,$s]}" "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,$s]}")
