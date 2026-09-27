@@ -304,7 +304,11 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86) reads 1.157 / 0.991 locally
 # (Nix 2.34.8 and Determinate 3.22.5) and 1.157 / 0.992 on the CI runner's Determinate (hub CI run
 # 36228440647 on fcb8a69); the alloc bound is the larger measured figure, still margin 0.000.
-ROW_THUNKS_MAX[schemaHosts,1600]=1.157 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+# RE-ANCHORED thunks 1.157 → 1.163, margin 0.000 (den-hoag-ez1yq relock 32, R8 default; alloc unmoved,
+# 0.991): bisect by root-lock arm on the relock-32 candidate (host evaluator): gen-scope a650104 (kinds minted by a staged
+# fold) reads 1.158, + gen-scope 67b690c (the quotient accessor) 1.163; gen-graph e10c49d does not
+# red this row.
+ROW_THUNKS_MAX[schemaHosts,1600]=1.163 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 ROW_ALLOC_MAX[schemaHosts,1600]=0.992  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
@@ -429,7 +433,9 @@ declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
 # gen-merge's w1k40/jzatq/2f4gm). Priced and re-anchored under owner sitting item R8's default
 # (den-hoag-xwhq4): a correctness fix's stated, re-anchored price is not an xzchx regression.
 # migrated, n=400  — anchors 0.973 / 0.991.
-KINDMATCH_THUNKS_MAX[migrated,400]=0.973
+# RE-ANCHORED thunks 0.973 → 0.974, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
+# a650104 (kinds minted by a staged fold) alone; neither 67b690c nor gen-graph e10c49d moves it.
+KINDMATCH_THUNKS_MAX[migrated,400]=0.974
 KINDMATCH_ALLOC_MAX[migrated,400]=0.991
 # migrated, n=1600 — anchors 0.962 / 0.976 (1,602,162 / 1,664,803 thunks; 85,042,560 / 87,154,096 B).
 # RE-ANCHORED 0.962 / 0.976 → 0.963 / 0.977, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default):
@@ -438,7 +444,9 @@ KINDMATCH_ALLOC_MAX[migrated,400]=0.991
 KINDMATCH_THUNKS_MAX[migrated,1600]=0.963
 KINDMATCH_ALLOC_MAX[migrated,1600]=0.977
 # sealed, n=400    — anchors 0.967 / 0.984.
-KINDMATCH_THUNKS_MAX[sealed,400]=0.967
+# RE-ANCHORED thunks 0.967 → 0.968, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
+# 67b690c (the quotient accessor); a650104 and gen-graph e10c49d leave it at 0.967.
+KINDMATCH_THUNKS_MAX[sealed,400]=0.968
 KINDMATCH_ALLOC_MAX[sealed,400]=0.984
 # sealed, n=1600   — anchors 0.957 / 0.970 (1,602,745 / 1,675,319 thunks; 85,050,064 / 87,719,184 B).
 # RE-ANCHORED thunks 0.957 → 0.958, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default): crosses
@@ -523,19 +531,27 @@ declare -A ENTITYMATCH_THUNKS_MAX ENTITYMATCH_ALLOC_MAX
 #       +0.010 more; the full landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86)
 #       reads the anchors below.
 # migrated, n=400  — 1.311 / 1.125 → 1.326 / 1.137.
-ENTITYMATCH_THUNKS_MAX[migrated,400]=1.326
+# RE-ANCHORED (den-hoag-ez1yq relock 32, R8 default), bisect by root-lock arm on the relock-32 candidate (host evaluator):
+#   gen-scope a650104 (kinds minted by a staged fold) +0.001 to +0.002 on every fixture; + gen-scope
+#   67b690c (the quotient accessor) about +0.006 more; gen-graph e10c49d (the key-former door) alone
+#   moves only sealed n=400, 1.331 → 1.332. Alloc unmoved.
+# migrated, n=400  — 1.326 → 1.334.
+ENTITYMATCH_THUNKS_MAX[migrated,400]=1.334
 ENTITYMATCH_ALLOC_MAX[migrated,400]=1.137
 # migrated, n=1600 — anchors 1.307 / 1.116 (2,976,281 / 2,277,190 thunks; 148,649,792 / 133,249,584 B).
 # migrated, n=1600 — 1.307 / 1.116 → 1.321 / 1.128.
-ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.321
+# migrated, n=1600 — 1.321 → 1.329.
+ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.329
 ENTITYMATCH_ALLOC_MAX[migrated,1600]=1.128
 # sealed, n=400    — anchors 1.317 / 1.129 (756,521 / 574,390 thunks; 37,976,080 / 33,622,624 B).
 # sealed, n=400    — 1.317 / 1.129 → 1.331 / 1.142.
-ENTITYMATCH_THUNKS_MAX[sealed,400]=1.331
+# sealed, n=400    — 1.331 → 1.339.
+ENTITYMATCH_THUNKS_MAX[sealed,400]=1.339
 ENTITYMATCH_ALLOC_MAX[sealed,400]=1.142
 # sealed, n=1600   — anchors 1.312 / 1.120 (2,986,721 / 2,277,190 thunks; 149,237,056 / 133,249,584 B).
 # sealed, n=1600   — 1.312 / 1.120 → 1.326 / 1.133.
-ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.326
+# sealed, n=1600   — 1.326 → 1.334.
+ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.334
 ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.133
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG

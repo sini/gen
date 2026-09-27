@@ -419,7 +419,11 @@ let
     # gen-scope e64c00719a → e355bb866a (den-hoag-n6dh7 Unit 1, the recursive NTA channel): the
     # surface gained FOUR names, `childDepth`, `decodeNta`, `flattenChildren` and `mintNtaId`.
     # Nothing was removed and no other member moved.
-    scope = "09a4a0e6afa73fb847dca869add3572755a190edfae37a8641ae26eb8bbfe1c7";
+    #
+    # gen-scope f5f2b6550c → a650104f6f (kinds minted by a staged fold): the surface lost ONE name,
+    # `isKindSet`, the registry provenance test the fold made redundant. Nothing was added and no
+    # other member moved.
+    scope = "314c8d80846abb1c2cb290afa2a6eadcfc870dbaffc870870d6d79f3490d36c3";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
