@@ -29,8 +29,10 @@
 # ── THE ARMING IS IN THE CELL, AND IT GATES ──
 # Three seeded defects are evaluated here on every run, each a DELTA against the live reading printed
 # beside it: a member repointed to another member's repository, a member repointed to a node that
-# does not exist, and the HUB-SCOPED path form this lock cannot serve. A guard that can no longer
-# fire is not a passing guard, so an arming failure exits 1 even where a reading would only print.
+# does not exist, and the HUB-SCOPED path form this lock cannot serve. A fourth arm drives the scan
+# holding `lock` to the entry's own over seeded TEXT, since no lock mutation reaches it. A guard
+# that can no longer fire is not a passing guard, so an arming failure exits 1 even where a reading
+# would only print.
 {
   gen,
   lib,
@@ -41,15 +43,17 @@ let
   roster = gen.lib.mkGenLibs { };
   rosterKeys = builtins.attrNames (builtins.removeAttrs roster [ "strata" ]);
 
-  # The lock the entry defaults against. `../default.nix` reads `./flake.lock` — the ROOT lock, not
-  # this directory's — so from here that is one level up, and it is read as data exactly as the entry
-  # reads it. The ci lock beside this file is the TEST graph's own pin source and is no longer what
-  # the entry resolves through (ADR-0037 as amended 2026-09-15).
-  lock = builtins.fromJSON (builtins.readFile ../flake.lock);
+  # The lock the entry defaults against — the ROOT lock `../default.nix` reads, taken from the record
+  # the entry hands `wire` rather than read a second time here. A second read is a second copy that
+  # can fall out of step with the entry's: the ci lock beside this file names the same members at
+  # other revisions, so a read of it passes every `locked.repo` comparison below while resolving
+  # through the TEST graph's pin source (ADR-0037 as amended 2026-09-15). The gate's
+  # `entry-lock-is-read-through-the-seam` holds this binding to that one shape.
+  lock = seam.lock;
 
   # THE SEAM READ. `dep = segs: segs` makes each default evaluate to its own path instead of an
-  # import; `wire = args: args` hands back the record the body builds. One application yields both
-  # halves — the map and the entry's own resolver.
+  # import; `wire = args: args` hands back the record the body builds. One application yields all
+  # three — the map, the entry's own resolver and the lock that resolver runs over.
   seam = import "${gen}" {
     dep = segs: segs;
     wire = args: args;
@@ -154,6 +158,37 @@ let
   seededWrongRepo = readingOn lockWrongRepo;
   seededMissingNode = readingOn lockMissingNode;
 
+  # ── WHICH LOCK — what `locked.repo` cannot see ──
+  # Every reading above compares a repository NAME, and two locks naming one repository at two
+  # revisions agree on it, so they cannot tell which lock `lock` read. Measured 2026-09-16
+  # (`specs/2026-09-15-gen-pin-source-split-spec.md` §2.2): a member's test left reading the ci lock
+  # after its entry moved to the root lock stayed green. There is no independently declared revision
+  # to compare against, so the guard is on this FILE'S OWN TEXT: `lock` is bound exactly once, to
+  # `seam.lock`. It scans the COMPLEMENT of that one shape rather than the defect's spelling — every
+  # binding of `lock` is captured and any other right-hand side is offending, so a path bound a
+  # statement earlier, an aliased `readFile` and a read moved into a second file red alike; the
+  # leading class keeps `lockWrongRepo =` out, `[^=;]` keeps `lock ==` out, and `seamBound` counts
+  # the permitted shape itself, so a binding moved into an `inherit` reds on its absence. Comments
+  # are stripped first: the prose above names `lock` and `flake.lock` freely.
+  lockBindingNeedle = "(^|[^[:alnum:]_'-])lock[[:space:]]*=([^=;][^;]*);";
+  lockBindingsOf =
+    text:
+    let
+      rhss = map (m: builtins.elemAt m 1) (
+        builtins.filter builtins.isList (
+          builtins.split lockBindingNeedle (
+            builtins.concatStringsSep "" (builtins.filter builtins.isString (builtins.split "#[^\n]*" text))
+          )
+        )
+      );
+      isSeam = rhs: builtins.match "[[:space:]]*seam[.]lock[[:space:]]*" rhs != null;
+    in
+    {
+      offending = builtins.length (builtins.filter (rhs: !isSeam rhs) rhss);
+      seamBound = builtins.length (builtins.filter isSeam rhss);
+    };
+  lockProvenance = lockBindingsOf (builtins.readFile ./hub-entry.nix);
+
   arming = {
     inherit controlMember donorMember;
     seededWrongRepo = {
@@ -176,6 +211,21 @@ let
       ofCount = builtins.length rosterKeys;
       inherit rootInputNames;
     };
+    # Each way a second read of the lock comes back, and the permitted shape. ASSEMBLED, NOT
+    # WRITTEN: every fixture binding is split inside `lock`, so the live scan of this file does not
+    # read the fixtures as bindings of its own.
+    lockProvenance = builtins.mapAttrs (_: lockBindingsOf) {
+      permitted = "  lo" + "ck = seam.lock;\n";
+      ciLock = "  lo" + "ck = builtins.fromJSON (builtins.readFile ./flake.lock);\n";
+      reflowed =
+        "  lo" + "ck =\n    builtins.fromJSON\n      (builtins.readFile\n        ../flake.lock);\n";
+      pathBound =
+        "  lockPath = ../flake.lock;\n  lo" + "ck = builtins.fromJSON (builtins.readFile lockPath);\n";
+      aliased =
+        "  readLock = builtins.readFile;\n  lo" + "ck = builtins.fromJSON (readLock ../flake.lock);\n";
+      secondFile = "  lo" + "ck = import ./lock-reader.nix;\n";
+      inherited = "  inherit (import ./lock-reader.nix) lock;\n";
+    };
   };
 
   gate = {
@@ -195,6 +245,13 @@ let
     # member's (ADR-0037 as amended 2026-09-15).
     entry-paths-are-member-scoped = live.notMemberScoped == [ ];
 
+    # The lock every reading above runs over is the entry's own, bound once and through the seam.
+    entry-lock-is-read-through-the-seam =
+      lockProvenance == {
+        offending = 0;
+        seamBound = 1;
+      };
+
     # ── ARMING — a guard that cannot fire is not a passing guard ──
     arming-wrong-repository =
       arming.seededWrongRepo.named
@@ -209,6 +266,19 @@ let
       arming.pathForm.hubScopedReaches == 0
       && arming.pathForm.memberScopedReaches == arming.pathForm.ofCount
       && arming.pathForm.ofCount == live.memberCount;
+
+    arming-lock-provenance =
+      builtins.mapAttrs (_: r: r.offending) arming.lockProvenance == {
+        permitted = 0;
+        ciLock = 1;
+        reflowed = 1;
+        pathBound = 1;
+        aliased = 1;
+        secondFile = 1;
+        inherited = 0;
+      }
+      && arming.lockProvenance.permitted.seamBound == 1
+      && arming.lockProvenance.inherited.seamBound == 0;
   };
 in
 {
@@ -233,6 +303,6 @@ in
       correctCount
       ;
 
-    inherit arming;
+    inherit arming lockProvenance;
   };
 }

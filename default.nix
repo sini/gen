@@ -77,13 +77,19 @@ in
   # publishes WHETHER a formal has a default and never WHAT it is, and a formal is an INPUT channel
   # that cannot carry a value outward — so the only place a member NAME and its resolved PATH are
   # both in scope is this file's argument TO `wire`, and `resolve` leaves by that same argument
-  # rather than by a fourth formal. `wire` RECEIVES `{ deps, resolve }`, and `./lib/mkGenLibs.nix`
+  # rather than by a fourth formal. `wire` RECEIVES `{ deps, resolve, lock }`, and `./lib/mkGenLibs.nix`
   # sees only whatever `wire` chooses to hand it — here `deps`, but only because the default below
   # reads it that way. A cell injecting `dep = segs: segs` alongside `wire = args: args` reads this
   # shim's own member-to-path map AND its own resolver directly, with nothing fetched, no path
   # restated and no fold transcribed. The record destructures with no `...`, so a drifted body shape
   # is loud at the default.
-  wire ? { deps, resolve }: import ./lib/mkGenLibs.nix deps,
+  wire ?
+    {
+      deps,
+      resolve,
+      lock,
+    }:
+    import ./lib/mkGenLibs.nix deps,
   algebra ? inputs.gen-algebra or (dep [ "gen-algebra" ]),
   aspects ? inputs.gen-aspects or (dep [ "gen-aspects" ]),
   assemble ? inputs.gen-assemble or (dep [ "gen-assemble" ]),
@@ -147,5 +153,5 @@ let
   forced = builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) deps) null;
 in
 builtins.seq forced (wire {
-  inherit deps resolve;
+  inherit deps resolve lock;
 })
