@@ -17,7 +17,7 @@ jobs:
   # key sets and every non-identity field). `id_hash` is the ADR-0016 excluded axis — no forward
   # golden pin can carry the new encoding, so it is held by a teeth arm on the PURE engine instead.
   evaluators:
-    uses: sini/gen-harness/.github/workflows/evaluators.yml@f1483f5b27a788f92556e268e8d37dda2177680e
+    uses: sini/gen-harness/.github/workflows/evaluators.yml@9af27e315ccd5171a00c480fa6c5b9c01de23755
     with:
       # `.` is the ROOT flake, the bare `nix flake check` every member repository runs. Its `roster`
       # output is what carries the check — forcing the roster to names depth reds on an unhealthy
@@ -41,8 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: "disabled"
       - run: nix run ./ci#perf-bench
 
   # Reported, gated by nothing (den-hoag-6fmmb): the ADR-0006 sole-evaluator scan. A refusal is the
@@ -55,8 +57,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: "disabled"
       - run: nix run ./ci#sole-evaluator-report
 
   # Trust surface: the cited fleet numbers still agree with their own arithmetic (pure jq over the
@@ -65,6 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: "disabled"
       - run: nix run ./ci#fleet-consistency
