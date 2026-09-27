@@ -429,7 +429,12 @@ let
     # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
     # surface gained ONE name, `identityGuard`, the step-indexed guard that bounds type nesting for
     # identity. Nothing was removed and no other member moved.
-    types = "c65360ca4734e07b2e5a8992fad8237f4358400633f4a202e89ef26c5ba41754";
+    #
+    # gen-types 048dd55fb → ef69ea948 (the construction-payload reader, taken by the lock-currency
+    # relock): the surface gained ONE name, `payloadOf`, the certifying reader of a checker's
+    # `__payload`. Nothing was removed. gen-merge re-exports it inside its `types` namespace only,
+    # so its own published names did not move.
+    types = "175d4758b46a1aed56241a1e7948001776c17039c762bf53305d3a845a464559";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.

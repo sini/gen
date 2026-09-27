@@ -32,8 +32,11 @@ Every constructor returns a record:
   verify;  # value -> null | errString      (null = ok)
   check;   # v: v2: throws verify's error on failure, else returns v2
   __name;  # base name with polymorphic metadata stripped ("listOf")
+  __nameWithin;  # budget -> the name within that many bytes
   __mint;  # tagged identity regime
   __id;    # the accessor for a consumer demanding an identity
+  __payload;  # the mint's preimage { ctor; args; }, read-only, never identity; read it with `payloadOf`
+  __okAt;  # composites only: the guard bounding type nesting for the mint
 }
 ```
 
