@@ -388,7 +388,10 @@ let
     # gen-merge 88919f8 → 50250c1 (den-hoag-bfc0k): the surface gained ONE name, `closuresFirst`,
     # the comparison subject of a value that can carry a type record. Nothing was removed.
     merge = "fc9aa174dc8be63b816fe6a7ec1487ed839b14fcf8dd007aff55a2e7e013b54f";
-    prelude = "b8cbf955917bd58ef8cfc78720762b88e704a9ba43623e603155cd7e128e400c";
+    # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
+    # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
+    # other member moved.
+    prelude = "de3a4efc30630ad7d4d546a1c25e624bc83b81e4c3a411bb36d624eab7fa3072";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
