@@ -341,17 +341,19 @@ n=1600 thunks to 0.963 and `entityMatch` thunks up about +0.012; the full landin
 0.958, `entityMatch` migrated 1.326 / 1.137 (n=400) and 1.321 / 1.128 (n=1600), sealed 1.331 / 1.142
 and 1.326 / 1.133. Every other bound is unchanged. ① and ② in the table are not re-derived.
 
-★ **Two of the twelve bounds are INTERIM, and this states what ends them.** `schemaHosts` thunks
-and alloc (**1.207** / **1.018** when marked, **1.157** / **0.992** now) are what remains of the three that loosened (`scalar`
-thunks **0.902** was the third); they encode an **accepted, carried regression**, and they are the ceiling this project has
-agreed not to exceed **while the `564ad1c` cost stands** — not a target it is aiming at. The prior
-anchors are preserved in the 2026-07-05 `fdbf140` block below, retained rather than overwritten, for
-exactly this purpose. **The marking ends when those two gated counters return toward the `fdbf140`
-anchors and these two bounds are tightened back**; `den-hoag-restore-perf-promises-xzchx` owes that
-restoration and `den-hoag-fvphc` §4 Q1 carries the unrepaired cost itself. The other nine bounds
-TIGHTEN and are not interim. **This is a separate debt from the stale publication**: `BENCHMARKS.md`'s
-2026-07-04 composition-plane table is also wrong, for reasons this isolation does not account for, and
-restoring the perf promises would not repair it.
+★ **The two INTERIM bounds are retired (2026-09-27).** `schemaHosts` thunks and alloc (**1.207** /
+**1.018** when marked, **1.163** / **0.992** at the last interim reading) were what remained of the three
+that loosened; `scalar` thunks returned to **0.90** at `ab05306`. They encoded an accepted, carried
+regression, a ceiling rather than a target, and `den-hoag-restore-perf-promises-xzchx` owed their
+restoration. gen-schema `ffdf8ec` holds `_identity` as one `lazyAttrsOf (listOf str)` leaf closed to
+`keys` by its `apply`, where it had been a submodule evaluating a nested module per instance, with its
+own `declarationGuard` walk and `driveKnot`, to hold one list. The row reads **0.892** / **0.789** (Nix
+2.34.8), and both bounds are the **0.90** promise again. ADR-0033 and ADR-0006 hold: a module-shaped
+`_identity` definition refuses by name at the leaf's domain, and no evaluator is added. The prior anchors
+stay in the 2026-07-05 `fdbf140` block below. `den-hoag-fvphc` §4 Q1 carries the engine's own `564ad1c`
+cost, which this does not touch. **This is a separate debt from the stale publication**:
+`BENCHMARKS.md`'s 2026-07-04 composition-plane table is also wrong, for reasons this isolation does not
+account for, and restoring the perf promises did not repair it.
 
 **What every bound still catches, as one claim:** a regression costing half of the cheaper of the
 two constructions this engine change is calibrated on, on that row and that counter. Half rather

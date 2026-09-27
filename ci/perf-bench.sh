@@ -308,8 +308,15 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # 0.991): bisect by root-lock arm on the relock-32 candidate (host evaluator): gen-scope a650104 (kinds minted by a staged
 # fold) reads 1.158, + gen-scope 67b690c (the quotient accessor) 1.163; gen-graph e10c49d does not
 # red this row.
-ROW_THUNKS_MAX[schemaHosts,1600]=1.163 # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
-ROW_ALLOC_MAX[schemaHosts,1600]=0.992  # INTERIM (xzchx): ends on a return toward the fdbf140 anchor
+# RESTORED to the original 0.90 on both counters (xzchx arm 4, gen-schema ffdf8ec: `_identity` is one
+# `lazyAttrsOf (listOf str)` leaf closed to `keys` by its `apply`, not a submodule evaluating a nested
+# module per instance with its own declaration guard and knot). Read 0.890 / 0.786 on the host evaluator
+# (Nix 2.34.8) at hub b48c1d0 with that gen-schema; the thunk ratio is 0.890 under nix, Determinate and
+# Lix alike. The bound is the restored promise, as scalar's was at ab05306, not ANCHOR + MARGIN; the
+# ratchet to a derived anchor reads its alloc figure off CI's Determinate log, because the local
+# Determinate binary's allocation diverges from CI's. A tightening; the bounds are no longer interim.
+ROW_THUNKS_MAX[schemaHosts,1600]=0.90
+ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.495

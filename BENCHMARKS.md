@@ -32,22 +32,22 @@ Post-fix pure-gen vs the nixpkgs reference stack, median cpu on den composition 
 
 ### The live reading — current pins
 
-Every figure below is derived from the regenerated live regression report at the bottom of this page, at the gated (largest) size of each workload. **If the two ever disagree, the live report is right and this table is stale.** `thunks×`/`alloc×` here are the reciprocals of the live report's three-decimal `p/r` ratios, rounded to two places — with one stated exception: `schemaHosts` alloc reciprocates to 1.005 and is published as **1.00**, parity rather than a 0.5% win.
+Every figure below is derived from the regenerated live regression report at the bottom of this page, at the gated (largest) size of each workload. **If the two ever disagree, the live report is right and this table is stale.** `thunks×`/`alloc×` here are the reciprocals of the live report's three-decimal `p/r` ratios, rounded to two places.
 
 ★ **The two conventions on this page are RECIPROCALS OF ONE PAIR, and reading them as independent comparisons has already inverted a conclusion.** This section prints `nixpkgs ÷ pure-gen` (higher = pure wins); the live report prints `thunks p/r` / `alloc p/r`, which is `pure ÷ ref` (lower = pure wins). **`ref` IS the pinned nixpkgs.lib stack** — `ci/perf-bench.nix` builds the reference provider over `srcs.nixpkgs-lib` and its header says so outright (*"PURE … vs REFERENCE (frozen original gen-schema on pinned nixpkgs.lib evalModules)"*). So `thunks× = 1 ÷ (thunks p/r)`, and the same for allocation. There is one comparison here, written in two directions.
 
-| workload      |    n | thunks× | alloc× | reading                                                    |
-| ------------- | ---: | ------: | -----: | ---------------------------------------------------------- |
-| deepSubmodule | 1600 |   1.74× |  2.16× | pure lower on both                                         |
-| registry      | 2000 |   1.29× |  1.58× | pure lower on both                                         |
-| lazyRegistry  | 2000 |   1.29× |  1.58× | pure lower on both                                         |
-| scalar        | 8000 |   1.10× |  1.32× | pure lower on both                                         |
-| wideFreeform  | 8000 |   0.91× |  1.24× | **pure HIGHER on thunks**; lower on allocation             |
-| schemaHosts   | 1600 |   0.85× |  1.00× | **pure HIGHER on thunks**; allocation is parity, not a win |
-| aspects       | 1600 |       — |      — | **not measurable** — no reference arm exists               |
-| startup       |    1 |       — |      — | `n=1` fixed cost; there is no per-item slope to compare    |
+| workload      |    n | thunks× | alloc× | reading                                                 |
+| ------------- | ---: | ------: | -----: | ------------------------------------------------------- |
+| deepSubmodule | 1600 |   1.74× |  2.16× | pure lower on both                                      |
+| registry      | 2000 |   1.29× |  1.58× | pure lower on both                                      |
+| lazyRegistry  | 2000 |   1.29× |  1.58× | pure lower on both                                      |
+| scalar        | 8000 |   1.10× |  1.32× | pure lower on both                                      |
+| wideFreeform  | 8000 |   0.91× |  1.24× | **pure HIGHER on thunks**; lower on allocation          |
+| schemaHosts   | 1600 |   1.12× |  1.27× | pure lower on both                                      |
+| aspects       | 1600 |       — |      — | **not measurable** — no reference arm exists            |
+| startup       |    1 |       — |      — | `n=1` fixed cost; there is no per-item slope to compare |
 
-**The claim, bounded to these rows and split by counter.** Scaling is linear on both stacks — every workload in the live report's linearity table grows **3.95–4.00×** across a ×4 size step, on both counters, gated ≤ 5.5 (the dedicated `classShare` and `overrideWarm` arms below run 3.93–4.00× on the same step). **On allocation**, pure-gen's per-item slope is lower on five of the six measurable rows, from 1.24× to 2.16×; the sixth, `schemaHosts` at 1.00×, is parity to within 0.5% and is **not** counted as a win. **On thunks**, pure-gen is lower on four of six and **higher on two** — `wideFreeform` by ~10% and `schemaHosts` by ~17%. `lazyRegistry` is counted in both of those tallies on its **single-size ratio**, not on a derived slope: it runs at one size only, as the next paragraph states. The two are not the same kind of fact: `wideFreeform` thunks is by design and gated as a stated parity band, because freeform absorption is thunk-parity with nixpkgs; `schemaHosts` thunks is a carried regression, marked below. `startup` is excluded from all of this by construction — at `n=1` there is no per-item slope — and must not be read as a counterexample.
+**The claim, bounded to these rows and split by counter.** Scaling is linear on both stacks — every workload in the live report's linearity table grows **3.95–4.00×** across a ×4 size step, on both counters, gated ≤ 5.5 (the dedicated `classShare` and `overrideWarm` arms below run 3.93–4.00× on the same step). **On allocation**, pure-gen's per-item slope is lower on all six measurable rows, from 1.24× to 2.16×. **On thunks**, pure-gen is lower on five of six and **higher on one** — `wideFreeform`, by ~10%, which is by design and gated as a stated parity band, because freeform absorption is thunk-parity with nixpkgs. `lazyRegistry` is counted in both of those tallies on its **single-size ratio**, not on a derived slope: it runs at one size only, as the next paragraph states. `schemaHosts` was the second thunk row until 2026-09-27, a carried regression; its end is recorded below. `startup` is excluded from all of this by construction — at `n=1` there is no per-item slope — and must not be read as a counterexample.
 
 **These ratios do stand as *slope* statements for the five workloads that run at two sizes, and here is why.** Those five run at two sizes in the live report, so the per-item slope ratio is recoverable from the ratio at each size plus the pure-side growth: with `pure(n) = a + s·n` on both stacks, `s_pure/s_ref = (g − 1) ÷ (g/r_big − 1/r_small)`. Across those five workloads and both counters that quantity differs from the large-`n` ratio by at most **0.002** — the measured ratio barely moves with size. `lazyRegistry` and `startup` run at one size only and carry no such derivation.
 
@@ -55,15 +55,15 @@ Every figure below is derived from the regenerated live regression report at the
 
 **`scalar` is published at `n=16000`; the current matrix runs `n=2000` and `n=8000` only.** The 1.10× above is a different cell from the published 1.27×, not a refresh of it.
 
-### The `schemaHosts` thunk cost is INTERIM — and this is what ends it
+### The `schemaHosts` thunk cost was INTERIM — and it has ended
 
-★ **Recorded 2026-09-21, widened from the open-owner-item note this section used to carry.** At the current pins `schemaHosts` reads **1.171** pure ÷ nixpkgs thunks, so the audit table's `1.75×` inverts to ≈ **0.85×** on its own stated convention, and the row is now gated as a **stated band** rather than as a win (`ci/perf-bench.sh`, `ROW_THUNKS_MAX[schemaHosts,1600]`; what the band buys — ADR-0033's refusal-by-name and ADR-0006's one evaluator — is recorded in [`ci/README.md`](ci/README.md)'s 2026-09-21 baseline block). Whether the *published claim* moved with the gate was the owner's to decide and **was decided on 2026-09-21: amend the published claim.** This section is that amendment; the regenerated live report below is always the current reading.
+★ **Recorded 2026-09-21; ended 2026-09-27.** At the 2026-09-21 pins `schemaHosts` read **1.171** pure ÷ nixpkgs thunks, so the audit table's `1.75×` inverted to ≈ **0.85×** on its own stated convention, and the row was gated as a **stated band** rather than as a win (`ci/perf-bench.sh`, `ROW_THUNKS_MAX[schemaHosts,1600]`). The owner decided on 2026-09-21 to amend the published claim, and this section was that amendment; the regenerated live report below is always the current reading.
 
-**What "interim" names, precisely.** The one-engine consolidation (ADR-0008 §1, gen-merge `564ad1c`) moved every pure/ref row, and three of the twelve gated assertions crossed the old shared `COUNTER_RATIO_MAX = 0.90` and were re-based to per-row derived bounds: `scalar` thunks **0.912**, `schemaHosts` thunks **1.210**, `schemaHosts` alloc **1.023**. **Read those three as a ceiling this project has agreed not to exceed while the regression stands — never as a target it is aiming at.** The other nine bounds tightened. The prior anchors are preserved, not overwritten, in [`ci/README.md`](ci/README.md)'s retained **2026-07-05 `fdbf140`** baseline block, because a dated walk is what makes cumulative drift readable rather than arguable.
+**What "interim" named.** The one-engine consolidation (ADR-0008 §1, gen-merge `564ad1c`) moved every pure/ref row, and three of the twelve gated assertions crossed the old shared `COUNTER_RATIO_MAX = 0.90` and were re-based to per-row derived bounds: `scalar` thunks **0.912**, `schemaHosts` thunks **1.210**, `schemaHosts` alloc **1.023**, each a ceiling this project agreed not to exceed while the regression stood, never a target. The prior anchors are preserved, not overwritten, in [`ci/README.md`](ci/README.md)'s retained **2026-07-05 `fdbf140`** baseline block.
 
-**The termination condition, so that "interim" is falsifiable rather than permanent:** the marking ends when those three gated counters return toward the `fdbf140` anchors and the three loosened bounds are tightened back. `den-hoag-restore-perf-promises-xzchx` owes that restoration; `den-hoag-fvphc` §4 Q1 carries the unrepaired cost itself, and is open.
+**How it ended.** `scalar` thunks returned to **0.90** at `ab05306` (gen-merge `63ae058`'s path-free declaration walk). The `schemaHosts` pair returned at gen-schema `ffdf8ec`: `_identity` is one `lazyAttrsOf (listOf str)` leaf closed to `keys` by its `apply`, where it had been a submodule evaluating a nested module per instance to hold one list. The row reads **0.892** / **0.789** (Nix 2.34.8), and both bounds are **0.90** again, with ADR-0033's refusal-by-name and ADR-0006's one evaluator intact. `den-hoag-restore-perf-promises-xzchx` owed this restoration; `den-hoag-fvphc` §4 Q1 carries the engine's own `564ad1c` cost, which it does not touch.
 
-★ **Two debts, two owners — and restoring the perf promises does NOT repair the table above.** The carried `564ad1c` cost is one debt. The other is that the audit table's `registry`, `lazyRegistry`, `scalar` and `aspects` rows are stale for reasons the `564ad1c` isolation does not account for — a different harness, a size the current matrix does not run, and a reference arm that no longer exists — and every one of them would still be wrong if the regression were repaired tomorrow. Nothing here asks any gate to move: every figure on this page is measured **inside** the current bounds, and `nix run ./ci#perf-bench` exits **0**.
+★ **Two debts, two owners — and restoring the perf promises did NOT repair the table above.** The carried `564ad1c` cost was one debt. The other is that the audit table's `registry`, `lazyRegistry`, `scalar` and `aspects` rows are stale for reasons the `564ad1c` isolation does not account for — a different harness, a size the current matrix does not run, and a reference arm that no longer exists — and every one of them is still wrong now that the `schemaHosts` regression is repaired. Nothing here asks any gate to move: every figure on this page is measured **inside** the current bounds, and `nix run ./ci#perf-bench` exits **0**.
 
 ### Dedicated workloads — the spine skip and the warm re-eval
 
@@ -265,37 +265,40 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 ### combination under test
 
-| key             | axis      | source                   | rev / path   | leak  |
-| --------------- | --------- | ------------------------ | ------------ | ----- |
-| gen-algebra     | member    | baseline (ci/flake.lock) | 57b12aa948be | —     |
-| gen-aspects     | member    | baseline (ci/flake.lock) | 8fca7bd100f7 | —     |
-| gen-class       | member    | baseline (ci/flake.lock) | 8bd9ba8af016 | —     |
-| gen-identity    | member    | baseline (ci/flake.lock) | cc367de0526e | —     |
-| gen-memo        | member    | baseline (ci/flake.lock) | c08125d06a92 | graph |
-| gen-merge       | member    | baseline (ci/flake.lock) | ce193e0139a8 | —     |
-| gen-prelude     | member    | baseline (ci/flake.lock) | ffea6a9681ca | —     |
-| gen-schema      | member    | baseline (ci/flake.lock) | 5da15b1b42db | —     |
-| gen-schema-orig | reference | baseline (ci/flake.lock) | 2b7c2d39ad30 | —     |
-| gen-scope       | member    | baseline (ci/flake.lock) | ac56cb85efc2 | graph |
-| gen-types       | member    | baseline (ci/flake.lock) | d01507be8d85 | —     |
-| nixpkgs-lib     | reference | baseline (ci/flake.lock) | db3f255737b9 | —     |
+| key             | axis      | source                   | rev / path   | leak |
+| --------------- | --------- | ------------------------ | ------------ | ---- |
+| gen-algebra     | member    | baseline (flake.lock)    | d6fa371eff11 | —    |
+| gen-aspects     | member    | baseline (flake.lock)    | 4a16a88e890d | —    |
+| gen-class       | member    | baseline (flake.lock)    | 634557d2bbe1 | —    |
+| gen-graph       | member    | baseline (flake.lock)    | 978f618e592e | —    |
+| gen-identity    | member    | baseline (flake.lock)    | 980632a00c9f | —    |
+| gen-memo        | member    | baseline (flake.lock)    | 4c7ad2ab15ca | —    |
+| gen-merge       | member    | baseline (flake.lock)    | 7d8b4373f818 | —    |
+| gen-prelude     | member    | baseline (flake.lock)    | 0e2d39ddfb1a | —    |
+| gen-schema      | member    | baseline (flake.lock)    | 63c9637eb608 | —    |
+| gen-schema-orig | reference | baseline (ci/flake.lock) | 2b7c2d39ad30 | —    |
+| gen-scope       | member    | baseline (flake.lock)    | 98ca7a4d405d | —    |
+| gen-select      | member    | baseline (flake.lock)    | a3b866b5c437 | —    |
+| gen-select-orig | reference | baseline (ci/flake.lock) | 9285b5b8264a | —    |
+| gen-types       | member    | baseline (flake.lock)    | 4723edb3d02e | —    |
+| nixpkgs-lib     | reference | baseline (ci/flake.lock) | db3f255737b9 | —    |
 
-> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member's OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: striking "prelude" from the environment fires on 5 of 8 applied entries. Entries that are not functions, so they declare no formals to read: gen-algebra, gen-identity, gen-prelude, nixpkgs-lib. The two reference keys do not take --at, because a ratio's denominator is its control.
+> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member's OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: striking "prelude" from the environment fires on 6 of 11 applied entries. Entries that are not functions, so they declare no formals to read: gen-algebra, gen-identity, gen-prelude, nixpkgs-lib. The three reference keys do not take --at, because a ratio's denominator is its control.
 
 | workload      |    n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 | ------------- | ---: | ----------: | -----------: | ------: | ---------: | --------: | ------ |
-| startup       |    1 |       0.009 |        0.087 |   9.579 |      0.976 |     1.578 | ok     |
-| scalar        | 2000 |       0.031 |        0.103 |   3.278 |      0.912 |     0.761 | ok     |
-| scalar        | 8000 |       0.103 |        0.151 |   1.473 |      0.912 |     0.756 | ok     |
-| registry      |  500 |       0.048 |        0.112 |   2.327 |      0.777 |     0.633 | ok     |
-| registry      | 2000 |       0.165 |        0.207 |   1.257 |      0.776 |     0.630 | ok     |
-| lazyRegistry  | 2000 |       0.171 |        0.205 |   1.201 |      0.777 |     0.631 | ok     |
-| schemaHosts   |  400 |       0.065 |        0.155 |   2.402 |      1.170 |     0.995 | ok     |
-| schemaHosts   | 1600 |       0.233 |        0.339 |   1.457 |      1.171 |     0.995 | ok     |
-| wideFreeform  | 2000 |       0.028 |        0.108 |   3.848 |      1.095 |     0.810 | ok     |
-| wideFreeform  | 8000 |       0.079 |        0.150 |   1.888 |      1.096 |     0.806 | ok     |
-| deepSubmodule |  400 |       0.207 |        0.193 |   0.935 |      0.576 |     0.463 | ok     |
-| deepSubmodule | 1600 |       1.617 |        0.502 |   0.310 |      0.575 |     0.463 | ok     |
+| startup       |    1 |       0.008 |        0.013 |   1.661 |      1.149 |     1.456 | ok     |
+| scalar        | 2000 |       0.031 |        0.028 |   0.912 |      0.886 |     0.727 | ok     |
+| scalar        | 8000 |       0.094 |        0.074 |   0.784 |      0.884 |     0.723 | ok     |
+| registry      |  500 |       0.047 |        0.044 |   0.942 |      0.705 |     0.560 | ok     |
+| registry      | 2000 |       0.171 |        0.127 |   0.742 |      0.704 |     0.557 | ok     |
+| lazyRegistry  | 2000 |       0.168 |        0.130 |   0.774 |      0.701 |     0.556 | ok     |
+| schemaHosts   |  400 |       0.064 |        0.069 |   1.083 |      0.897 |     0.795 | ok     |
+| schemaHosts   | 1600 |       0.221 |        0.235 |   1.062 |      0.892 |     0.789 | ok     |
+| wideFreeform  | 2000 |       0.026 |        0.031 |   1.201 |      1.097 |     0.809 | ok     |
+| wideFreeform  | 8000 |       0.087 |        0.075 |   0.864 |      1.096 |     0.805 | ok     |
+| deepSubmodule |  400 |       0.207 |        0.116 |   0.561 |      0.523 |     0.407 | ok     |
+| deepSubmodule | 1600 |       1.882 |        0.435 |   0.231 |      0.523 |     0.406 | ok     |
 
 > Every ratio-gated row carries its OWN bound, derived from its measured anchor plus a margin smaller than the cheaper of the two constructions the one-engine consolidation introduced on it (the derivation is in perf-bench.sh beside each constant, the record in ci/README.md). wideFreeform thunks ride a parity band (gate ≤ 1.096) rather than a win-gate, because freeform absorption is thunk-parity with nixpkgs. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of 3 interleaved samples). See ci/README.md.
 
@@ -303,8 +306,8 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload |    n | pure cpu (s) | pure thunks | pure alloc |
 | -------- | ---: | -----------: | ----------: | ---------: |
-| aspects  |  400 |        0.158 |     1031297 |   49416528 |
-| aspects  | 1600 |        0.384 |     4115597 |  196912416 |
+| aspects  |  400 |        0.097 |     1044071 |   49160464 |
+| aspects  | 1600 |        0.340 |     4164971 |  195876800 |
 
 > These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
 > track a grammar that moves by design ruling, so such a gate would red on ruled improvements
@@ -314,30 +317,54 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload      | sizes       | thunk growth | alloc growth |
 | ------------- | ----------- | -----------: | -----------: |
-| scalar        | 2000 → 8000 |        3.970 |        3.954 |
-| registry      | 500 → 2000  |        3.985 |        3.970 |
-| schemaHosts   | 400 → 1600  |        3.985 |        3.979 |
-| aspects       | 400 → 1600  |        3.991 |        3.985 |
-| wideFreeform  | 2000 → 8000 |        3.964 |        3.949 |
-| deepSubmodule | 400 → 1600  |        3.996 |        3.992 |
+| scalar        | 2000 → 8000 |        3.964 |        3.954 |
+| registry      | 500 → 2000  |        3.980 |        3.970 |
+| schemaHosts   | 400 → 1600  |        3.962 |        3.949 |
+| aspects       | 400 → 1600  |        3.989 |        3.984 |
+| wideFreeform  | 2000 → 8000 |        3.958 |        3.954 |
+| deepSubmodule | 400 → 1600  |        3.995 |        3.991 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ 0.30)
 
 | n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 | ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
-| 400  |     2006428 |       343963 |      0.171 |     0.175 |   0.490 | ok        |
-| 1600 |     8008828 |      1359763 |      0.170 |     0.173 |   0.312 | ok        |
+| 400  |     1817306 |       312978 |      0.172 |     0.177 |   0.277 | ok        |
+| 1600 |     7250906 |      1233978 |      0.170 |     0.174 |   0.211 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): pure-full 3.992×, pure-fixed 3.953× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): pure-full 3.990×, pure-fixed 3.943× (gate ≤ 5.5)
 
 ### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ 0.30 on thunks + alloc)
 
 | n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
 | ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
-| 400  |     2029198 |      489544 |      0.241 |     0.252 |   0.583 | ok        |
-| 1600 |     8097598 |     1927744 |      0.238 |     0.248 |   0.395 | ok        |
+| 400  |     1840076 |      449378 |      0.244 |     0.245 |   0.356 | ok        |
+| 1600 |     7339676 |     1763978 |      0.240 |     0.241 |   0.296 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): cold 3.991×, warm 3.938× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): cold 3.989×, warm 3.925× (gate ≤ 5.5)
+
+### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)
+
+| fixture  | n    | attrs-ref thunks | kind thunks | thunks k/a (≤) | alloc k/a (≤) | cpu k/a | byte gate |
+| -------- | ---- | ---------------: | ----------: | -------------: | ------------: | ------: | --------- |
+| migrated | 400  |           429517 |      418159 |  0.974 (0.974) | 0.991 (0.991) |   0.992 | ok        |
+| migrated | 1600 |          1697317 |     1634959 |  0.963 (0.963) | 0.976 (0.977) |   0.917 | ok        |
+| sealed   | 400  |           432833 |      418734 |  0.967 (0.968) | 0.984 (0.984) |   0.952 | ok        |
+| sealed   | 1600 |          1707833 |     1635534 |  0.958 (0.958) | 0.970 (0.970) |   0.958 | ok        |
+
+thunk linearity (400 → 1600, ×4 step): attrs-ref 3.952×, kind 3.910×, attrs-ref-sealed 3.946×, kind-sealed 3.906× (gate ≤ 5.5)
+arming (planted per-node recompute, n=400): kind/attrs-ref thunks 5.336, alloc 6.530 — must exceed 0.974
+
+### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)
+
+| fixture  | n    | attrs-ref thunks | entity thunks | thunks e/a (≤) | alloc e/a (≤) | cpu e/a | projection |
+| -------- | ---- | ---------------: | ------------: | -------------: | ------------: | ------: | ---------- |
+| migrated | 400  |           574392 |        572282 |  0.996 (1.334) | 0.884 (1.137) |   1.364 | ok         |
+| migrated | 1600 |          2277192 |       2250482 |  0.988 (1.329) | 0.872 (1.128) |   1.190 | ok         |
+| sealed   | 400  |           574392 |        575526 |  1.002 (1.339) | 0.889 (1.142) |   1.312 | ok         |
+| sealed   | 1600 |          2277192 |       2260926 |  0.993 (1.334) | 0.877 (1.133) |   1.161 | ok         |
+
+thunk linearity (400 → 1600, ×4 step): attrs-ref 3.965×, entity 3.932×, attrs-ref-sealed 3.965×, entity-sealed 3.928× (gate ≤ 5.5)
+arming (planted per-instance kind re-derivation, n=400): entity/attrs-ref thunks 7.008, alloc 6.819 — must exceed 1.334
 
 ALL GATES PASSED (parity + ratio + linearity)
 
