@@ -303,8 +303,8 @@ smaller of the two, truncated down to three places.
 | lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** |  0.90 |
 | schemaHosts   | 1600 | thunks  |  1.157 | 0.197886 | 0.079462 |  0.000 | **1.157** | 1.146 |
 | schemaHosts   | 1600 | alloc   |  0.992 | 0.187996 | 0.057494 |  0.000 | **0.992** | 0.982 |
-| deepSubmodule | 1600 | thunks  |  0.575 | 0.105358 | 0.087229 |  0.043 | **0.618** |  0.90 |
-| deepSubmodule | 1600 | alloc   |  0.463 | 0.090347 | 0.065271 |  0.032 | **0.495** |  0.90 |
+| deepSubmodule | 1600 | thunks  |  0.643 | 0.105358 |  retired |  0.000 | **0.643** | 0.618 |
+| deepSubmodule | 1600 | alloc   |  0.595 | 0.090347 |  retired |  0.000 | **0.595** | 0.495 |
 | wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |   1.3 |
 | wideFreeform  | 8000 | alloc   |  0.806 | 0.000154 | 0.000090 |  0.000 | **0.806** |  0.90 |
 
@@ -314,6 +314,17 @@ replaces. `scalar` moves down from the pre-channel figure 0.912 / 0.756 to 0.902
 `schemaHosts` from its 1.210 / 1.023 band to 1.207 / 1.018. A bound moving down is a tightening and
 needs no licence (below). ① and ② on those rows are the 7516886 measurements and are not re-derived;
 the other eight rows are unchanged.
+
+★ **`deepSubmodule` is RE-DERIVED for the Unit 2 engine and RATCHETED** (den-hoag-n6dh7; owner
+ruling 2026-09-28, ADR-0032 ruling 5). Unit 2 makes every nested tree an `nta` child of one
+`scope.eval`, so ② (a `scope.eval` per nested tree) is no longer paid on this row and the margin is
+0.000; ① is the 7516886 measurement, not re-derived. The anchor is read at gen-merge `0c49041`
+(arm (B), L5c, den-hoag-9d80v and den-hoag-1n12c, on the relock-38 mains). The loosening's licence is the reader-API spike
+(`den-ag-design/reports/den-hoag-n6dh7-reader-api-spike-v0.md`: no lever reaches 0.618 / 0.495) and
+the owner's reading. **The ratchet is mechanical:** `ROW_RATCHET` makes a reading BELOW the bound
+refuse as `ratchet:` until the bound is lowered to it in the same change, so the bound follows every
+reduction down (the gen-merge nesting-side rebuild, den-hoag-i4c0n, is where one is expected) and
+never moves up without a fresh owner reading.
 
 ★ **`scalar` thunks is RESTORED to the original 0.90.** gen-merge `63ae058` forces the declaration
 spine with a path-free walk instead of materialising every leaf path, and the row reads **0.883** at
@@ -598,7 +609,8 @@ of its own the first time someone measures what its cost is made of.
 
 **The rule is one-sided on purpose.** It licenses a bound to move UP; a bound moving DOWN is a
 tightening and needs no licence. Note what that does and does not cover: it governs the BOUND, not
-the CANDIDATE, and a candidate whose gated counters fall is not refused by anything in this file.
+the CANDIDATE, and a candidate whose gated counters fall is not refused by anything in this file,
+except on a `ROW_RATCHET` row (`deepSubmodule`), where the bound must fall with it.
 
 Where the five cannot be produced, **the bound does not move and the change does not land**
 *(defaulted, reversible)*. Where they can, the loosening takes the recommendation and is banked for

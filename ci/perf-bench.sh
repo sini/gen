@@ -318,8 +318,25 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 ROW_THUNKS_MAX[schemaHosts,1600]=0.90
 ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.618
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.495
+# RE-DERIVED for the Unit 2 engine (den-hoag-n6dh7; owner ruling 2026-09-28, ADR-0032 ruling 5 "re-
+# derived when the engine changes"), 0.618 / 0.495 → 0.643 / 0.595, margin 0.000, RATCHETED.
+# The old anchor and margin measured ② `driveKnot`, one `scope.eval` per nested tree; Unit 2 retires
+# it (every nested tree is an `nta` child of ONE `scope.eval`, ADR-0006 / ADR-0008 §1), so ② is no
+# longer paid on this row and the rule gives margin 0.000, as on the rows where ② is ~free. ANCHOR:
+# read on hub ec614fa at gen-merge 0c49041 (Unit 2 with arm (B): a child reads its definitions off
+# its host's position record; L5c; den-hoag-9d80v, +0.001 alloc; den-hoag-1n12c), gen-scope ba726ef,
+# gen-schema 33e4dda, gen-aspects afd8972, host evaluator. The five
+# licensing items for this loosening: reports/den-hoag-n6dh7-reader-api-spike-v0.md (isolation by
+# per-arm curves; the named construction, the `nta` node at 214.8 thunks / 14,640 B per tree over a
+# plain knot; measured irreducibility, no lever reaches 0.618 / 0.495) and
+# reports/den-hoag-n6dh7-u2-armb-build-v0.md (both suites of each member at the anchor revs).
+# RATCHET: this row only ever tightens. A reading BELOW the bound refuses as `ratchet:` until the
+# bound is lowered to it in the same change (the gen-merge nesting-side rebuild, den-hoag-i4c0n, is
+# where it is expected to move); a reading above it refuses as every row does, and raising it needs
+# a fresh owner reading on top of the five licensing items.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.643
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.595
+declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
 # bound is WIDEFREEFORM_RATIO_MAX below, which carries that row's own claim.
@@ -772,6 +789,10 @@ for row in "${MATRIX[@]}"; do
     amax=${ROW_ALLOC_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
     lte "${TR[$w,$n]}" "$tmax" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $tmax")
     lte "${AR[$w,$n]}" "$amax" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $amax")
+    if [[ -n ${ROW_RATCHET[$w,$n]:-} ]]; then
+      lte "$tmax" "${TR[$w,$n]}" || FAILURES+=("ratchet: $w n=$n pure/ref thunks ${TR[$w,$n]} < $tmax — lower ROW_THUNKS_MAX[$w,$n] to ${TR[$w,$n]}")
+      lte "$amax" "${AR[$w,$n]}" || FAILURES+=("ratchet: $w n=$n pure/ref alloc ${AR[$w,$n]} < $amax — lower ROW_ALLOC_MAX[$w,$n] to ${AR[$w,$n]}")
+    fi
   elif has_tag "$tags" rb; then
     # wideFreeform: ALLOC is a win-gate, THUNKS ride a parity band — two different CLAIMS, which is
     # why the band keeps its own named constant and its own failure wording.

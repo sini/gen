@@ -387,7 +387,11 @@ let
     #
     # gen-merge 88919f8 → 50250c1 (den-hoag-bfc0k): the surface gained ONE name, `closuresFirst`,
     # the comparison subject of a value that can carry a type record. Nothing was removed.
-    merge = "fc9aa174dc8be63b816fe6a7ec1487ed839b14fcf8dd007aff55a2e7e013b54f";
+    #
+    # gen-merge 1b95c7e → 9be19f2 (den-hoag-n6dh7 Unit 2, den-hoag-1n12c): the surface gained ONE
+    # name, `moduleSyntax`, the reader's own structured/shorthand key lists, which gen-schema reads
+    # instead of restating them. Nothing was removed and no other member moved.
+    merge = "b04fc4bea43025bcd0ea5d318b7b2ae982a7e053a74eb9aa91e373f8c2ef4330";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
