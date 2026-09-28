@@ -331,11 +331,14 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # plain knot; measured irreducibility, no lever reaches 0.618 / 0.495) and
 # reports/den-hoag-n6dh7-u2-armb-build-v0.md (both suites of each member at the anchor revs).
 # RATCHET: this row only ever tightens. A reading BELOW the bound refuses as `ratchet:` until the
-# bound is lowered to it in the same change (the gen-merge nesting-side rebuild, den-hoag-i4c0n, is
-# where it is expected to move); a reading above it refuses as every row does, and raising it needs
-# a fresh owner reading on top of the five licensing items.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.643
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.595
+# bound is lowered to it in the same change; a reading above it refuses as every row does, and
+# raising it needs a fresh owner reading on top of the five licensing items.
+# RATCHETED 0.643 / 0.595 → 0.583 / 0.536 by the gen-merge nesting-side rebuild (den-hoag-i4c0n: the
+# walk reads the fold's own `typeDefs`, one discharge per nesting option; no freeform group without
+# a declared freeform type, decided by key; gen-merge `0010eb7` + `fa73591`). Re-read at relock 40's
+# hub, every member at its tip (gen-merge `f47c48a`, with gen-scope's L2 grammar), host evaluator.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.583
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.536
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
@@ -373,7 +376,11 @@ CLASSSHARE_RATIO_MAX=0.30
 # blocked A-then-B protocol this script no longer runs, and a figure a blocked protocol produced on this
 # host is not evidence about the subject. The same reasoning, with these figures, is written out in
 # ci/README.md's wideFreeform section; regenerate via `nix run ./ci#perf-bench`.
-WIDEFREEFORM_RATIO_MAX=1.096
+# RE-ANCHORED 1.096 → 1.097 (owner ruling on den-hoag-7gp66 G8, arm (a), 2026-09-28): the P2 door
+# price of gen-scope's L2 argument grammar, a CONSTANT +182 pure thunks per evaluation at gen-scope's
+# entry (750,941 → 751,123 at n=8000, the same +182 at n=2000; ref 684,857), linearity and alloc
+# unchanged. The cheaper path for gen-merge's knot is den-hoag-kvj78.
+WIDEFREEFORM_RATIO_MAX=1.097
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -578,6 +585,59 @@ ENTITYMATCH_ALLOC_MAX[sealed,400]=1.142
 ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.334
 ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.133
 
+# ── coordMatch (the PRODUCT COORDINATE's identity decision at scale; den-hoag-8hqx0) ──
+# `adapters.product.coord dim kind entry` decides as `sel.entity` does: the stamp, then — at an equal
+# stamp whose kind has sealed components — the context's per-dimension kind (`mkContext`'s `kinds`,
+# published once as the context field `coordKinds`) through `entityEq`. The node's kind is read ONLY
+# there, so the per-cell cost is unchanged from the bare-stamp arm it replaced (+0.000 thunks/cell and
+# +0.0 B/cell against stock on all three evaluators, den-hoag-8hqx0 §3a B1).
+#
+# STACKS. The numerator is `coord` (the LIVE gen-select, `coord "host" kH hosts.h0` over a context
+# carrying `kinds`). The denominator is `coord-ref`: the FROZEN gen-select (`gen-select-orig`, rev-pinned
+# in ci/flake.nix), whose two-argument `coord` compares the bare stamp, over its own mkContext. Both
+# stacks share one set of live gen-schema instances, so this row meters gen-select's coordinate arm
+# and nothing else; a cost in the stamp is common-mode here, and entityMatch meters it.
+#
+# 64 selectors each run over every cell (perf-bench.nix states why: with one, construction dilutes
+# the matcher below the ratio's printed precision). THREE GATES, entityMatch's. (1) PROJECTION: both
+# stacks select exactly `[ "h0" … "h63" ]`. (2) RATIO, thunks
+# AND alloc, coord/coord-ref ≤ the bound, per fixture and size. (3) LINEARITY on every stack.
+#
+# WHY ALLOC IS GATED (den-hoag-8hqx0 gate PF5). The rejected construction A — the kind projected into
+# every cell's `data` — is THUNK-NEUTRAL (+0.000/cell) and costs bytes only (+16.7 / +9.9 B/cell): a
+# thunk-only row passes it. Both plants were driven through `--at gen-select=path:` at the landing and
+# must exit non-zero: `plant-kindread` (the context kind read before the stamp decides, +3 thunks/cell)
+# and `plant-A` (construction A). ALLOC is GC-quantised and depends on the source PATH string (the
+# bank's perf-bench trap), so the anchor is read on a `path:` overlay and must be re-read at the relock
+# that lands gen-select's tip.
+#
+# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (xzchx). ANCHOR — measured at the landing: Nix 2.34.8, hub
+# ec614fa, gen-select 8hqx0 tip `5348baf` (`--at gen-select=path:`), frozen gen-select `9285b5b`:
+# migrated 815,275 / 814,878 thunks (n=400), 3,236,875 / 3,236,478 (n=1600) — the +397 is the constant
+# (64 kind keys and the context's `coordKinds`); sealed 819,976 / 818,096 and 3,248,776 / 3,246,896 —
+# the +1,880 is the 64 matching cells' `entityEq`. Constant, as the bound demands: +0.000 per cell.
+# The plants, same instrument, same paths' length: plant-kindread reads thunks 1.095 / 1.095 / 1.096 /
+# 1.095 and alloc 1.030-1.031; plant-A reads thunks IDENTICAL to the anchor (thunk-neutral) and alloc
+# 1.010 / 1.010 / 1.012 / 1.010, so only the alloc gate refuses it.
+# HEADROOM AT THE CONSTANT FLOOR (den-hoag-8hqx0 landing gate PF-b): migrated n=400 reds on any growth of
+# the numerator over 10 thunks or 556 B, CONSTANT (n=1600: 1,221 thunks / 58,935 B; sealed n=400: 165 /
+# 23,839 B). So a red here is not by itself a per-cell cost: compare the n=1600 and n=400 excesses over
+# coord-ref — a per-cell cost scales ×4 across the step, a constant does not. The FAILURES text says so.
+COORDMATCH_SMALL=400
+COORDMATCH_BIG=1600
+# sha256 of the JSON projection `[ "h0" … "h63" ]` (each of the 64 selectors selects its own cell),
+# both stacks.
+COORDMATCH_DIGEST=ec30bebff99631b2d8ef98e29a6403135aea466f4b4d1d2ab303d1dffefe77dc
+declare -A COORDMATCH_THUNKS_MAX COORDMATCH_ALLOC_MAX
+COORDMATCH_THUNKS_MAX[migrated,400]=1.000
+COORDMATCH_ALLOC_MAX[migrated,400]=1.000
+COORDMATCH_THUNKS_MAX[migrated,1600]=1.000
+COORDMATCH_ALLOC_MAX[migrated,1600]=1.000
+COORDMATCH_THUNKS_MAX[sealed,400]=1.002
+COORDMATCH_ALLOC_MAX[sealed,400]=1.002
+COORDMATCH_THUNKS_MAX[sealed,1600]=1.001
+COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
+
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
 CELL_ERRF=""
@@ -585,6 +645,7 @@ CELL_OUT=""
 declare -A LIN_SMALL LIN_BIG LIN_TG LIN_AG
 declare -A CS_TR CS_AR CS_CR CS_BG
 declare -A EM_TR EM_AR EM_CR EM_BG EM_LIN
+declare -A CM_TR CM_AR CM_CR CM_BG CM_LIN
 CS_LIN_FULL=""
 CS_LIN_FIXED=""
 declare -A OW_TR OW_AR OW_CR OW_BG
@@ -966,6 +1027,35 @@ if lte "$EM_PLANT_TR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"; 
   FAILURES+=("entityMatch arming: the planted per-instance re-derivation read entity/attrs-ref thunks $EM_PLANT_TR ≤ ${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]} — the bound cannot see the class this row exists for")
 fi
 
+# ── coordMatch — the product coordinate's identity decision at scale (den-hoag-8hqx0; the gate derivation is beside the constants) ──
+for fx in migrated sealed; do
+  sfx=""
+  [[ "$fx" == sealed ]] && sfx="-sealed"
+  for n in "$COORDMATCH_SMALL" "$COORDMATCH_BIG"; do
+    run_row coordMatch "$n" "coord-ref$sfx" "coord$sfx"
+    den="${DIG[coordMatch,$n,coord-ref$sfx]}"
+    num="${DIG[coordMatch,$n,coord$sfx]}"
+    if [[ "$num" == "$COORDMATCH_DIGEST" && "$den" == "$COORDMATCH_DIGEST" ]]; then
+      CM_BG[$fx,$n]="ok"
+    else
+      CM_BG[$fx,$n]="MISMATCH"
+      FAILURES+=("coordMatch projection gate ($fx): n=$n expected coord=coord-ref=$COORDMATCH_DIGEST actual coord=${num:-<none>} coord-ref=${den:-<none>} — the coordinate selects a different cell set")
+    fi
+    CM_TR[$fx,$n]=$(ratio "${THUNKS[coordMatch,$n,coord$sfx]}" "${THUNKS[coordMatch,$n,coord-ref$sfx]}")
+    CM_AR[$fx,$n]=$(ratio "${ALLOC[coordMatch,$n,coord$sfx]}" "${ALLOC[coordMatch,$n,coord-ref$sfx]}")
+    CM_CR[$fx,$n]=$(ratio "${CPU[coordMatch,$n,coord$sfx]}" "${CPU[coordMatch,$n,coord-ref$sfx]}")
+    lte "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}" \
+      || FAILURES+=("coordMatch ratio ($fx): n=$n coord/coord-ref thunks expected≤${COORDMATCH_THUNKS_MAX[$fx,$n]} actual=${CM_TR[$fx,$n]} delta=$(delta "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}") — the coordinate arm costs more: PER CELL (a kind read before the stamp decides) if the n=1600 excess over coord-ref is ~4× the n=400 excess, or a CONSTANT (per context or per selector; migrated n=400 has ~10 thunks of headroom) if the two are equal")
+    lte "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}" \
+      || FAILURES+=("coordMatch ratio ($fx): n=$n coord/coord-ref alloc expected≤${COORDMATCH_ALLOC_MAX[$fx,$n]} actual=${CM_AR[$fx,$n]} delta=$(delta "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}") — the coordinate arm allocates more: PER CELL (a per-cell kind projection) if the n=1600 excess over coord-ref is ~4× the n=400 excess, or a CONSTANT (per context or per selector; migrated n=400 has ~556 B of headroom) if the two are equal")
+  done
+  for s in "coord-ref$sfx" "coord$sfx"; do
+    CM_LIN[$s]=$(ratio "${THUNKS[coordMatch,$COORDMATCH_BIG,$s]}" "${THUNKS[coordMatch,$COORDMATCH_SMALL,$s]}")
+    lte "${CM_LIN[$s]}" "$GROWTH_MAX" \
+      || FAILURES+=("coordMatch linearity: $s thunks expected≤$GROWTH_MAX actual=${CM_LIN[$s]}× delta=$(delta "${CM_LIN[$s]}" "$GROWTH_MAX") over a 4× size step")
+  done
+done
+
 # ── report (pure printing from the computed values above) ──────────────────────
 emit_report() {
   echo
@@ -1097,6 +1187,23 @@ emit_report() {
     "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "${EM_LIN[attrs-ref]}" "${EM_LIN[entity]}" "${EM_LIN[attrs-ref-sealed]}" "${EM_LIN[entity-sealed]}" "$GROWTH_MAX"
   printf 'arming (planted per-instance kind re-derivation, n=%s): entity/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
     "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"
+  echo
+  echo "### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo
+  echo "| fixture | n | coord-ref thunks | coord thunks | thunks c/r (≤) | alloc c/r (≤) | cpu c/r | projection |"
+  echo "|---|---|---:|---:|---:|---:|---:|---|"
+  for fx in migrated sealed; do
+    sfx=""
+    [[ "$fx" == sealed ]] && sfx="-sealed"
+    for n in "$COORDMATCH_SMALL" "$COORDMATCH_BIG"; do
+      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[coordMatch,$n,coord-ref$sfx]}" "${THUNKS[coordMatch,$n,coord$sfx]}" \
+        "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}" "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}" "${CM_CR[$fx,$n]}" "${CM_BG[$fx,$n]}"
+    done
+  done
+  echo
+  printf 'thunk linearity (%s → %s, ×4 step): coord-ref %s×, coord %s×, coord-ref-sealed %s×, coord-sealed %s× (gate ≤ %s)\n' \
+    "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "${CM_LIN[coord-ref]}" "${CM_LIN[coord]}" "${CM_LIN[coord-ref-sealed]}" "${CM_LIN[coord-sealed]}" "$GROWTH_MAX"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"

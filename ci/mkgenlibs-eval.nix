@@ -704,6 +704,12 @@ let
       clause = "meaning cut: the hosted module system's value wins (ADR-0027, amended 2026-09-17), not a fleet object (ADR-0035)";
     }
     {
+      member = "scope";
+      at = "mintNtaId:host";
+      word = "host";
+      clause = "meaning cut: the NTA's hosting node — the node an `nta` child is minted under, the coordinate `decodeNta` answers (Vogt, Swierstra & Kuiper 1989; ADR-0008) — not a fleet object (ADR-0035); a record field since den-hoag-7gp66 P2 L2";
+    }
+    {
       member = "settings";
       at = "assembleHost";
       word = "host";

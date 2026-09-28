@@ -23,8 +23,8 @@
 # the bottom. The perf-bench.sh classShare section drives it in a DEDICATED loop, not the pure/ref matrix.
 {
   srcs, # { gen-prelude, gen-types, gen-merge, gen-memo, gen-scope, gen-algebra, gen-identity, gen-schema, gen-aspects, gen-select, gen-schema-orig, gen-select-orig, gen-class, nixpkgs-lib } — store paths as strings
-  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant"; entityMatch: "attrs-ref" | "entity" | "attrs-ref-sealed" | "entity-sealed" | "entity-plant")
-  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "entityMatch" | "preflight"
+  stack, # "pure" | "ref"  (aspects: "pure" only; classShare: "pure-full" | "pure-fixed"; overrideWarm: "cold" | "warm"; kindMatch: "attrs-ref" | "kind" | "attrs-ref-sealed" | "kind-sealed" | "kind-plant"; entityMatch: "attrs-ref" | "entity" | "attrs-ref-sealed" | "entity-sealed" | "entity-plant"; coordMatch: "coord-ref" | "coord" | "coord-ref-sealed" | "coord-sealed")
+  workload, # "startup" | "scalar" | "registry" | "lazyRegistry" | "schemaHosts" | "aspects" | "wideFreeform" | "deepSubmodule" | "classShare" | "overrideWarm" | "kindMatch" | "entityMatch" | "coordMatch" | "preflight"
   n,
 }:
 let
@@ -1026,6 +1026,82 @@ let
     in
     builtins.filter (id: sel.matches selector id ctx) nodes;
 
+  # ── coordMatch — the PRODUCT COORDINATE's identity decision at scale (den-hoag-8hqx0) ──
+  # `adapters.product.coord dim kind entry` decides an entity identity at one position, as
+  # `sel.entity` does: the stamp, then (equal stamp, kind with sealed components) the context's
+  # per-dimension kind through `entityEq`. The node's kind is read ONLY there, so the per-cell cost
+  # must not move; a gen-select that reads the context kind before the stamp decides, or that
+  # projects the kind into every cell's `data` (construction A, +10 to +17 B/cell), is the class this
+  # row exists for.
+  #
+  #   coord-ref    : THE DENOMINATOR, and it runs no gen-select under test: the FROZEN gen-select
+  #                  (`gen-select-orig`), whose `coord dim entry` compares the bare stamp, over its
+  #                  own `adapters.product.mkContext`. Projection: `[ "h0" … "h63" ]`.
+  #   coord        : `coord "host" kH hosts.hI` through the LIVE gen-select, over a context carrying
+  #                  `kinds.host = kH`, one selector per `h0`..`h63`. Projection: `[ "h0" … "h63" ]`.
+  #   *-sealed     : `addr` typed by nixpkgs `lib.types.str`, so the kind has a sealed component and the
+  #                  one matching cell reaches `entityEq`; without it a cost confined to that arm is
+  #                  invisible here.
+  #
+  # MATCH-DOMINATED, by construction: `m` = 64 coordinate selectors (`h0`..`h63`) each run over every
+  # cell, so the matcher's per-cell work is ~64x the per-cell construction it would otherwise be
+  # diluted in. With ONE selector, construction A's +16.7 B per `data` call is ~0.02% of a cell's
+  # allocation and reads 1.000 at the ratio's printed precision; the kind-read plant likewise.
+  #
+  # Both stacks build ONE set of live gen-schema instances, and a cell is its own coordinate tuple
+  # (`coordsFor = id: { host = hosts.${id}; }`, gen-product's `coordsOf` shape); gen-product is not a
+  # perf member and is not what this row meters. So a cost in gen-schema's stamp is COMMON-MODE here
+  # and lowers the ratio: entityMatch meters the stamp, this row meters gen-select's coordinate arm.
+  coordMatch =
+    let
+      isRef = stack == "coord-ref" || stack == "coord-ref-sealed";
+      sealedC = stack == "coord-ref-sealed" || stack == "coord-sealed";
+      sel = if isRef then genSelectOrig else genSelect;
+      P = sel.adapters.product;
+      kH =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = genSchemaNew.mkSchemaOption { };
+              config.schema.host.options.addr = genMerge.mkOption {
+                type = if sealedC then lib.types.str else genMerge.types.str;
+              };
+            }
+          ];
+        }).config.schema.host;
+      names = builtins.genList (i: "h${toString i}") n;
+      hosts =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.hosts = genSchemaNew.mkInstanceRegistry kH { };
+              config.hosts = builtins.listToAttrs (
+                map (x: {
+                  name = x;
+                  value.addr = x;
+                }) names
+              );
+            }
+          ];
+        }).config.hosts;
+      ctx = P.mkContext (
+        {
+          cellIds = names;
+          coordsFor = id: { host = hosts.${id}; };
+        }
+        // (if isRef then { } else { kinds.host = kH; })
+      );
+      m = 64;
+      selectors = builtins.genList (
+        i:
+        let
+          e = hosts."h${toString i}";
+        in
+        if isRef then P.coord "host" e else P.coord "host" kH e
+      ) m;
+    in
+    builtins.concatMap (selector: builtins.filter (id: sel.matches selector id ctx) names) selectors;
+
   projection =
     if workload == "preflight" then
       preflight
@@ -1037,6 +1113,8 @@ let
       kindMatch
     else if workload == "entityMatch" then
       entityMatch
+    else if workload == "coordMatch" then
+      coordMatch
     else
       workloads.${workload} P;
   json = builtins.toJSON projection;

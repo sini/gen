@@ -303,9 +303,9 @@ smaller of the two, truncated down to three places.
 | lazyRegistry  | 2000 | alloc   |  0.632 | 0.101548 | 0.046891 |  0.023 | **0.655** |  0.90 |
 | schemaHosts   | 1600 | thunks  |  1.157 | 0.197886 | 0.079462 |  0.000 | **1.157** | 1.146 |
 | schemaHosts   | 1600 | alloc   |  0.992 | 0.187996 | 0.057494 |  0.000 | **0.992** | 0.982 |
-| deepSubmodule | 1600 | thunks  |  0.643 | 0.105358 |  retired |  0.000 | **0.643** | 0.618 |
-| deepSubmodule | 1600 | alloc   |  0.595 | 0.090347 |  retired |  0.000 | **0.595** | 0.495 |
-| wideFreeform  | 8000 | thunks  |  1.096 | 0.000158 | 0.000215 |  0.000 | **1.096** |   1.3 |
+| deepSubmodule | 1600 | thunks  |  0.583 | 0.105358 |  retired |  0.000 | **0.583** | 0.643 |
+| deepSubmodule | 1600 | alloc   |  0.536 | 0.090347 |  retired |  0.000 | **0.536** | 0.595 |
+| wideFreeform  | 8000 | thunks  |  1.097 | 0.000158 | 0.000215 |  0.000 | **1.097** | 1.096 |
 | wideFreeform  | 8000 | alloc   |  0.806 | 0.000154 | 0.000090 |  0.000 | **0.806** |  0.90 |
 
 **The four `scalar` / `schemaHosts` rows are RATCHETED** (the lock-currency relock onto gen-merge
@@ -323,8 +323,10 @@ ruling 2026-09-28, ADR-0032 ruling 5). Unit 2 makes every nested tree an `nta` c
 (`den-ag-design/reports/den-hoag-n6dh7-reader-api-spike-v0.md`: no lever reaches 0.618 / 0.495) and
 the owner's reading. **The ratchet is mechanical:** `ROW_RATCHET` makes a reading BELOW the bound
 refuse as `ratchet:` until the bound is lowered to it in the same change, so the bound follows every
-reduction down (the gen-merge nesting-side rebuild, den-hoag-i4c0n, is where one is expected) and
-never moves up without a fresh owner reading.
+reduction down and never moves up without a fresh owner reading. The gen-merge nesting-side rebuild
+(den-hoag-i4c0n, gen-merge `0010eb7` + `fa73591`: one discharge per nesting option, no freeform group without a
+declared freeform type) moved it from 0.643 / 0.595 to **0.583 / 0.536**, the thunk half back under
+the pre-Unit-2 0.618.
 
 ★ **`scalar` thunks is RESTORED to the original 0.90.** gen-merge `63ae058` forces the declaration
 spine with a path-free walk instead of materialising every leaf path, and the row reads **0.883** at
@@ -499,7 +501,9 @@ absorption path. Its **thunk** ratio sits in a parity band rather than below a w
 freeform absorption rides the SAME per-key type merges nixpkgs.lib performs (the engine's thunk win is
 on DECLARED option paths), so thunk-parity is the honest contract on that counter (band-gated at
 `WIDEFREEFORM_RATIO_MAX`, re-derived 2026-09-21 to the anchor itself — deterministic 1.096, margin
-0.000, because both constructions of the one-engine consolidation are ~free on this shape; the former
+0.000, because both constructions of the one-engine consolidation are ~free on this shape; re-anchored
+at 1.097 by the owner's ruling of 2026-09-28 as the price of gen-scope's argument grammar, a constant
++182 pure thunks per evaluation with linearity and alloc unchanged; the former
 1.3 was 1.099 + ~18% headroom and was absorbing a +19% pure-side move in silence). Its **cpu** used to ride a band
 of its own (`0.95`, against the 0.85 win-gate) on the ground that the cell is tiny (~0.07s at n=8000)
 and therefore load-sensitive. That band is retired with the rest of the cpu gating, and its

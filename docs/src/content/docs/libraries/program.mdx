@@ -40,6 +40,6 @@ model = genProgram.model {
 };
 ```
 
-`engine.solve` takes `{ program, interpretation }`; the interpretation is a prior pass's verdicts,
+`engine.solve interpretation program` takes the program last; the interpretation is a prior pass's verdicts,
 crossing as themselves — a first pass supplies `[ ]` explicitly rather than falling back to an
 implicit default. No roster member currently builds on gen-program.
