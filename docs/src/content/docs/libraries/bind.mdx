@@ -29,11 +29,10 @@ resolves settings schemas through gen-bind's binding surface.
       genBind = gen-bind.lib;
     in {
       wrappedModule = (genBind.wrap {
-        module = { host, config, lib, ... }: {
-          networking.hostName = host.name;
-        };
         bindings = { host = { name = "igloo"; }; };
-      }).module;
+      } ({ host, config, lib, ... }: {
+        networking.hostName = host.name;
+      })).module;
     };
 }
 ```

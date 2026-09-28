@@ -142,11 +142,7 @@ let
     # The observation is spliced UNCONDITIONALLY — a result reached without an edit carries no
     # `trace` because the record says so (gen-memo `warmTrace`'s attachment rule), not because a
     # branch here says so.
-    projection
-    // warmTrace {
-      edited = traced;
-      decision = result.warmDecision;
-    };
+    projection // warmTrace traced result.warmDecision;
 in
 {
   # The public entry: a base compose — no warm context, no `trace`. `override` re-enters with the

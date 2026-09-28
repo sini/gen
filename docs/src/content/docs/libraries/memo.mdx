@@ -35,7 +35,7 @@ engine first — the plane decides reuse and populates no store of its own:
 ```nix
 let
   engine = import "${genMemo-src}/reference/schedule.nix" { prelude = gen-prelude.lib; };
-  ctx = genMemo.build engine { /* … */ };
+  ctx = genMemo.build { } engine { /* … */ };
 in
 ```
 

@@ -711,12 +711,10 @@ let
       word = "flake";
       clause = "HELD: the construction's disposition awaits the owner's re-affirmation of ADR-0027's agnosticism ruling and ADR-0031 F2 at this point of use (den-hoag-52hn7)";
     }
-    {
-      member = "bind";
-      at = "crossing.mkFlakeTerminal:evalFlakeModule";
-      word = "flake";
-      clause = "HELD: as `crossing.mkFlakeTerminal` (den-hoag-52hn7)";
-    }
+    # `crossing.mkFlakeTerminal:evalFlakeModule` [flake] had an entry here, HELD under the same
+    # den-hoag-52hn7. P2 L2 moved it into the door's record step, which the walk does not read (it
+    # reads step 1 only), so the entry went stale and was dropped. The name is HELD, not admitted:
+    # it is out of the walk's reach (OQ16), and nested per-step contracts would bring it back.
     {
       member = "bind";
       at = "crossing.mkFlakeTerminal:systems";
