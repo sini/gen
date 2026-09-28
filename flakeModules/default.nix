@@ -259,9 +259,8 @@ let
       a = record.adapter {
         inherit (args) extent extraModules;
         peerGraph = genGraph.labeledFrom {
-          nodes = peerKeys;
-          perLabel.peer = _id: peerKeys;
-        };
+          peer = _id: peerKeys;
+        } peerKeys;
         marksOf = _: [ ];
         readerId = args.name;
       };

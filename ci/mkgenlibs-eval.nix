@@ -395,7 +395,10 @@ let
     # gen-prelude 0e2d39d → 02dc956 (den-hoag-7gp66 P2 L0): the surface gained ONE name, `door`,
     # the door constructor. `isFunction` and `functionArgs` keep their names and became nixpkgs'
     # functor-aware readers. Nothing was removed.
-    prelude = "ea5ede98f56a5c49f9edd6d5a251518d49a6ffa8e7e2848da3c0eedb8595073b";
+    #
+    # gen-prelude 6487a87 → f7247d1 (den-hoag-7gp66 P2 v1.2): the surface gained ONE name,
+    # `checkGuarded`, the misplaced-option guard `door`'s `optionsStep` applies. Nothing was removed.
+    prelude = "70b37e53523bb7178d3d0e45b23c22c8e81ce1d4bb7a8c10a314f0796b57c15b";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
