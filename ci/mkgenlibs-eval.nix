@@ -391,7 +391,11 @@ let
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
-    prelude = "de3a4efc30630ad7d4d546a1c25e624bc83b81e4c3a411bb36d624eab7fa3072";
+    #
+    # gen-prelude 0e2d39d → 02dc956 (den-hoag-7gp66 P2 L0): the surface gained ONE name, `door`,
+    # the door constructor. `isFunction` and `functionArgs` keep their names and became nixpkgs'
+    # functor-aware readers. Nothing was removed.
+    prelude = "ea5ede98f56a5c49f9edd6d5a251518d49a6ffa8e7e2848da3c0eedb8595073b";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
@@ -560,8 +564,13 @@ let
   #
   # THE POPULATION: every roster member plus the hub's own `compose`, walked through PLAIN attrsets
   # (not `_type`, option-type or functor sets) to depth 4, and the attrset formals of every function
-  # met on that walk. ★ WHAT IT DOES NOT SEE, stated rather than left to be discovered: fields of a
-  # record a function RETURNS, curried and functor formals, sets inside lists, `_type` sets, `name`
+  # met on that walk. A FUNCTOR DOOR's formals are read too: a published door that takes a record
+  # step publishes its field contract as data (`prelude.door`, den-hoag-49yxv), so the walk reads
+  # its `__functionArgs` where `builtins.functionArgs` reads nothing. That is the owner's C′ ruling
+  # (2026-09-27, "accept C'"), which also decided den-hoag-2xg6e as (β): the contract doors
+  # reshape like every other door and publish their contract as data. ★ WHAT IT DOES NOT SEE,
+  # stated rather than left to be discovered: fields of a record a function RETURNS, curried
+  # formals (a chained door's steps after the first), sets inside lists, `_type` sets, `name`
   # strings, error text, option descriptions and docs prose, and the hub flakeModule's option names.
   # A clean read here is a claim about the population above and nothing wider.
   #
@@ -637,11 +646,16 @@ let
           at = at';
         }) (wordsIn name);
       own = if p == [ ] then [ ] else hits at (builtins.elemAt p (builtins.length p - 1));
-      formals =
-        if kind == "lambda" then
-          builtins.concatMap (f: hits "${at}:${f}" f) (builtins.attrNames (builtins.functionArgs v))
-        else
-          [ ];
+      formals = builtins.concatMap (f: hits "${at}:${f}" f) (
+        builtins.attrNames (
+          if kind == "lambda" then
+            builtins.functionArgs v
+          else if kind == "set" && v ? __functor && v ? __functionArgs then
+            v.__functionArgs
+          else
+            { }
+        )
+      );
       plain = kind == "set" && !(v ? _type) && !(v ? type && v ? check) && !(v ? __functor);
       names = builtins.tryEval (builtins.attrNames v);
       kids =
@@ -717,11 +731,19 @@ let
   vocabularyUnregistered = map showOffender (unregisteredOf vocabularyRegister vocabularyOffenders);
   vocabularyStale = map showEntry (staleOf vocabularyRegister vocabularyOffenders);
 
-  # ── the vocabulary arming ── a synthetic fixture, disjoint from the live surface.
+  # ── the vocabulary arming ── a synthetic fixture, disjoint from the live surface. `doorOf` is
+  # the roster's own door constructor, so the functor-formals route is armed on the construct the
+  # live surface uses.
+  doorOf =
+    name: required:
+    genLibs.prelude.door {
+      inherit name required;
+    } (a: a);
   armVocab = {
     alpha = {
       mkHostThing = x: x;
       g = { userName }: userName;
+      d = doorOf "alpha.d" [ "hostName" ];
       fromNixOS = 1;
       hostname = 1;
       ok = 1;
@@ -731,6 +753,7 @@ let
     alpha = {
       mkNodeThing = x: x;
       g = { nodeName }: nodeName;
+      d = doorOf "alpha.d" [ "nodeName" ];
       ok = 1;
     };
   };
@@ -775,9 +798,12 @@ in
     surface-vocabulary = vocabularyUnregistered == [ ];
     vocabulary-register-live = vocabularyStale == [ ];
     # ARMING — the predicates themselves, over the synthetic fixture. The planted set carries one
-    # hit per route: a camel-case token, a formal, and the two the token split cannot see.
+    # hit per route: a camel-case token, a formal, a functor door's published formal, and the two
+    # the token split cannot see.
     arming-vocabulary-names-planted =
       vocabularyArming.planted == [
+        "alpha.d:hostName [host]"
+        "alpha.d:hostName [hostname]"
         "alpha.fromNixOS [nixos]"
         "alpha.g:userName [user]"
         "alpha.g:userName [username]"
