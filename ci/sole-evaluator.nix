@@ -287,6 +287,79 @@ let
   ruledExclusion = mkExclusion exclusionEntries;
   excludedDirs = map (e: e.dir) ruledExclusion;
 
+  # ── THE DRIVER REGISTER (O4, den-hoag-0pk67) — a REPORT, never a gate ──
+  # Owner-ruled 2026-09-13 (den-hoag-6fmmb): "a check whose red is cleared by a RULING must not
+  # gate." Every row's disposition is an owner act (§0.4 of
+  # specs/2026-09-13-gen-single-engine-consolidation-spec.md), so this fourth ruled set is read at
+  # the landing and at consolidation milestones by a person — it never enters `checks` by any
+  # route, and it MUST NOT be added to `entrySetArms`/`exception-arms` (O6) below, which is wired
+  # for the other three sets alone.
+  #
+  # Unlike those three, `mkRuledSet`'s width/field enforcement here IS the whole oracle: a planted
+  # seventh (unregistered) entry or a removed row throws on the WIDTH check the moment `report` is
+  # forced (`nix run`/`nix eval`), which is an EVALUATION FAILURE and reds the job — an instrument
+  # defect cleared by a FIX (correcting the register), not a ruling. `disposition` is enforced by
+  # the already-landed `extraRequired` fix (den-hoag-0pk67 unit-c-instruments-build).
+  #
+  # ★ ONE ROW'S DISPOSITION IS CORRECTED FROM THE SPEC'S OWN TEXT, measured at this build's own
+  # pin rather than relayed: the spec's O4 row named gen-algebra's `search.converge` disposition as
+  # "owed, carrier den-hoag-b7u1v" (current at the spec's 2026-09-20 reading). `den-hoag-b7u1v` has
+  # SINCE landed (session 159, 2026-09-25): gen-algebra's whole `search` namespace, `converge`
+  # included, was RETIRED (gen-algebra `5a8d8d5`, hub `89625da`, gen-demo `a8d2db7`,
+  # orchestrator-verified) — and `5a8d8d5` is a strict ancestor of the gen-algebra revision THIS
+  # HUB'S OWN `flake.lock` resolves today, so the removal is carried forward, not a stale read. The
+  # driver no longer exists in the scanned domain; there is no evaluator/caller/driver/decision-
+  # procedure choice left to make, because retirement is the disposition that actually happened.
+  # A second correction, of citation only: the spec cites gen-bind's bridging call at
+  # `lib/arg-env.nix:47`; at the pin this hub resolves the call sits at `:63` — line drift since
+  # the spec's reading, not a change of subject.
+  driverRegisterEntries = [
+    {
+      driver = "gen-scope eval";
+      cause = "ADR-0006's licensed evaluator, by name: gen-scope's `eval` is the one construct the criterion is EXPECTED to match, and the whole check exists to keep it singular. §0.4 of the single-engine consolidation spec states the counted unit and names `eval` first";
+      carrier = "ADR-0006; specs/2026-09-13-gen-single-engine-consolidation-spec.md §0.4";
+      disposition = "evaluator";
+    }
+    {
+      driver = "gen-merge evalModuleTree";
+      cause = "gen-merge's own module-tree fixpoint applies caller-supplied module functions and owns its own iteration — §0.4's own words, \"it IS counted, and it is the second one\" — until the single-engine consolidation (den-hoag-0pk67; unit (a) landed at gen-merge `e6074ee`) injects gen-scope's evaluator, making it a CALLER of the licensed evaluator rather than a second one. That is this landing's own act. The register keys by driver/construct rather than by call site, so every site invoking `evalModuleTree` — gen-merge's own four internal call sites, the hub's `lib/compose.nix`, and gen-class's and gen-schema's own calls — carries this same disposition";
+      carrier = "den-hoag-0pk67; specs/2026-09-13-gen-single-engine-consolidation-spec.md §3 O4";
+      disposition = "caller";
+    }
+    {
+      driver = "gen-scope ascend";
+      cause = "a published bounded-ascent driver (`lib/ascent.nix`'s `ascend`): it takes the round-loop forcing, a bound and a per-member quiescence test from its caller and owns no graph and no content of its own — a peer of `stratify`, not an evaluator. §0.4 names it explicitly as a driver the (deferred) over-matching predicate will find and that this register pre-dispositions";
+      carrier = "specs/2026-09-13-gen-single-engine-consolidation-spec.md §0.4, §3 O4";
+      disposition = "driver";
+    }
+    {
+      driver = "gen-scope leastModel/wellFoundedModel";
+      cause = "the SOLVER: `leastModel` and `well-founded.nix`'s `wellFoundedModel` evaluate caller-supplied DATA (a `program` of atoms/rules/signs) and take no graph — a decision procedure, not an evaluator, per §0.4. ★ The published name is `wellFoundedModel`, never `wellFounded`: `lib/merge-surface.nix` flattens each module's OWN exports into the top-level surface, and `well-founded.nix` exports `wellFoundedModel` — `wellFounded` is only the local let-binding inside `lib/default.nix` and does not survive the merge. `leastModel` does survive, under that exact name, from `least-model.nix`'s own export";
+      carrier = "specs/2026-09-13-gen-single-engine-consolidation-spec.md §0.4, §3 O4";
+      disposition = "decision procedure";
+    }
+    {
+      driver = "gen-algebra search.converge";
+      cause = "the third engine invisible to this scan's own criterion (den-hoag-b7u1v: terminates by a cap with a throw, not a fixpoint argument, and is a self-applying lambda — the two encodings gen-scope's own header calls unsound). RETIRED, not dispositioned as an engine or a caller: gen-algebra's whole `search` namespace was removed (gen-algebra `5a8d8d5`, hub `89625da`, gen-demo `a8d2db7`), an ancestor of the gen-algebra revision this hub currently resolves, so no `lib/search.nix` remains in the scanned domain";
+      carrier = "den-hoag-b7u1v";
+      disposition = "retired";
+    }
+    {
+      driver = "gen-bind lib.evalModules";
+      cause = "gen-bind's `lib/arg-env.nix`'s `crossEval` reaches nixpkgs' own `evalModules` directly — a foreign universe's fixpoint reached across a boundary, ADR-0027's bridging clause, in the source's own comment at the call site: \"a foreign module-system fixpoint reached across a boundary is bridging. No exception entry is owed.\" This is the one refused site the live report's own tally already counts under `bind(1)`";
+      carrier = "ADR-0027; specs/2026-09-13-gen-single-engine-consolidation-spec.md §0.4, §3 O4";
+      disposition = "bridging";
+    }
+  ];
+  driverRegisterWidth = 6;
+  mkDriverRegister = mkRuledSet {
+    label = "driver register";
+    keyField = "driver";
+    width = driverRegisterWidth;
+    extraRequired = [ "disposition" ];
+  };
+  ruledDriverRegister = mkDriverRegister driverRegisterEntries;
+
   # ── THE READER ──
   # ★ IT HAS NO SCOPE OF ITS OWN: its extent is THE TREE MINUS THE RULED EXCLUSION. A scope written
   # into the walk is invisible — a published surface outside `lib/` would be unread, unnamed, and
@@ -1447,6 +1520,8 @@ in
     outOfDomainRegister = ruledRegister;
     exclusionWidthRuled = exclusionWidth;
     readScopeExclusion = ruledExclusion;
+    driverRegisterWidthRuled = driverRegisterWidth;
+    driverRegister = ruledDriverRegister;
 
     # The FILE-granularity notification: a tree that starts publishing from a new directory moves a
     # printed number here. There is no second object at file granularity to assert totality against,
