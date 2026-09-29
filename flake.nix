@@ -280,7 +280,8 @@
       # declares no flake-parts input because it evaluates none.
       #
       # INTERIM, the same standing as `flakeModules.default` above: it does NOT satisfy ADR-0027 and
-      # leaves with that surface when the den v2 framework surface arrives (den-hoag-z5wsg).
+      # leaves with that surface when the den v2 framework surface arrives (den-hoag-es9g, which
+      # carries `flakeModules.default`'s INTERIM marker).
       lib.flakePartsEvaluate =
         {
           evalFlakeModule,
