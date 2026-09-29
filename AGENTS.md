@@ -262,7 +262,7 @@ Current output (verbatim):
 <!-- gen-drift:begin -->
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
 ```
 
 <!-- gen-drift:end -->

@@ -272,5 +272,33 @@
       # carries the marker and names the two measured defects that travelled with it unfixed
       # (den-hoag-es9g).
       flakeModules.default = ./flakeModules/default.nix;
+
+      # The flake-parts `evaluate` for gen-bind's outputs terminal (den-hoag-52hn7; ADR-0031 F1 and
+      # ADR-0027, re-affirmed 2026-09-28): gen-bind publishes `crossing.mkOutputsTerminal evaluate` in
+      # substrate vocabulary, and this is its one flake-parts binding — a CALLER of that construct,
+      # never a relocation of it. The consumer supplies flake-parts' own `evalFlakeModule`: this hub
+      # declares no flake-parts input because it evaluates none.
+      #
+      # INTERIM, the same standing as `flakeModules.default` above: it does NOT satisfy ADR-0027 and
+      # leaves with that surface when the den v2 framework surface arrives (den-hoag-z5wsg).
+      lib.flakePartsEvaluate =
+        {
+          evalFlakeModule,
+          inputs,
+          self,
+          systems ? [ ],
+        }:
+        body:
+        (evalFlakeModule
+          {
+            inputs = inputs // {
+              inherit self;
+            };
+          }
+          {
+            imports = body;
+            inherit systems;
+          }
+        ).config.flake;
     };
 }
