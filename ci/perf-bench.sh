@@ -337,8 +337,12 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # walk reads the fold's own `typeDefs`, one discharge per nesting option; no freeform group without
 # a declared freeform type, decided by key; gen-merge `0010eb7` + `fa73591`). Re-read at relock 40's
 # hub, every member at its tip (gen-merge `f47c48a`, with gen-scope's L2 grammar), host evaluator.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.583
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.536
+# RATCHETED 0.583 / 0.536 → 0.557 / 0.533 by the gen-merge module graph (den-hoag-470xp arm F: a
+# plain module list is its own closure, and the merge path collects by breadth-first levels with no
+# minted id; gen-merge `7398fd3`). Read on hub 98c056c with `--at gen-merge=path:` at that tree,
+# host evaluator (reports/den-hoag-470xp-arm-f-build-v0.md §5).
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.557
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.533
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
@@ -630,7 +634,11 @@ COORDMATCH_BIG=1600
 COORDMATCH_DIGEST=ec30bebff99631b2d8ef98e29a6403135aea466f4b4d1d2ab303d1dffefe77dc
 declare -A COORDMATCH_THUNKS_MAX COORDMATCH_ALLOC_MAX
 COORDMATCH_THUNKS_MAX[migrated,400]=1.000
-COORDMATCH_ALLOC_MAX[migrated,400]=1.000
+# RAISED 1.000 → 1.001 (owner-approved, den-hoag-470xp arm F): the residue is one GC heap block, not a
+# cost. ΔThunks coord−ref stays the row's constant 397 at gen-merge `3a8d116`, and the byte excess moves
+# by whole 4 096 B blocks whose sign changes with n (+1 block at n=400, −2 at n=1600), which a per-cell
+# cost could not do (reports/den-hoag-470xp-arm-f-landing-gate-v0.md §4.3).
+COORDMATCH_ALLOC_MAX[migrated,400]=1.001
 COORDMATCH_THUNKS_MAX[migrated,1600]=1.000
 COORDMATCH_ALLOC_MAX[migrated,1600]=1.000
 COORDMATCH_THUNKS_MAX[sealed,400]=1.002
