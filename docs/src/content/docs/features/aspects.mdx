@@ -1,0 +1,129 @@
+---
+title: Aspects
+description: Declare aspects, classify their keys, gate inclusion with guards, read the include graph and federate aspects from several flakes.
+---
+
+The homelab has three features. `desktop` and `monitoring` both include `ssh`. Each aspect carries
+content for one or more classes, here `nixos` and `homeManager`.
+
+```nix title="homelab-aspects.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  inherit (gen.merge) evalModuleTree mkOption types;
+
+  cnf = {
+    keySemantics.nixos.category = "class";
+    keySemantics.homeManager.category = "class";
+  };
+
+  result = evalModuleTree {
+    modules = [
+      ((gen.aspects.mkAspectSchema cnf).mkAspectModule { })
+      { options.hosts = mkOption { type = types.attrsOf types.raw; default = { }; }; }
+      {
+        aspects.ssh.nixos.services.openssh.enable = true;
+
+        aspects.monitoring.includes = [ "ssh" ];
+        aspects.monitoring.nixos.services.prometheus.enable = true;
+
+        aspects.desktop.includes = [ "ssh" ];
+        aspects.desktop.nixos.services.xserver.enable = true;
+        aspects.desktop.homeManager.programs.firefox.enable = true;
+
+        hosts.laptop.aspects = [ "desktop" ];
+        hosts.server.aspects = [ "monitoring" ];
+      }
+    ];
+  };
+
+  facts = gen.aspects.graphFacts cnf result.config.aspects;
+in
+{
+  includesOf = facts.includesOf;
+  laptopNeeds = gen.graph.reachableFrom { edges = id: facts.includesOf.${id} or [ ]; } "desktop";
+}
+```
+
+```console
+$ nix eval --impure --json --file homelab-aspects.nix
+{
+  "includesOf": { "desktop": ["ssh"], "monitoring": ["ssh"], "ssh": [] },
+  "laptopNeeds": ["ssh"]
+}
+```
+
+An **aspect** is a named bundle of configuration for one feature. It holds content per class, a
+list of other aspects it `includes`, and an identity. `graphFacts` turns a set of aspects into plain
+graph data, so every query on [Graphs and Queries](/features/graphs/) runs over it.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Declare aspects | `mkAspectSchema cnf`, then `.mkAspectModule { }` or `.mkAspectOption { }` | Add an `aspects` option whose entries are typed aspects |
+| Classify keys | `cnf.keySemantics.<key>.category`, `keyCategory` | Say whether a key is a `class`, a `channel` or a `facet` |
+| Include | `includes = [ "ssh" ]`, `keyRef` | Reference other aspects by name, by value, or in another flake |
+| Identify | `key`, `aspectPath`, `pathKey` | The path-based identity of an aspect, such as `hardware/cpu/intel` |
+| Guard | `guard`, `pred`, `mkGuardVocab`, `applyGuard` | Include content only when a condition holds, with the condition written as data |
+| Read the graph | `graphFacts cnf aspects`, `flatten` | Nodes, `includesOf`, `parentOf` and node data as plain attribute sets |
+| Federate | `link.link { sources; wire?; }`, `normalize`, `disjointUnion` | Combine aspect graphs from several flakes, keeping each node's origin |
+| Ports | `providesOf`, `requiresOf`, `checkCapability` | What an aspect graph offers and what it needs filled in |
+
+## Details
+
+### Key categories
+
+Every key on an aspect other than `name`, `includes` and the other structural keys is classified by
+`cnf.keySemantics`:
+
+| Category | What the value is | Example |
+|---|---|---|
+| `class` | a module for one target, `null` when unset | `nixos`, `homeManager`, `darwin` |
+| `channel` | a raw value passed through unchanged | settings handed to another framework |
+| `facet` | a typed field declared by its own option | an aspect's port number |
+
+A key with no entry is a nested aspect with its own identity. `aspects.hardware.cpu.intel` is the
+aspect with key `hardware/cpu/intel`. Two aspects share a key only when they sit at the same path.
+
+### What `graphFacts` returns
+
+| Field | Contents |
+|---|---|
+| `nodes` | every aspect's id |
+| `parentOf` | each aspect's enclosing aspect, `null` for a top-level one |
+| `includesOf` | the includes that resolve to aspects in this set |
+| `foreignIncludesOf` | `keyRef` references to aspects in another flake, left for federation to resolve |
+| `unresolvedIncludesOf` | positions in `includes` holding inline content instead of a reference |
+| `nodeData` | each aspect's value |
+
+A name in `includes` that matches no aspect fails with an error naming the aspect and the position:
+
+```
+gen-aspects.includes (aspect 'desktop', include position 0): reference 'sshd' names no entry of the registry
+```
+
+### Includes and delivery
+
+`includes` states edges between aspects. A consumer that wants a host to receive the content of
+every included aspect computes the include closure, as `laptopNeeds` does above.
+[Delivery](/features/delivery/) shows the full route from aspects to a built host.
+
+### Guards
+
+A guard includes content only in contexts that satisfy a predicate. gen-aspects has two forms. A
+function aspect such as `{ host, ... }: { nixos = ...; }` stays unevaluated until a host is known.
+A guard record built from the `mkGuardVocab` vocabulary is plain data: `applyGuard` evaluates it,
+and `guardKey` gives it an identity derived from its content, so two identical guards count as one.
+
+### Federation
+
+`link` takes aspect graphs from several flakes and joins them into one graph. Each node keeps an
+origin label, so two flakes can both define `ssh` without a collision. `wire` fills a flake's
+declared holes with nodes from another flake. The result includes a manifest of every resolution,
+which can be diffed like a lock file.
+
+For the idea behind aspects, see [Reusable Features](/understand/features/).
+
+---
+
+**Provided by** gen-aspects (aspects, key categories, guards, graph facts) and gen-link (federation).

@@ -1,8 +1,6 @@
 ---
 title: "Hammer, Phang, Hicks & Foster (2014) -- Adapton: Composable, Demand-Driven Incremental Computation"
 description: "Our reading of Adapton."
-source:
-  - den-ag-design:reference-catalog/summaries/hammer-2014-adapton.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ M. A. Hammer, K. Y. Phang, M. Hicks, and J. S. Foster, "Adapton," *PLDI '14: ACM
 
 [doi:10.1145/2594291.2594324](https://doi.org/10.1145/2594291.2594324)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -23,7 +21,7 @@ The paper's answer is a core calculus λcdd_ic and its OCaml realization, **Adap
 
 Adapton's second core idea is an explicit **inner/outer layer separation** (S1-S3), which the authors claim is absent from all prior IC. **Inner** computations -- the bodies of thunks, the incrementally-reused units -- may *read* refs (`get`) but may neither allocate nor mutate them. **Outer** computations -- the interactive top level, the observer -- may allocate refs (`ref`), mutate them (`set`), and `force` thunks, thereby precipitating change propagation. The restriction that inner computations are read-only is precisely what makes them safe to memoize and reuse. Layer purity is enforced in λcdd_ic by the type system (rules Ty-E-Ref, Ty-E-Set are `outer`-only; Ty-E-Get is layer-polymorphic; Ty-E-Inner coerces an inner computation into an outer context but not vice-versa, and `|Γ|` strips the outer layer's recursive functions from the inner layer -- Fig 3, p.5). In the OCaml library the layer separation is *not* statically enforced (OCaml's types make it hard): an inner computation "implicitly begins when `force` is called and ends when the call returns" (footnote 1, p.7).
 
-The DCG is the load-bearing data structure (S2, pp.2-3; S5.2, pp.7-8). Each **node** is a `ref` (drawn as a square, holds an address + content) or a `thunk` (drawn as a circle, holds a suspended expression and, once forced, its valuation). Each directed **edge** points from a thunk to a ref or thunk it depends on: edges targeting refs come from `get`, edges targeting thunks come from `force`. Edges are **labeled with the value returned** by that get/force call -- this label is the early-cutoff witness. Edges are stored **bidirectionally**: each node keeps an *ordered list of outgoing edges* (appended in get/force order -- leftmost created first) and an *unordered set of incoming edges*, so the graph can be walked caller→callee or callee→caller. The DCG starts empty; nodes are added on `aref`/`athunk`/memo-miss; edges are added on get/force during evaluation.
+The DCG is the central data structure (S2, pp.2-3; S5.2, pp.7-8). Each **node** is a `ref` (drawn as a square, holds an address + content) or a `thunk` (drawn as a circle, holds a suspended expression and, once forced, its valuation). Each directed **edge** points from a thunk to a ref or thunk it depends on: edges targeting refs come from `get`, edges targeting thunks come from `force`. Edges are **labeled with the value returned** by that get/force call -- this label is the early-cutoff witness. Edges are stored **bidirectionally**: each node keeps an *ordered list of outgoing edges* (appended in get/force order -- leftmost created first) and an *unordered set of incoming edges*, so the graph can be walked caller→callee or callee→caller. The DCG starts empty; nodes are added on `aref`/`athunk`/memo-miss; edges are added on get/force during evaluation.
 
 The heart of the algorithm is the **two-phase split of change propagation into dirtying and propagation** (S2, p.3; S5.2, pp.7-8; Algorithm 1, Fig 8 + the box on p.7). **Dirtying** runs on `set`: starting from the mutated ref, traverse *incoming* edges *backward* (caller-ward), marking each traversed edge `dirty`; stop at any edge already dirty (`dirty(node)`: for each incoming edge, if not already dirty, set dirty and recurse to `edge.source`). This is eager but cheap -- it only flips flags, it does not recompute. **Propagation/cleaning** runs on `force`: starting from the forced thunk, do an in-order traversal of its *outgoing* edges (in the order they were added, line 7). For each dirty edge: clean the flag (line 9); if the target is a thunk, recursively propagate into it (lines 10-11); then **compare the edge's stored label against the target's current value** (line 12 -- this is the early-cutoff check). If the label still matches, the dependency is unchanged and the subgraph is *cut off* (not recomputed). If it differs, at least one input changed, so **clear all the node's outgoing edges (line 13) and re-evaluate the thunk (line 14)**, returning immediately (line 15) since the remaining edges will be rebuilt during re-evaluation. Crucially, propagation traverses **bottom-up, left-to-right, in original evaluation/demand order**, so it lazily repairs only the parts of the graph currently under demand -- a thunk whose result no observer forces is never repaired (the line-6 example does not recompute `t2`, S2 p.3).
 
@@ -61,73 +59,66 @@ Related work (S7) positions Adapton against self-adjusting computation (Acar et 
 
 - **Call-by-push-value foundation (S3 p.3-4).** λcdd_ic = Levy's CBPV [27,28] (explicit thunk/force, values vs. computations syntactically split, explicit evaluation order) + `ref`/`get`/`set` + inner/outer layers. CBPV chosen as "canonical" since both CBV and CBN translate into it.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-memo
 
-**gen-rebuild (Primary -- Adapton is the canonical demand-driven IC paper; supplies the lazy two-phase invalidate/revalidate the surface currently lacks)**
+gen-memo is the rebuilder of Mokhov 2018: it decides whether a key needs recomputation over a dependency graph. Mokhov's rebuilders answer "given a key, is its cached value still valid?" and assume a scheduler has already chosen to visit the key. Adapton supplies the demand-driven half, where `set` only marks change and recomputation waits until a `force` demands a result.
 
-gen-rebuild is the *rebuilder* of Mokhov 2018 -- it decides whether a node needs recomputation over a dependency graph. Its current 13-op surface (`override`; `verify`/`constructive`/`deepConstructive`/`earlyCutoff`; `applyDelta`/`batch`/`retract`/`dirtySet`; `support`/`why`/`affected`; `restabilize`) is grounded in Mokhov's *eager, batch-oriented* rebuilder taxonomy plus Forgy/Radul/Arntzenius. Mokhov's rebuilders are all "given a key, is its cached value still valid?" -- they presume the scheduler already decided to visit the key. Adapton supplies the *missing demand-driven half*: a two-phase **lazy** invalidate-then-revalidate over a DCG, where `set` only flips dirty flags and recomputation is deferred until a `force` actually demands the result.
+gen-memo takes Adapton's split between change and demand, with dirtiness held as a value instead of a mutated flag.
 
-The decisive contrast for gen-rebuild's design: `override` recomputes the *entire reverse-dependency cone* of a changed node (eager, push, breadth-first over dependents), reusing the rest from a flat relocatable store. Adapton's `dirty`/`clean` is *lazy and pull-based* -- `dirty` marks the cone but recomputes nothing; `clean` (= force-triggered propagation) walks *only the path actually demanded*, with early-cutoff at every edge via stored value labels. A node in the dirtied cone whose result is never forced is never recomputed. This is exactly the "swapping/switching/undemanded-output" win Adapton measures (300× on mergesort; AS2 exponential speedup) and exactly what `override`'s eager cone-recomputation forfeits.
+- **`applyDelta` is Adapton's `set` (Alg. 1 lines 1-5).** It rewrites the changed key's data, appends the key to the context's pending dirty list and recomputes nothing. The store and trace stay out of date until the change is propagated. `batch` folds several deltas before one propagation.
+- **`force` is Adapton's demand entry point (S2, S5.2).** On a quiescent context it reads the value. On a context with pending changes it drains them and then reads. `forceCtx` returns the drained context for reuse. `propagate` performs the drain directly.
+- **`earlyCutoff` is the stored-value comparison (Alg. 1 line 12).** After a key is recomputed, an unchanged hash stops propagation past it. gen-memo compares a node's output hash, where Adapton compares the value stored on each edge.
+- **`dirtySet` and `affected`** compute the reverse-dependency cone of changed keys, the region Adapton's dirtying walk marks.
 
-- **Files:** gen-rebuild op surface (rebuilder strategies + deltas + provenance). Adapton adds the demand-driven invalidate/revalidate axis orthogonal to Mokhov's batch rebuilders.
-- **Mapping:** Adapton's `set` + `dirty(node)` (Alg 1 lines 1-5) = a *lazy* `dirtySet` that recomputes nothing; Adapton's `force` + `propagate(node)` (Alg 1 lines 6-15) = `clean`/repair, a demand-ordered, early-cutoff revalidation; Adapton's edge-label comparison (line 12) = `earlyCutoff` lifted from "compare output hash" to "compare per-dependency stored value"; Adapton's `memo` = the warm-cache memo-match (gen-scope's co-located `_eval`).
+gen-memo's `force` drains the whole dirty cone. Adapton's `clean` walks only the path the forced result depends on, in its original demand order, with a cutoff at every edge. Selective per-edge repair needs dirty flags that persist between interactions and an order among recomputations, which a single pure Nix evaluation cannot hold. `propagateEager` narrows the work on localised edits, and total work stays at least proportional to the cone.
 
-**gen-scope (Foundational -- the DCG's `force`/demand driver and memo are gen-scope's evaluation model)**
+### gen-scope
 
-Adapton's `force` IS gen-scope's demand-driven HOAG evaluation, and Adapton's `memo` IS gen-scope's co-located `_eval` memo on `lib.fix self`. The suspending scheduler that Mokhov attributes to Nix lazy evaluation is precisely how an Adapton `force` recursively brings dependencies up to date before resuming. The seam (below) is whether the DCG's *dirty flags* -- mutable per-edge state -- can live anywhere in gen-scope's pure-Nix, mutation-free fixpoint.
+Adapton's `force` corresponds to gen-scope's demand-driven evaluation, and Adapton's `memo` to gen-scope's memoisation on each node's `_eval` attrset. The suspending scheduler Mokhov attributes to Nix's lazy evaluation is how an Adapton `force` brings dependencies up to date before resuming. A demand on a node attribute is a `force`, and a read of another node's attribute through `get` is a dependency edge. Nix has no weak references, so memoised values are not evicted within one evaluation.
 
-- **Files:** gen-scope `eval`, `_eval` memo, `self.get`.
-- **Mapping:** Adapton `force` = gen-scope demand on a node attribute; Adapton `get` edge = gen-scope `self.get id attr` dependency record; Adapton `memo`/weak-table = gen-scope `_eval` thunk memoization (but Nix has no weak refs, so no GC eviction within one evaluation).
+### gen-graph
 
-**gen-graph (Supporting -- DCG queries are reverse/forward dependent walks)**
+Adapton stores edges in both directions: an ordered outgoing list for propagation and an incoming set for dirtying. gen-graph answers both directions. Dirtying corresponds to reverse reachability (`dependentsOf`), and propagation to a forward dependency walk.
 
-Adapton's bidirectional edges (outgoing list for propagation, incoming set for dirtying) are exactly the two query directions gen-graph already provides for the rebuilder's frontier. Dirtying walks incoming (callee→caller = `dependents`); propagation walks outgoing (caller→callee = `dependencies`).
+### Correspondence
 
-- **Mapping:** Adapton dirtying traversal = gen-graph reverse reachability (`dependents`/affected cone); Adapton propagation traversal = gen-graph forward dependency walk in evaluation order.
-
-### Relevance to gen-rebuild Op Surface
-
-| Adapton concept | gen-rebuild realization |
+| Adapton concept | gen realisation |
 |---|---|
-| DCG (S2, S5.2) | The dependency graph the rebuilder decides over; nodes = keys, edges = recorded deps with value labels |
-| `set` + dirtying (Alg 1 l.1-5) | A *lazy* `dirty` op: mark reverse-dep cone, recompute nothing (vs. eager `override`) |
-| `force` + propagation (Alg 1 l.6-15) | `clean`/repair op: demand-ordered, early-cutoff revalidation of only the forced path |
-| Edge-label compare (l.12) | `earlyCutoff` at per-dependency granularity, not just per-output |
-| `memo` (S5.1) | Warm-cache memo-match = gen-scope `_eval`; the "reuse rest from store" half of `override` |
-| Weak-table GC (S5.1-5.2) | `gc` op: evict undemanded/orphaned cache entries (no native analogue in pure Nix) |
-| Inner/outer layer (S1, S3) | The read-only-deps vs. mutate-and-observe split: `override`/`applyDelta` are outer; node equations are inner |
-| Soundness (Thm 4.3) | Rebuilder correctness: revalidated value = from-scratch value |
+| DCG (S2, S5.2) | The dependency graph gen-memo decides over, read through a caller-supplied accessor: keys as nodes, recorded dependencies as edges |
+| `set` and dirtying (Alg. 1 lines 1-5) | `applyDelta`: record the change as pending, recompute nothing |
+| `force` and propagation (Alg. 1 lines 6-15) | `force` and `propagate`: drain the pending cone with early cutoff (whole cone, not per edge) |
+| Edge-label compare (line 12) | `earlyCutoff`, per output hash |
+| `memo` (S5.1) | gen-scope's `_eval` memoisation |
+| Weak-table GC (S5.1-5.2) | No counterpart within a pure evaluation |
+| Inner and outer layers (S1, S3) | Node equations are inner and read only. `applyDelta`, `override` and `retract` are outer operations |
+| Soundness (Thm. 4.3) | gen-memo's contract: the incremental result is byte-identical to a cold run |
 
-The paper's central lesson for gen-rebuild is that **demand-driven rebuilding is strictly more general than eager cone recomputation**, and it is achieved not by a smarter scheduler but by *splitting invalidation from revalidation* (dirty vs. clean) and *checking value equality at every edge during the demand-ordered walk* (early cutoff lifted to per-dependency granularity). `override` collapses both phases into one eager push; Adapton separates them so undemanded work is never done.
+The paper's lesson for gen is that demand-driven rebuilding is more general than eager cone recomputation. It comes from separating invalidation from revalidation and from checking value equality at each edge during the demand-ordered walk. gen-memo has the first separation. The second needs state across evaluations.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Lazy two-phase `dirty`/`clean` as distinct ops (S2 p.3; S5.2 p.7-8).** The surface's `dirtySet`/`override` fuse invalidation and recomputation eagerly. Adapton's separation -- `dirty` flips flags over the reverse-dep cone and recomputes *nothing*; `clean` recomputes *only the demanded path* with per-edge early cutoff -- is the missing demand-driven rebuilder. This is the single largest gap the paper exposes.
+- **Per-dependency early cutoff through edge labels (Alg. 1 line 12).** `earlyCutoff` compares a node's output hash. Adapton stores the returned value on each edge and cuts off when the label still matches the target's current value, which prunes per dependency. Label-bearing edges would let revalidation prune subtrees mid-walk.
 
-- **Per-dependency early cutoff via edge labels (Alg 1 l.12).** `earlyCutoff` currently compares a node's *output* hash. Adapton stores the returned value *on each edge* and cuts off when the edge label still matches the target's current value -- finer-grained cutoff that stops propagation per-dependency, not per-node. Lifting `earlyCutoff` to label-bearing edges would let revalidation prune subtrees mid-walk.
+- **Sharing, swapping and switching as a reuse benchmark (S1, S2, S6).** The three patterns totally ordered incremental computation cannot handle make a conformance test for a demand-driven rebuilder: reuse a subcomputation across contexts (sharing), tolerate reordered dependencies (swapping) and restore an inactive prior result (switching). gen-memo's store should give sharing. Swapping and switching test whether the rebuilder works over a partial order.
 
-- **Sharing/swapping/switching as a reuse benchmark (S1, S2, S6).** The three patterns total-ordered IC cannot do are a concrete conformance test for gen-rebuild: a faithful demand-driven rebuilder must reuse a subcomputation across contexts (sharing), tolerate reordered dependencies (swapping), and restore an inactive prior result (switching). The flat relocatable store should already give sharing; swapping/switching test whether the rebuilder is truly partial-order, not total-order.
-
-- **Weak-table GC of undemanded cache (S5.1, S5.2 p.8).** Adapton evicts athunks/edges via OCaml weak hash tables once unreachable. A `gc` op for gen-rebuild would evict stale or never-demanded entries from the relocatable store -- but pure Nix has no weak references and no within-evaluation reachability hook, so this is the least natively expressible idea (see Research Directions).
+- **Weak-table GC of undemanded entries (S5.1, S5.2 p.8).** Adapton evicts unreachable thunks and edges through OCaml weak hash tables. Pure Nix has no weak references and no reachability hook within an evaluation, so this is the least natively expressible idea (see Research Directions).
 
 ### Potential New Libraries or Features
 
-- **`dirty` / `clean` ops for gen-rebuild.** `dirty :: Store -> KeySet -> Store` marks the reverse-dep cone of changed keys (flag-only, no recomputation). `clean :: Store -> Key -> (Value, Store)` (a.k.a. `force`/`demand`) performs the demand-ordered, early-cutoff repair of only the path to `Key`. Together they are the lazy counterpart to `override`. Scope: large -- requires the store to carry per-edge dirty flags and value labels, which in pure Nix must be *re-derived each evaluation* from a serialized prior-run trace rather than mutated in place.
+- **Selective `clean`.** A demand-ordered repair of only the path to one key, with cutoff at every edge, as the lazy counterpart to `propagate`. The store would need per-edge dirty flags and value labels, which in pure Nix must be re-derived each evaluation from a serialised trace of the previous run.
 
-- **`force`/`demand` as an explicit driver (S2, S5.2).** The surface has no explicit demand entry point distinct from the rebuilder strategies -- demand is implicit in `override`'s cone. Adapton makes `force` the *only* thing that triggers recomputation. An explicit `demand :: Store -> Key -> (Value, Store)` would make gen-rebuild's pull-based contract first-class and is the natural seam to gen-scope's `self.get`.
-
-- **`memoConstructor` / keyed allocation (S5.1 p.7-8; [17]).** Adapton's `memo` keys thunk allocation by argument and is the named-allocation primitive whose absence hurt mergesort. A keyed-allocation op (`alloc :: Key -> Thunk -> Node`) would let gen-rebuild stabilize node identity across runs so reuse survives structural change -- the prerequisite for swapping/switching reuse and the cited future-work fix [3,17].
+- **Keyed allocation (S5.1 p.7-8; [17]).** Adapton's `memo` keys thunk allocation by argument, and its absence hurt mergesort. An allocation keyed by a stable identity would keep node identity across runs so reuse survives structural change. This is the prerequisite for swapping and switching and the fix the paper cites as future work [3,17].
 
 ### Research Directions
 
-- **Is dirtying even expressible in pure Nix? (S5.2 p.7-8 -- the crux).** Adapton's dirty flags are *mutable per-edge state* set by `set` and cleared by `force` *across* observer interactions, amortized by an invariant maintained between phases. Nix has no mutation: the `_eval` memo lives on `lib.fix self` and is reconstructed from scratch each `nix eval`. So a flag *flipped in place between two interactions* has no representation in a single pure evaluation. The honest options are (a) **re-derive dirtiness each evaluation** by *diffing a serialized prior-run trace (DCT/DCG) against the new input set* -- the dirty set becomes a pure function `dirty(priorTrace, changedKeys)` rather than a mutated flag, recomputed every run; or (b) **externalize the DCG to a store** (JSON/Nix file persisted between `nix eval` invocations) so dirty flags live in the *external* store and Nix reads/writes it imperatively at the harness level, outside the pure evaluation. Option (a) keeps purity but pays a re-derivation cost each run (and cannot amortize dirtying across `set`s the way Adapton's invariant does, since there is no "between sets" inside one evaluation). Option (b) recovers true incrementality but moves the mutable DCG *outside* gen-scope's `lib.fix self`, into the same external trace store gen-rebuild already needs for cross-evaluation incrementality (the rebuilder dimension Mokhov's mapping flagged as future work). **Conclusion: lazy dirty/clean is NOT expressible as in-place mutation in pure Nix; it is expressible either as a pure trace-diff per run (purity-preserving, no amortization) or as an externally-persisted DCG the harness mutates (true incrementality, impure at the harness layer).**
+- **Can dirtying be expressed in pure Nix? (S5.2 p.7-8).** Adapton's dirty flags are mutable per-edge state, set by `set` and cleared by `force` across observer interactions, with an invariant maintained between phases. A single Nix evaluation has no mutation and no "between interactions". Two options remain. The first re-derives dirtiness in each evaluation by diffing a serialised trace of the prior run against the new inputs, which keeps purity and cannot amortise dirtying across several `set`s. gen-memo's pending dirty list is this option within one evaluation. The second persists the DCG outside the evaluation, in a file the harness reads and writes between `nix eval` runs, which recovers incrementality across runs and is impure at the harness layer.
 
-- **GC without weak references (S5.1, S5.2 p.8).** Adapton's `gc` relies on OCaml weak hash tables + a tracing collector. Pure Nix has neither weak refs nor a reachability hook within evaluation, and laziness already drops unforced thunks for free *within* a run. So `gc` is only meaningful for the *external* trace store of option (b): evict entries not reachable from any demanded key in the latest run -- a pure reachability computation over the persisted DCG, run by the harness, not a within-evaluation collection. There is no faithful in-evaluation `gc` for pure Nix; the op only makes sense at the external-store layer.
+- **GC without weak references (S5.1, S5.2 p.8).** Adapton's `gc` needs weak hash tables and a tracing collector. Within one Nix evaluation, laziness already drops unforced thunks. GC is meaningful only for an externally persisted trace: evict entries unreachable from any key demanded in the latest run, a pure reachability computation the harness runs between evaluations.
 
-- **Inner/outer layer as a static discipline (S3, Fig 3 p.5).** Adapton's type-enforced inner(read-only)/outer(mutate+observe) split has a clean Nix analogue: node *equations* are inner (they may only `self.get`, never inject deltas), while `override`/`applyDelta`/`retract` are outer driver ops. Making this a typed/checked boundary in gen-scope -- inner attributes provably cannot trigger change propagation -- would mirror Adapton's central novelty and is the precondition for sound memo reuse. Even OCaml-Adapton couldn't enforce it statically (fn.1 p.7); pure Nix's purity *already* enforces the read-only-inner half for free, which is a genuine advantage worth stating.
+- **The inner and outer layers as a static discipline (S3, Fig. 3 p.5).** Adapton's split between read-only inner code and mutating outer code maps onto gen: node equations only read other attributes, and gen-memo's delta operations are the outer layer. OCaml Adapton could not enforce the split statically (fn. 1 p.7). Nix's purity enforces the read-only inner half already.
 
-- **Trace-diff dirtying vs. Mokhov verifying traces -- granularity (S4 p.4-6; cf. Mokhov S4.2.2).** Adapton's DCT is *hierarchical* (per-force subtrees) where Mokhov's verifying trace is *flat* (per-key dependency-hash list). The DCT's tree structure is what gives sharing/swapping/switching. The open question for gen-rebuild: should the persisted trace be flat (Mokhov, cheap, per-key) or hierarchical (Adapton, sharing-capable, per-force-subtree)? The hierarchical form is required to faithfully reproduce Adapton's three patterns but costs more storage and a tree-structured diff. This trade-off is unresolved and is the key design decision for gen-rebuild's external trace representation.
+- **Trace granularity (S4 p.4-6; cf. Mokhov S4.2.2).** Adapton's DCT is hierarchical, with a subtree per force, and Mokhov's verifying trace is flat, a dependency-hash list per key. The tree structure is what gives sharing, swapping and switching. gen-memo's trace is the flat form. A persisted trace across evaluations could be flat (cheap, per key) or hierarchical (supports the three patterns, costs more storage and a tree diff), and that choice is open.

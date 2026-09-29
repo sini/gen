@@ -1,8 +1,6 @@
 ---
 title: "Forgy (1982) -- Rete: A Fast Algorithm for the Many Pattern/Many Object Pattern Match Problem"
 description: "Our reading of Rete: A fast algorithm for the many pattern/many object pattern match problem."
-source:
-  - den-ag-design:used/summaries/forgy-1982-rete.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ C. L. Forgy, "Rete: A fast algorithm for the many pattern/many object pattern ma
 
 [doi:10.1016/0004-3702(82)90020-0](https://doi.org/10.1016/0004-3702(82)90020-0)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -47,76 +45,65 @@ The analytical complexity results (Table 1) establish sharp bounds. Space: the n
 
 - **Sharp complexity bounds.** The algorithm's worst-case time per firing is O(W^(C-1)) in working memory size and O(P) in production memory size, but the best case is O(1) and O(log2 P) respectively. The tree indexing gives logarithmic best-case production memory cost. All bounds are proven sharp, meaning pathological systems achieve them.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-dispatch
 
-#### gen-derive (MAJOR)
+gen-dispatch is a production rule system on the Rete paper's condition-action model. Forgy's productions are gen-dispatch rules, an LHS is a rule's `condition`, an RHS is its `produce` function, and the conflict set becomes the grouped actions `dispatch` returns.
 
-gen-derive is a production rule system directly modeled on the Rete paper's condition-action architecture. The mapping is structural: Forgy's productions become gen-derive's rules, LHS conditions become gen-derive's `condition` field, RHS actions become gen-derive's `produce` function, and the conflict set becomes the grouped `actions` output.
+**Condition-action rules (S1, S2).** A Rete production is `(LHS, RHS)`, where the LHS is a conjunction of patterns and the RHS a sequence of actions. `mkRule { ... } condition produce` is the analogue: `condition` is tested by the caller's `match` function, and `produce id ctx` returns a list of tagged actions whose meaning belongs to the consumer. `dispatch` performs one recognize-act cycle (S1: match, conflict resolution, act). It tests every rule's condition against the context, resolves conflicts, fires the surviving rules and returns their actions grouped.
 
-**Condition-action rule model** (Forgy S1, S2). A Rete production is `(LHS, RHS)` where the LHS is a conjunction of patterns and the RHS is a sequence of actions. gen-derive's `mkRule { condition; produce; ... }` is the direct analogue: `condition` is the LHS (an opaque predicate tested by the `match` function), and `produce id ctx` generates the RHS (a list of opaque tagged actions). The `dispatch` function plays the role of the Rete interpreter's recognize-act cycle (S1: Match -> Conflict Resolution -> Act -> Goto 1). `dispatch` evaluates all rules' conditions against the current context, applies conflict resolution, fires matching rules, and returns grouped actions.
+**Conflict resolution (S1, step 2).** Forgy's interpreter selects one instantiation from the conflict set and leaves the selection strategy to the language (S4, the TERM node's `UPDATECONFLICTSET`). gen-dispatch resolves in three steps: a rule's `overrides` list suppresses named rules, rules are sorted by numeric `priority` with declaration order breaking ties, and the optional `exclusive` mode keeps only the highest-priority rules.
 
-**Shared condition evaluation** (Forgy S2.2.1, Fig. 1 -- structural sharing). The Rete network's defining optimization is sharing test nodes across productions with common pattern prefixes. In gen-derive, `fromFunction` uses `builtins.functionArgs` to extract the condition from a Nix function's formal parameters. When multiple rules destructure the same arguments (e.g., `{ host, ... }:`), the `fromFunctionMatch` implementation evaluates the presence test once per context key, effectively sharing the intra-element tests. The `fired` set in `fixpoint` further reduces redundant evaluation: once an identified rule has been matched and fired, it is never re-tested in subsequent iterations -- analogous to how Rete's state preservation avoids re-evaluating patterns that haven't changed.
+**Negated patterns (S2.3).** Rete's NAND nodes implement patterns that must not be satisfied. A gen-dispatch rule's `nac` field is the analogue: a candidate rule survives only when its NAC does not match and its condition does.
 
-**Conflict resolution** (Forgy S1, step 2 -- "Select one production with a satisfied LHS"). Forgy's interpreter selects one instantiation from the conflict set; the selection mechanism is the conflict resolution strategy. gen-derive generalizes this to a three-tier resolution pipeline: override suppression (rules can explicitly replace others via `overrides`), priority sorting (numeric `priority`, with optional `exclusive` mode selecting only the highest-priority group), and specificity via the gen-select adapter. Forgy's paper leaves conflict resolution as a language-dependent operation (S4, TERM node: `UPDATECONFLICTSET(SELF(25:0))`); gen-derive makes it a first-class, extensible mechanism.
+**Compiled pattern tests (S2.2.1).** `fromFunction` builds a rule whose condition is the set of formal arguments of a Nix function, read with `builtins.functionArgs`. `fromFunctionMatch` tests that the context supplies every required argument. These are Rete's intra-element feature tests. Each rule's test runs on its own, with no network shared between rules.
 
-**Negative application conditions** (Forgy S2.3 -- negated patterns). Rete's NAND nodes implement negated patterns: conditions that must NOT be satisfied. gen-derive's `nac` field on rules is the direct analogue. The NAC is checked before the condition (dispatch sequence: NAC check -> condition match -> ...), exactly as Rete's negated pattern nodes filter before join nodes pass tokens downstream.
+**The outer loop is the caller's.** `dispatch` is a pure function of rules and context, and keeps no record of which rules fired on earlier passes. Forgy's outer cycle (S1 step 4, "Goto 1") is run by the caller, which threads domain state through repeated dispatch, for example with gen-scope's `circular`, and reads the actions at the fixed point. Because actions are recomputed from the converged state, they depend on that state and not on the order in which it was reached.
 
-**Incremental state between cycles** (Forgy S2.1, S2.2.3 -- saving information in the network). The Rete network's two-input nodes store tokens between cycles, avoiding re-evaluation of unchanged patterns. gen-derive's `fixpoint` maintains the `fired` set across iterations: identified rules that have already fired are recorded, and on subsequent iterations they are skipped without re-evaluating their conditions. This is the same principle -- state preservation eliminates redundant work when most of the "working memory" (context) is unchanged between cycles. The `fixpoint` loop models Rete's outer recognize-act cycle: dispatch (match), apply conflict resolution, fire (act), extract feedback (working memory changes), and repeat.
+Summary of the correspondence:
 
-**Token-like delta propagation** (Forgy S2.1.1 -- tokens as change descriptors). Rete processes deltas: `+` tokens for additions, `-` tokens for deletions. gen-derive's `fixpoint` similarly processes deltas: `extract` pulls new information from actions, `combine` merges it into the context (addition), and `eq` checks stability (no further deltas). The monotonic widening guarantee (context only grows) corresponds to a system where only `+` tokens are generated -- context keys are added but never removed, ensuring convergence.
+- `mkRule` is a Rete production (S1: LHS and RHS).
+- `condition` is the LHS patterns (S1; S2.2.1 intra- and inter-element features).
+- `produce` is the RHS actions (S1: MAKE, MODIFY, REMOVE).
+- `nac` is a negated pattern, the NAND node (S2.3).
+- `dispatch` is one recognize-act cycle (S1 steps 1-3).
+- `fromFunction` and `fromFunctionMatch` are compiled pattern tests (S2.2.1).
+- `mkActions` and the caller's `classify` manage the conflict set's instantiations as tagged values (S2).
+- Overrides, priority and `exclusive` generalise Forgy's conflict resolution step (S1 step 2).
 
-**Concrete function-to-section mapping:**
-- `mkRule` = Rete production (S1 production definition: LHS + RHS)
-- `condition` = Rete LHS patterns (S1, S2.2.1 intra/inter-element features)
-- `produce` = Rete RHS actions (S1: MAKE, MODIFY, REMOVE working memory)
-- `nac` = negated patterns / NAND node (S2.3)
-- `dispatch` = one cycle of the recognize-act loop (S1 steps 1-3)
-- `fixpoint` = the outer loop (S1 step 4: Goto 1) with state preservation (S2.2.3)
-- `fired` set = Rete's two-input node memories (S2.2.3: information stored between cycles)
-- `fromFunction` / `fromFunctionMatch` = compiled pattern matching (S2.2.1: compiling patterns into network)
-- `mkActions` / `classify` = conflict set management (S2 -- instantiations as tagged pairs)
-- Three-tier conflict resolution = generalization of Forgy's conflict resolution step (S1 step 2)
+### gen-memo
 
-### Relevance to Den v2 HOAG Pipeline
+gen-memo uses Rete's token vocabulary for changes. `applyDelta` records an input change, which is Forgy's `+` token (in Acar's terms the change `δ ⊕ σ`), and `applyEdgeDelta` replaces a node's edge set as `modify = delete + add` (S2.1.1). The rebuild that follows is Acar's change propagation, and the token vocabulary is Forgy's.
 
-Den v2 replaces hand-rolled policy dispatch with gen-derive. Policies are the production rules; entity context (host kind, user presence, platform) is the working memory; effects (spawn, edge, drop, reroute, inject) are the RHS actions.
+### Rules over a configuration graph
 
-**Policies as condition-action productions.** A den v2 policy like `({ host, ... }: [ fx.spawn "user" { } ])` is exactly Forgy's production: the function signature `{ host, ... }` is the LHS (pattern to match against entity context), and the body `[ fx.spawn ... ]` is the RHS (actions modifying the configuration graph). The `fromFunction` bridge in gen-derive compiles these into rules, and `fromFunctionMatch` evaluates them -- the policy's `builtins.functionArgs` become the intra-element feature tests of the Rete network.
-
-**Shared condition evaluation across policies.** In a typical den configuration, many policies test the same context keys: `host` is checked by nearly every host-level policy, `user` by every user-level policy. Forgy's structural sharing principle applies: `fromFunctionMatch` evaluates the presence of each context key once, and all policies that require that key benefit from the single check. In Rete terms, the shared `host` presence test is a one-input node near the root of the network, reached by all host-level policies.
-
-**Fixpoint convergence for entity discovery.** Den v2's scope graph construction is iterative: a host-level policy fires and spawns user-level entities, which widen the context, which enables user-level policies to fire, which may spawn further entities. This is Forgy's recognize-act cycle: working memory changes (new context keys from `spawn` effects) trigger new matches. gen-derive's `fixpoint` manages this loop, with `extract` pulling new entity context from spawn effects, `combine` merging it into the scope, and `eq` testing whether the entity graph has stabilized. The `fired` set ensures policies fire at most once per scope, preventing infinite loops -- the state preservation mechanism from Rete S2.2.3 applied to scope graph construction.
-
-**Phase stratification for effect ordering.** Den v2 requires structural effects (spawn, enrich) to complete before resolution effects (edge, drop, reroute) and collection effects (pipe routing). gen-derive's stratified phases, while primarily drawn from Datafun's stratification, also parallel Rete's implicit ordering: intra-element tests complete before inter-element joins, which complete before terminal node signaling. The phase DAG ensures spawn effects are processed before edge effects can reference the spawned nodes.
-
-**NACs for constraint propagation.** Den v2's `drop` effect (prune an aspect from resolution) maps to Rete's negated patterns: "this aspect must NOT be present in scope." A policy might declare `nac = sel.attrs { type = "aspect"; name = "logging"; }` to fire only when logging is absent from the current scope. The NAND node semantics -- pass only when the count is zero -- are the correct model for conditional absence.
+In a framework built on gen, entity context (host kind, user presence, platform) is the working memory, rules are the productions, and their actions change the configuration graph. A rule written as `({ host, ... }: [ ... ])` is a Forgy production: the argument pattern `{ host, ... }` is the LHS and the returned action list is the RHS. `fromFunction` turns it into a gen-dispatch rule. Rules that create entities widen the context, which lets further rules match, which is Forgy's recognize-act cycle with working memory growing between cycles.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Compiled discrimination network topology** (S2.2.1, S3.2, Fig. 2). Forgy's compiler builds an actual tree-structured network with shared one-input node prefixes, then linearizes it into instruction sequences with FORK/MERGE nodes. gen-derive evaluates conditions independently per rule via `match(condition, id, ctx)`. A true Rete network would precompute a discrimination tree over `builtins.functionArgs` signatures, routing context checks through shared prefix paths and avoiding redundant key-presence tests entirely. For configurations with hundreds of policies sharing common context key patterns, this could measurably reduce dispatch cost.
+- **A compiled discrimination network (S2.2.1, S3.2, Fig. 2).** Forgy's compiler builds a tree of one-input nodes with shared prefixes and linearises it into instructions with FORK and MERGE nodes. gen-dispatch tests each rule's condition separately through `match`. A discrimination tree over `builtins.functionArgs` signatures would test common context keys once along shared paths. With hundreds of rules sharing key patterns this could measurably reduce dispatch cost.
 
-- **Two-input join node memories** (S2.2.3). Rete's two-input nodes store partial matches persistently: when a token arrives on one side, it is joined against all stored tokens on the other. gen-derive's `fired` set tracks which rules have fired but does not cache partial match state. In a multi-position dispatch scenario (gen-derive's `fixpoint` running across many scope graph positions), caching partial match results between positions could avoid redundant condition evaluation.
+- **Two-input join memories (S2.2.3).** Rete's two-input nodes keep partial matches between cycles and join each arriving token against the stored tokens on the other side. gen-dispatch keeps no state between calls. When the caller dispatches repeatedly across many scope-graph positions, caching partial match results could avoid repeated condition tests.
 
-- **Linearized network representation** (S3.2, S4). Forgy's linearization converts the network DAG into a flat instruction stream with FORK (branch) and MERGE (join) pseudo-instructions, enabling a simple interpreter loop with a state stack. gen-derive's dispatch is structured as function calls. A linearized representation could be beneficial for very large rule sets where the overhead of Nix function calls dominates.
+- **Linearised network representation (S3.2, S4).** Forgy converts the network DAG into a flat instruction stream interpreted with a state stack. gen-dispatch is structured as function calls. For very large rule sets, where Nix function-call overhead dominates, a linearised form could help.
 
-- **Incremental modification via paired tokens** (S2.1.1). When a working memory element is modified, Rete sends a `-` token for the old value and a `+` token for the new value. gen-derive's `fixpoint` reprocesses all non-fired rules on each iteration. A paired-token model could enable true incremental re-evaluation: when context changes, only the affected rules are re-tested, not the entire rule set.
+- **Incremental re-matching with paired tokens (S2.1.1).** A modification in Rete sends a `-` token for the old value and a `+` token for the new one. Each `dispatch` call tests every candidate rule. A paired-token model would re-test only the rules a context change affects.
 
 ### Potential New Libraries or Features
 
-- **gen-rete: Compiled condition network.** A library that takes a set of rules with `builtins.functionArgs`-based conditions and compiles a discrimination DAG (Forgy S2.2.1). Shared prefix nodes would test common context keys once. The library would return a `dispatch` function that traverses the compiled network rather than iterating over rules. Scope: medium (~200 lines core). Depends on gen-algebra for identity. Useful for den configurations with 50+ policies where condition overlap is high.
+- **A compiled condition network.** Compile a rule set whose conditions come from `builtins.functionArgs` into a discrimination DAG (S2.2.1), with shared prefix nodes testing common context keys once, and return a `dispatch` that walks the network instead of iterating over rules. Useful where many rules overlap in the keys they test.
 
-- **Partial match caching for gen-derive fixpoint.** Extend `fixpoint` with optional two-input-node-style memories that cache condition evaluation results between iterations. When context changes, only rules whose conditions depend on changed keys are re-evaluated. This would require tracking which context keys each condition reads -- information already available from `builtins.functionArgs`. Scope: small extension to gen-derive (~50 lines). High impact for configurations with many fixpoint iterations.
+- **Partial match caching across repeated dispatch.** Cache condition results between calls, and re-test only the rules whose conditions read keys that changed. The keys each `fromFunction` rule reads are already known from `builtins.functionArgs`.
 
-- **Delta-driven context widening.** Replace gen-derive's current "reprocess all unfired rules" approach with Rete-style delta propagation: each `combine` step produces a set of changed keys, and only rules whose conditions reference those keys are re-tested. This narrows the per-iteration work from O(rules) to O(affected rules). Scope: moderate refactor of the fixpoint loop. Requires `fromFunctionMatch` to expose its key dependency set.
+- **Delta-driven re-matching.** Have each widening of the context report its changed keys, and re-test only the rules whose conditions reference them. That narrows each round from O(rules) to O(affected rules), and needs `fromFunctionMatch` to expose the keys it depends on.
 
 ### Research Directions
 
-- **Rete network sharing analysis for den policy sets.** Empirical study: given a real den configuration's policy set, what is the sharing factor of the compiled discrimination network? If most policies share `{ host, ... }` or `{ host, user, ... }` prefixes, the sharing factor could be very high, and a compiled network would provide significant constant-factor improvement.
+- **Sharing in real rule sets.** Given a real framework's rule set, measure the sharing factor of the compiled discrimination network. If most rules share `{ host, ... }` or `{ host, user, ... }` prefixes, the factor is high and a compiled network gives a large constant-factor gain.
 
-- **Lazy Rete for demand-driven evaluation.** Forgy's Rete is eager: all tokens propagate through the full network. In a Nix context where evaluation is demand-driven, a lazy Rete variant could defer node activation until downstream consumers demand results. This would combine Rete's incremental state with gen-scope's demand-driven evaluation model, potentially yielding an incremental demand-driven policy dispatch engine.
+- **Lazy Rete.** Rete propagates every token eagerly. In Nix, evaluation is demand-driven, and a lazy variant could activate nodes only when a downstream consumer demands a result, combining Rete's incremental state with gen-scope's demand-driven evaluation.
 
-- **Rete-like state for scope graph attribute caching.** gen-scope's `_eval` memoization caches computed attributes, but does not track dependencies between attribute computations. A Rete-style dependency network between attributes could enable incremental re-evaluation when scope graph structure changes (e.g., when gen-derive's fixpoint adds new nodes) -- re-computing only the attributes whose inputs changed, rather than relying on Nix's lazy evaluation to avoid redundant work. This connects to Mokhov 2018's build system traces and could enable truly incremental scope graph evaluation.
+- **Rete-like dependencies between attributes.** gen-scope memoises computed attributes on each node's `_eval` without recording which attributes a computation read. A Rete-style dependency network between attributes would allow recomputing only the attributes whose inputs changed when the scope graph's structure changes. gen-memo provides this decision for a caller-supplied dependency accessor, following Mokhov 2018's build-system traces.

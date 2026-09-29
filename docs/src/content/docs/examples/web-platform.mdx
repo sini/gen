@@ -1,0 +1,153 @@
+---
+title: A Web Platform
+description: Environments, datacenters and roles, with rules that decide which servers may connect.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<Aside type="caution">
+gen is pre-release and its API is still changing. This example is simplified for the docs.
+Full integration demos will be linked here once the framework interfaces built on gen are
+final.
+</Aside>
+
+A small web company runs six hosts. Each host has an environment (`dev` or `prod`), a
+datacenter (`us-east` or `us-west`) and a role (`webserver` or `database`). One rule decides
+the access list: a webserver may reach a database in the same environment, unless that
+database is quarantined.
+
+| host | environment | datacenter | role |
+|---|---|---|---|
+| `web-dev-east` | dev | us-east | webserver |
+| `web-prod-east` | prod | us-east | webserver |
+| `web-prod-west` | prod | us-west | webserver |
+| `db-dev-east` | dev | us-east | database |
+| `db-prod-east` | prod | us-east | database |
+| `db-prod-west` | prod | us-west | database, quarantined |
+
+The access list is a set of edges between hosts. gen-program solves the rule, and gen-graph
+queries the edges it produces.
+
+## The whole example
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  inherit (gen) program graph;
+
+  hosts = {
+    web-dev-east  = { env = "dev";  dc = "us-east"; role = "webserver"; };
+    web-prod-east = { env = "prod"; dc = "us-east"; role = "webserver"; };
+    web-prod-west = { env = "prod"; dc = "us-west"; role = "webserver"; };
+    db-dev-east   = { env = "dev";  dc = "us-east"; role = "database"; };
+    db-prod-east  = { env = "prod"; dc = "us-east"; role = "database"; };
+    db-prod-west  = { env = "prod"; dc = "us-west"; role = "database"; quarantined = true; };
+  };
+
+  names = builtins.attrNames hosts;
+  withRole = role: builtins.filter (h: hosts.${h}.role == role) names;
+  fact = head: relata: { inherit head relata; };
+
+  # (1) facts read off the host data
+  facts =
+    map (h: fact "role:${hosts.${h}.role}:${h}" [ h ]) names
+    ++ builtins.concatMap (w:
+         builtins.concatMap (d:
+           if hosts.${w}.env == hosts.${d}.env then [ (fact "sameEnv:${w}:${d}" [ w d ]) ] else [ ]
+         ) (withRole "database")
+       ) (withRole "webserver")
+    ++ map (h: fact "quarantined:${h}" [ h ])
+         (builtins.filter (h: hosts.${h}.quarantined or false) names);
+
+  # (2) the rule
+  rules = builtins.concatMap (w:
+    map (d: {
+      head = "reaches:${w}:${d}";
+      pos = [ "role:webserver:${w}" "role:database:${d}" "sameEnv:${w}:${d}" ];
+      neg = [ "quarantined:${d}" ];
+      relata = [ w d ];
+    }) (withRole "database")
+  ) (withRole "webserver");
+
+  # (3) solve
+  model = program.model {
+    prior = null;
+    program = program.program { frozen = names; declarations = facts ++ rules; };
+    interpretation = [ ];
+    complete = true;
+  };
+
+  # (4) turn each true `reaches` atom into an edge
+  acl = builtins.filter (e: e != null) (map (atom:
+    let parts = builtins.split ":" atom; in
+    if builtins.elemAt parts 0 == "reaches"
+    then { from = builtins.elemAt parts 2; to = builtins.elemAt parts 4; }
+    else null
+  ) model.trueAtoms);
+
+  # (5) query the result as a graph
+  g = {
+    edges = id: map (e: e.to) (builtins.filter (e: e.from == id) acl);
+    parent = _: null;
+    nodes = names;
+    nodeData = id: hosts.${id};
+  };
+in
+{
+  inherit acl;
+  reachableFromWebProdWest = graph.reachableFrom g "web-prod-west";
+  whoReachesDbProdEast = graph.dependents { } g "db-prod-east";
+  usEast = graph.select g (d: d.dc == "us-east");
+  quarantined = (model.resolve "reaches:web-prod-east:db-prod-west").included;
+}
+```
+
+1. Facts are rules with no conditions. They state each host's role, which webserver and
+   database pairs share an environment, and which hosts are quarantined.
+2. One rule per webserver and database pair. `pos` lists the atoms that must be true and
+   `neg` the atoms that must be false.
+3. `model` solves the program. Every atom is true, false or undefined.
+4. The caller maps each true `reaches` atom to an edge.
+5. The edges form an ordinary accessor graph, so every gen-graph query works on them.
+
+It evaluates to:
+
+```nix
+{
+  acl = [
+    { from = "web-dev-east";  to = "db-dev-east"; }
+    { from = "web-prod-east"; to = "db-prod-east"; }
+    { from = "web-prod-west"; to = "db-prod-east"; }
+  ];
+  reachableFromWebProdWest = [ "db-prod-east" ];
+  whoReachesDbProdEast = [ "web-prod-east" "web-prod-west" ];
+  usEast = [ "db-dev-east" "db-prod-east" "web-dev-east" "web-prod-east" ];
+  quarantined = false;
+}
+```
+
+No dev webserver reaches a prod database. `db-prod-west` is in `prod`, but its quarantine
+fact makes the negative condition fail, so no webserver reaches it. `web-prod-west` crosses
+datacenters to reach `db-prod-east`. To keep traffic inside a datacenter, add a
+`sameDc` fact and put it in the rule's `pos` list.
+
+## Each part, explained
+
+| part of the example | what it is | read more |
+|---|---|---|
+| hosts with environment, datacenter and role | nodes and their attributes | [Your Configuration as a Graph](/understand/graph/) |
+| `facts`, `rules`, `program.model` | a stratified logic program and its well-founded model | [Rules That Add Relationships](/understand/rules/) |
+| `pos`, `neg`, `model.resolve` | positive and negative conditions and each atom's verdict | [Rules](/features/rules/) |
+| `acl`, `g`, `reachableFrom`, `dependents`, `select` | edges and queries over them | [Graphs and Queries](/features/graphs/) |
+| asking why an edge exists | gen-inspect over the program and its model | [Inspection](/features/inspection/) |
+
+In a full configuration the hosts are instances in a registry, as in [A
+Homelab](/examples/homelab/), and the firewall rules on each database host are built from
+`whoReaches…` queries like the one above.
+
+<CardGrid>
+  <LinkCard title="A Homelab" href="/examples/homelab/"
+    description="Two hosts, two users and three features, built into NixOS systems." />
+  <LinkCard title="Which Tool for Which Job" href="/understand/choosing/"
+    description="Rules, views, aspects or delivery: which one fits a goal." />
+</CardGrid>

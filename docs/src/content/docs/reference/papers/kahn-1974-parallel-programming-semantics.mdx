@@ -1,8 +1,6 @@
 ---
 title: "Kahn (1974) -- The Semantics of a Simple Language for Parallel Programming"
 description: "Our reading of The Semantics of a Simple Language for Parallel Programming.."
-source:
-  - den-ag-design:used/summaries/kahn-1974-parallel-programming-semantics.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -10,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 <Aside type="note" title="The paper">
 G. Kahn, "The Semantics of a Simple Language for Parallel Programming.," *IFIP Congress*, 1974.
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -53,64 +51,59 @@ Section 5 establishes results on parallel program schemata (uninterpreted networ
 
 - **Deadlock analysis via the length function.** The continuous `length` mapping from D-omega to the completed naturals enables deadlock proofs: if length(X) satisfies an equation whose only solution is infinity, all processes run forever.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+gen takes Kahn's demand discipline, with monotone data produced incrementally as it is requested, and does not take KPN determinism. Kahn's determinism comes from each channel having exactly one writer. gen's channels are cells that several views can write, so their determinism comes from a canonical ordering of each cell's contents instead.
 
-#### gen-graph (Minor)
+### gen-graph
 
-gen-graph's accessor-based lazy traversal aligns with Kahn's incremental production model (S2.2.4). The INDEX.md records this as a minor influence.
+gen-graph queries take accessor functions (`edges`, `parent`, `nodes`, `nodeData`) instead of materialised data. Wired to gen-scope's memoised `result.get`, each `edges id` call evaluates only the node it visits. Traversals such as `reachableFrom` and `canReach` (breadth-first through `builtins.genericClosure`) force only the nodes they reach. This matches Kahn's model of a station producing output incrementally as input arrives: gen-graph requests edges on demand and gen-scope produces them lazily.
 
-**Lazy accessor pattern as Kahn channel semantics.** gen-graph queries take accessor functions (`{ edges, parent, nodes, nodeData }`) rather than materialized data. When wired to gen-scope's memoized `result.get`, each `edges id` call triggers evaluation only for the visited node. Traversal operations like `reachableFrom` and `canReach` (C-level BFS via `builtins.genericClosure`) only force the nodes they reach -- nodes never visited are never evaluated. This mirrors Kahn's model where a computing station produces output incrementally as input arrives: gen-graph "requests" edge data from gen-scope on demand, and gen-scope "produces" it lazily. The monotonicity property holds: once a node's attribute is evaluated, the result only grows (more edges may be discovered in memoized caches, but none are removed).
+gen-graph's pre-order traversals (`foldPreorder`, `expandPreorder`, `foldReach`) cite Kahn 1974 for the same property. A frame is forced only when the traversal reaches it, so its successors can be generated on demand, and a key already marked visited prunes its whole subtree without forcing it.
 
-**Concrete mapping:**
-- Accessor functions = Kahn channels (data flows through function calls, not shared state)
-- `builtins.genericClosure` BFS = a computing station consuming channel data as it arrives
-- Nix lazy evaluation = Kahn's delay rule: "start unfolding a recursive call when output is requested, not when input is presented" (S4)
-- `_eval` memoization in gen-scope = channel history: once produced, values persist and grow monotonically
+- Accessor functions play the part of Kahn channels: data flows through function calls, with no shared state.
+- A `builtins.genericClosure` traversal is a station consuming channel data as it arrives.
+- Nix's lazy evaluation is Kahn's delay rule: "start unfolding a recursive call when output is requested, not when input is presented" (S4).
+- gen-scope's memoisation on each node's `_eval` plays the part of channel history: once produced, a value persists.
 
-### Relevance to Den v2 HOAG Pipeline
+### gen-product
 
-Kahn process networks are an **informed-by** lens for den v2's pipe data flow over scope graphs — a useful intuition for the demand-driven, monotone, lazy flow. They are **NOT** the source of collection determinism: `pipe.gather` has multiple writers, violating Kahn's single-writer condition (the source of KPN determinism). Determinism comes from a pinned traversal order plus an associative combine (see `den-hoag/REFERENCE.md` line 23 and `den-hoag/ISSUES.md` #10), not from KPN. The claims below are deliberately scoped to laziness/monotonicity, not to determinism.
+gen-product builds graph products (cartesian, tensor, strong, lexicographic) as accessor-graphs, lazy in and lazy out, and cites Kahn 1974 for demand-driven accessors. Its containment chains and adjacency never force a factor's nodes or a slice's structure, with one documented exception in membership testing.
 
-**Pipes resemble Kahn channels (informed-by).** Den v2 collections (declared via `den.collections`) are named data aggregation points where multiple scopes contribute values. Pipe operators (`pipe.from`, `pipe.gather`, `pipe.ascend`, `pipe.source`, `pipe.target`, `pipe.channel`) route collection data through the scope graph. Each pipe carries typed data (module lists, configuration fragments) and data flows in one direction. **But the analogy breaks on the load-bearing property:** a Kahn channel has exactly one writer and determinism follows from that; `pipe.gather` is *multi-writer*. Contribution order comes from the collection's pinned traversal order fed to a left fold, **not** from a single-writer FIFO — so the FIFO-determinism mapping does not hold.
+### gen-view: channels with several writers
 
-**Monotonicity enables lazy/demand-driven evaluation (not determinism).** Kahn's central insight -- monotonicity enables parallel execution because partial input suffices for partial output (S2.2.4a) -- maps directly to den v2's demand-driven HOAG evaluation. (This is the laziness/monotonicity half of the analogy, which holds; the determinism half does not — see above.) When gen-scope evaluates a scope node's attributes, it does not require all pipe data from all contributing scopes to begin producing output. A host node can begin assembling its NixOS configuration while user-level pipe data is still being computed. Once a value is produced at a scope node, it only grows: more modules may be added to a collection, but none are removed. This is the monotonicity property that makes Nix's lazy evaluation a correct implementation strategy for the pipe network.
+gen-view materialises views into cells keyed by scope and channel. Two views may write the same cell, which is the ordinary case. Kahn's single-writer condition therefore does not hold, and gen does not rely on KPN semantics for determinism. A cell's contents are ordered by each producing definition's fixed sort key, never by arrival, so every valid schedule gives the same result.
 
-**Scope graph as Kahn network topology.** The scope graph (P-edges for parent/lexical scope, I-edges for imports) defines the network topology through which pipe data flows. Each scope node is a Kahn "computing station" that consumes input from its import edges and parent edge, performs computation (attribute evaluation), and produces output on its channels (collection contributions, class module fragments). The `pipe.gather` operator traverses import edges to collect data -- equivalent to a Kahn station reading from multiple input channels. The `pipe.ascend` operator propagates data along P-edges -- a station forwarding input to its parent channel.
+### Monotonicity and the delay rule
 
-**Compositionality (Scott Property 2) justifies aspect substitution.** Property 2 states that the minimal solution is continuous in the operators of the system. In den v2, this means replacing an aspect's internal implementation (e.g., swapping a monolithic aspect for a composed set of sub-aspects with `includes`) does not perturb the rest of the system, provided the external channel interface (collection contributions and class output) is preserved. This is precisely den's top-down design property: aspects are interchangeable subsystems in a Kahn network.
+Kahn's central observation is that monotone processes can run on partial input and produce partial output (S2.2.4a). gen-scope's demand-driven evaluation relies on the same property: a node's attributes can begin producing output before every contributing node has been evaluated. Nix is single-threaded, and Kahn's corollary to Property 2, that a parallel program can be simulated sequentially under fair scheduling, says a sequential lazy evaluation gives the same result, provided every demanded thunk is eventually forced.
 
-**Fixpoint equations model circular pipe dependencies.** When pipe data flows in cycles (e.g., a collection that contributes to an aspect that in turn contributes back to the collection), the den v2 pipeline must find the minimal fixpoint of the resulting equation system. gen-scope's `circular` attribute combinator and gen-derive's fixpoint convergence loop implement Kahn's Property 1 (Kleene ascending chain) over the scope graph: starting from empty collections (Lambda), iteratively computing until stable. Monotonicity of the pipe operations guarantees convergence.
-
-**Delay rule = Nix lazy evaluation.** Kahn identifies the correct strategy for recursive process networks (S4): "start unfolding a recursive call when output is requested, not when input is presented -- basically the delay rule of Vuillemin." Nix's lazy evaluation IS this delay rule. gen-scope's `_eval` cache is a lazy attrset: attribute computations are thunks that evaluate only when demanded. This means den v2's pipe network naturally implements Kahn's recommended strategy for recursive parallelism without explicit scheduling.
-
-**Sequential simulation correctness.** Kahn's Property 2 corollary -- a parallel program can be safely simulated on a sequential machine with fair scheduling -- is directly relevant. Nix evaluation is single-threaded and sequential. The Kahn model guarantees that this sequential evaluation produces the same result as a hypothetical parallel evaluation of the scope graph, provided the evaluation order is "fair enough" (every demanded thunk is eventually forced). Nix's lazy evaluation is fair in this sense: any thunk that contributes to the final output is eventually forced by the demand chain.
+Property 1, the minimal solution as the limit of a Kleene ascending chain, is the model for circular attributes. gen-scope's `circular` iterates from a declared bottom element until the value is stable, and monotonicity of the step guarantees convergence.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Deadlock analysis via the length function (S3, Example 2).** Kahn proves deadlock freedom by showing that channel lengths satisfy equations whose only solution is infinity. Den v2 has no static deadlock analysis for pipe networks. A circular collection dependency that cannot converge (non-monotone pipe operation) would currently manifest as a Nix infinite recursion error, not a diagnosed deadlock. The length-function technique could provide static detection of pipe configurations guaranteed to produce output (liveness) or guaranteed to deadlock.
+- **Deadlock analysis through the length function (S3, Example 2).** Kahn proves deadlock freedom by showing that channel lengths satisfy equations whose only solution is infinity. gen has no static liveness analysis for data flowing between scopes. A circular dependency that cannot converge shows up as Nix's infinite-recursion error or an iteration cap. The length-function technique could classify flows statically as guaranteed to produce output or guaranteed to deadlock.
 
-- **Schema equivalence (S5, Theorems 1-4).** Kahn proves that uninterpreted parallel program schemata have decidable equivalence and unique minimal forms. Den v2 aspects are essentially interpreted schemata (the process functions are known). The uninterpreted schema theory could be applied to detect structurally equivalent aspect network topologies -- e.g., two different arrangements of `includes` and `neededBy` edges that produce identical pipe flow patterns. Theorem 2's unique minimal schema could identify redundant edges in aspect composition graphs.
+- **Schema equivalence (S5, Theorems 1-4).** Kahn proves that uninterpreted schemata have decidable equivalence and unique minimal forms. Applied to aspect composition graphs, Theorem 2 could identify two arrangements of include edges that produce the same data flow, and find redundant edges.
 
-- **Minimal equation systems via minimal cuts (S5, Theorem 3).** The minimal set of equations needed to characterize a parallel program corresponds to the minimal cuts of the schema graph. For den v2 diagnostics, this could identify the minimal set of scope nodes whose collection values fully determine all other collection values in a subnetwork -- the "critical path" through a pipe network.
+- **Minimal equation systems through minimal cuts (S5, Theorem 3).** The minimal set of equations characterising a program corresponds to the minimal cuts of its schema graph. For diagnostics this would identify the smallest set of scope nodes whose values determine all others in a subnetwork.
 
-- **Recursive parallel programs with unbounded processes (S4).** Kahn extends to networks where an unbounded number of stations compute in parallel, with fixpoint equations over both sequences and continuous mappings. Den v2's parametric aspects (guard functions that instantiate per-entity) create unbounded process families at evaluation time. The functional fixpoint theory (equations over continuous mappings, not just sequences) could formalize the semantics of parametric aspect families more precisely than the current ad hoc treatment.
+- **Recursive programs with unbounded processes (S4).** Kahn extends the model to networks with an unbounded number of stations, with fixpoint equations over sequences and continuous mappings. Parametric aspects, instantiated once per entity during evaluation, create unbounded families of this kind, and the functional fixpoint theory could give them a precise semantics.
 
 ### Potential New Libraries or Features
 
-- **Static pipe network analyzer.** A diagnostic tool that takes a den v2 aspect graph and extracts the induced Kahn network (pipe topology), then applies Kahn's length-function technique to classify each pipe as: (a) guaranteed to produce output (liveness), (b) potentially deadlocked (circular dependency without monotone convergence), or (c) conditionally live (depends on guard function evaluation). Scope: medium. Would consume gen-graph for topology analysis and gen-scope for attribute inspection. Could be a gen-graph extension or a standalone `gen-liveness` library. Interaction: reads gen-scope's `_eval` cache to determine which attributes contribute to which collections; uses gen-graph's `cycles` and `canReach` to identify circular pipe flows.
+- **A liveness analyser.** Extract the data-flow network a configuration induces between scopes and apply Kahn's length function to classify each flow as live, possibly deadlocked, or conditionally live depending on guards. gen-graph's `cycles` and `canReach` would find the circular flows.
 
-- **Aspect schema minimization.** Apply Theorem 2 (unique minimal schema) to den v2 aspect composition graphs. Given an aspect network, compute the minimal equivalent network by identifying and eliminating redundant `includes`/`neededBy` edges -- edges whose removal does not change any collection value at any scope node. Scope: small-medium. Would be a gen-graph query combinator operating on the aspect topology. Useful for den v2 diagnostics ("this includes edge is redundant") and potentially for optimization (fewer edges = fewer gen-scope attribute evaluations).
+- **Aspect graph minimisation.** Apply Theorem 2 to aspect composition graphs: compute the minimal equivalent network by removing include edges whose removal changes no value at any node. Useful for diagnostics ("this include is redundant") and for evaluation cost.
 
-- **Pipe network visualization as Kahn schema.** Extend den's diagram generation (`nix/lib/diag/`) to render pipe networks as Kahn-style schemata (Figure 2 in the paper): nodes for scope types, directed edges for pipes with type labels, input/output boundary edges for external data. The existing Mermaid/DOT generators could be extended with a "pipe flow" view. Scope: small. Consumes gen-graph `materialize` for the edge map and gen-scope node metadata for labels.
+- **Data-flow views as Kahn schemata.** Render the flows between scopes in the style of the paper's Figure 2, with nodes for scope kinds, labelled directed edges for flows and boundary edges for external data. gen-inspect's renderers over gen-graph's `materialize` could supply this.
 
 ### Research Directions
 
-- **Non-determinism extension.** Kahn explicitly notes (S6) that his model "can produce only determinate programs" and that extending to non-deterministic parallel programs is "far from obvious." Den v2 has no non-determinism, but future features like priority-based aspect conflict resolution (where the winner depends on evaluation order) could introduce it. The WARN primitive Kahn describes (S6, iv) -- which outputs on either of two input events -- is a prototype for non-deterministic merge. Understanding the boundaries of determinism in den's pipe model would clarify which future features are safe.
+- **Non-determinism.** Kahn notes (S6) that his model "can produce only determinate programs" and that extending it to non-deterministic programs is "far from obvious". gen's results do not depend on evaluation order. A future feature whose winner depended on evaluation order would introduce non-determinism, and Kahn's WARN primitive (S6, iv), which outputs on either of two input events, is a prototype of non-deterministic merge. Knowing the boundary of determinism would show which future features are safe.
 
-- **Quantitative pipe flow analysis.** Kahn's length function is qualitative (finite vs. infinite). A quantitative extension -- tracking the volume of data flowing through each pipe -- could inform den v2 performance optimization. Pipes that carry large volumes of module fragments are candidates for caching or batching. gen-graph's `materialize` + edge counting could provide the raw data; the analysis would compute "flow rates" as attribute values in gen-scope.
+- **Quantitative flow analysis.** Kahn's length function is qualitative (finite or infinite). Tracking the volume of data flowing between scopes would point to flows worth caching or batching.
 
-- **Categorical formulation of the pipe algebra.** Kahn's framework is implicitly categorical (continuous functions form a category, parallel composition is a tensor). Making this explicit could unify den v2's pipe operators (`pipe.from`, `pipe.gather`, `pipe.ascend`) as morphisms in a category of scope-graph-indexed channels, enabling algebraic reasoning about pipe network transformations. This connects to Mokhov 2017 (algebraic graphs) -- the pipe algebra would be a typed overlay on the scope graph algebra.
+- **A categorical formulation.** Kahn's framework is implicitly categorical: continuous functions form a category and parallel composition is a tensor. Stating gen's data-flow operations as morphisms in a category of scope-indexed channels would support algebraic reasoning about network transformations, connecting to Mokhov 2017's algebraic graphs.

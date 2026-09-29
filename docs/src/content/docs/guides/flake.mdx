@@ -1,19 +1,20 @@
 ---
-title: Add gen to a flake
-description: Wiring the hub, and what each input is for.
+title: Add gen to a Flake
+description: Use one library directly, or wire the hub to build NixOS systems.
 source:
   - README.md
 ---
 
 import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-There are two ways to bring gen into a flake, and the second one is optional.
+<Aside type="caution">gen is pre-release and its API is still changing.</Aside>
+
+You can bring gen into a flake in two ways. Take one library's `.lib` when you need one
+feature. Import the hub's flake-parts module when you want a gen module tree built into
+`nixosConfigurations`.
 
 <Tabs>
 <TabItem label="One library">
-
-Take a single library's `.lib` and use it directly. This is [Getting started](/guides/getting-started/)
-in full — no hub input, no framework surface:
 
 ```nix
 {
@@ -24,65 +25,111 @@ in full — no hub input, no framework surface:
       graph = gen-graph.lib;
     in
     {
-      # … use graph.reachableFrom / graph.roots / … directly
+      # use graph.reachableFrom, graph.roots, ... directly
     };
 }
 ```
 
-A consumer reading `inputs.gen-X.lib` never needs this hub repository at all.
+A flake that reads `inputs.gen-<name>.lib` does not need the hub. [Getting
+Started](/guides/getting-started/) is a complete example.
 
 </TabItem>
 <TabItem label="The hub">
 
-The hub (this repository) publishes the roster and one flake-parts module for the full
-compose-to-NixOS route:
+```nix
+{
+  inputs = {
+    gen.url = "github:sini/gen";
+    nixpkgs.follows = "gen/nixpkgs";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  };
 
-```nix file=<rootDir>/README.md#L120-L126
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.gen.flakeModules.default ];   # (1)
+      systems = [ "x86_64-linux" ];
+
+      gen = {
+        tree = ./gen-modules;                          # (2)
+        aspectCnf = import ./aspect-cnf.nix;           # (3)
+        nodeRegistryPath = [ "hosts" ];                # (4)
+        extraModules.laptop = [ ./hardware/laptop.nix ]; # (5)
+      };
+    };
+}
 ```
+
+1. The hub's flake-parts module. It composes the tree and sets `flake.nixosConfigurations`.
+2. A directory of gen modules. The `.nix` files in it are loaded as gen modules.
+3. The declaration of which aspect keys are classes. The tree reads the same file.
+4. Required. The attribute path of the registry whose members become systems.
+5. NixOS modules added to one system, such as its hardware configuration.
 
 </TabItem>
 </Tabs>
 
-## What each hub input does
+[From an Aspect to a NixOS System](/guides/aspects-to-nixos/) fills in `gen-modules/` and
+builds the systems.
 
-Wiring `inputs.gen.flakeModules.default` gets you three options and one module argument.
+## The hub options
 
-- **`gen.tree`** — a directory of gen definition modules: the nodes and relations you
-  declare, the same shape [Your first graph](/guides/first-graph/) builds by hand at the
-  library level.
-- **`gen.aspectCnf`** — the key-category declaration the delivery projection classifies
-  against. It has **no default**. A delivery class realizes only on content declared
-  through it, never by guessing from a value's shape — so with no `aspectCnf` supplied,
-  the hub refuses by name rather than falling back to a shape test. `gen.tree`'s own
-  `mkAspectSchema` call takes the exact same argument, so the honest way to wire this is
-  one file, imported by both:
+`inputs.gen.flakeModules.default` declares these options under `gen`:
 
-  ```nix
-  # gen-modules/_aspect-cnf.nix, imported by both the tree and the flake
-  gen.aspectCnf = import ./gen-modules/_aspect-cnf.nix;
-  ```
-- **`gen.extraModules.<name>`** — per-node platform modules (hardware configuration, the
-  base NixOS profile) that ride alongside what the tree composes. They reach the `nixos` system
-  only, and a node with no NixOS content of its own is refused by name rather than silently
-  skipped. Key them from your own node list, not from `nixosConfigurations`, which would loop.
-- **`genValues`** — the module argument your ordinary NixOS modules read the resolved
-  graph through:
+| option | default | what it sets |
+|---|---|---|
+| `tree` | `null` | A directory of gen modules. They are merged by gen's own module system, gen-merge, and never by nixpkgs. |
+| `modules` | `[ ]` | More gen modules, added to the tree. |
+| `specialArgs` | `{ }` | Extra module arguments for the tree, merged over the gen libraries the hub passes in. |
+| `aspectCnf` | none | The `mkAspectSchema` argument: which aspect keys are classes, such as `nixos`, and which are channels. Required. Without it the build fails with an error. |
+| `nodeRegistryPath` | none | The attribute path, in the composed values, of the registry holding the systems to build, for example `[ "hosts" ]` or `[ "fleet" "hosts" ]`. Required. A missing path fails with an error listing the top-level keys. A wrong path fails with an error naming the segment it could not find and the keys present beside it. |
+| `extraModules.<node>` | `{ }` | NixOS modules added to one node's system. A node with no `nixos` content fails with an error. Key this from your own node list, never from `nixosConfigurations`. |
+| `nixpkgs` | `inputs.nixpkgs` | The nixpkgs whose `lib.nixosSystem` builds each system. `null` removes the default `nixos` terminal. |
+| `terminals` | `{ }` | One terminal per class: the function that turns a node's modules into a built artifact. A default `nixos` terminal is added unless you supply one. |
+| `inject` | `{ genValues = …; }` | Values passed to your flake-parts modules as module arguments. |
+| `injectPerSystem` | `false` | Also pass `inject` to every `perSystem` module. |
 
-  ```nix file=<rootDir>/README.md#L140-L145
-  ```
+Two read-only values let you look at the result: `gen.composed` (the composed values) and
+`gen.realized` (every built artifact, keyed by class and node). `flake.nixosConfigurations`
+is `gen.realized.nixos`.
 
-<Aside type="caution">
-`flakeModules.default` is the **interim** entry surface — rehomed here when gen-flake
-dissolved, and the settled framework interface arrives later. The shape above is real and
-current, but it is a surface still moving, not a stable v1 API to build tooling against.
-</Aside>
+Name one registry in `nodeRegistryPath`. To build systems from several registries, declare
+an option in your tree that merges them with `mkMerge`, and name that option's path.
+
+## Module arguments
+
+Modules in `gen.tree` receive the gen libraries they build with: `genMerge`, `genSchema`,
+`genAspects`, `genTypes` and `genPrelude`. Add others through `gen.specialArgs`.
+
+Your ordinary flake-parts modules receive the composed values as `genValues`:
+
+```nix
+{ genValues, ... }:
+{
+  flake.hostNames = builtins.attrNames genValues.hosts;
+}
+```
+
+To get library arguments in your flake-parts modules too, import
+`inputs.gen.flakeModules.genLibs`. It adds `genAlgebra`, `genSchema`, `genAspects`,
+`genScope`, `genGraph`, `genSelect`, `genBind` and `genDispatch`.
+
+## The whole library set
+
+`inputs.gen.lib.mkGenLibs { }` returns every gen library under a short name:
+`graph`, `merge`, `schema`, `aspects`, `program` and the rest. Each value is the same as
+`inputs.gen-<name>.lib`.
+
+```nix
+let gen = inputs.gen.lib.mkGenLibs { }; in
+gen.graph.reachableFrom g "web"
+```
 
 ## An outputs terminal over flake-parts
 
-gen-bind's `crossing.mkOutputsTerminal evaluate` is a terminal over whatever `evaluate` you hand
-it, and it names no module system. The hub's `lib.flakePartsEvaluate` is that `evaluate` for
-flake-parts: you supply flake-parts' own `evalFlakeModule`, and it returns the body's `flake`
-outputs.
+A terminal can build flake outputs as well as NixOS systems. gen-bind's
+`crossing.mkOutputsTerminal` takes an `evaluate` function. The hub's
+`lib.flakePartsEvaluate` is that function for flake-parts:
 
 ```nix
 genBind.crossing.mkOutputsTerminal (inputs.gen.lib.flakePartsEvaluate {
@@ -92,31 +139,14 @@ genBind.crossing.mkOutputsTerminal (inputs.gen.lib.flakePartsEvaluate {
 })
 ```
 
-`lib.flakePartsEvaluate` is **interim** in the same way as `flakeModules.default`, and it leaves
-with that surface.
-
-## The hub is optional
-
-Nothing above is required to use gen. `mkGenLibs` hands you the whole roster under short
-keys (`genLibs.graph`, `genLibs.merge`, …), and `gen.lib.substrate` / `gen.lib.modules` /
-`gen.lib.aspects` / `gen.lib.framework` give you one stratum of it at a time. Both are
-selections from the same roster, not re-exports — so a bucket path and the flat library
-name are one build, never two evaluations of the same source. If you only ever read
-`inputs.gen-graph.lib` or `inputs.gen-scope.lib` directly, as the first tab above does,
-you can ignore this repository entirely.
-
-## What this page doesn't get you to
-
-Populating `gen.tree` with real declarations, and turning that into a booting NixOS host,
-is a framework's job — the tree is the shape [den](https://github.com/denful/den) builds
-its own vocabulary on top of. This page shows the wiring surface, honestly, rather than a
-worked host: there is no generic `gen.tree` example that builds a real machine, because
-what goes in it is exactly the part a framework supplies. For a graph you can build and
-query today, with every step run and verified, see the two guides below.
+<Aside type="caution">
+`flakeModules.default` and `lib.flakePartsEvaluate` are an interim entry point. A framework
+interface will replace them. Expect their options to change.
+</Aside>
 
 <CardGrid>
-  <LinkCard title="Getting started" href="/guides/getting-started/"
-    description="One library, no hub, a resolved graph in two commands." />
-  <LinkCard title="Your first graph" href="/guides/first-graph/"
-    description="Declaring nodes, relating them, and reading the result back." />
+  <LinkCard title="From an Aspect to a NixOS System" href="/guides/aspects-to-nixos/"
+    description="Fill the tree with hosts and aspects and build them." />
+  <LinkCard title="Delivery" href="/features/delivery/"
+    description="Projection, terminals and realization in full." />
 </CardGrid>

@@ -1,0 +1,53 @@
+---
+title: Roadmap
+description: What gen ships now, what comes next, and what is planned later.
+---
+
+This page groups gen's work by theme. It carries no dates. Everything under Next and Later is
+planned, not shipped.
+
+## Now
+
+These ship today and are tested on every push under upstream Nix, Determinate Nix and Lix.
+
+- **Graphs and queries.** Reachability, ordering, cycles, path queries over edge labels, node
+  selectors and product graphs. See [Graphs and Queries](/features/graphs/).
+- **Typed configuration without nixpkgs.** A module system with priorities, conditions, submodules
+  and freeform types, which records which file set every value. See
+  [Typed Configuration](/features/configuration/).
+- **Kinds and identity.** Typed registries of hosts, users or anything else, each instance with an
+  identity derived from its content. See [Kinds, Registries and Identity](/features/registries/).
+- **Aspects.** Reusable features with content per class, includes between them, and aspect graphs
+  combined from several flakes. See [Aspects](/features/aspects/).
+- **Rules.** Rules with positive and negative conditions, solved together as one logic program,
+  with conflicting rules reported as undefined. See [Rules](/features/rules/).
+- **Evaluation and incremental rebuild.** Values computed on demand, and rebuilds that reuse
+  unchanged work with output identical to a full rebuild. See [Evaluation](/features/evaluation/)
+  and [Incremental Rebuild](/features/incremental/).
+- **Delivery.** Each node's configuration handed to builders you supply, such as a NixOS system
+  builder, plus a flake-parts module for the whole route. See [Delivery](/features/delivery/).
+- **Inspection.** SQL queries over the graph, answers to why an edge exists, and diagrams. See
+  [Inspection](/features/inspection/).
+
+## Next (planned, not shipped)
+
+- **One grammar across the libraries.** Consistent names, argument shapes and options on every
+  public function, so that knowing one library tells you how to call the next.
+- **A shorter path from rules to systems.** The results of rules become edges in the graph
+  directly, delivery follows the includes between aspects, and one evaluator runs the whole path.
+- **Errors that name their cause.** Failures reported against the node and feature that caused
+  them, built on stable identity.
+- **The first framework on the full toolkit.** A configuration framework built on all of gen's
+  libraries from the start, exposing them to its power users.
+
+{/* DRAFT for the owner: the Later section below is a seeded draft. Edit freely. */}
+
+## Later (planned, not shipped)
+
+- **A second framework.** A second configuration framework built on gen's libraries.
+- **gen's extensions for every module system.** Identity, argument injection, provenance and
+  rules offered to modules written for any framework.
+- **Interactive graph tools.** Rendering and exploring a configuration's graph as you work on it.
+- **Layered settings.** Settings resolved against ordered override layers, with the full chain of
+  where each value came from, promoted from experimental.
+- **A first stable release.** A versioned API with a compatibility promise.

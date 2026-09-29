@@ -1,0 +1,91 @@
+---
+title: Automatic Argument Injection
+description: A module names the values it needs, such as the host it configures, and gen passes them in, with optional checks on each value (implicit parameters).
+---
+
+The homelab's `monitoring` feature needs to know which host it is running on, so that it can
+publish a scrape target such as `server:9100`. The feature is written once, and both hosts could
+use it. The module asks for `host` in its argument list, and gen supplies the right host for each
+use.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  # A feature module that asks for the host it configures.
+  monitoring = { host, ... }: {
+    monitoring.target = "${host.name}:9100";
+  };
+
+  forServer = gen.bind.wrap {
+    bindings.host = { name = "server"; };
+  } monitoring;
+
+  server = m.evalModuleTree {
+    modules = [
+      { options.monitoring.target = m.mkOption { type = m.types.str; }; }
+      forServer.module
+    ];
+  };
+in
+server.config.monitoring.target
+```
+
+```text
+"server:9100"
+```
+
+## How it works
+
+`wrap` reads the argument names the module declares. For each name that has a binding, it passes
+the bound value in. Arguments without a binding, such as `config` or `lib`, are left for the
+module system to supply as usual. Bindings the module does not ask for are ignored, so one set of
+bindings can serve every feature a host uses.
+
+The wrapped result also describes the module's interface. `forServer.signature` lists the
+arguments that were bound and the ones still required, so a framework can check a module's needs
+before it evaluates anything. If a module asks for `host` and nothing binds it, evaluation fails
+with:
+
+```text
+gen-merge: module argument `host' is not defined
+```
+
+## Checking what is passed in
+
+A binding can carry a contract and a note of where its value came from:
+
+```nix
+gen.bind.wrap {
+  bindings.host = { name = "server"; };
+  contracts.host = gen.bind.contract.hasFields [ "name" "system" ];
+  provenance.host = { source = "homelab"; scope = "host=server"; };
+} monitoring
+```
+
+The host value above has no `system` field, so reading it fails with a message that names the
+missing field and the source:
+
+```text
+gen-bind: contract violation: value must have fields: name, system
+(provided by 'homelab' at scope 'host=server')
+```
+
+The contract runs when the module reads `host`. A module that never reads a binding never pays
+for its check.
+
+When a binding has the same name as an argument the module system already provides, such as
+`lib`, the binding wins by default. You can choose per name to let the module system win or to
+make the collision an error.
+
+## The theory
+
+An **implicit parameter** is a value a function uses without every caller passing it by hand.
+The nearest enclosing binding supplies it. Lewis et al. showed how to give such parameters static
+types, so a function's type records which implicit values it needs. A gen module's argument list
+plays the same role: it declares what the module needs, and the framework binds it where the
+module is used. See our reading of
+[Lewis et al. (2000)](/reference/papers/lewis-2000-implicit-parameters/).
+
+Next: [Rules That Add Relationships](/understand/rules/).

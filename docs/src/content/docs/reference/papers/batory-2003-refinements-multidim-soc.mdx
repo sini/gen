@@ -1,8 +1,6 @@
 ---
 title: "Batory, Liu & Sarvela (2003) — Refinements and Multi-Dimensional Separation of Concerns"
 description: "Our reading of Refinements and multi-dimensional separation of concerns."
-source:
-  - den-ag-design:reference-catalog/summaries/batory-2003-refinements-multidim-soc.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ D. Batory, J. Liu, and J. N. Sarvela, "Refinements and multi-dimensional separat
 
 [doi:10.1145/940071.940079](https://doi.org/10.1145/940071.940079)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -35,7 +33,7 @@ The macro examples — the Bali matrix (2D, 4x4, programs of ~14K LOC, Section 3
 
 ## Key Concepts
 
-- **Tyranny of the dominant decomposition** — Traditional software privileges one modularization dimension (classes, procedures). All other concerns cross-cut it. Batory 2003 reads MDSOC as eliminating this privilege by treating all dimensions equally; Tarr 1999's own construct keeps the dominant dimension and adds hyperslices for the others (§3.2 — equality language measures 0 in that paper, `dominant` fires 19 times).
+- **Tyranny of the dominant decomposition** — Traditional software privileges one modularization dimension (classes, procedures). All other concerns cross-cut it. Batory 2003 reads MDSOC as eliminating this privilege by treating all dimensions equally; Tarr 1999's own construct keeps the dominant dimension and adds hyperslices for the others (§3.2).
 
 - **N-dimensional concern space** — Software artifacts are points in an N-dimensional space. Each dimension is a modularization: classes, features, aspects, operations, structure variants. No dimension is inherently primary.
 
@@ -49,89 +47,71 @@ The macro examples — the Bali matrix (2D, 4x4, programs of ~14K LOC, Section 3
 
 - **Principle of Uniformity** — All artifacts can be given class structure and refined. Code, UML, makefiles, performance models — the same algebraic formalism applies uniformly. File types are classes; tools are methods; refinements extend both.
 
-- **MDSOC as abstraction of AHEAD** — An n-dimensional model D is not a separate formalism but a higher-level view of a 1D model M. D generates equations for M with fewer, more comprehensible units. The space of correct D-derivable equations is a subset of M-derivable equations containing all interesting ones.
+- **MDSOC as abstraction of AHEAD** — An n-dimensional model D is a higher-level view of a 1D model M. D generates equations for M with fewer, more comprehensible units. The space of correct D-derivable equations is a subset of M-derivable equations containing all interesting ones.
 
 - **Cross-cuts as refinement packages** — A feature refinement encapsulates fragments of multiple classes that collectively implement one cross-cutting concern. Composition merges fragments into their targets. This is the FOP realization of aspect-oriented cross-cutting.
 
-- **Subjectivity** — An object does not have a single interface; the interface given to it is specific to the task at hand (Harrison and Ossher 1993). In Origami, refinement F means different things to different tools — there is no single definition of F, only per-tool interpretations.
+- **Subjectivity** — An object does not have a single interface; the interface given to it is specific to the task at hand (Harrison and Ossher 1993). In Origami, refinement F means different things to different tools, and each tool has its own interpretation of F.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-aspects
 
-#### gen-aspects (aspect type system)
+gen-aspects realises the MDSOC model at the type level.
 
-gen-aspects realizes the MDSOC model at the type level. The connection is conceptual but structurally precise:
+- **Classes along one dimension.** A framework registers its output targets (`nixos`, `darwin`, `homeManager`) as keys with `category = "class"` in `keySemantics`, the configuration passed to `aspectsType`. The class axis is one dimension of Tarr's concern space, and each class is a unit along it. Adding a class extends that dimension.
 
-- **Classes as dimensions** — gen-aspects' registered classes (`nixos`, `darwin`, `homeManager`) are dimensions in Tarr's N-dimensional concern space. An aspect's content is classified into these dimensions via key classification (class key, collection key, nested key). This trifecta mirrors the Origami matrix structure: classes are one dimension, and aspects cut across all of them. The `cnf.classes` configuration parameter (passed to `aspectsType`) registers the dimensions, making the set of output targets extensible — new classes are new dimensions added to the matrix.
+- **Aspects as cross-cuts.** An aspect holds fragments for several classes at once. A `networking` aspect might contribute `nixos.networking.hostName` and `homeManager.programs.ssh.enable`, two fragments of different class outputs bound into one composable unit. This is Batory's AHEAD refinement encapsulating a cross-cut (Section 2): one feature, implemented by fragments scattered across several classes, composed together.
 
-- **Aspects as cross-cuts** — Each aspect in gen-aspects encapsulates fragments targeting multiple classes and multiple entity contexts simultaneously. The `networking` aspect might contribute `nixos.networking.hostName` and `homeManager.programs.ssh.enable` — fragments of two different class outputs bound together as one composable unit. This is Batory's AHEAD refinement encapsulating a cross-cut (Section 2): one feature, implemented by fragments scattered across multiple classes, composed atomically.
+- **Lock-step through aspect atomicity.** An aspect's contributions to different classes are included as a unit. A configuration includes the aspect or it does not, and cannot take only the `nixos` fragment. This is the lock-step constraint of Origami matrices (Section 3.1.1).
 
-- **Lock-step via aspect atomicity** — gen-aspects enforces that an aspect's contributions to different classes are composed as a unit. You include an aspect or you don't; you cannot include only its `nixos` fragment while excluding its `homeManager` fragment. This is the lock-step constraint from Origami matrices (Section 3.1.1) — folding a dimension composes corresponding entries in all rows.
+- **Key classification before folding.** `keyCategory` sorts each key of an aspect into one category: `structural`, `class`, `channel` or `facet`, and a key with no declared category becomes a nested aspect. Knowing which dimension each entry belongs to before folding is the same step the matrix requires.
 
-- **Key classification as dimensional folding** — When gen-aspects processes an aspect, key classification partitions content into class keys (dimension-specific output), collection keys (data aggregation), and nested keys (sub-aspects that recurse). This partitioning is the structural equivalent of recognizing which matrix dimension each entry belongs to before folding.
+- **`deferredModule` as the dimension boundary.** Class content is kept as a `deferredModule`, a lazy constructor that can be inspected before it is forced (Lorenzen 2025). This is where content leaves the multi-dimensional aspect space and enters one class's evaluation (NixOS `evalModules`, darwin `evalModules`). In MDSOC terms the folded matrix entry exits the concern space there.
 
-- **`deferredModule` as dimension boundary** — Class content in gen-aspects is wrapped as `deferredModule` — a lazy constructor inspectable before forcing (Lorenzen 2025). This boundary marks where content transitions from the multi-dimensional aspect space into a single dimension's evaluation context (NixOS evalModules, darwin evalModules, etc.). In MDSOC terms, the `deferredModule` boundary is where the folded matrix entry exits the concern space and enters its target evaluation domain.
+### gen-algebra
 
-#### gen-algebra (conceptual substrate)
+gen-algebra's record primitives supply the algebra that folding needs.
 
-gen-algebra's record composition primitives provide the algebraic machinery that makes MDSOC's folding operations concrete in Nix:
+- **`record.combine`** is left-biased combination (⊕), the composition operator of Batory's Section 2.
+- **`record.compose`** is mixin composition (Bracha 1990), `M1 ⋆ M2 = fun(i) M1(M2(i) ⊕ i) ⊕ M2(i)`, the associative operator dimensional equations need.
 
-- **`record.combine`** — The base combination operator used when folding entries within a dimension. Left-biased merge mirrors Batory's composition operator (the bullet in Section 2).
+### Dimensions in a gen configuration
 
-- **`record.compose`** — Mixin composition (Bracha 1990) provides the associative composition operator needed for dimensional equations. When folding a dimension's units, the order within each composition step follows `record.compose`'s associativity guarantees.
+A gen configuration has at least three orthogonal dimensions: classes (the output target), entities such as hosts and users (the structural identity) and aspects (the functional concern). A single setting, such as the hostname of one host, sits at the intersection of all three. The same aspect can contribute `nixos` content at a host and `homeManager` content at a user. Plain NixOS configuration privileges the class dimension, since users write NixOS modules directly. gen places classes as one dimension among several, reached through the same aspect mechanism, which is Tarr's point that no dimension should be privileged.
 
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2's architecture is fundamentally an operationalization of N-dimensional separation of concerns over a demand-driven scope graph.
-
-**Three orthogonal dimensions.** Den's concern space has (at minimum) three dimensions: classes (nixos/darwin/homeManager — the output target), entities (host/user/home — the structural identity), and aspects (networking/desktop/shell — the functional concern). Each dimension cross-cuts the others: the `networking` aspect applies to hosts and users, targeting both nixos and homeManager classes. A specific configuration point (e.g., "set the hostname on igloo") lives at the intersection of all three dimensions — it is a point in the 3D concern space.
-
-**Scope graph as N-dimensional substrate.** The HOAG scope graph provides the structural backbone for MDSOC. Each scope node carries declarations from all dimensions simultaneously. When gen-scope's resolution follows P (parent/lexical) and I (import) edges, it is traversing the N-dimensional space. The specificity ordering D \< I \< P (from Neron 2015) provides the folding discipline — declarations shadow imports shadow inherited values, giving each dimension's contributions a principled priority.
-
-**Entity-class orthogonality.** In den v2, entities spawn scope nodes (`spawn "host" { ... }`, `spawn "user" { ... }`), and aspects contribute class content at those scopes. The entity dimension and the class dimension are orthogonal — the same aspect can contribute `nixos` modules at the host level and `homeManager` modules at the user level. This is precisely Tarr's insight that no dimension should be privileged. Traditional NixOS configuration privileges the class dimension (you write NixOS modules directly); den v2 de-privileges it by placing classes as one dimension among equals, all accessed through the same aspect mechanism.
-
-**Dimensional equations as scope operations.** Den v2's domain vocabulary maps to dimensional equations:
-- `spawn "kind" { ... }` — Select a point along the entity dimension (create a host scope, user scope).
-- `edge aspect` — Include an aspect's contributions (select along the aspect dimension).
-- `drop aspect` — Exclude an aspect (restrict the aspect dimension).
-- `reroute { from, to }` — Redirect content between classes (transform the class dimension).
-- The final output assembly — collecting all class modules per entity and passing them to `evalModules` — is the complete folding of the matrix into a 1x1 result.
-
-**Collections as inter-dimensional data flow.** Den's collections (declared via `den.collections`) carry data between dimensions. A collection aggregation gathers contributions from aspects (the aspect dimension) scoped to entities (the entity dimension) and delivers the merged result to other aspects. This is data flow across the concern matrix — not folding, but lateral communication between matrix entries. The paper does not address inter-entry communication (entries in an Origami matrix are composed, not queried), making den's collections an extension beyond the paper's model.
-
-**Policies as dimensional constraints.** Den v2's policies (gen-derive rules) fire based on context and produce effects. In MDSOC terms, policies are design rules (Section 2, reference [5]) — constraints on legal compositions. Batory 2003 explicitly defers design rules to separate work; den v2 implements them via gen-derive's stratified dispatch with conflict resolution, realizing the constraint mechanism the paper only mentions.
+Batory 2003 defers design rules, the constraints on legal compositions (Section 2, reference [5]), to separate work. In gen, rules are the place such constraints live: gen-program turns a framework's rule declarations into a logic program and solves it.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**Explicit dimensional equation syntax (Section 3.1.2).** The paper's notation — separate equations per dimension, each specifying a folding strategy — has no direct counterpart in den's user API. Users declare entities and aspects, and the pipeline implicitly folds the concern space. An explicit dimensional equation syntax would let users specify folding order and strategy per dimension, potentially enabling optimizations (fold the entity dimension first for fleet-scale builds, fold the class dimension first for single-host debugging). The paper's observation that different folding orders yield the same result (when refinements are independent) could be verified as an invariant.
+**Explicit dimensional equations (Section 3.1.2).** The paper writes one equation per dimension, each naming a folding strategy. gen has no user-facing counterpart. Users declare entities and aspects, and the framework folds the concern space implicitly. An explicit per-dimension equation would let users choose folding order and strategy, for example folding the entity dimension first for fleet-scale builds or the class dimension first for debugging one host. The paper's observation that independent refinements fold to the same result in any order could be checked as an invariant.
 
-**Subjectivity as per-consumer aspect interpretation (Section 5).** The paper inherits Harrison and Ossher's (1993) observation that an object's interface is subjective — specific to the task. In den, aspects currently have a single definition regardless of who consumes them. Subjectivity would mean the `networking` aspect presents different content depending on the consuming entity's kind: a host sees firewall rules; a microVM sees network namespace configuration; a container sees none. This is partially addressed by guard functions (`{ host, ... }: { ... }`) and meta.guard, but the mechanism is coarse — guards are boolean (include or exclude), not interface-reshaping.
+**Subjectivity as per-consumer interpretation (Section 5).** The paper inherits Harrison and Ossher's (1993) observation that an object's interface depends on the task. A gen aspect has one definition regardless of who consumes it. Subjectivity would let a `networking` aspect present firewall rules to a host, network namespace configuration to a microVM and nothing to a container. Parametric aspects (`{ host, ... }: { ... }`) and aspect guards cover part of this, and a guard decides inclusion without reshaping the interface.
 
-**Origami matrix visualization (Section 3.1.1, Tables 1-4; Section 3.2, Table 5).** The paper's matrix notation — with row/column labels, entries showing refinement names, and folded versions showing composed expressions — is a powerful communication tool. Den v2's diagram generation (nix/lib/diag/) produces C4, Mermaid, and DOT outputs but does not produce Origami-style matrix views. A matrix visualization showing entity kinds as one axis, classes as another, and aspect contributions as cells would directly realize the paper's notation for den configurations.
+**Origami matrix views (Section 3.1.1, Tables 1-4; Section 3.2, Table 5).** The paper's matrix notation, with labelled rows and columns, refinement names in the entries and folded versions showing composed expressions, communicates a product line compactly. A matrix view of a configuration, with entity kinds on one axis, classes on another and aspect contributions in the cells, would carry that notation over.
 
-**Tool suite synthesis via file type models (Section 4.1-4.3).** The Principle of Uniformity and the file type / method / tool model (Section 4.2) describe synthesizing families of tools from shared designs. Den's template system (`templates/`) provides example configurations but does not synthesize tool variants from shared infrastructure. The paper's model — where file types are classes, tools are methods, and refinements extend both — could apply to den's CI/CD tooling, documentation generators, and diagram tools.
+**Tool suite synthesis from file type models (Sections 4.1-4.3).** The Principle of Uniformity and the file type, method and tool model (Section 4.2) describe synthesising families of tools from shared designs. The same model, where file types are classes, tools are methods and refinements extend both, could generate CI tooling, documentation generators and diagram tools from one design.
 
-**Higher-dimensional matrices (Section 3.3).** The paper describes a 3D (8x6x8) Jak matrix with Frontal and Horizontal sub-matrices for feature-feature interactions. Den currently models three dimensions implicitly (entity, class, aspect), but feature-feature interactions (e.g., the `desktop` aspect's behavior changes when `wayland` is also included) are handled ad-hoc via guards and includes. The paper's explicit encoding of interactions as a separate matrix dimension — with lock-step folding against the primary dimensions — offers a more principled approach.
+**Higher-dimensional matrices (Section 3.3).** The paper describes a 3D (8x6x8) Jak matrix with Frontal and Horizontal sub-matrices for feature-feature interactions. A gen configuration has three implicit dimensions (entity, class, aspect), and interactions between aspects, such as a `desktop` aspect that behaves differently when `wayland` is also included, are handled case by case through guards and includes. Encoding interactions as a separate matrix dimension, folded in lock-step with the primary ones, is a more principled approach.
 
 ### Potential New Libraries or Features
 
-**gen-aspects: origami matrix introspection** — Expose the implicit N-dimensional structure of a configured aspect set as an explicit matrix. Given `cnf.classes` (one dimension) and a set of entity kinds (another dimension), produce a matrix whose entries are the aspect fragments contributing to each (entity-kind, class) cell. Scope: moderate, requires traversing classified aspect content and grouping by dimension. Interactions: gen-scope provides the graph structure; gen-graph's `materialize` could build the cell index. Output: attrset `{ rows = [...]; cols = [...]; cells = { "host/nixos" = [ aspect-fragments ]; }; }`. Useful for diagnostics, visualization, and validating lock-step completeness.
+**Matrix introspection.** Expose the implicit N-dimensional structure of a configured aspect set as an explicit matrix. Given the class keys in `keySemantics` (one dimension) and a set of entity kinds (another), produce a matrix whose entries are the aspect fragments contributing to each (entity kind, class) cell, for example `{ rows = [ ... ]; cols = [ ... ]; cells = { "host/nixos" = [ ... ]; }; }`. gen-graph's `materialize` could build the cell index. This serves diagnostics, visualisation and checking lock-step completeness.
 
-**gen-aspects: dimensional folding order control** — An API allowing consumers to specify which dimension to fold first. For a 3D concern space (entity x class x aspect), folding entity first produces per-host aspect bundles; folding class first produces per-class module sets across all hosts; folding aspect first produces per-aspect cross-entity summaries. Scope: small addition to `cnf` configuration. The paper proves folding order does not affect the result when refinements are independent (Section 3.1, equations 4 and 5); gen-aspects could verify this invariant in tests.
+**Folding order control.** An API that lets a consumer choose which dimension to fold first. Folding entity first produces per-host aspect bundles, folding class first produces per-class module sets across hosts, and folding aspect first produces per-aspect summaries across entities. The paper proves order does not affect the result when refinements are independent (Section 3.1, equations 4 and 5), and tests could check that invariant.
 
-**gen-scope: matrix-aware attribute definitions** — Extend gen-scope's attribute definition mechanism to be aware of dimensional structure. Currently attributes are functions `self id -> value`; a matrix-aware variant would be `self id dimension -> value`, allowing per-dimension attribute computation with cross-dimension queries. Scope: significant — requires gen-scope API changes. Interactions: gen-select's `adapters.scope.mkContext` would need dimension-aware context construction.
+**Matrix-aware attributes in gen-scope.** Attributes are functions `self id -> value`. A dimension-aware variant, `self id dimension -> value`, would allow per-dimension attribute computation with cross-dimension queries. gen-select's `adapters.scope.mkContext` would need dimension-aware context construction.
 
-**den: subjective aspect interfaces** — Implement Harrison and Ossher's subjectivity: an aspect presents different content depending on the consuming scope's properties. Beyond boolean guards, this would allow per-consumer interface reshaping — the `networking` aspect exposes different options to a bare-metal host vs. a microVM vs. a container. Scope: medium-large. Implementation: extend gen-aspects' guard mechanism from `pred -> bool` to `pred -> interface-transform`, where the transform reshapes the aspect's visible content. Interactions: gen-derive's rule dispatch could select transforms; gen-select's selectors could specify consumer properties.
+**Subjective aspect interfaces.** Harrison and Ossher's subjectivity applied to aspects: an aspect presents different content depending on the consuming scope. Extending aspect guards from a predicate returning a boolean to one returning an interface transform would let a `networking` aspect expose different options to a bare-metal host, a microVM and a container. gen-dispatch rules could select transforms, and gen-select selectors could describe consumer properties.
 
 ### Research Directions
 
-**Verifying dimensional independence.** The paper's key optimization — O(kn) vs O(k^n) — depends on refinements along different dimensions being independent. In den's concern space, this independence is assumed but not verified. Aspects can contain guards that depend on entity context, breaking dimensional independence. A static analysis (via gen-derive's condition inspection or gen-select's selector analysis) could identify aspects whose contributions violate dimensional independence, flagging potential composition-order sensitivity.
+**Verifying dimensional independence.** The O(kn) versus O(k^n) result depends on refinements along different dimensions being independent. A gen configuration assumes this without checking it, and aspects whose guards depend on entity context break it. Analysis of gen-select selectors or gen-dispatch rule conditions could flag aspects whose contributions are sensitive to composition order.
 
-**Category-theoretic folding.** The paper's folding operation is algebraically characterized but not given a category-theoretic treatment. Formalizing origami folding as a functor from the product category of dimension categories to the output category could connect MDSOC to the pushout-based rewriting in Ehrig 2006 (already used by gen-derive). This might yield a unified framework where aspect composition (MDSOC folding), graph rewriting (Ehrig pushouts), and scope-graph resolution (Neron path-finding) are all instances of the same categorical construction.
+**Category-theoretic folding.** The paper characterises folding algebraically without a category-theoretic treatment. Formalising origami folding as a functor from the product of the dimension categories to the output category would connect MDSOC to the pushout-based rewriting of Ehrig 2006, which informs gen-dispatch's negative application conditions. Aspect composition, graph rewriting and scope-graph resolution (Néron path-finding) might then be instances of one categorical construction.
 
-**Incremental re-folding.** When one aspect changes, den v2 currently re-evaluates the entire scope graph (modulo Nix's lazy evaluation memoization). The paper's dimensional structure suggests incremental re-folding: if a change only affects one dimension (e.g., a new operation column), only that dimension's folding needs to be recomputed. Formalizing which scope-graph attributes depend on which dimensions could enable demand-driven incremental re-evaluation — connecting to Mokhov 2018's build-system traces and gen-scope's `_eval` memoization.
+**Incremental re-folding.** The dimensional structure suggests that a change affecting one dimension, such as a new operation column, needs only that dimension refolded. Recording which scope-graph attributes depend on which dimensions would give gen-memo a sharper dirty set when an aspect changes, connecting to Mokhov 2018's build-system traces.
 
-**MDSOC for fleet configuration.** The paper's examples are single programs. Den manages fleets — many programs (hosts) with shared structure. The fleet dimension (which hosts get which configurations) is not well-modeled by Origami matrices. Extending the matrix model to include a fleet dimension — where entries are host-specific overrides and folding produces per-host configurations — could formalize den's host/user/home entity model as a dimensional decomposition rather than a tree structure.
+**A fleet dimension.** The paper's examples are single programs. A fleet is many programs (hosts) with shared structure, and which hosts receive which configuration is not well modelled by Origami matrices. A fleet dimension whose entries are host-specific overrides, folded into per-host configurations, would describe the host and user entity model as a dimensional decomposition.

@@ -1,0 +1,88 @@
+---
+title: Stable Identity for Everything
+description: Every node gets an identity computed from how it is defined (intensional identity), which gen uses for reuse, error messages and introspection.
+---
+
+The homelab has two hosts of one **kind**, `host`. The kind declares what a host looks like: a
+`system` with a default, and a `role`. A **registry** holds the hosts. Each host it holds gets its
+defaults filled in and an identity, `id_hash`, computed from its definition.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  schema = gen.schema.evalSchema {
+    modules = [
+      {
+        config.schema.host = {
+          options.system = m.mkOption { type = m.types.str; default = "x86_64-linux"; };
+          options.role = m.mkOption { type = m.types.str; };
+        };
+      }
+    ];
+  };
+
+  homelab = m.evalModuleTree {
+    modules = [
+      {
+        options.hosts = gen.schema.mkInstanceRegistry schema.host { };
+        config.hosts.laptop.role = "workstation";
+        config.hosts.server.role = "server";
+      }
+    ];
+  };
+in
+{
+  laptop = homelab.config.hosts.laptop.id_hash;
+  server = homelab.config.hosts.server.id_hash;
+  serverSystem = homelab.config.hosts.server.system;
+}
+```
+
+```text
+{ laptop = "host:da48f8b73e5c…";
+  server = "host:ca35c36e942e…";
+  serverSystem = "x86_64-linux"; }
+```
+
+## How identity is computed
+
+An identity is a hash over the kind name and the values of the kind's declared options, the
+host's `name` among them. Evaluate the same definition twice, on any machine, and you get the
+same identity. Change the laptop's role and its identity changes with it.
+
+One function computes every identity in gen, `hashIdentity`. You can call it directly:
+
+```nix
+gen.identity.hashIdentity "host" [ "name" ] (label: { name = "server"; }.${label})
+# => "host:8bf83a5f135b…", the same value on every call
+```
+
+A relation that carries data of its own becomes a node too. Alice's account on the laptop has a
+shell, so it is an `account` node related to `alice` and to `laptop`. Its identity is computed from
+the identities of the nodes it relates, so those nodes are identified first, in an earlier pass.
+A relation that names a node from its own pass fails with an error.
+
+## What identity is for
+
+- **Reuse.** Equal definitions have equal identities, so an identity works as a cache key: a
+  result computed for one identity is valid wherever that identity appears, in this evaluation or
+  the next. See [Rebuilding Only What Changed](/understand/incremental/).
+- **Error messages.** Nix's own errors point at a line of source code. An error from gen can
+  also name the part of the configuration it concerns. The next two pages show errors that name
+  the option, the missing argument, and the host that supplied a bad value.
+- **Introspection.** Tools can ask about a node by its identity: what it relates to, and why an
+  edge exists. [Inspection](/features/inspection/) shows the queries gen supports today. Interactive
+  graph tools are on the [Roadmap](/roadmap/).
+
+## The theory
+
+An **intensional** identity comes from how a thing is defined. Two values built the same way
+compare equal, even when one of them is a function, which Nix cannot compare. Palmer et al.
+describe functions that carry a name and their captured data so they can be identified,
+inspected and compared. gen applies the idea to every node, and to functions built from a named
+constructor and its arguments. See our reading of
+[Palmer et al. (2024)](/reference/papers/palmer-2024-intensional-functions/).
+
+Next: [An Enhanced Module Type System](/understand/module-types/).

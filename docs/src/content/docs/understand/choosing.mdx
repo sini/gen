@@ -1,0 +1,46 @@
+---
+title: Which Tool for Which Job
+description: A goal-by-goal guide to gen's mechanisms (graph queries, aspects, identity, typed merging, argument injection, logic-program rules, attribute grammars, incremental rebuild), and the pairs that are easy to mix up.
+---
+
+Start from what you want to do. Each row names the mechanism that does it and the page that
+explains it.
+
+| you want to | use | read |
+|---|---|---|
+| ask which nodes relate to which, along certain kinds of edge | a labelled path query | [Graph](/understand/graph/), [Graphs and Queries](/features/graphs/) |
+| bundle configuration and reuse it on several hosts | an aspect, with `includes` for dependencies | [Features](/understand/features/), [Aspects](/features/aspects/) |
+| declare what a host or user looks like, with defaults | a kind and a registry | [Identity](/understand/identity/), [Kinds, Registries and Identity](/features/registries/) |
+| find out which file set a value | `provenance` on the merge result | [Module types](/understand/module-types/), [Typed Configuration](/features/configuration/) |
+| reject bad values with a clear message | a type, or a refined type | [Module types](/understand/module-types/) |
+| give a module the host or user it configures | argument injection with `wrap` | [Argument injection](/understand/argument-injection/) |
+| derive relations from conditions, such as an access list | rules solved as a logic program | [Rules](/understand/rules/), [Rules](/features/rules/) |
+| compute a value per node from the node and its surroundings | an attribute | [On demand](/understand/on-demand/), [Evaluation](/features/evaluation/) |
+| move settings along edges, with a clear winner when several apply | a view | [Delivery](/features/delivery/) |
+| turn each host's content into a NixOS system | delivery to a terminal | [Delivery](/features/delivery/) |
+| re-evaluate quickly after an edit | `compose` and `override` | [Incremental](/understand/incremental/), [Incremental Rebuild](/features/incremental/) |
+| see why an edge exists, or query the graph with SQL | the inspector | [Inspection](/features/inspection/) |
+
+## Pairs that are easy to mix up
+
+**`includes` or a rule?** Use `includes` when one feature always needs another: `desktop` always
+brings `ssh`. Use a rule when a relation depends on facts about the nodes: a webserver reaches a
+database only in the same environment and only while the database is up.
+
+**A query or a rule?** A query reads the edges that exist. A rule adds edges. Run the rules
+first, then query the combined graph.
+
+**A merge priority or a view order?** A merge priority decides between definitions of one option,
+such as the server's own port against a default. A view order decides between contributions that
+arrive along different edges, such as a setting from the environment against one from the host.
+
+**An injected argument or an option?** A module reads an injected argument and sets options. The
+host a module configures is an argument. The port it opens is an option.
+
+**An attribute or an option?** An option is a value that modules define and gen merges. An
+attribute is a value gen computes at a node from an equation, often from the node's position in
+the graph, such as a domain inherited from the environment above.
+
+**A name or an identity?** A name is what you call a node. An identity is computed from the
+node's kind and its definition. Two nodes of different kinds never share an identity, even when
+their names match, and an edit that changes a definition changes its identity.

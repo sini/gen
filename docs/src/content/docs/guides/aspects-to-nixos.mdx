@@ -1,0 +1,226 @@
+---
+title: From an Aspect to a NixOS System
+description: Declare hosts and aspects in a gen tree, resolve their includes and build a NixOS system.
+---
+
+import { Steps, Aside, FileTree, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<Aside type="caution">gen is pre-release and its API is still changing.</Aside>
+
+This guide builds the `laptop` of the [homelab example](/examples/homelab/) from nothing.
+You declare two kinds, `host` and `user`, a few aspects that carry NixOS configuration, and
+the hosts that use them. The hub turns each host into a `nixosConfiguration`.
+
+An aspect is a named, reusable feature. It holds configuration for one or more classes,
+such as `nixos`, and can include other aspects. See [Reusable Features](/understand/features/).
+
+The finished project has five files:
+
+<FileTree>
+- flake.nix
+- aspect-cnf.nix
+- gen-modules/
+  - homelab.nix
+- hardware/
+  - laptop.nix
+  - server.nix
+</FileTree>
+
+<Steps>
+
+1. ##### Wire the flake
+
+   ```nix
+   # flake.nix
+   {
+     inputs = {
+       gen.url = "github:sini/gen";
+       nixpkgs.follows = "gen/nixpkgs";
+       flake-parts.url = "github:hercules-ci/flake-parts";
+       flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+     };
+
+     outputs = inputs:
+       inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+         imports = [ inputs.gen.flakeModules.default ];
+         systems = [ "x86_64-linux" ];
+
+         gen = {
+           tree = ./gen-modules;
+           aspectCnf = import ./aspect-cnf.nix;
+           nodeRegistryPath = [ "hosts" ];                    # (1)
+           extraModules.laptop = [ ./hardware/laptop.nix ];   # (2)
+           extraModules.server = [ ./hardware/server.nix ];
+         };
+       };
+   }
+   ```
+
+   1. Each member of the `hosts` registry becomes one NixOS system.
+   2. Per-host NixOS modules. Here they hold the platform and file systems:
+
+   ```nix
+   # hardware/laptop.nix
+   {
+     nixpkgs.hostPlatform = "x86_64-linux";
+     boot.loader.grub.enable = false;
+     fileSystems."/" = { device = "none"; fsType = "tmpfs"; };
+   }
+   ```
+
+   [Add gen to a Flake](/guides/flake/) lists every hub option.
+
+2. ##### Declare the class
+
+   ```nix
+   # aspect-cnf.nix
+   {
+     keySemantics.nixos.category = "class";
+   }
+   ```
+
+   This file says that an aspect's `nixos` key holds NixOS modules. The hub reads it to
+   decide what to deliver, and the tree reads it to build the aspect schema. Both import the
+   same file so they always agree.
+
+3. ##### Declare the kinds
+
+   A kind is a typed record type. Every `host` and every `user` is an instance of one. The
+   rest of this step and the next ones are in `gen-modules/homelab.nix`.
+
+   ```nix
+   { config, genAspects, genMerge, genSchema, ... }:                # (1)
+   let
+     inherit (genMerge) mkOption types;
+     aspectSchema = genAspects.mkAspectSchema (import ../aspect-cnf.nix);
+
+     schema = genSchema.evalSchema {
+       inherit (aspectSchema) schemaOption;
+       modules = [ {
+         config.schema.host = {
+           options.aspects = mkOption { type = types.listOf types.str; default = [ ]; };   # (2)
+         };
+         config.schema.user = {
+           options.hosts = mkOption { type = types.listOf types.str; default = [ ]; };
+           options.admin = mkOption { type = types.bool; default = false; };
+         };
+       } ];
+     };
+   ```
+
+   1. The hub passes these gen libraries to every module in the tree.
+   2. The hub delivers the aspects named in each host's `aspects` list.
+
+4. ##### Declare the registries and instances
+
+   ```nix
+   in
+   {
+     imports = [ (aspectSchema.mkAspectModule { }) ];                  # (1)
+
+     options.hosts = genSchema.mkInstanceRegistry schema.host { };     # (2)
+     options.users = genSchema.mkInstanceRegistry schema.user { };
+
+     config = {
+       hosts.laptop.aspects = withIncludes [ "desktop" ];              # (3)
+       hosts.server.aspects = withIncludes [ "monitoring" ];
+
+       users.alice = { hosts = [ "laptop" "server" ]; admin = true; };
+       users.bob.hosts = [ "laptop" ];
+   ```
+
+   1. Declares the `aspects` option, built from the class declaration in step 2.
+   2. A registry holds the instances of one kind. Each instance gets its `name` and a stable
+      identity. See [Stable Identity for Everything](/understand/identity/).
+   3. `withIncludes`, defined in the next step, adds every aspect that `desktop` includes.
+
+5. ##### Write the aspects
+
+   ```nix
+       aspects.base.nixos = { node, ... }: {                           # (1)
+         networking.hostName = node.name;
+         users.users = builtins.listToAttrs (map (u: {                 # (2)
+           name = u;
+           value = {
+             isNormalUser = true;
+             extraGroups = if config.users.${u}.admin then [ "wheel" ] else [ ];
+           };
+         }) (usersOn node.name));
+         system.stateVersion = "25.05";
+       };
+
+       aspects.ssh.includes = [ "base" ];                              # (3)
+       aspects.ssh.nixos.services.openssh.enable = true;
+
+       aspects.desktop.includes = [ "ssh" ];
+       aspects.desktop.nixos.services.xserver.enable = true;
+
+       aspects.monitoring.includes = [ "ssh" ];
+       aspects.monitoring.nixos.services.prometheus.exporters.node.enable = true;
+     };
+   }
+   ```
+
+   1. `node` is the host instance being built. gen passes it in by name, so the same aspect
+      serves every host. See [Automatic Argument Injection](/understand/argument-injection/).
+   2. A query over the `users` registry: the users that list this host.
+   3. `ssh` includes `base`, so any host with `ssh` also gets `base`.
+
+   The two helpers go in the `let` block from step 3:
+
+   ```nix
+     usersOn = host:
+       builtins.filter (u: builtins.elem host config.users.${u}.hosts)
+         (builtins.attrNames config.users);
+
+     withIncludes = names: map (x: x.key) (builtins.genericClosure {
+       startSet = map (key: { inherit key; }) names;
+       operator = x: map (key: { inherit key; }) (config.aspects.${x.key}.includes or [ ]);
+     });
+   ```
+
+   The hub delivers the aspects listed on each host. `withIncludes` computes the list by
+   following `includes`, so `laptop` gets `desktop`, `ssh` and `base`.
+
+6. ##### Evaluate and build
+
+   ```sh
+   nix eval .#nixosConfigurations --apply builtins.attrNames
+   # [ "laptop" "server" ]
+
+   nix eval --json .#nixosConfigurations.laptop.config.services.openssh.enable
+   # true
+
+   nix eval --json .#nixosConfigurations.laptop.config.users.users.alice.extraGroups
+   # ["wheel"]
+
+   nix build .#nixosConfigurations.laptop.config.system.build.toplevel
+   ```
+
+   `laptop` has X11 from `desktop`, and SSH and its host name from `ssh` and `base`, which
+   it reaches through includes. It has accounts for `alice` and `bob`. `server` has SSH and
+   the Prometheus node exporter, and an account for `alice` only.
+
+</Steps>
+
+## What happened
+
+1. The hub merged `gen-modules/` with gen's own module system and produced the composed
+   values: `hosts`, `users` and `aspects`.
+2. For each member of `hosts`, it collected the `nixos` content of every aspect in that
+   host's `aspects` list. The class declaration in `aspect-cnf.nix` decided which keys
+   count as content to deliver.
+3. It passed each host's modules, with `node` bound to the host, plus its `extraModules`,
+   to `nixpkgs.lib.nixosSystem`. The result is `nixosConfigurations.<host>`.
+
+A framework such as den hides most of this file behind its own vocabulary. The kinds,
+registries, aspects and delivery underneath are the same.
+
+<CardGrid>
+  <LinkCard title="A Homelab" href="/examples/homelab/"
+    description="This project whole, with links to the pages that explain each part." />
+  <LinkCard title="Delivery" href="/features/delivery/"
+    description="Projection, terminals and building artifacts for other classes." />
+  <LinkCard title="Aspects" href="/features/aspects/"
+    description="Includes, guards, graph facts and federation." />
+</CardGrid>

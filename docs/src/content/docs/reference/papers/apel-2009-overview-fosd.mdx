@@ -1,8 +1,6 @@
 ---
 title: "Apel et al. (2009) — An Overview of Feature-Oriented Software Development"
 description: "Our reading of An overview of feature-oriented software development."
-source:
-  - den-ag-design:reference-catalog/summaries/apel-2009-overview-fosd.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ S. Apel and C. Kaestner, "An overview of feature-oriented software development,"
 
 [doi:10.5381/jot.2009.8.5.c5](https://doi.org/10.5381/jot.2009.8.5.c5)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -51,46 +49,46 @@ The paper identifies five key open issues: the expressiveness-simplicity trade-o
 - **Architectural metaprogramming**: treating feature selections as system designs, optimization as design transformation
 - **Composition-based vs. annotation-based**: two implementation strategies with orthogonal trade-offs (modularity vs. granularity)
 
-## Ecosystem Relevance
+## How gen uses this
 
 ### Conceptual Influence
 
-The FOSD paradigm maps directly onto the gen/den design philosophy at multiple levels:
+The FOSD paradigm maps onto gen's design at several levels.
 
-**Features as aspects.** Apel's definition — "a structure that extends and modifies the structure of a given program" — is precisely what den aspects are. gen-aspects implements feature-oriented composition: aspects are composable increments with structural identity, composed via superimposition (merging attrset structures). The FOSD goal of a one-to-one mapping between analysis features and implementation artifacts is realized in den's aspect model, where each aspect declared in `den.aspects` corresponds to a named configuration concern.
+**Features as aspects.** Apel's definition of a feature, "a structure that extends and modifies the structure of a given program", describes a gen aspect. gen-aspects gives aspects a type and a structural identity (`aspectId`), and aspects compose by merging their attrset structure, which is superimposition. FOSD's goal of a one-to-one mapping between analysis features and implementation artifacts is what a named aspect provides: one aspect, one configuration concern.
 
-**Software product lines as fleet configurations.** FOSD's central problem — generating many related programs from a shared feature set — is exactly the den use case: many NixOS/darwin/home-manager systems generated from shared aspects, varying by which aspects each host or home includes. Den's `den.hosts` and `den.homes` declarations parallel FOSD's feature selection, and the pipeline generates per-entity configurations analogous to FOSD variant generation.
+**Software product lines as fleet configurations.** FOSD's central problem is generating many related programs from a shared feature set. A fleet of NixOS, darwin and home-manager systems built from shared aspects is that problem, varying by which aspects each host or user includes. Choosing a host's aspects is FOSD's feature selection, and producing each system's configuration is variant generation.
 
-**Feature models as entity schemas.** FODA feature models capture variability constraints (mandatory, optional, alternative, cross-tree). gen-schema's typed registries with refinement predicates, topology (parent-child kind relationships), and constraints serve the same role: they describe what valid entity configurations look like. The expressiveness-simplicity trade-off Apel identifies is one gen-schema navigates — rich enough for automated validation, simple enough for users to declare.
+**Feature models as entity schemas.** FODA feature models capture variability constraints: mandatory, optional, alternative and cross-tree. gen-schema's typed registries, with refinement predicates (`refined`, `checkRefinements`) and validators, serve the same role. They describe what a valid entity configuration looks like. gen-schema faces the expressiveness-simplicity trade-off Apel identifies: rich enough for automated validation, simple enough for users to declare.
 
-**Feature interaction as the central engineering problem.** The doubly-linked list example illustrates the exact problem den's pipeline solves: when multiple aspects contribute to the same entity, naive merging produces broken configurations. Den's gate (dedup), scope isolation, and policy-driven context expansion are the framework's answer to feature interaction. gen-derive's conflict resolution (override, priority, specificity) directly parallels Prehofer's lifters — both factor interaction handling into explicit, composable units.
+**Feature interaction.** The doubly-linked list example shows the problem any aspect framework faces: when several aspects contribute to the same entity, naive merging can produce a broken configuration. gen-dispatch's conflict handling (a rule's `overrides` list, `priority` and `exclusive` groups) and its rule combinators `restrict`, `override` and `chain` factor interaction handling into explicit, composable units, as Prehofer's lifters do.
 
-**Superimposition as the composition model.** AHEAD's language-independent superimposition — merging feature structure trees node-by-node — is the structural model underlying aspect composition in den. When two aspects contribute `nixos.networking.hostName` and `nixos.networking.firewall`, these are merged by structural overlay, exactly as AHEAD composes class diagrams or code trees.
+**Superimposition as the composition model.** AHEAD's language-independent superimposition merges feature structure trees node by node. Aspect composition in gen works the same way: when two aspects contribute `nixos.networking.hostName` and `nixos.networking.firewall`, the module system merges them by structural overlay, as AHEAD composes class diagrams or code trees.
 
-### Connection to Used Papers
+### Connection to Other Papers
 
-**Batory 2005 (AHEAD tool suite)** — The most direct ancestor. Batory's feature algebra (features as nested records, composition as structural merging) is the theoretical backbone of gen-aspects. The TERMINOLOGY.md entry for gen-aspects explicitly cites "Batory 2005 (AHEAD feature algebra)" as provenance for the aspect concept. gen-derive's rule composition operators — restrict, override, chain — are named after and inspired by AHEAD's feature composition algebra, where features refine base programs through layered application. AHEAD's language-independence (composing Java, grammars, documentation uniformly) anticipated gen's accessor pattern, where libraries operate on structural descriptions rather than language-specific artifacts.
+**Batory 2005 (AHEAD tool suite).** The most direct ancestor. gen's terminology cites Batory's feature algebra (features as nested records, composition as structural merging) as the provenance of the aspect concept. gen-dispatch's `restrict`, `override` and `chain` combinators are inspired by AHEAD's feature composition, where features refine base programs in layers. AHEAD's language independence (composing Java, grammars and documentation uniformly) anticipates gen's accessor pattern, where libraries operate on structural descriptions of a graph rather than on one concrete representation.
 
-**Tarr et al. 1999 (N Degrees of Separation)** — Tarr's multi-dimensional separation of concerns provides the theoretical grounding for den's class system. The TERMINOLOGY.md entry for classes explicitly cites "Tarr 1999 (multi-dimensional separation of concerns)." Where Tarr argued that a single decomposition dimension (OO hierarchy) is insufficient and proposed hyperslices allowing simultaneous decomposition along multiple concern axes, den's classes (nixos, darwin, homeManager) are exactly these orthogonal output dimensions. An aspect can contribute to multiple classes simultaneously, achieving the multi-dimensional decomposition Tarr advocated.
+**Tarr et al. 1999 (N Degrees of Separation).** Tarr's multi-dimensional separation of concerns grounds gen's class axis. Tarr argued that one decomposition dimension (the OO hierarchy) is not enough and proposed hyperslices that decompose along several concern axes at once. In gen the class axis (nixos, darwin, homeManager) is one dimension of concern, and each class is a unit along it. An aspect can contribute to several classes at once, which is the multi-dimensional decomposition Tarr advocated.
 
-**Kiczales et al. 1997 (AOP)** — Apel's survey positions FOSD as converging with AOSD at the implementation level while retaining distinct goals (simplicity, algebraic models, automated synthesis). This mirrors the gen ecosystem's relationship with AOP concepts: gen-aspects uses the term "aspects" acknowledging the AOP lineage (cross-cutting concern modularization), but the composition model is feature-algebraic (structural superimposition) rather than pointcut-advice. The TERMINOLOGY.md cites Kiczales 1997 for "cross-cutting concerns, aspect weaving" as a conceptual ancestor. Den's neededBy (reverse injection) has structural similarity to AOP advice — declaring that content should be woven into targets identified by pattern — but operates at the scope-graph level rather than through syntactic join points.
+**Kiczales et al. 1997 (AOP).** Apel positions FOSD as converging with AOSD at the implementation level while keeping distinct goals (simplicity, algebraic models, automated synthesis). gen follows the same split. The name "aspects" acknowledges the AOP lineage of modularising cross-cutting concerns, and the composition model is feature-algebraic structural superimposition, without pointcuts or advice.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**Annotation-composition unification.** Apel identifies the open problem of combining annotation-based and composition-based approaches. Den currently uses only the composition model (aspects as separate units). An annotation mode — where aspect content is declared inline within entity definitions and attributed to named aspects by metadata — could simplify cases where the natural authoring site is the entity rather than the aspect. This would parallel CIDE's approach of co-locating feature boundaries with the code they annotate.
+**Annotation-composition unification.** Apel identifies the open problem of combining annotation-based and composition-based approaches. gen uses only the composition model (aspects as separate units). An annotation mode, where aspect content is declared inline in an entity definition and attributed to a named aspect by metadata, would simplify cases where the natural authoring site is the entity. This parallels CIDE, which places feature boundaries next to the code they annotate.
 
-**Lifter/derivative scaling.** The paper raises but does not resolve whether lifters scale to large feature counts. gen-derive's stratified dispatch with override/priority/specificity is one answer, but the question of whether explicit pairwise interaction modules are needed (vs. implicit merge strategies) remains relevant as den configurations grow in complexity.
+**Lifter scaling.** The paper leaves open whether lifters scale to large feature counts. gen-dispatch's group-ordered dispatch with overrides and priority is one answer. Whether explicit pairwise interaction modules are needed, as opposed to implicit merge strategies, stays relevant as configurations grow.
 
-**Feature model optimization.** FOSD envisions using non-functional properties (performance, footprint) to guide feature selection. Den currently treats all aspects as equal — there is no framework for expressing that certain aspect combinations are preferred or that aspect selection should optimize for properties like build time or closure size. gen-schema's refinement types could potentially encode such constraints.
+**Feature model optimization.** FOSD envisions using non-functional properties (performance, footprint) to guide feature selection. gen treats all aspects alike. There is no way to express that certain aspect combinations are preferred or that selection should optimise build time or closure size. gen-schema's refinement types could encode such constraints.
 
-**Product-line-wide type checking.** The paper discusses checking all variants without generating each one — a problem directly applicable to den, where the combinatorial space of host/user/aspect configurations makes exhaustive `nix flake check` infeasible. The feature algebra's compositional type checking (proving properties of features individually, then deriving properties of compositions) suggests a direction: proving aspect compatibility algebraically rather than by instantiation.
+**Product-line-wide type checking.** The paper discusses checking all variants without generating each one. The host, user and aspect combinations of a fleet make exhaustive `nix flake check` infeasible, so this applies directly. The feature algebra's compositional type checking, which proves properties of features individually and derives properties of their compositions, suggests proving aspect compatibility algebraically instead of by instantiation.
 
 ### Research Directions
 
-**Formal feature interaction detection for Nix configurations.** Apel's survey documents techniques (static analysis, model checking) for detecting feature interactions in code. Applying similar analysis to Nix module compositions — detecting when two aspects make conflicting option assignments, or when an aspect assumes module options that another aspect removes — would address a class of configuration errors currently caught only at evaluation time.
+**Feature interaction detection for Nix configurations.** Apel's survey documents static analysis and model checking for detecting feature interactions in code. Applying similar analysis to Nix module compositions, to detect two aspects making conflicting option assignments or an aspect assuming an option another aspect removes, would catch a class of errors that today surface only at evaluation time.
 
-**Algebraic aspect composition theory.** The feature algebra (features as algebraic expressions with typed elements) could be formalized for gen-aspects. Currently, aspect composition is operationally defined by the pipeline. An algebraic characterization would enable reasoning about composition properties (commutativity for specific aspect pairs, associativity, identity elements) and support refactoring guarantees analogous to those Apel and Batory demonstrated for AHEAD.
+**Algebraic aspect composition theory.** The feature algebra, with features as algebraic expressions over typed elements, could be formalised for gen-aspects. Aspect composition is defined operationally today. An algebraic characterisation would support reasoning about composition properties (commutativity for specific aspect pairs, associativity, identity elements) and give refactoring guarantees like those Apel and Batory showed for AHEAD.
 
-**Connecting analysis and implementation models.** The paper's call for a unified theory spanning feature models, design, and implementation maps to the gen ecosystem's gap between gen-schema (analysis-level type descriptions) and gen-scope (implementation-level evaluation). A formal correspondence between schema-level constraints and scope-graph-level resolution properties would strengthen the guarantee that valid schema instances produce valid scope graph evaluations.
+**Connecting analysis and implementation models.** The paper calls for a unified theory spanning feature models, design and implementation. In gen this is the gap between gen-schema (type descriptions at the analysis level) and gen-scope (evaluation at the implementation level). A formal correspondence between schema constraints and scope-graph resolution would strengthen the guarantee that a valid schema instance produces a valid scope-graph evaluation.

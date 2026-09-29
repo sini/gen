@@ -4,8 +4,49 @@ The gen documentation site: [Astro](https://astro.build) +
 [Starlight](https://starlight.astro.build), sharing the design pattern used by
 [den's docs](https://github.com/denful/den/tree/main/docs).
 
-Scaffolding and components only at this point — every page under
-`src/content/docs/` is a placeholder.
+## Writing
+
+Every page under `src/content/docs/` follows these rules.
+
+- **Plain technical English.** Write the way a good man page or a Rust book
+  chapter reads. Short declarative sentences, common words, one idea per
+  sentence. A reader who knows Nix and nothing about gen should follow every
+  paragraph on the first read.
+- **Say what a thing is.** Never define something by what it is not. Cut "not
+  X, but Y", "X isn't a Y — it's a Z", "It was not assembled. It was resolved."
+  and "We did not invent this. We implemented it." Write "A policy is a rule in
+  a logic program."
+- **State, don't defend.** Present a design as the design. No justifying it
+  against alternatives nobody raised, no "we say so", no "on purpose", no
+  "honestly". Drop hedges ("in principle", "worth knowing about", "narrower
+  and does more work").
+- **Promote with facts.** Show what gen does and what that gets the user, with
+  an example or a number. No marketing adjectives ("powerful", "seamless").
+- **Concrete first.** Lead a section with the example or the one-sentence
+  answer; the mechanism follows. Prefer a code block over a paragraph
+  describing code.
+- **No invented idiom.** Avoid coined phrasings the reader has to decode:
+  "refuses by name", "by construction", "load-bearing", "the whole trick",
+  "nothing less than", "the crossing", "owes". Say "fails with an error naming
+  X", "always", "required".
+- **Define a term once, where it first appears,** in one plain clause, and link
+  to [terminology](src/content/docs/reference/terminology.mdx) for the rest.
+- **Sparing punctuation.** At most one dash aside per paragraph. No
+  semicolon chains. No rhetorical fragments.
+- **Public audience.** No internal tracker ids (`den-hoag-*`), design-repo
+  paths (`den-ag-design:`), session history or arc names.
+- **Accurate to the code.** Every library name, function name and behaviour on
+  a page matches the source at the current lock. The roster is
+  `lib/mkGenLibs.nix`. gen is pre-release: document what ships today, never removed or renamed features.
+- **Organise by domain, not by repository.** Pages cover what gen does (graphs
+  and queries, typed configuration, aspects, policies, incremental evaluation,
+  delivery) and name the library that provides it in passing. The library and
+  stratum layout is an implementation detail that will change.
+- **Facts earn their place.** A number, check or guarantee goes on a page when
+  it helps a reader decide to use gen or use it correctly. Internal CI
+  bookkeeping stays in the repositories.
+- **Asides are for warnings a reader would act on.** Everything else goes in
+  the prose.
 
 ## Running it
 

@@ -1,8 +1,6 @@
 ---
 title: "Ehrig et al. (2006) — Fundamentals of Algebraic Graph Transformation"
 description: "Our reading of Fundamentals of Algebraic Graph Transformation."
-source:
-  - den-ag-design:used/summaries/ehrig-2006-algebraic-graph-transformation.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ H. Ehrig, K. Ehrig, U. Prange, and G. Taentzer, "Fundamentals of Algebraic Graph
 
 [doi:10.1007/3-540-31188-2](https://doi.org/10.1007/3-540-31188-2)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -53,78 +51,66 @@ The final sections introduce **typed attributed graphs** (E-graphs with data alg
 
 - **Typed attributed graph transformation**: Integration of typed graphs with DSIG-algebras for data attributes. The category (AGraphsATG, M) is adhesive HLR, so all theorems apply.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-dispatch
 
-**gen-derive** (Major influence):
+gen-dispatch uses algebraic graph transformation vocabulary for its rule system, applied to Nix's pure functional evaluation instead of literal graph mutation. Given rules, a position and a context, it answers which rules fire there and what actions they produce. The actions are opaque to gen-dispatch, and their vocabulary belongs to the consumer.
 
-gen-derive implements the algebraic graph transformation vocabulary as the core structure of its rule dispatch system, mapped to Nix's pure functional evaluation model rather than to literal graph mutation.
+- **Rule structure as a DPO span analogue.** `mkRule { nac ? ; identity ? ; priority ? ; overrides ? ; group ? ; produces ? ; } condition produce` corresponds to the span `L <- K -> R`. The `condition` is the left-hand pattern that a match tests, `produce` generates the right-hand side actions, and the rule's `identity` plays the part of the interface, stable across repeated dispatch.
 
-- **Rule structure as DPO span analogue**: `mkRule { condition; produce; nac; identity; priority; overrides; }` maps to the conceptual span `L <- K -> R`. The condition is the match morphism's applicability test (L pattern), the `produce` function generates the right-hand side actions (R), and the rule's identity serves as the interface (K) — preserved across fixpoint iterations for dedup. Located in the `mkRule` constructor.
+- **Match morphism.** The caller-supplied `match` function realises Ehrig's match morphism `m : L -> G`. For rules built with `fromFunction`, `builtins.functionArgs` gives the context keys the rule requires, which act as the pattern matched against the working context, the host graph. `fromFunctionMatch` performs that match by checking that every required argument is present.
 
-- **Match morphism**: The `match : condition -> id -> ctx -> bool` function parameter realizes Ehrig's match morphism `m : L -> G`. For `fromFunction` rules, `builtins.functionArgs` extracts the required context keys as the "pattern" to match against the working context (the "host graph"). `fromFunctionMatch` implements the actual matching — checking that all required args are present in context.
+- **Negative application conditions.** A rule's `nac` field implements Ehrig's NAC(x). Within one group, dispatch filters candidate rules by NAC and condition together, then applies overrides, sorts by priority, applies the exclusive filter, fires the surviving rules and classifies their actions into groups. A rule with a `nac` fires only when the NAC pattern does not match, which is Ehrig's "there does not exist an injective p : X -> G with p . x = m".
 
-- **Negative Application Conditions**: The first-class `nac` field on rules directly implements Ehrig's NAC(x). In gen-derive's dispatch sequence, NAC check occurs *before* condition matching: "NAC check -> condition match -> override suppression -> priority sort -> exclusive filter -> fire -> classify -> group." A rule with `nac` set only fires when the NAC pattern does NOT match — precisely Ehrig's semantics that "there does not exist an injective p : X -> G with p . x = m."
+- **Overrides as rule replacement.** A rule's `overrides` list suppresses named rules by identity, and `override { original; replacement; }` builds that pairing. This corresponds to controlled deletion in DPO, removing matched structure before adding new structure.
 
-- **Override as rule replacement**: The `overrides` field on rules (suppressing named rules by identity) corresponds to the controlled deletion aspect of DPO — removing matched structure before adding new structure. `derive.override original replacement` provides sugar for this pattern.
+- **Conflict resolution in place of critical pair analysis.** gen-dispatch resolves conflicts by overrides, then priority, then the optional `exclusive` mode, with declaration order breaking ties deterministically. Ehrig's critical pairs address the same question, what happens when several rules fire on overlapping structure. The Critical Pair Lemma says local confluence requires every critical pair to be strictly confluent. gen-dispatch reaches determinism through explicit ordering without enumerating critical pairs.
 
-- **Conflict resolution via critical pair analysis**: gen-derive's three-tier conflict resolution (override -> priority -> specificity) addresses the same problem as Ehrig's critical pairs — what happens when multiple rules can fire on overlapping structure. The Critical Pair Lemma says local confluence requires all critical pairs to be strictly confluent; gen-derive achieves determinism through explicit priority ordering and exclusive mode rather than exhaustive critical pair analysis.
+- **Iteration as a transformation sequence.** `dispatch` is a pure one-shot function of rules and context. Iteration belongs to the caller, which threads domain state through repeated dispatch, for example with gen-scope's `circular`, and reads the actions at the fixed point. The sequence `G0 => G1 => ... => Gn` ends when the state stops changing, a normal form. Because actions are recomputed from the converged state, they depend on that state and not on the path to it.
 
-- **Fixpoint convergence as transformation sequence**: gen-derive's `fixpoint` loop — dispatch, extract feedback, widen context, check stability — models an iterated graph transformation sequence `G0 => G1 => ... => Gn`. The convergence check (`eq`) corresponds to reaching a normal form. The `maxIter` guard (default 100) is a practical termination bound analogous to Ehrig's layer conditions for termination.
+- **Rule composition.** `restrict` (narrow the condition), `override` (replace a rule) and `chain` (feed A's actions to B) parallel the tutorial's production operations: restriction of matches, concurrent productions and E-concurrent sequential composition.
 
-- **Rule composition**: `derive.restrict` (narrow condition), `derive.override` (replace rule), and `derive.chain` (sequential composition) parallel the production composition operations in the tutorial: restriction of matches, concurrent productions, and E-concurrent sequential composition.
+- **Groups as typed layers.** Rules belong to groups, and dispatch walks the groups in a caller-supplied order, completing each before the next. gen-graph computes that order from `entryAfter`, `entryBefore`, `entryBetween` and `entryAnywhere` constraints. This parallels typed graph transformation systems where the type graph constrains which productions apply in which order.
 
-- **Phase stratification as typed transformation**: gen-derive's stratified phases with DAG ordering (`entryAnywhere`, `entryAfter`, `entryBefore`, `entryBetween`) parallel typed graph transformation systems where the type graph constrains which productions can apply in which order.
+### gen-graph
 
-**gen-graph** (Minor conceptual influence):
+gen-graph's edge map operations (`unionEdges`, `intersectEdges`, `differenceEdges`) correspond to the set operations on graph components used in pushout and pullback constructions. Its `fixpoint` refuses a step whose output does not contain its input, which keeps an iterated transformation monotone.
 
-gen-graph's edge map operations (`unionEdges`, `intersectEdges`, `differenceEdges`) correspond to the set-theoretic operations on graph components used in pushout and pullback constructions. The `fixpoint` function with monotonicity enforcement (throws on non-monotonic steps) reflects the categorical requirement that transformation sequences preserve structure.
+### Rules that change a graph
 
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2's demand-driven HOAG (Higher-Order Attribute Grammar) over scope graphs uses algebraic graph transformation as the formal model for how policies transform the scope graph during evaluation:
-
-- **Policy dispatch as graph production**: Den policies are rules that transform the scope graph by adding nodes (`spawn`), edges (`edge`), and declarations (`enrich`). Each policy invocation corresponds to a DPO application: the policy's pattern (its function signature destructured from scope context) is the match morphism L -> G; the emitted effects construct the right-hand side additions. The preserved interface K is the existing scope context that persists across the transformation.
-
-- **Effect vocabulary as typed actions**: Den v2's effect vocabulary — `spawn`, `enrich`, `emit`, `edge`, `drop`, `reroute`, `inject` — constitutes the typed attributed graph transformation's action repertoire. Each effect modifies the scope graph's typed structure: `spawn` adds typed nodes, `edge` adds I-edges, `drop` constrains resolution (analogous to a NAC on future queries), `reroute` redirects edge targets.
-
-- **`drop` as NAC constraint**: Den's `drop aspect` constraint prunes an aspect from resolution, implementing a graph-level negative condition — when evaluating, if aspect X is dropped, resolution queries skip it. This is a runtime NAC: the "pattern that must not match" during scope graph traversal.
-
-- **Scope graph confluence**: Den v2 must ensure that policy evaluation order doesn't affect the final scope graph. The Local Church-Rosser Theorem's conditions (parallel independence when overlaps are on preserved structure) guide the design: policies that operate on disjoint scope regions are commutable, while policies with overlapping effects must be ordered via phase stratification.
-
-- **Fixpoint convergence as normal form**: The gen-derive fixpoint loop driving policy dispatch converges to a normal form of the scope graph — the point where no more policies can fire (all conditions satisfied, context fully enriched). This is exactly the functional behavior theorem: a terminating, locally confluent GTS has unique normal forms.
+In a framework built on gen, rules add structure to the scope graph: new nodes, new edges and new declarations. Each rule application corresponds to a DPO application. The rule's pattern is the match morphism into the current scope context, its emitted actions build the right-hand side, and the existing context that persists across the step is the interface K. Rules that act on disjoint regions commute, as the Local Church-Rosser Theorem states for parallel-independent transformations, and rules with overlapping effects are ordered by group. A terminating, locally confluent system has unique normal forms, which is why the result of rule evaluation does not depend on firing order.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Pushout complement construction** (Part III, slide 30): The explicit two-step construction — "delete matched elements except interface, then add new elements" — is described but gen-derive's current dispatch treats deletion and addition as separate opaque actions. A unified delete-then-add primitive that automatically preserves the interface would give structural guarantees currently left to consumers.
+- **Pushout complement construction (Part III, slide 30).** The tutorial's two steps, delete matched elements except the interface and then add new elements, are separate opaque actions in gen-dispatch. A single delete-then-add primitive that preserves the interface would give structural guarantees that consumers currently provide themselves.
 
-- **Embedding Theorem** (Part III, slide 32-34): Extension of a transformation to a larger graph via consistent morphisms. Den currently re-dispatches policies when context grows; the Embedding Theorem suggests that if the boundary (shared structure) is preserved, extensions can be constructed without re-dispatch — potentially enabling incremental policy evaluation.
+- **Embedding Theorem (Part III, slides 32-34).** A transformation extends to a larger graph through consistent morphisms. When context grows, rules are dispatched again. The theorem suggests that when the shared boundary is preserved, the extension can be constructed without re-dispatch, which would allow incremental rule evaluation.
 
-- **E-concurrent productions** (Part IV, slide 42-44): The Concurrency Theorem's `p1 *_E p2` construction fuses dependent sequential transformations into a single production. gen-derive's `chain` combinator is a manual approximation; a formal E-concurrent construction could automatically fuse rule sequences for performance.
+- **E-concurrent productions (Part IV, slides 42-44).** The Concurrency Theorem's `p1 *_E p2` fuses dependent sequential transformations into one production. `chain` is a manual approximation. A formal E-concurrent construction could fuse rule sequences automatically.
 
-- **Graph constraints as application conditions** (Part VI, slide 64-68): The construction transforming graph constraints into equivalent left application conditions (`H |= c` iff `m |= lacc`) is not exploited. This would enable static pre-checking of invariants: "will this rule maintain the well-formedness constraint?" without actually applying it.
+- **Graph constraints as application conditions (Part VI, slides 64-68).** Transforming graph constraints into equivalent left application conditions (`H |= c` iff `m |= lacc`) would allow checking, before applying a rule, whether it keeps a well-formedness constraint.
 
-- **Adhesive HLR generalization** (Part V): The categorical abstraction to adhesive HLR categories is entirely unexploited. gen-derive works in the concrete setting of Nix attrsets as "graphs." Formalizing the Nix data structures as objects in an adhesive HLR category would enable proving that all the classical theorems (Church-Rosser, Parallelism, Concurrency, Critical Pair Lemma) hold for gen-derive's dispatch.
+- **Adhesive HLR generalisation (Part V).** gen-dispatch works concretely on Nix attrsets. Formalising those structures as objects of an adhesive HLR category would establish that the classical theorems (Church-Rosser, Parallelism, Concurrency, Critical Pair Lemma) hold for its dispatch.
 
-- **Typed attributed graph transformation with inheritance** (Part VI, slide 69): Inheritance in the type graph (abstract node types with concrete subtypes) could map to den's entity hierarchy — e.g., abstract "entity" type with concrete "host" and "home" subtypes, where rules written for the abstract type apply to all concrete instances.
+- **Typed attributed graph transformation with inheritance (Part VI, slide 69).** Inheritance in the type graph, with abstract node types and concrete subtypes, maps to an entity hierarchy: an abstract entity type with concrete host and home subtypes, where rules written for the abstract type apply to every instance.
 
 ### Potential New Libraries or Features
 
-- **gen-critical**: Static critical pair analysis for gen-derive rule sets. Given a set of rules, compute all critical pairs (minimal overlapping matches) and check strict confluence. Scope: medium (~300-500 lines). Would consume gen-derive rule definitions and gen-select selectors. Output: conflict report identifying which rule pairs can produce non-confluent results, with concrete minimal counterexample graphs. This directly implements the Critical Pair Lemma and would catch policy conflicts at definition time rather than at runtime.
+- **Static critical pair analysis.** Given a rule set, compute all critical pairs (minimal overlapping matches) and check strict confluence, reporting which rule pairs can produce non-confluent results with minimal counterexamples. This implements the Critical Pair Lemma and would catch rule conflicts at definition time. It would consume gen-dispatch rules and gen-select selectors.
 
-- **gen-derive incremental dispatch**: Implement the Embedding Theorem as an optimization. When context grows (new nodes/edges added), determine which existing policy results remain valid (boundary preservation check) and only re-dispatch policies affected by the boundary change. Scope: significant (~500-800 lines within gen-derive). Would require tracking the "boundary" of each dispatch result — which context elements were actually read. Interaction: extends gen-derive's fixpoint loop with differential re-evaluation.
+- **Incremental dispatch.** Apply the Embedding Theorem: when context grows, determine which earlier results remain valid by checking their boundary, and dispatch again only the rules the change affects. This needs a record of which context elements each dispatch actually read.
 
-- **gen-derive concurrent productions**: Automatic fusion of sequentially dependent rule pairs into E-concurrent productions. When two rules always fire in sequence and share intermediate structure, fuse them into a single rule that skips the intermediate state. Scope: medium (~300 lines as gen-derive extension). Interaction: consumes `chain` results and gen-derive's override system.
+- **Concurrent productions.** Fuse sequentially dependent rule pairs into E-concurrent productions. When two rules always fire in sequence and share intermediate structure, a fused rule skips the intermediate state.
 
 ### Research Directions
 
-- **Confluence verification for den policies**: Can den v2's policy set be statically verified as locally confluent? The Critical Pair Lemma says: enumerate all critical pairs, check strict confluence. The challenge is that den policies operate on scope graphs (not finite typed graphs), so the critical pair space may be infinite. A bounded model checking approach — enumerate critical pairs up to a size bound — would give practical confidence.
+- **Confluence verification.** Can a rule set be verified locally confluent statically? The Critical Pair Lemma says to enumerate critical pairs and check strict confluence. Rules over scope graphs may have an infinite critical pair space, and bounded model checking up to a size limit would give practical confidence.
 
-- **Termination guarantees via layer conditions**: Ehrig's layered typed graph grammar termination theorem requires suitable layer conditions on deleting vs non-deleting productions. Den policies are mostly non-deleting (`spawn`, `edge`, `enrich` add structure; only `drop` constrains). Formalizing den's phase stratification as a layering and proving that each layer's productions satisfy the termination conditions would give a formal termination proof for policy evaluation.
+- **Termination through layer conditions.** Ehrig's termination theorem for layered typed graph grammars needs layer conditions on deleting and non-deleting productions. Rules that only add structure are non-deleting. Formalising dispatch groups as layers and showing each layer's productions meet the conditions would give a termination proof for rule evaluation.
 
-- **Adhesive HLR formalization of Nix attrsets**: Are Nix attrsets with `//` (merge) as the pushout construction an adhesive HLR category? The merge operation is not a true categorical pushout (it's left-biased, not universal). However, a restricted setting — attrsets with disjoint keys and union as pushout — likely satisfies the van Kampen square property. Formalizing this would establish whether gen-derive's correctness can be derived from the categorical framework rather than verified case-by-case.
+- **Nix attrsets as an adhesive HLR category.** `//` is left-biased and so is not a categorical pushout. Attrsets with disjoint keys and union as the pushout likely satisfy the van Kampen square property. Establishing this would let dispatch correctness follow from the categorical framework instead of case-by-case checking.
 
-- **NAC composition**: Ehrig's NACs are individual morphisms checked independently. In practice, den policies often need conjunctions of negative conditions ("fire only when aspect X is NOT present AND entity Y has NOT been spawned"). Formalizing NAC composition (conjunction, disjunction, nesting) while preserving the transformation to left application conditions would strengthen gen-derive's constraint system.
+- **NAC composition.** Ehrig's NACs are checked individually. Rules often need conjunctions of negative conditions, such as "fire only when aspect X is absent and entity Y has not been created". Formalising conjunction, disjunction and nesting of NACs, while keeping their transformation into left application conditions, would strengthen gen-dispatch's constraints.

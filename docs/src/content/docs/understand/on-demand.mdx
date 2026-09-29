@@ -1,0 +1,100 @@
+---
+title: Values Computed on Demand
+description: Each node's values are defined by equations over the node and its neighbours and computed only when read, once per node, as in attribute grammars.
+---
+
+Every host on the web platform needs a fully qualified domain name, such as
+`db-prod-east.us-east.example.com`. The datacenter comes from the host itself. The domain comes
+from the environment the host belongs to: production uses `example.com` and development uses
+`dev.example.com`. Nobody should have to copy the domain onto each host.
+
+In gen you write one equation per value, and each node computes it from its own data and its
+neighbours'.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  sc = gen.scope;
+
+  platform = sc.buildRoots {
+    kinds = sc.mkKinds [ (sc.mkKind { } "env") (sc.mkKind { } "host") ];
+    types = {
+      prod = "env";
+      dev = "env";
+      web-prod-east = "host";
+      db-prod-east = "host";
+      web-dev-west = "host";
+      db-dev-west = "host";
+    };
+    parentGraph = sc.overlay
+      (sc.star "prod" [ "web-prod-east" "db-prod-east" ])
+      (sc.star "dev" [ "web-dev-west" "db-dev-west" ]);
+    decls = {
+      prod = { domain = "example.com"; };
+      dev = { domain = "dev.example.com"; };
+      web-prod-east = { dc = "us-east"; };
+      db-prod-east = { dc = "us-east"; };
+      web-dev-west = { dc = "us-west"; };
+      db-dev-west = { dc = "us-west"; };
+    };
+  };
+
+  attrs = sc.eval { } {
+    children = _: _: { };
+
+    # Inherited: a host takes the domain of the environment above it.
+    domain = sc.inherit' { } (node: node.decls.domain or null);
+
+    # Synthesized: computed from the host's own data and another attribute.
+    fqdn = self: id: "${id}.${self.get id "dc"}.${self.get id "domain"}";
+    dc = self: id: (self.node id).decls.dc;
+
+    # Never read below, so never computed.
+    audit = self: id: throw "audit is not computed unless something reads it";
+  } platform;
+in
+{
+  fqdn = attrs.get "db-prod-east" "fqdn";
+  dev = attrs.get "web-dev-west" "fqdn";
+}
+```
+
+```text
+{ dev = "web-dev-west.us-west.dev.example.com";
+  fqdn = "db-prod-east.us-east.example.com"; }
+```
+
+## How it works
+
+`buildRoots` places the hosts under their environments. `parentGraph` says which node sits above
+which, and `decls` holds each node's own data.
+
+`eval` takes a set of **attributes**. An attribute is an equation, `self: id: value`, that says how
+to compute one value at any node `id`. Inside it, `self.get` reads another attribute, at the same
+node or at a different one. Two shapes cover most needs:
+
+- An **inherited** attribute flows down from above. `inherit'` walks up from the node until it
+  finds a node that answers, so each host picks up its environment's `domain`.
+- A **synthesized** attribute is computed from values at the node itself. `fqdn` combines the
+  host's `dc` and `domain`.
+
+Nothing runs until something reads it. Reading `fqdn` at `db-prod-east` computes that node's `dc`
+and its `domain`, which it finds at `prod`. No other host computes anything.
+The `audit` attribute would stop evaluation with an error, but no one reads it, so it never runs. Each value is stored on its node the first time it is read, so a
+second read of the same attribute at the same node reuses it.
+
+This lets a framework declare many values for thousands of nodes and pay only for the ones a
+build uses.
+
+## The theory
+
+An **attribute grammar** attaches values to the nodes of a tree and defines each value by an
+equation over the node and its neighbours. Knuth introduced them to give programming languages a
+meaning, with inherited attributes flowing down the tree and synthesized attributes flowing up.
+Hedin's reference attribute grammars let an attribute point at another node, and showed that
+computing each attribute on demand, with caching, works for any grammar without cycles. gen's
+evaluator follows that design. See our readings of
+[Knuth (1990)](/reference/papers/knuth-1990-genesis-attribute-grammars/) and
+[Hedin (2000)](/reference/papers/hedin-2000-reference-ag/).
+
+Next: [Rebuilding Only What Changed](/understand/incremental/).

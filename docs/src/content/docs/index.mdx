@@ -1,138 +1,161 @@
 ---
 title: gen
-description: Packages, hosts, networks, services — it is all one graph. gen gives it one evaluation layer, from a single machine to thousands.
+description: Nix libraries that model hosts, users and features as one graph. Write a feature once as a function of its host, and gen passes the host in.
 template: splash
 editUrl: false
 hero:
   tagline: |
-    It is all a graph — packages, hosts, networks, services.
-    One evaluation layer, from a single machine to thousands.
-  actions:
-    - text: Start here
-      link: /guides/getting-started/
-      icon: right-arrow
-    - text: How it works
-      link: /explanation/architecture/
-      icon: document
-      variant: minimal
+    Hosts, users and features form one graph.
+    Write each feature once, as a function of the host it lands on, and gen passes the host in.
 ---
 
-import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import { LinkButton } from '@astrojs/starlight/components';
 import HeroGraph from '../../components/HeroGraph.astro';
 
 <HeroGraph />
 
-## You already know this
+## The wiring problem
 
-Package dependencies are a graph. So is the OS configuration that installs them.
-So is the network the host sits on, and the services depending on each other
-across it, and the fleet those hosts belong to.
-
-Every one of those is the same shape. You describe each in a different language,
-with a different tool, and you reconcile them by hand — at the seams, where the
-interesting failures live.
-
-## Every config tool makes you assemble
-
-You write the modules. You wire them together. You remember which host needs
-which user, which user needs which shell, which shell needs which package — and
-you encode all of it by hand, in the order the evaluator happens to need.
-
-The relationships were the interesting part, and you spent your evening on the
-plumbing.
-
-## So declare the relationships instead
-
-Systems, users, packages and services are nodes. What relates them is an edge.
-Policies are small programs that produce more edges from the ones you wrote.
-
-Then you ask the graph a question, and it answers. One model and one evaluator,
-whether you are describing a laptop or a fleet.
+Take a homelab with two machines. Both run SSH. The server also exports metrics, and the laptop runs
+a desktop. In plain NixOS the wiring looks like this:
 
 ```nix
-{ genValues, ... }:
+nixosConfigurations = {
+  laptop = nixpkgs.lib.nixosSystem {
+    specialArgs = { addr = "10.0.0.2"; users = [ "alice" ]; };
+    modules = [ ./ssh.nix ./desktop.nix ];
+  };
+  server = nixpkgs.lib.nixosSystem {
+    specialArgs = { addr = "10.0.0.1"; users = [ "alice" "bob" ]; };
+    modules = [ ./ssh.nix ./monitoring.nix ]; # monitoring.nix needs ssh.nix
+  };
+};
+```
+
+Three facts in that file live only in your head:
+
+- `monitoring.nix` needs `ssh.nix`. A host that lists the first and forgets the second still
+  evaluates.
+- `addr` and `users` reach every module through `specialArgs`, whether the module reads them or not.
+- The module lists are the only record of which host has which feature. To answer "which hosts run
+  SSH?" you read every list.
+
+## The same homelab in gen
+
+Each feature is an *aspect*, a named bundle of configuration. An aspect can include other aspects,
+and each include is an edge in a graph. An aspect that needs to know its host takes `host` as an
+argument, and gen passes the host in.
+
+```nix
+aspects.ssh.nixos = { host, ... }: {
+  services.openssh.enable = true;
+  services.openssh.settings.AllowUsers = host.users;
+};
+aspects.desktop.nixos.services.xserver.enable = true;
+aspects.monitoring.includes = [ "ssh" ];
+aspects.monitoring.nixos = { host, ... }: {
+  services.prometheus.exporters.node.listenAddress = host.addr;
+};
+
+hosts.laptop = { addr = "10.0.0.2"; users = [ "alice" ]; aspects = [ "desktop" "ssh" ]; };
+hosts.server = { addr = "10.0.0.1"; users = [ "alice" "bob" ]; aspects = [ "monitoring" ]; };
+```
+
+The server lists only `monitoring`, and SSH arrives through the include edge. Each host's NixOS
+configuration comes out filled in with its own address and users (output formatted for reading):
+
+```console
+$ nix eval --file homelab.nix
 {
-  networking.hostName = genValues.hosts.igloo.name;
+  includesOf = { desktop = [ ]; monitoring = [ "ssh" ]; ssh = [ ]; };
+  laptop.services = {
+    openssh = { enable = true; settings.AllowUsers = [ "alice" ]; };
+    xserver.enable = true;
+  };
+  server.services = {
+    openssh = { enable = true; settings.AllowUsers = [ "alice" "bob" ]; };
+    prometheus.exporters.node.listenAddress = "10.0.0.1";
+  };
 }
 ```
 
-That value was not assembled. It was resolved — by one evaluator, over a graph
-you described rather than built.
+<details>
+<summary>The whole of `homelab.nix`</summary>
 
-<CardGrid>
-  <Card title="Nodes and edges" icon="puzzle">
-    Hosts, users, aspects. Relations are data you can query, not call order you
-    have to get right.
-  </Card>
-  <Card title="Policies produce edges" icon="random">
-    A rule fires when its conditions hold and adds to the graph. Logic
-    programming, with the termination question taken seriously.
-  </Card>
-  <Card title="One evaluator" icon="approve-check">
-    Every fixpoint goes through one place. A load-bearing design rule, with a
-    scanner that reports any second one.
-  </Card>
-</CardGrid>
+This file runs as it is, with no flake and no nixpkgs. The last step evaluates each host's modules
+with gen's own module system. In a real flake that step is a NixOS system builder.
 
-## We did not invent this. We implemented it.
+```nix
+let
+  gen = import (builtins.fetchGit "https://github.com/sini/gen") { };
+  m = gen.merge;
+  t = m.types;
 
-Configuration resolution is name resolution, and name resolution over a scope
-graph is a reachability query with a well-formedness condition on the paths.
-Policies producing edges is Datalog, and negation in Datalog is exactly where
-the semantics get delicate — so gen solves stratum by stratum, and a rule can
-never observe its own still-open conclusion. Incremental rebuild is
-demand-driven recomputation with early cutoff.
+  cnf.keySemantics.nixos.category = "class";
+  aspectSchema = gen.aspects.mkAspectSchema cnf;
 
-Each of those is a settled result with a proof behind it. Building on them is a
-design decision, and it is why a question about gen's behaviour has somewhere to
-go beyond the source.
+  declared = m.evalModuleTree {
+    modules = [
+      (aspectSchema.mkAspectModule { })
+      { options.hosts = m.mkOption { type = t.attrsOf t.raw; }; }
+      {
+        aspects.ssh.nixos =
+          { host, ... }:
+          {
+            services.openssh.enable = true;
+            services.openssh.settings.AllowUsers = host.users;
+          };
+        aspects.desktop.nixos.services.xserver.enable = true;
+        aspects.monitoring.includes = [ "ssh" ];
+        aspects.monitoring.nixos =
+          { host, ... }:
+          {
+            services.prometheus.exporters.node.listenAddress = host.addr;
+          };
 
-<CardGrid>
-  <LinkCard title="The reading list" href="/reference/reading-list/"
-    description="Which published work carries which part of the system." />
-  <LinkCard title="Policies" href="/explanation/policies/"
-    description="Rules, stratification, and what happens under a negative cycle." />
-</CardGrid>
+        hosts.laptop = {
+          addr = "10.0.0.2";
+          users = [ "alice" ];
+          aspects = [ "desktop" "ssh" ];
+        };
+        hosts.server = {
+          addr = "10.0.0.1";
+          users = [ "alice" "bob" ];
+          aspects = [ "monitoring" ];
+        };
+      }
+    ];
+  };
 
-## One concern per library
+  # The include edges, and each host's aspects plus everything they reach.
+  facts = gen.aspects.graphFacts cnf declared.config.aspects;
+  withIncludes =
+    names: names ++ builtins.concatMap (gen.graph.reachableFrom { edges = a: facts.includesOf.${a}; }) names;
 
-Each layer is a set of flakes you can depend on alone. Take the graph algebra
-without the module system. Take the module system without the aspect layer. The
-hub is a convenience, and a consumer reading `inputs.gen-graph.lib` never needs
-it.
+  projected = gen.delivery.project {
+    values = declared.config;
+    inherit cnf;
+    selectNodes = v: builtins.mapAttrs (_: h: h // { aspects = withIncludes h.aspects; }) v.hosts;
+  };
 
-Every member declares exactly one stratum, and that declaration is total — a
-library cannot join the roster without one, so the layering is a build error
-rather than a diagram.
-
-```mermaid
-flowchart TB
-  F["framework — settings, assemble, program, inspect, delivery"]
-  A["aspects — aspects, link, class"]
-  M["modules — types, merge"]
-  S["substrate — the graph, the evaluator, identity, memoisation, the algebra"]
-  F --> A
-  A --> M
-  M --> S
+  # Each host's `nixos` modules, with `host` bound to that host's record.
+  realized = gen.delivery.realize {
+    inherit projected;
+    terminals.nixos =
+      { modules, bindings, ... }:
+      (m.evalModuleTree {
+        modules = [
+          { freeformType = t.lazyAttrsOf t.anything; }
+        ] ++ map (mod: (gen.bind.wrap { bindings.host = bindings.node; } mod).module) modules;
+      }).config;
+  };
+in
+{
+  inherit (facts) includesOf;
+  inherit (realized.nixos) laptop server;
+}
 ```
 
-<CardGrid>
-  <LinkCard title="The roster" href="/libraries/roster/"
-    description="Every library, what it owns, and how to depend on one alone." />
-  <LinkCard title="Strata" href="/explanation/strata/"
-    description="Why the layering is total, and what it rules out." />
-</CardGrid>
+</details>
 
-## We wrote down what we owe you
-
-Every promise in gen names the command that enforces it. Every roster library is
-free of `nixpkgs.lib` — checked by a scanner, per repository, on every run. Full
-nixpkgs enters at the terminals alone. Where the enforcer is a person rather than
-a command, we say so.
-
-<CardGrid>
-  <LinkCard title="Trust" href="/trust/"
-    description="Each promise, the mechanism behind it, and how it fails." />
-  <LinkCard title="Validation" href="/validation/"
-    description="The oracles every landing passes, and what each one proves." />
-</CardGrid>
+<LinkButton href="/guides/getting-started/" icon="right-arrow">Get started</LinkButton>

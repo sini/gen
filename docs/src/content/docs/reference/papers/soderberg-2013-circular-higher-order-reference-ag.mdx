@@ -1,8 +1,6 @@
 ---
 title: "Söderberg & Hedin (2013) -- Circular Higher-Order Reference Attribute Grammars"
-description: "Our reading of Circular Higher-Order Reference Attribute Grammars."
-source:
-  - den-ag-design:used/summaries/soderberg-2013-circular-higher-order-reference-ag.md
+description: "A summary of Circular Higher-Order Reference Attribute Grammars and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ E. Söderberg and G. Hedin, "Circular Higher-Order Reference Attribute Grammars,
 
 [doi:10.1007/978-3-319-02654-1_17](https://doi.org/10.1007/978-3-319-02654-1_17)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 **SLE 2013, LNCS 8225, pp. 302-321. Springer. DOI 10.1007/978-3-319-02654-1_17.**
@@ -26,17 +24,23 @@ The fix is to co-evaluate both in ONE fixed-point cycle so each sees the other's
 
 Well-definedness (§4.1) rests on the classical circular-AG conditions applied to AST values: values drawn from a **lattice of bounded height**, a **monotonic** semantic function, and a **bottom value** seeding the iteration (Def. 1 gives AST-value equality: same type, tokens, and recursively-equal children; the parent reference is a computed value, not part of the value). Nested/mutually-dependent circular NTAs converge to a common fixed point regardless of iteration order. Termination of the NTA-per-iteration-step view is handled by the Krishnan & Van Wyk (SLE 2012) conservative multi-level-NTA ordering -- each generated NTA has a lower order than its host. §6 evaluates on Java name-reclassification rewrites (DemoJavaNames): the unified CIRCULAR-NTA algorithm matches or beats the specialized rewrite evaluators, with substantially better scaling on complex programs because more attributes can be cached during evaluation.
 
-## Relevance to den-hoag (the step-6 materialization bridge)
+## How gen uses this
 
-This is the keystone for the **materialization bridge** -- the seam letting an off-trace resolution attribute (`provided-modules`, the who-provides-to-me reverse-read) feed on-trace materialized module content into `evalModules`. Three specific bearings:
+### gen-scope: circular attributes
 
-1. **The §5.1 "computed-AST-as-attribution-over-static-initial-AST" frame IS the bridge's posture.** den's materialized output (the terminal module set at `terminalModulesAt`) is a function of the resolution attribution over a STATIC base (the claim pool / ingested fleet), exactly as CHORAG's computed AST is a function of attributes over the unchanged initial AST. The bridge's `provided-modules` derived attr feeding `terminalModulesAt` is the "computed child reference defined by an attribute" pattern.
+The paper's well-definedness contract is what a gen-scope circular attribute declares. `circular { carrier; } f` returns a declaration whose carrier states a `bottom` value, an order `leq`, a bounded `height`, and whether the order is over a `quotient` of the values (§2.4, §4.1: "a lattice of bounded height, that the semantic function is monotonic, and that a bottom value is provided as the starting point of the fixed-point iteration"). None of these can be recovered from `f`, so each is declared. As in the paper's CIRCULAR-ATTR-EVAL (Fig. 5), the evaluator reads the declaration at demand time. A declaration with no carrier fails at its first demand with an error naming the missing terms. Mutually dependent circular instances iterate together in one shared round, the single co-evaluation cycle §3 shows is needed to avoid reading a stale intermediate value, and the iteration bound is derived from the declared heights.
 
-2. **The interdependence failure mode (§3, Fig. 10-11) is precisely the danger the bridge's stratification avoids.** CHORAG's lesson: a generative step (rewrite) and a circular attribute that are interdependent MUST co-evaluate in one cycle, or the generation terminates prematurely on stale values. The bridge sidesteps this by being **acyclic**: `provided-modules` reads only the static EDB claim pool (`readsAttrs = []`, `edbStubSelf` throws on `self.get`, leaf claims `from = ∅`), and `terminalModulesAt` runs POST-resolution over the final `result`. There is no cycle between materialization and resolution, so the co-evaluation algorithm is NOT needed. CHORAG tells us *why* the stratified/acyclic design is the sound choice, and *what we would be forced to build* (single-cycle co-evaluation) if we ever admitted provide-of-provide cycles -- which the EDB-purity guard structurally forbids. This is the theory backing for soundness obligation S3 (resolve-before-materialize, no cycle).
+### gen-scope: bounded non-terminal attributes
 
-3. **Bounded-height lattice + monotonic + bottom = the well-definedness contract**, and the Krishnan & Van Wyk NTA-ordering = den's shipped **L5 bounded-NTA** guard. den's `provided-modules` is a degenerate (non-circular) case -- a single stratified pass, trivially a one-step fixed point -- so it satisfies the contract without iteration. Should a future design admit genuine circularity between provision and resolution, CHORAG is the algorithm to adopt.
+gen-scope synthesizes child nodes from attributes (a node's spawned and NTA children). Termination follows the technique §7 restates from Krishnan & Van Wyk 2012: order the node types so that "each new NTA has a lower order than its host". A kind declares the kinds it may spawn in its `below` set, and each name in `below` resolves only against kinds registered strictly earlier, so a cyclic or self-referencing spawn cannot be written. A spawn of a kind outside `below` fails with an error naming it.
 
-Contrast with the CURRENT compat `provides.to-*` lowering: it uses the Magnusson-Hedin circular fixpoint (`resolved-aspects.nix` joint neededBy+guard least-fixpoint), which resolves selectors at presence-resolution time. The bridge deliberately trades that circular power for a static stratified read -- reproducing delivery only for compile-time-enumerable entity targets, ledgering the dynamic-cell residual. CHORAG characterizes exactly the circular capability being traded away.
+### gen-memo: never cache a non-final value
+
+gen-memo, gen's incremental rebuilder, keeps §4.2's obligation that a value computed during an unfinished fixed-point iteration is never served as final. A rebuild whose dependency cone reaches a cycle fails with a catchable error instead of caching anything, and cyclic components are solved separately to their fixed point by `runScc`.
+
+### gen-bind: values resolved at their producer
+
+gen-bind thunks follow the §5.1 view of materialization as attribution over a static tree. A thunk created with `mkThunkFrom` records the scope that produced it. When the caller supplies that scope's configuration, the thunk resolves against the producer's configuration rather than the consumer's.
 
 ## Key Concepts
 
@@ -44,18 +48,18 @@ Contrast with the CURRENT compat `provides.to-*` lowering: it uses the Magnusson
 
 - **Rewrites as a special form of circular NTA (§5):** an in-place AST rewrite = a circular NTA over the computed children, where the `when` clause is the change condition and consistency (no applicable `when`) is the fixed point. Enables freely mixing rewrites and circular attributes.
 
-- **Interdependence premature-termination bug (§3):** separate evaluation cycles for a generative step and a circular attribute that depend on each other yield a stale intermediate (bottom) value read across the boundary; the generation terminates too soon. Fix = one shared cycle. (The failure mode den's stratified bridge avoids by acyclicity.)
+- **Interdependence premature-termination bug (§3):** separate evaluation cycles for a generative step and a circular attribute that depend on each other yield a stale intermediate (bottom) value read across the boundary; the generation terminates too soon. Fix = one shared cycle.
 
-- **Computed AST as attribution over the static initial AST (§5.1):** reframe the AG as defining an attribution -- including a computed AST -- that is a pure function of the unchanged initial AST. Computed children are reference attributes; the initial AST is never mutated. (The bridge's exact posture: materialized output as a function of resolution attributes over a static claim pool.)
+- **Computed AST as attribution over the static initial AST (§5.1):** reframe the AG as defining an attribution -- including a computed AST -- that is a pure function of the unchanged initial AST. Computed children are reference attributes; the initial AST is never mutated.
 
 - **Well-definedness conditions (§4.1):** bounded-height value lattice + monotonic semantic function + bottom value. Nested circular NTAs reach a common fixed point independent of iteration order.
 
-- **Bounded-NTA termination (§7, via Krishnan & Van Wyk SLE 2012):** conservative termination for multi-level NTAs by ordering node types so each generated NTA is lower-order than its host. (= den's shipped L5 bounded-NTA guard.)
+- **Bounded-NTA termination (§7, via Krishnan & Van Wyk SLE 2012):** conservative termination for multi-level NTAs by ordering node types so each generated NTA is lower-order than its host.
 
-- **Design B may-have-rewrite gating / Design C change-flag stack (§5.2):** build NTAs only for statically rewrite-bearing node types (demand-driven), and skip value comparisons using a push/pop change-flag stack. (Inertness-when-absent precedent: a node with no rewrites returns its initial child unchanged -- mirrors the bridge's `++ []` byte-identity when no `provide` is present.)
+- **Design B may-have-rewrite gating / Design C change-flag stack (§5.2):** build NTAs only for statically rewrite-bearing node types (demand-driven), and skip value comparisons using a push/pop change-flag stack. A node with no rewrites returns its initial child unchanged.
 
-- **Forwarding contrast (§7, Van Wyk CC 2002):** forwarding constructs the transformed tree as an NTA and auto-forwards attributes to it, KEEPING all intermediate steps; rewrites REPLACE nodes. Relevant to the copy-rule/forwarding framing of the resolution-tier verbs.
+- **Forwarding contrast (§7, Van Wyk CC 2002):** forwarding constructs the transformed tree as an NTA and auto-forwards attributes to it, KEEPING all intermediate steps; rewrites REPLACE nodes.
 
-## Cited works already in the catalog
+## Related cited works
 
 Vogt-Swierstra-Kuiper 1989 (HOAG/NTA), Hedin 2000 (RAGs), Magnusson-Hedin 2007 (circular RAGs), Ekman-Hedin 2004 (rewritable RAGs), Knuth 1968 (AGs), Boyland 2005 (remote attributes, undecidable static circularity), Krishnan-Van Wyk 2012 (HOAG termination), Van Wyk et al. 2002 (forwarding), Demers-Reps-Teitelbaum 1981 / Reps 1982 (incremental AG evaluation), Farrow 1986 (fixed-point circular AG evaluators).

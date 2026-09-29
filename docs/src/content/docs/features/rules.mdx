@@ -1,0 +1,140 @@
+---
+title: Rules
+description: Write rules with positive and negative conditions, solve them together, read each atom's verdict and turn the results into edges.
+---
+
+On the web platform, a webserver may reach a database in its own environment unless the database
+is in maintenance. `db-2` is in maintenance, so `web-2` gets no access.
+
+```nix title="platform-acl.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  hosts = {
+    web-1 = { role = "webserver"; env = "prod"; };
+    web-2 = { role = "webserver"; env = "dev"; };
+    db-1  = { role = "database";  env = "prod"; };
+    db-2  = { role = "database";  env = "dev"; };
+  };
+  names = builtins.attrNames hosts;
+  ofRole = role: builtins.filter (n: hosts.${n}.role == role) names;
+
+  facts =
+    map (n: { head = "${hosts.${n}.role}:${n}"; relata = [ n ]; }) names
+    ++ [ { head = "maintenance:db-2"; relata = [ "db-2" ]; } ];
+
+  access = builtins.concatMap (web: map (db: {
+    head = "reach:${web}:${db}";
+    pos = [ "webserver:${web}" "database:${db}" ];
+    neg = [ "maintenance:${db}" ];
+    relata = [ web db ];
+  }) (builtins.filter (db: hosts.${db}.env == hosts.${web}.env) (ofRole "database"))) (ofRole "webserver");
+
+  model = gen.program.model {
+    program = gen.program.program { declarations = facts ++ access; frozen = names; };
+    interpretation = [ ];
+    prior = null;
+    complete = true;
+  };
+in
+{
+  web1ToDb1 = (model.resolve "reach:web-1:db-1").included;
+  web2ToDb2 = (model.resolve "reach:web-2:db-2").included;
+  allowed = builtins.filter (a: builtins.substring 0 6 a == "reach:") model.trueAtoms;
+  outcome = model.adjudication.outcome;
+}
+```
+
+```console
+$ nix eval --impure --json --file platform-acl.nix
+{ "allowed": ["reach:web-1:db-1"], "outcome": "admitted", "web1ToDb1": true, "web2ToDb2": false }
+```
+
+A **rule** has a head atom, positive conditions (`pos`) and negative conditions (`neg`). The head
+holds when every positive condition holds and no negative one does. A rule with no conditions is a
+fact. An **atom** is one fact, such as `reach:web-1:db-1`. Its name is yours: gen does not parse it.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Write a program | `program.program { declarations; frozen; }` | Collect rules `{ head; pos?; neg?; relata; }` into one program |
+| Solve it | `program.model { program; interpretation; prior; complete; }` | Compute every atom's verdict |
+| Read a verdict | `.resolve atom`, `.trueAtoms`, `.falseAtoms`, `.undefinedAtoms`, `.withheldAtoms` | Ask about one atom, or list atoms by verdict |
+| Run passes | `prior = <previous model>` | Solve again after new rules arrive, with a check that no earlier rule was dropped |
+| Check stability | `.adjudication`, `adjudicate`, `stableModelBudget` | Decide whether the solution is a stable model, within a search budget |
+| Author rule bodies | `emit`, `forEach`, `body`, `rule`, `declaration` | Build rule bodies from data without evaluating them at registration |
+| The solver | `scope.solve`, `wellFoundedModel`, `leastModel`, `stratify` | The well-founded engine the program runs on |
+| Dispatch | `dispatch.mkRule`, `dispatch.dispatch`, `mkActions`, `chain`, `override` | Run condition-and-action rules in ordered groups and collect their actions |
+
+## Details
+
+### Three verdicts
+
+The engine computes the well-founded model of the program. Each atom is true, false, or
+**undefined**. An atom is undefined when rules contradict each other through negation and no other
+fact settles it:
+
+```nix
+gen.program.program {
+  frozen = [ "db-1" ];
+  declarations = [
+    { head = "primary:db-1"; neg = [ "replica:db-1" ]; relata = [ "db-1" ]; }
+    { head = "replica:db-1"; neg = [ "primary:db-1" ]; relata = [ "db-1" ]; }
+  ];
+}
+# model.undefinedAtoms == [ "primary:db-1" "replica:db-1" ]
+# (model.resolve "primary:db-1").flag == "U"
+```
+
+`resolve` returns a record with a `flag`:
+
+| `flag` | Meaning | `included` |
+|---|---|---|
+| `T` | the program is complete and the atom has a true or false verdict | `true` or `false` |
+| `P` | more rules may still arrive | `true` only when the atom is derived without any negation; otherwise it fails |
+| `U` | the atom is undefined | fails |
+
+Reading `included` where no answer exists fails with an error. It never returns `null` or `false`:
+
+```
+gen-program: the membership 'primary:db-1' is UNDEFINED — … Read `flag` and handle 'U'; `included` has no answer to give here
+```
+
+Read `flag` first when a program can contain such cycles.
+
+### Passes
+
+Rules can arrive over several passes. Each pass solves the whole program so far, and takes the
+previous pass's model as `prior`. `model` fails when the new program is missing a rule from `prior`,
+so a pass cannot silently drop earlier rules. Set `complete = true` on the pass after which no rules
+can arrive. Until then, answers that later rules could change report `P`.
+
+`interpretation` lists atoms you assert for this pass, as `{ atom; verdict; }`. It is required, so
+an empty assertion list is written as `[ ]`.
+
+### `frozen` and `relata`
+
+`relata` names the identifiers a rule is about. Each must appear in `frozen`, the set of identifiers
+settled before this program runs. A relatum missing from `frozen` fails with an error.
+
+### From atoms to edges
+
+A true atom can become an edge in the graph. Today this is the caller's step:
+
+```nix
+map (atom:
+  let parts = builtins.match "reach:(.*):(.*)" atom;
+  in { from = builtins.elemAt parts 0; to = builtins.elemAt parts 1; label = "reaches"; })
+  allowed
+# [ { from = "web-1"; to = "db-1"; label = "reaches"; } ]
+```
+
+[Inspection](/features/inspection/) shows these derived edges beside the declared ones, and answers
+why each exists.
+
+For the theory, see [Rules That Add Relationships](/understand/rules/).
+
+---
+
+**Provided by** gen-program (programs and models), gen-scope (the well-founded engine) and
+gen-dispatch (ordered rule dispatch).

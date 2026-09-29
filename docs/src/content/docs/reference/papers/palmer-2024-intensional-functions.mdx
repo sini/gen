@@ -1,8 +1,6 @@
 ---
 title: "Palmer et al. (2024) -- Intensional Functions"
-description: "Our reading of Intensional functions."
-source:
-  - den-ag-design:used/summaries/palmer-2024-intensional-functions.md
+description: "A summary of Intensional functions and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ Z. Palmer, N. W. Filardo, and K. Wu, "Intensional functions," *Proceedings of th
 
 [doi:10.1145/3689714](https://doi.org/10.1145/3689714)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 Palmer, Zachary, Nathaniel Wesley Filardo, and Ke Wu. "Intensional Functions." Proc. ACM Program. Lang. 8, OOPSLA2, Article 274 (October 2024), 26 pages. https://doi.org/10.1145/3689714
@@ -50,84 +48,55 @@ The implementation (Haskell+ItsFn, a GHC 9.2 extension) demonstrates a 25% reduc
 - **Saturation-aware application (S6.2)** -- fully-applied intensional functions need not construct closures, avoiding unnecessary constraint obligations at saturated call sites.
 - **Canonical closure (Def. 5.5)** -- a deterministic representation of a function's free variables and free type variables as a packed list, ensuring closure representations are comparable across function instances.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-algebra: intensional functions and conservative equality
 
-#### gen-algebra (MAJOR) -- intensional identity; Search monad retired
+`mkIntensional hashIdentity registry ctor args` (`lib/intensional.nix`) is an encoder in Palmer's sense. The author names a constructor `ctor` in a registry and passes inert arguments `args`. The registry builds the function, so the closure is derived from the construction and cannot be under-supplied. The result carries the paper's three eliminators:
 
-**Search monad (retired, ADR-0008 §1, den-hoag-b7u1v)**: gen-algebra's `search` namespace directly implemented the intensional Search monad from S3. The `search.empty` / `search.insert` / `search.lookup` / `search.on` / `search.converge` API mirrored the paper's `insert`/`lookup`/`itsBind` operations. `search.converge` was the fixed-point loop that fired continuations on unprocessed values and repeated until stable -- the exact convergence protocol described for the intensional Search monad. Continuations created with `mkIntensional` watching the same index key were deduplicated **by name only** (`keyOf = "${indexKey}:${fn.name}"`), NOT by name+closure, which did not transfer Theorem 1's soundness guarantee — that requires equal closures *and* assumes the closure is the function's actual captured environment, whereas gen's `closure` is programmer-declared inspect data. The namespace is retired: gen-scope is the sole evaluator, and `converge` was a second one, interpreting a caller-authored continuation program on its own carrier and its own round schedule.
+- `__functor` (application), which calls `registry.members.${ctor} args`.
+- `name` (identify, S2.2), the program point. It equals `ctor`, so it is constant across a constructor's instances and is never used as a key on its own.
+- `closure` (inspect, S2.3), which is `args`.
 
-**Intensional functions** (`pure/intensional.nix`): `mkIntensional name closure fn` creates a callable attrset with three fields corresponding to the paper's three eliminators -- `__functor` (application), `name` (identify, S2.2 program-point identity), and `closure` (inspect, S2.3 closure inspection). `intensionalEq a b` compares only `.name` fields (program-point equality), treating same-name functions as equal. This is NOT Palmer's conservative equality, which requires same program point AND element-wise equal closures (S2.3, Fig. 5). Comparing name alone is a *superset* of that relation -- it declares strictly *more* pairs equal (any two functions sharing a name, regardless of closure), so it is MORE aggressive, not more conservative. Name-only equality is sound only under the discipline that program-point names are made closure-discriminating: callers must fold any distinguishing closure data into the name string (e.g., `"myPolicy:${hostName}"`). Without that discipline it can declare behaviorally-distinct functions equal, which the paper's name+closure equality would not.
+The identity is minted lazily in `__mint`, a digest over the registry coordinate, the constructor and the arguments. The minting function `hashIdentity` is passed in from gen-identity, gen's one identity mint, which keeps gen-algebra free of dependencies.
 
-**Standalone identity** (`pure/identity.nix`): `mkIdentity` produces deterministic SHA-256 hashes from named fields, extending the paper's program-point concept to data identity beyond functions.
+`conservativeEq a b` is Palmer's conservative equality (S2.3, Fig. 5), a conjunction over identity and closure. Two minted values compare by digest, which covers both conjuncts. Any other pair compares the values themselves under Nix `==`, which on lambda-carrying values can only separate more pairs than Fig. 5 does. There is no name-only arm: comparing the program point alone would call two values with different closures equal, the direction S2.3 forbids. `identityOf` reads a value's identity regime (minted, unmintable, or unmigrated), and `isExact` tells a caller whether the identity it got is an exact key.
 
-#### gen-aspects (MAJOR) -- Flat dispatch, diamond dedup, guard defunctionalization
+### gen-aspects: guards as first-order data
 
-**One-type dispatch in merge (S2)**: `aspectType` implements Palmer's flat typing -- one type dispatches by value shape. Attrsets and module functions merge into the submodule; guard functions wrap into `functionTo`. This is the paper's insight that intensional functions can carry enough metadata for dispatch without requiring a separate type hierarchy.
+- **Guard defunctionalization (S5.1)** -- `lib/guard.nix` gives guards a closed predicate vocabulary with one global `applyGuard`. The predicate is first-order data, so an aspect's identity never has to hash a closure.
+- **Wrapped guard functions** -- a raw function such as `{ host, ... }: { nixos = ...; }` is wrapped as a functor record tagged `__isWrappedFn` with its `__functionArgs`, so gen can read what it asks for without calling it. `canTake` reads those formals to decide whether a function can be applied in a given context.
+- **Diamond dedup (S5.3, Lemma 5.12)** -- an aspect's identity is its path key (`lib/identity.nix`). When one aspect is included through several paths, equal identities deduplicate its contributions.
 
-**Guard functions as callable first-order data (S5.1)**: Guard functions like `{ host, ... }: { nixos = ...; }` are wrapped via `functionTo` with explicit metadata (`__isWrappedFn`, `__functionArgs`), paralleling the paper's intensional function representation where functions carry inspectable metadata alongside their callable behavior. `canTake` performs function arg introspection (analogous to `inspect` + constraint checking) to classify functions.
+### gen-dispatch: rule identity
 
-**Diamond dedup in fold-based collect (S5.3, Lemma 5.12)**: Aspect identity computed from `key`, `aspectPath`, `pathKey` serves as program-point identity for aspects. When the same aspect is included through multiple paths (diamond dependency), identity comparison deduplicates emissions -- directly applying Lemma 5.12's guarantee that same-identity entities with equivalent environments produce equivalent results.
+`fromFunction` turns a function into a rule. When the function is intensional (it has `name`, `__functor` and `closure`), the rule's `identity` is derived from its minted identity. That identity is the rule's override handle: a later rule can override it by identity. An unminted function gets no handle, and overriding it fails with an error naming it as an anonymous rule. Using the program-point name instead would give every instance of one constructor the same handle, so an override would replace the wrong rule.
 
-**`deferredModule` as lazy constructor**: Class content wrapped as `deferredModule` is inspectable before forcing (structural keys readable without evaluating content), paralleling the paper's distinction between identification/inspection (non-forcing) and application (forcing).
+### gen-select: identified selectors
 
-#### gen-derive (MAJOR) -- Rule identity via mkIntensional detection
+- **`sel.when fn`** wraps a lambda as a selector.
+- **`isIdentified`** is true when a `when` selector wraps an intensional function (the `name`, `__functor`, `closure` shape), the paper's runtime distinction between intensional and extensional functions.
+- **`selectorEq`** compares two identified `when` selectors with gen-algebra's `conservativeEq`, and returns false for any unidentified `when` selector, as extensional functions cannot be compared.
 
-**`fromFunction` with mkIntensional detection**: `fromFunction` converts Nix functions into rules, detecting `mkIntensional`-wrapped functions via a three-field check (`name`, `__functor`, `closure`) -- the exact three eliminators from the paper. When detected, the `name` field becomes the rule's identity for dedup across fixpoint iterations.
-
-**Fixpoint dedup via fired set**: The `fixpoint` convergence loop tracks identified rules in a `fired` set. Rules with identity fire at most once across iterations, directly implementing the paper's continuation dedup principle: same identity = same computation = safe to skip on subsequent rounds. Anonymous rules (no `mkIntensional` wrapping) re-fire each iteration, corresponding to extensional functions that cannot be compared.
-
-#### gen-select (MAJOR) -- selectorEq and isIdentified
-
-**`sel.when` with intensional identity**: `sel.when` wraps lambdas as selectors. When the wrapped function is an intensional function (created via `mkIntensional`), the selector gains identity -- it can be compared and deduplicated.
-
-**`isIdentified`**: Returns true when a `when` selector wraps an intensional function, checking for the three-field signature (`name`, `__functor`, `closure`). This is a direct realization of the paper's ability to distinguish intensional from extensional functions at runtime.
-
-**`selectorEq`**: Structural equality for selectors, delegating to `intensionalEq` for identified `when` selectors. For non-identified `when` selectors, returns false (cannot compare extensional functions) -- matching the paper's treatment where only intensional functions support equality.
-
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2 replaces the ~7000-line handler chain with a demand-driven Higher-Order Attribute Grammar over scope graphs, using 10 attributes and `lib.fix`. Palmer's paper is foundational to several aspects of this architecture:
-
-**Scope node identity and dedup**: Each scope node carries identity derived from its declaration context. When the same aspect is reachable through multiple scope graph paths (diamond imports via I-edges), identity comparison prevents duplicate attribute computation and duplicate class emission. This is the HOAG equivalent of gen-aspects' diamond dedup, now operating at graph-node granularity.
-
-**Policy rule convergence**: Den v2 policies fire as gen-derive rules on node context. The fixpoint loop that dispatches policies, extracts feedback (spawn, enrich), widens context, and re-dispatches relies on identified rules firing at most once. Without Palmer's intensional identity, the convergence loop would require explicit bookkeeping of which policies have fired in which scopes -- the exact manual defunctionalization burden the paper eliminates.
-
-**Collection pipe dedup**: Pipe stages that gather data from matching scopes may encounter the same contributing scope through multiple traversal paths. Intensional identity on pipe stage functions enables dedup at the collection level, preventing duplicate contributions without requiring the consumer to manually track visited scopes.
-
-**Attribute memoization soundness**: gen-scope's `_eval` cache assumes that the same attribute computed on the same node always yields the same value. For parametric attributes (those taking arguments), intensional identity on the argument functions provides the cache key -- two calls with intensionally-equal argument functions can safely share cached results.
-
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-**Full closure comparison (S2.3, Theorem 1)** — *evaluated and declined (2026-05-30).* A closure-aware `intensionalEqStrict` (name + closure) was designed (den-architecture archived spec `gen-specs/gen-algebra/archived/2026-05-30-gen-algebra-closure-aware-intensional-eq-design.md`) but **not** implemented, for two reasons: (1) gen's `closure` is *programmer-declared* inspect data, not the compiler-extracted environment Theorem 1 assumes — so a name+closure form would not transfer the theorem's soundness anyway (it implements the *structure*, not the result); (2) a demo survey found no consumer needs closure discrimination (`selectorEq`, `search.dedupContinuations`, and gen-derive's `fired` set are all name-only, operating on bare lambdas / empty closures), so it would be dead code, while `toJSON`-based closure equality adds real fragility (uncatchable eval-abort on a function in the closure, store-copy on a path, serialization-≠-value equality for `1` vs `1.0`). A1 is resolved as **documentation honesty**: name-only is the deliberate, documented over-approximation; gen implements the structure of Palmer's intensional functions, not Theorem 1. (This also supersedes the earlier "less conservative … while remaining sound" framing here, which mis-stated the direction — name-only is a *superset*, i.e. more aggressive.)
+**Constraint function polymorphism (S2.4)**: The paper supports polymorphic constraint functions (`\%c x y -> ...` where `c` is a type variable). gen uses one fixed constraint on closures: they must be inert values the identity mint can encode. Parameterizing `mkIntensional` over constraint strategies could allow domain-specific equality.
 
-**Constraint function polymorphism (S2.4)**: The paper supports polymorphic constraint functions (`\%c x y -> ...` where `c` is a type variable). The gen ecosystem uses a single implicit constraint (structural equality via `==`). Parameterizing `mkIntensional` over different constraint strategies could enable domain-specific equality (e.g., hash-based dedup for performance-critical paths, deep structural equality for correctness-critical paths).
+**Intensional monads (S3)**: The paper's intensional monad reconstruction applies to any monad. Intensional State, Writer, or Reader monads could enable inspection and dedup of monadic computations, e.g. inspectable configuration transformations.
 
-**Intensional monads beyond Search (S3)**: The paper's intensional monad reconstruction applies to any monad, not just Search. Intensional State, intensional Writer, or intensional Reader monads could enable inspection and dedup of monadic computations in contexts beyond index-based search -- e.g., inspectable configuration transformations or deduplicated logging pipelines.
+**Saturation-aware application (S6.2)**: The paper's optimization avoids constructing closures when all arguments are applied at once. In Nix, this maps to skipping `mkIntensional` wrapping when a function is called immediately rather than stored for comparison.
 
-**Saturation-aware application (S6.2)**: The paper's optimization avoids constructing closures when all arguments are applied simultaneously. In Nix, this maps to avoiding the overhead of `mkIntensional` wrapping when a function is immediately called rather than stored for later comparison. A `callIntensional` primitive could skip identity/closure construction at saturated call sites.
-
-**Runtime type comparison for heterogeneous closures (S5.1, E-Like/E-Unlike rules)**: The paper's `tyrep t1 ~ tyrep t2 ? e3 : e4` enables branch-aware type comparison of closure elements. This could enable comparing closures containing heterogeneous Nix values (functions, attrsets, strings) where current structural `==` fails on function values.
-
-### Potential New Libraries or Features
-
-**gen-algebra: closure-aware intensionalEq** -- Extend `intensionalEq` to optionally compare `.closure` fields when both are present and structurally comparable. Scope: small (modify `pure/intensional.nix`). Low risk -- strictly more precise than current name-only comparison while remaining sound per Theorem 1. Benefits gen-derive fixpoint (fewer redundant rule firings) and gen-select (more selector equalities detected).
-
-**gen-algebra: intensional hash** -- Add `intensionalHash` that produces a deterministic hash from `name` + `closure`, enabling intensional functions as keys in index structures generally (the now-retired search monad's original use case being one such structure). Scope: small. Enables gen-scope parameterized attribute caching keyed by intensional function arguments.
-
-**gen-algebra: typed closure items** -- Wrap closure values in tagged containers (analogous to the paper's `ClosureItem` GADT, Fig. 20) that carry type information for heterogeneous comparison. Scope: medium. Would enable gen-derive to compare rule closures containing mixed value types, improving fixpoint precision.
-
-**gen-memo: intensional memoization library** -- A standalone memoization library where cache keys are intensional functions. `mkMemo fn` wraps a function; cache lookups use `intensionalEq` on the function argument. Scope: medium, new library. Directly implements the paper's motivating caching example (Fig. 1-4). Benefits gen-scope attribute memoization for parameterized attributes.
+**Runtime type comparison for heterogeneous closures (S5.1, E-Like/E-Unlike rules)**: The paper's `tyrep t1 ~ tyrep t2 ? e3 : e4` enables branch-aware type comparison of closure elements. This could let gen compare closures holding heterogeneous Nix values, including functions, where structural `==` gives no useful answer.
 
 ### Research Directions
 
-**Nix as an intensional language**: Nix's `builtins.functionArgs` already provides a limited form of function inspection (formal parameter names and defaults). Investigating whether Nix's evaluation model (lazy, pure, with attrset-based closures) could support a deeper form of intensional function support -- where closures are naturally inspectable as attrsets -- without language modification.
+**Nix as an intensional language**: `builtins.functionArgs` already provides a limited form of function inspection (formal parameter names and whether each has a default). Whether Nix's evaluation model (lazy, pure, attrset-based closures) could support deeper intensional functions without language changes is open.
 
-**Intensional identity and incremental evaluation**: The paper's Theorem 1 proves that identity is stable across evaluation steps. In an incremental evaluation context (where inputs change between evaluations), understanding which intensional identities remain valid across incremental steps could enable sound cache reuse across nix evaluations -- connecting Palmer's work to Mokhov et al. (2018) build systems.
+**Intensional identity and incremental evaluation**: The paper's Theorem 1 proves that identity is stable across evaluation steps. gen-identity's identities are consistent within one evaluation and may differ across evaluations (a lazy source path mints a per-evaluation identity). Knowing which identities stay valid across evaluations would decide which cached results could be reused across them, connecting Palmer's work to Mokhov et al. (2018).
 
-**Convergence bounds from intensional structure**: the retired search monad's convergence depended on the index growing monotonically and continuations being finite. Intensional identity provides a static bound on the number of distinct continuations (one per program point). Formalizing this could still yield tighter convergence guarantees for gen-derive fixpoint loops -- proving termination within N iterations where N is bounded by the number of identified rules.
+**Convergence bounds from intensional structure**: Intensional identity bounds the number of distinct continuations (one per program point and closure). Formalizing this could yield termination bounds for gen's fixpoint loops over rules, bounded by the number of identified rules.
 
-**Composition of intensional identity**: When intensional functions are composed (f . g), what is the identity of the composition? The paper does not address this. A theory of compositional identity could benefit gen-derive's `chain` combinator and gen-scope's attribute combinators, where composed functions currently lose identity.
+**Composition of intensional identity**: When intensional functions are composed (f . g), what is the identity of the composition? The paper does not address this. A theory of compositional identity would let composed rules and composed attribute equations keep an identity, which they lose today.
+

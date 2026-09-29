@@ -1,0 +1,50 @@
+---
+title: History
+description: How gen came to be, with dates, told by the people who built it.
+---
+
+{/* OWNER: this page is a skeleton. The dated spine below is checked against each repository's
+first commit. The first-person stories and vision are yours and the team's to write; the
+placeholders mark where they go. Nothing here is written on anyone's behalf. */}
+
+## Where gen comes from
+
+{/* OWNER REVIEW: the lineage paragraph below is the writer's summary, not taken from a primary
+source. Check the description of quirks and pipes against den's own docs, or replace it. */}
+
+gen grew out of [den](https://github.com/denful/den), a framework for NixOS, nix-darwin and
+home-manager configuration. In den, a *quirk* is a piece of data a scope emits, and a *pipe* moves
+quirk data between scopes: from a user up to its host, across the hosts of one environment, or
+across a whole fleet. gen's graph model and its parametric aspects grew from quirks and pipes: the
+scopes became nodes, the movements of data became edges, and a feature that needs its host takes
+the host as an argument.
+
+{/* PLACEHOLDER (sini): how den started, what the limits of quirks and pipes were, and the moment
+the graph model became the design. */}
+
+## Timeline
+
+| Date | Event |
+|---|---|
+| October 2025 | den's first commit. |
+| 2026-05-10 | First commit of the schema library, the first piece of gen. |
+| 2026-05-20 | First commit of the scope library, the graph's evaluator. |
+| 2026-05-26 | The gen hub is created, gathering the libraries under one flake. |
+| 2026-06-15 | den adopts gen's schema library for its entities (den pull request #563). |
+| 2026-07-02 | First commit of gen's module system, which merges modules without nixpkgs. |
+
+{/* PLACEHOLDER (owner): further dated events, such as the libraries added since, the first
+framework built on the full toolkit, and releases. */}
+
+## The people
+
+{/* PLACEHOLDER (sini): a first-person account of why gen exists and what it is for. */}
+
+{/* PLACEHOLDER (team members): first-person stories from each contributor, in their own words. */}
+
+## Where it is going
+
+{/* PLACEHOLDER (sini and team): the vision in your own words. The Roadmap page carries the
+planned work by theme. */}
+
+The [Roadmap](/roadmap/) lists what gen ships now and what is planned.

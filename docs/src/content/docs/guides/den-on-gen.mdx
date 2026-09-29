@@ -1,0 +1,82 @@
+---
+title: den, a Framework Built on gen
+description: How den's entities, aspects, policies and quirks sit on gen's constructs.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<Aside type="caution">gen is pre-release and its API is still changing.</Aside>
+
+[den](https://github.com/denful/den) is a configuration framework for NixOS, nix-darwin and
+home-manager. It is the first framework built on gen's libraries. This page shows where each
+den concept sits on a gen construct, as an example of how a framework is layered on gen. gen
+itself has no hosts, users or homes. Those are den's names for kinds it declares.
+
+## What den uses today
+
+den declares its entity kinds through gen-schema. `den.schema` is a gen-schema option, so
+`den.schema.host` and `den.schema.user` are gen kinds, and gen-schema merges them with
+gen-merge. den reaches gen-schema through the hub, `inputs.gen.lib.mkGenLibs { }`, so every
+gen library it uses comes from one revision.
+
+## den's concepts on gen's constructs
+
+| den concept | the gen construct it sits on | read more |
+|---|---|---|
+| `den.schema.<kind>` | a kind, declared with gen-schema's `evalSchema` or `mkSchemaOption` | [Kinds, Registries and Identity](/features/registries/) |
+| `den.hosts`, `den.homes` | instances in a registry (`mkInstanceRegistry`), each with a content-derived `id_hash` | [Stable Identity for Everything](/understand/identity/) |
+| `den.aspects` | gen-aspects aspects, with `includes` and one key per class | [Aspects](/features/aspects/) |
+| a Nix class: `nixos`, `darwin`, `homeManager` | an aspect key declared `category = "class"` and built by a terminal | [Delivery](/features/delivery/) |
+| a parametric aspect, `{ host, user }: { … }` | argument injection: gen-bind binds `node` and other named arguments into a module function | [Automatic Argument Injection](/understand/argument-injection/) |
+| the host → users → homes pipeline | edges in one graph, walked by queries | [Your Configuration as a Graph](/understand/graph/) |
+| `den.policies` | rules in a logic program (gen-program), whose results the framework turns into edges | [Rules That Add Relationships](/understand/rules/) |
+| quirks and pipes | a channel key on an aspect (`category = "channel"`), moved between nodes by a view | [Delivery](/features/delivery/) |
+| den's diagrams and debugging | gen-inspect: SQL and selector queries over the graph, "why does this edge exist", mermaid rendering | [Inspection](/features/inspection/) |
+| batteries | framework content, which den provides itself | |
+
+## One laptop, two layers
+
+In den, a host and an aspect look like this:
+
+```nix
+den.hosts.x86_64-linux.laptop.users.alice = { };
+
+den.aspects.laptop = {
+  includes = [ den.aspects.ssh ];
+  nixos = { host, ... }: { networking.hostName = host.name; };
+};
+```
+
+The gen layer underneath holds the same facts in gen's terms. The host is an instance of a
+`host` kind, and the aspect's `nixos` module takes the host as `node`:
+
+```nix
+hosts.laptop.aspects = [ "base" "ssh" ];
+
+aspects.base.nixos = { node, ... }: { networking.hostName = node.name; };
+aspects.ssh.includes = [ "base" ];
+```
+
+den supplies the kinds, the registry names, the context argument names and the pipeline.
+gen supplies the merge, the identity, the graph and delivery. [From an Aspect to a NixOS
+System](/guides/aspects-to-nixos/) builds the gen layer in full.
+
+## Calling gen from a den configuration
+
+A den configuration can call any gen library directly. The hub's `mkGenLibs { }` returns the
+whole set:
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  deps = { web = [ "api" ]; api = [ "db" ]; db = [ ]; };
+in
+gen.graph.reachableFrom { edges = id: deps.${id} or [ ]; } "web"   # [ "api" "db" ]
+```
+
+<CardGrid>
+  <LinkCard title="Core Concepts" href="/understand/core-concepts/"
+    description="gen's concepts in its own terms." />
+  <LinkCard title="Which Tool for Which Job" href="/understand/choosing/"
+    description="From a goal to the gen construct that does it." />
+</CardGrid>

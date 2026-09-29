@@ -1,8 +1,6 @@
 ---
 title: "Bracha & Cook (1990) — Mixin-based Inheritance"
 description: "Our reading of Mixin-based inheritance."
-source:
-  - den-ag-design:used/summaries/bracha-1990-mixin-based-inheritance.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ G. Bracha and W. R. Cook, "Mixin-based inheritance," *OOPSLA/ECOOP '90: Object-o
 
 [doi:10.1145/97945.97982](https://doi.org/10.1145/97945.97982)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -55,76 +53,66 @@ The paper does not prove its theorems in formal detail — associativity of the 
 
 - **Static typing for mixins** — Subtyping via composition: `T1 = T2 * T3` implies `T1 <: T2` and `T1 <: T3`. Associativity reflected in the type system. `super` clause declares expected interface.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-algebra (`lib/rec.nix`)
 
-#### gen-algebra (`pure/rec.nix`)
+The most direct implementation. gen-algebra's record algebra realises Bracha's constructs over labelled records.
 
-The most direct implementation. gen-algebra's record algebra realizes Bracha's constructs with Nix attrsets:
+- **`record.combine { left; right; }`** is the base combination operator ⊕. It is left-biased: `left`'s values shadow `right`'s. This is Section 2.1's record combination.
 
-- **`record.combine a b`** — The base combination operator (circled-plus). Left-biased merge: `a`'s values shadow `b`'s. Maps to Section 2.1's record combination.
+- **`record.mixin delta parent`** is Smalltalk-direction inheritance, `combine (delta parent) parent`. The delta receives the parent record and can read its fields (the `super` parameter), and the result is combined left-biased with the parent. This is the formula `C = delta(P) + P` from Section 2.1.
 
-- **`record.mixin delta parent`** — Smalltalk-direction inheritance: `combine (delta parent) parent`. The delta receives the parent record and can reference its fields (the `super` parameter), then the result is combined left-biased with the parent. Directly implements the formula `C = delta(P) + P` from Section 2.1.
+- **`record.mixinBeta prefix suffix`** is Beta-direction inheritance with `inner` empty: the prefix (parent) has priority and the suffix is subordinate. This is the inverted formula from Section 2.2.
 
-- **`record.mixinBeta prefix suffix`** — Beta-direction inheritance: the prefix (parent) controls, the suffix (extension) is subordinate. Implements the inverted formula from Section 2.2 where the prefix has priority.
+- **`record.compose m1 m2`** is the mixin composition operator ⋆, `fun(i) m1(m2(i) + i) + m2(i)` from Section 4. It returns a new mixin, a function from the inner parameter to a record, so compositions chain and stay associative.
 
-- **`record.compose m1 m2`** — The mixin composition operator (star). Implements `fun(i) m1(m2(i) + i) + m2(i)` from Section 4. Returns a new mixin (function from inner parameter to record), preserving the associativity property. This is the paper's central formula realized as a Nix function.
+- **Scoped labels.** The shadow-stack representation of records comes from Leijen 2005. `combine` on records with duplicate labels follows Bracha's left bias, and the stack keeps the shadowed value so `restrict` can expose it again, which is Leijen's contribution.
 
-- **Scoped labels via shadow stacks** — While the shadow stack representation comes from Leijen 2005, the stacking behavior interacts with Bracha's combination operator: `combine` on records with duplicate labels follows left-biased semantics per Bracha, while the stack preserves the shadowed value for potential restriction (Leijen's contribution).
+### gen-schema (`lib/mixin.nix`)
 
-#### gen-schema (`lib/mixin.nix`)
+gen-schema lifts Bracha's algebra to kind definitions.
 
-gen-schema lifts Bracha's algebra to the schema/type level, applying mixin composition to kind definitions:
+- **`mkMixin { define; requires ? [ ]; provides ? [ ]; }`** creates a first-class mixin with an explicit interface. `requires` lists the labels the mixin expects on its parent, as a partial mixin references undefined fields. `provides` lists the labels it contributes. `define` receives the parent record and returns new fields, which is Bracha's parametric delta.
 
-- **`schema.mkMixin { requires, provides, define }`** — Creates a first-class mixin with explicit interface declarations. The `requires` field lists labels the mixin expects on the parent record (analogous to Bracha's partial mixin that references undefined fields). The `provides` field lists labels the mixin contributes. The `define` function receives a record-algebra record (the parent) and returns new fields — this is precisely Bracha's parametric delta. Structural validation of `requires` against the target record implements the paper's completeness check: composition fails if required fields are absent.
+- **`composeMixins [ m1 m2 m3 ]`** composes a chain with `record.compose`. It tracks `requires` and `provides` across the chain, so an earlier mixin's `provides` satisfies a later mixin's `requires`. Bracha's Modula-3 sketch leaves this compatibility to static typing.
 
-- **`schema.composeMixins [ m1 m2 m3 ]`** — Composes a chain of mixins. The requires/provides propagation across the chain ensures structural compatibility: earlier mixins' `provides` can satisfy later mixins' `requires`. This realizes Bracha's associative composition chains with an added structural safety layer that the paper's Modula-3 sketch handles via static typing but leaves to the type checker.
+- **`beta mixin`** marks a mixin for Beta-direction application. `composeMixins` then gives priority to what came before it, the parent or prefix side. This is the direction switch of Section 2.3 on the same composition machinery.
 
-- **`schema.beta mixin`** — Annotates a mixin for Beta-direction application. When `composeMixins` encounters a beta-annotated mixin, it reverses priority so existing fields (the parent/prefix) take precedence over the mixin's contributions. This is the direction switch from Section 2.3 — the same composition machinery, but the parent is on the priority side rather than the delta.
+- **`applyMixin`** applies a mixin to one kind's record. It checks the `requires` list against the record, respects the mixin's direction and returns the extended record. This is where a partial mixin becomes part of a complete kind definition.
 
-- **`schema.applyMixin mixin kindRecord kindName`** — Applies a single mixin to a concrete kind's record-algebra record. Validates structural compatibility (the `requires` check), respects Smalltalk/Beta direction annotation, and produces the extended record. This is the point where a partial mixin becomes part of a complete kind definition.
+- **Kind inheritance with `inherits`.** A kind definition can declare `inherits = [ "user" ]`, and `evalSchema` resolves each parent by name in a strictly earlier pass and imports the parent's module into the child. The module system's merge composes them. Naming the parent is Bracha's explicit ordering: the composition chain is stated, never discovered from the tree being declared.
 
-- **Kind inheritance via `inherits`** — gen-schema's `inherits = [ "user" ]` on a kind definition, resolved by `evalSchema`, is a higher-level realization of Bracha's mixin composition. Each kind definition is a deferred module (a delta); `evalSchema` resolves each parent by NAME in a strictly earlier pass and imports the parent's module into the child, composing them via the module system's merge, which is itself left-biased (later definitions override earlier ones via priority). Naming the parent rather than reading it out of the tree being declared is the paper's explicit ordering: the composition chain is stated, not discovered. The deprecated spelling, `imports = [ config.schema.user ]`, is read as `inherits` and warns where a value test can see it, and it will be refused once den v1 migrates; the constructions no value test decides are a declared exception, enumerated at gen-schema's boundary. The sidecar merge of collections alongside module merge follows the paper's combination-plus-application pattern.
+### Schema extension in a framework
 
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2 uses a demand-driven Higher-Order Attribute Grammar over scope graphs. Mixin composition enters at several points:
-
-**Schema kind extension.** Independent modules (aspects, policies, user configuration) contribute kind fragments to `den.schema.host`, `den.schema.user`, etc. These fragments are exactly Bracha's deltas — parametric modifications that compose associatively. The NixOS module system's deferred module merge is the composition operator. Because composition is associative, the order of flake input evaluation does not affect the merged kind definition (modulo explicit priority overrides via `mkForce`/`mkDefault`).
-
-**Aspect composition.** Aspects in den v2 are scope graph nodes whose content is classified into classes (output targets), collections (data aggregation), and nested sub-aspects. When multiple aspects contribute to the same class output (e.g., both `networking` and `firewall` aspects emit `nixos` modules), the class collector performs left-biased combination — the aspect with higher scope-graph specificity (D \< I \< P, per Neron 2015) shadows the other, paralleling Bracha's priority in the combination operator.
-
-**Collection merging.** Den's named collections (declared via `den.collections`) aggregate contributions from multiple scopes using merge strategies (list `++`, attrset `//`, custom). The collection merge is an instantiation of Bracha's combination operator generalized beyond method records to arbitrary data types. The merge strategy parameter corresponds to choosing the semantics of the circled-plus operator for each collection.
-
-**Policy-driven extension.** Policies in den v2 are rules (gen-derive) that fire based on scope context and produce effects (routes, includes, provides). When a policy fires, it composes new content into the scope — this is dynamic mixin application. The policy's output is a delta; the scope's existing content is the parent; composition follows Bracha's formula with the policy's contribution having priority (Smalltalk direction, since the policy is specializing the generic scope).
+In a framework built on gen, independent modules contribute fragments to one kind's schema, such as a host kind. Each fragment is a Bracha delta, and the module system's deferred-module merge is the composition operator. Because that composition is associative, the order in which fragments arrive does not change the merged kind, apart from explicit priorities such as `mkForce` and `mkDefault`.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**Commutativity under commutative combination (Section 4).** The paper notes that if the base combination operator were commutative (not just associative), the mixin composition operator would also be commutative. Neither gen-algebra nor gen-schema exploit this. For collections where merge order genuinely does not matter (e.g., set union for tags, commutative monoid aggregation), enforcing commutativity could enable parallel/unordered composition with guaranteed determinism. Currently, gen-schema's `composeMixins` is order-dependent even when the underlying merge strategy is commutative.
+**Commutativity under commutative combination (Section 4).** If the base combination operator is commutative as well as associative, mixin composition is commutative too. gen-algebra and gen-schema do not use this. Where merge order does not matter (set union for tags, commutative monoid aggregation), enforcing commutativity would allow unordered composition with guaranteed determinism. `composeMixins` is order-dependent even when the underlying merge is commutative.
 
-**Complete vs. partial mixin classification (Section 4).** The paper distinguishes complete mixins (instantiable) from partial mixins (composition-only). gen-schema's `mkMixin` does not track this distinction — all mixins are partial until applied to a kind. A completeness check could catch orphan mixins that are never composed into a complete kind, providing earlier error detection at schema definition time rather than at instance creation time.
+**Complete and partial mixins (Section 4).** The paper separates complete mixins (instantiable) from partial ones (composition-only). `mkMixin` does not track the distinction, and every mixin is partial until applied to a kind. A completeness check could catch a mixin that is never composed into a complete kind, at schema definition time instead of at instance creation.
 
-**Modula-3 super clause as interface declaration (Section 5.3).** The `super` clause in Bracha's Modula-3 extension declares the expected interface of overridden methods, enabling static type checking of mixins in isolation (before composition). gen-schema's `requires` field approximates this but only checks field presence, not type compatibility. The paper's approach validates method signatures (parameter types, return types), which would catch type mismatches between a mixin's expectations and the actual parent.
+**The Modula-3 `super` clause as an interface declaration (Section 5.3).** The `super` clause declares the expected interface of overridden methods, so a mixin can be type-checked before composition. gen-schema's `requires` checks field presence only. The paper's approach checks signatures and would catch type mismatches between a mixin's expectations and its parent.
 
-**Mixin-procedure distinction (Section 5.3.1).** The paper introduces `mixin procedure` as a distinct callable form — procedures that reference `super` are tagged and can only be invoked as methods, preventing the overridden methods of a mixin instance from being accessed externally. This encapsulation property is not enforced in gen-schema. A mixin's `define` function can produce any attrset, and nothing prevents external code from reaching into the parent record's shadowed fields via `record.restrict`.
+**Mixin procedures (Section 5.3.1).** The paper's `mixin procedure` form tags procedures that reference `super` so they can only be invoked as methods, hiding a mixin instance's overridden methods from outside code. gen-schema does not enforce this. A mixin's `define` can return any attrset, and outside code can reach shadowed fields through `record.restrict`.
 
 ### Potential New Libraries or Features
 
-**gen-algebra: `record.composeCommutative`** — A variant of `record.compose` that asserts commutativity of the base merge for each label. Scope: small addition to `pure/rec.nix`. Would take a commutativity witness (or check) per label and throw if composition order would change the result. Useful for den collections with commutative merge strategies.
+**`record.composeCommutative` in gen-algebra.** A variant of `record.compose` that checks commutativity of the base merge per label and fails when composition order would change the result.
 
-**gen-schema: mixin completeness checker** — A `schema.isComplete` predicate that checks whether a mixin (or composed chain) defines all fields it references and does not use its parent parameter. Scope: moderate, requires tracking the `requires` closure across composition chains. Interactions: gen-schema's `mkSchemaEntryType` could warn when a kind with unsatisfied requires has instances created.
+**A mixin completeness check in gen-schema.** A predicate that checks whether a mixin or composed chain defines every field it references and does not use its parent parameter, by following `requires` across the chain. A kind with unsatisfied requirements could warn when instances are created.
 
-**gen-schema: typed requires** — Extend `mkMixin`'s `requires` from field names to field name + type pairs. `applyMixin` would validate not just presence but type compatibility against the target kind's option declarations. Scope: moderate, requires accessing the kind's option types during mixin application. Interactions: builds on gen-schema's existing `_kindMeta` introspection and gen-algebra's validation pipeline.
+**Typed `requires` in gen-schema.** Extend `mkMixin`'s `requires` from field names to name and type pairs, so `applyMixin` checks type compatibility against the kind's option declarations as well as presence.
 
-**gen-bind: mixin-aware wrapping** — gen-bind injects external values into NixOS modules. A mixin-aware variant could compose binding sets using Bracha's formula: a "binding mixin" would be a function from parent bindings to extended bindings, with `super` access to see what the previous binding layer provided. This would formalize gen-bind's current `composeWith` as explicit mixin composition. Scope: small-medium. Interactions: gen-bind's existing merge strategies (bind-wins, system-wins) map to Smalltalk/Beta direction.
+**Mixin-aware binding in gen-bind.** gen-bind injects values into NixOS modules and layers binding sets with `composeWith`. A binding mixin would be a function from the previous bindings to extended bindings, with `super` access to the earlier layer, which states `composeWith` as mixin composition. gen-bind's `bind-wins` and `system-wins` merge strategies correspond to Smalltalk and Beta direction.
 
 ### Research Directions
 
-**Mixin composition in attribute grammars.** gen-scope evaluates demand-driven attributes over scope graphs. Attribute definitions from different aspects are currently merged by the consumer (den) before being passed to `eval`. Formalizing attribute composition as mixin composition — where each aspect contributes a delta over the attribute set, with `super` access to the previous aspect's attribute definitions — would give principled conflict resolution for attribute name collisions. The associativity property would guarantee that aspect ordering within a priority tier does not affect evaluation.
+**Mixin composition in attribute grammars.** gen-scope evaluates demand-driven attributes over scope graphs, and attribute definitions from different aspects are merged by the consumer before evaluation. Treating attribute composition as mixin composition, where each aspect contributes a delta over the attribute set with `super` access to the previous definitions, would give principled resolution of attribute name collisions. Associativity would guarantee that aspect order within a priority tier does not affect evaluation.
 
-**Scope-graph-aware linearization.** Bracha's paper eliminates linearization in favor of explicit ordering. However, den v2's scope graph already provides a natural linearization via resolution specificity (D \< I \< P). Investigating whether scope-graph resolution order satisfies Bracha's associativity requirements could yield a principled automatic linearization that respects encapsulation — unlike CLOS linearization, scope-graph resolution is local (each node resolves independently) rather than global.
+**Scope-graph linearisation.** Bracha replaces linearisation with explicit ordering. A scope graph already orders declarations through resolution specificity (D \< I \< P). Whether that order satisfies Bracha's associativity requirements is open. If it does, it gives an automatic linearisation that respects encapsulation, and it is local, since each node resolves independently, where CLOS linearisation is global.
 
-**Typed mixin composition for NixOS modules.** The NixOS module system performs untyped merge — type checking happens at evaluation time, not at composition time. Bracha's static typing rules for mixins suggest a path toward compile-time (or at least definition-time) validation of module compositions. gen-schema's refinement contracts (Findler 2002) and gen-algebra's validators provide the predicate infrastructure; combining these with Bracha's interface declarations could detect incompatible module compositions before `evalModules` forces evaluation.
+**Typed composition of NixOS modules.** The NixOS module system merges untyped definitions and checks types at evaluation time. Bracha's typing rules for mixins suggest validating module compositions at definition time. gen-schema's refinements (after Findler 2002) and gen-types' validators provide the predicates. Combined with Bracha's interface declarations they could detect incompatible module compositions before `evalModules` forces them.

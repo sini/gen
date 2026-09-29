@@ -1,8 +1,6 @@
 ---
 title: "Acar, Blelloch & Harper (2002) -- Adaptive Functional Programming"
 description: "Our reading of Adaptive functional programming."
-source:
-  - den-ag-design:used/summaries/acar-2002-adaptive-functional-programming.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ U. A. Acar, G. E. Blelloch, and R. Harper, "Adaptive functional programming," *P
 
 [doi:10.1145/503272.503296](https://doi.org/10.1145/503272.503296)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -67,57 +65,44 @@ Finally the paper re-presents change propagation as a *formal algorithm over tra
 
 - **Purity = persistence of reader closures (S8, p43).** The real requirement is not "no side effects" but that each edge's stored reader closure (code + environment) cannot be mutated. Benign side effects (print, counters, lazy memoization) are harmless; the technique is expected to extend to lazy languages and to imperative settings with persistent data.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-memo
 
-#### gen-rebuild (Foundational -- the formal model `override`/`restabilize` realize)
+gen-memo is gen's incremental plane: given the last evaluation, it decides which keys must be recomputed and reuses the rest. Acar's AFL is the formal model for that decision. Change propagation is the rebuild step expressed as an algorithm with a proof.
 
-gen-rebuild is the *rebuilder* of the Mokhov framework -- the component that decides what must be recomputed when an input changes and reuses everything else. Acar's AFL is the canonical formal model for that decision: change propagation *is* the rebuild step expressed as an algorithm with a proof. The correspondence is direct:
+- **The adg is gen-memo's dependency record.** Acar's node (a modifiable) is a key and its value in gen-memo's store. Acar's edge (a read) is a recorded dependency from a producer key to a consumer key, read through the caller's accessor (S4.4, p8).
+- **`applyDelta` and `propagate` are Acar's `change` and `propagate` (S4.3, p7).** gen-memo keeps the two apart the way the paper does. `applyDelta` records an input change and marks it dirty. `propagate` drains the dirty set to quiescence over the dependency cone. Several `applyDelta` calls before one `propagate` is Acar's batched change. `override` is the fused convenience, `propagate ∘ applyDelta`. `force` demands a value after a change.
+- **`retract` uses Acar's splice-out (S4.5, p10).** When a node is deleted, the reads it contained become obsolete and are removed before its dependent cone is recomputed.
+- **`earlyCutoff` is the conservative comparison `cmp` (S4.1, p6; Figure 5 line 10, p10).** After a reader is re-run, an unchanged result does not enqueue its out-edges, so propagation stops there. gen-memo compares content hashes produced by the caller's `hashOf`.
+- **`dirtySet` and Theorem 1 (S4.7, p12).** Acar separates the invalidated edges `I` from the edges actually updated, `Iu ⊆ I`. The cost bound `O(Σ_{Iu}(|e|+||e||)+|I|log q)` says why a smaller dirty set pays: branches cut off by the comparison and obsolete reads are never re-run.
+- **`affected`, `support` and `why` are adg reachability queries.** `affected` is forward reachability from a changed input, the seed-and-walk of Figure 5. `support` and `why` read backward, from a value to the inputs it depends on.
+- **`verify` and `needsEval`** are trace strategies from Mokhov 2018 and Reps, Teitelbaum and Demers 1983. They sit on the trace-storage axis, which is outside Acar's scope. Acar contributes the change-propagation axis, and the two combine.
 
-- **adg / trace = gen-rebuild's dependency record.** Acar's node = modifiable = a (key, value) entry in gen-rebuild's flat relocatable store; Acar's edge = read = a recorded dependency `(source-key → consumer-key)` tagged with the consumer's re-eval closure. The store-plus-dependency-record that `override` operates over is the adg (S4.4, p8).
-- **`override` = change propagation seeded from a changed input (Figure 5, p10).** `override` recomputes the *reverse-dependency cone* of a changed key and reuses the rest. Acar grounds the cone exactly: it is the set of edges reachable by the queue starting from the changed input's out-edges, walked in time order, with the conservative-comparison early-cutoff pruning branches whose value did not actually change (Figure 5 lines 10-12). The "reuse rest from a flat store" is Acar's "skip reads not in the changed set" (S7 read rule, `l∉C`, p30).
-- **`override`'s *splice* semantics = obsolete-edge deletion + reader re-eval (S4.5, p10; S7 read rule, p30).** When a recomputed node takes a different control path, the reads dynamically contained in it become obsolete and are *spliced out* before the new sub-computation is spliced in. This is the precise semantics of replacing one node's reverse-cone subtree: not "recompute the whole cone" but "delete the contained sub-trace, re-run the reader, graft the fresh sub-trace." gen-rebuild's `override` currently cites this only indirectly (via Mokhov S7.2); Acar S4.5 + S7 is its direct ground.
-- **`restabilize` = `propagate` to a fixed point (S4.3 `propagate`, p7; S7).** `restabilize` runs incremental recomputation until the system is consistent again. Acar's `propagate` is exactly that driver: drain the priority queue, where each target whose value changed re-enqueues its out-edges, terminating when the queue empties (quiescence = re-stabilized). The "incremental fixpoint" is the queue-drain of Figure 5.
-- **`dirtySet` minimality = invalidated set `I` / updated set `Iu` (Theorem 1, S4.7, p12).** Acar formally distinguishes `I` (invalidated edges, enqueued) from `Iu ⊆ I` (edges actually updated; the rest go obsolete and are deleted unrun). gen-rebuild's `dirtySet` minimality claim is grounded by this distinction and by the cost bound `O(Σ_{Iu}(|e|+||e||)+|I|log q)`: the minimal dirty set is the affected reverse-cone, *minus* obsolete reads, *minus* branches cut off by the conservative comparison. Acar is the proof that this set is both necessary (Theorem 18 correctness) and sufficient (Theorem 1 cost).
-- **`earlyCutoff` = conservative comparison function (S4.1 `cmp`, p6; Figure 5 line 10, p10).** The Mokhov-named "early cutoff" rebuilder strategy is, in Acar's model, the `cmp` passed to `mod`: after re-evaluating a reader, if `cmp(new,old)` says unchanged, the target's out-edges are *not* enqueued, so propagation stops. gen-rebuild's `earlyCutoff` is this branch verbatim.
-- **`support` / `why` / `affected` provenance = adg reachability queries.** `affected` = the set of edges reached from a changed input (the seed-and-walk of Figure 5) = forward reachability in the adg. `support`/`why` = the in-edges/source modifiables a value's edge depends on = backward reachability. Acar's adg is the provenance graph these three queries read.
-- **`verify` / `constructive` / `deepConstructive`** are Mokhov-domain strategies (trace verification vs value-storing) not directly in Acar's scope; Acar contributes the *change-propagation* axis (suspending-scheduler-driven re-execution), which is orthogonal and complementary to the trace-storage axis.
+`restabilize` is the cyclic counterpart of `override`. It re-solves strongly connected components to a fixed point, which Acar's acyclic setting does not cover.
 
-#### gen-scope (Seam provider -- the scheduler Acar's algorithm assumes)
+### gen-graph
 
-Acar's change-propagation algorithm is *driven by* an evaluator that re-runs readers; in gen-rebuild that evaluator is gen-scope (demand-driven HOAG eval with co-located `_eval` memo). The five named seams map onto Acar's machinery:
-
-- **S1 warm-cache eval** = re-running a reader against the post-change store (Figure 5 line 9, "apply(reader(e), val(src(e)))"); the `_eval` memo is Acar's already-computed node values reused across the unaffected store.
-- **S2 dep-recording** = adg edge creation: every `read` records a `(source → consumer)` edge tagged with the reader closure (S4.4, p8). This is the seam Acar leans on hardest -- without dep-recording there is no adg to propagate over.
-- **S3 frontier `dependents`** = `outEdges(v)` (Figure 5 lines 1, 12): the out-edges of a changed/updated node, i.e. the propagation frontier.
-- **S4 seeded fixpoint** = the priority-queue drain seeded with changed inputs (Figure 5 lines 1-2) = `restabilize`'s engine.
-- **S5 `hashOf` hook** = the conservative comparison `cmp` (S4.1, p6) used to decide whether a recomputed target actually changed (early cutoff). Acar's `cmp` is *value equality up to a sound under-approximation*; `hashOf` is the natural Nix realization.
-
-#### gen-graph (Seam provider -- the adg as a queryable graph)
-
-Acar's adg is literally a DAG with typed nodes (modifiables) and typed edges (reads). gen-graph provides the reachability queries (`dependents`, reverse-cone, time-span containment) that `affected`/`support`/`why` are built from. Acar adds one structural requirement beyond plain reachability: **edge ordering + containment spans** (S4.4, p8-9) -- the adg is not just a DAG but a *time-stamped* DAG, and the containment hierarchy (an edge's span vs another edge's start) is a second relation layered on the reachability relation.
+Acar's adg is a DAG with typed nodes (modifiables) and typed edges (reads). gen-graph supplies the reachability gen-memo reads it through, such as `dependentsOf` for the reverse cone. Acar adds one requirement beyond plain reachability: edge ordering and containment spans (S4.4, p8-9). The adg is a time-stamped DAG, and containment (one edge's span holding another edge's start) is a second relation layered on reachability.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Order maintenance as an explicit time-stamp service (S4.6, p11-12; Dietz-Sleator [4]).** Acar's efficiency hinges on a totally-ordered, dynamically-insertable stamp domain with constant-time compare/insert/delete/find-next. gen-rebuild currently has no notion of evaluation *order* among recomputations -- only the reverse-dependency *cone*. For change propagation that must re-run readers in original order (to keep splice points valid), an order-maintenance structure (or its Nix-feasible surrogate: a monotone integer rank assigned during S2 dep-recording) is the missing primitive.
+- **Order maintenance as an explicit time-stamp service (S4.6, p11-12; Dietz-Sleator [4]).** Acar's efficiency depends on a totally ordered, dynamically insertable stamp domain with constant-time compare, insert, delete and find-next. gen-memo has no order among recomputations, only the reverse-dependency cone. Change propagation that re-runs readers in their original order, to keep splice points valid, needs an order-maintenance structure. In Nix a monotone integer rank assigned when dependencies are recorded is the feasible surrogate.
 
-- **Containment-aware invalidation, not just cone invalidation (S4.5, p9-10; S5.3 nested traces, p20).** Acar's deletion step removes the reads *dynamically contained* in an updated read -- a strictly smaller, more precise set than "everything in the reverse cone." gen-rebuild's `dirtySet` could be sharpened from "reverse-dependency cone" to "reverse cone minus obsolete-contained sub-traces," which is the difference between `|I|` and `|Iu|` in Theorem 1. This is the formal route to a *minimal* dirty set.
+- **Containment-aware invalidation (S4.5, p9-10; S5.3 nested traces, p20).** Acar's deletion step removes the reads dynamically contained in an updated read, a smaller and more precise set than the whole reverse cone. gen-memo's `dirtySet` could narrow from the reverse cone to the reverse cone minus obsolete contained sub-traces. That is the difference between `|I|` and `|Iu|` in Theorem 1, and the formal route to a minimal dirty set.
 
-- **Correctness-up-to-bijection as the gen-rebuild equational spec (Theorem 18, p42).** Acar's correctness statement -- propagate ≡ full re-eval, up to a partial bijection on locations -- is exactly the property gen-rebuild's `override`/`restabilize` should satisfy: an incremental rebuild equals a from-scratch build, up to renaming of internally-generated keys. This gives gen-rebuild a precise, provable contract rather than an operational description.
+- **Correctness up to bijection as an equational spec (Theorem 18, p42).** Acar proves propagation equals full re-evaluation, up to a partial bijection on locations. gen-memo's contract is byte parity with a cold run, which is the same statement with the bijection fixed to the identity. Keys that gen-memo generated internally would need the bijection form.
 
 ### Potential New Libraries or Features
 
-- **gen-rebuild `read`/`write`/`mod` modifiable layer.** The 13-op surface manipulates a store of already-computed values but has no *constructor* vocabulary for the dependency-bearing cells themselves. Acar's `mod`/`read`/`write` are the minimal primitives that *build* the adg in the first place (S4.1, p6). gen-rebuild may need an explicit modifiable/read/write seam (even if thin over gen-scope's `_eval`) to make dependency recording (S2) a first-class, inspectable operation rather than an implicit byproduct.
-
-- **`propagate` as an explicit driver op distinct from `override`.** Acar separates `change` (mutate an input, S4.3 p7) from `propagate` (drive the queue to quiescence). gen-rebuild's `applyDelta`/`batch`/`override` conflate input mutation with propagation. A standalone `propagate`/`restabilize` driver -- "given a set of changed keys, drain the frontier to a fixed point" -- matches Acar's factoring and makes batched changes (multiple `change`s before one `propagate`, S4.3 p7) natural.
+- **A modifiable layer: `mod`, `read`, `write`.** gen-memo operates on a store of computed values and a caller-supplied accessor. It has no constructor vocabulary for the dependency-bearing cells themselves. Acar's `mod`, `read` and `write` build the adg in the first place (S4.1, p6). A thin modifiable layer would make dependency recording a first-class, inspectable operation.
 
 ### Research Directions
 
-- **Lazy-language adaptivity (S8, p44).** Acar conjectures the mechanism extends to lazy languages and that lazy memoization is harmless to change-propagation correctness. gen-rebuild lives in Nix (lazy, persistent) -- precisely the setting Acar flags as expected-to-work-but-unexplored. The open question: does Nix's native thunk memoization subsume Acar's `_eval`/node-value reuse, or must dependency order (S4.6) be tracked explicitly on top of it?
+- **Lazy-language adaptivity (S8, p44).** Acar conjectures the mechanism extends to lazy languages and that lazy memoization does not harm change-propagation correctness. gen-memo runs in Nix, a lazy language with persistent values, which is the setting Acar flags as expected to work and unexplored. The open question is whether Nix's thunk memoization subsumes Acar's node-value reuse, or whether dependency order (S4.6) must be tracked on top of it.
 
-- **Splice granularity for Nix-embedded adgs.** Acar splices at the *read* (edge) granularity. In a Nix-embedded rebuilder the natural unit is a (nodeId, attr) key. Characterizing the right splice granularity -- per-read, per-attribute, per-node, per-subtree -- for the cost bound of Theorem 1 to hold over a lazy store is open, and mirrors the trace-granularity question raised for verifying traces in the Mokhov summary.
+- **Splice granularity.** Acar splices at the read (edge) granularity. In a Nix rebuilder the natural unit is a (node, attribute) key. Which granularity makes the cost bound of Theorem 1 hold over a lazy store, per read, per attribute, per node or per subtree, is open.
 
-- **Eliminating obsolete re-execution without static containment.** Acar prevents re-running obsolete readers via the syntactic containment of `R^{x.e}_l(Tc)` traces (S5.3, p20) -- it knows statically which reads are nested. A demand-driven Nix rebuilder records dependencies dynamically and may lack this nesting. Recovering containment (so obsolete sub-computations are not wrongly re-run) from a flat dynamic dependency log is a concrete research problem for gen-rebuild.
+- **Recovering containment from a dynamic log.** Acar avoids re-running obsolete readers through the syntactic containment of `R^{x.e}_l(Tc)` traces (S5.3, p20). A demand-driven Nix rebuilder records dependencies dynamically and has no such nesting. Recovering containment from a flat dependency log is a concrete research problem.

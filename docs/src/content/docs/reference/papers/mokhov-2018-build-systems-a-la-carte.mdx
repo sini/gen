@@ -1,8 +1,6 @@
 ---
 title: "Mokhov, Mitchell & Peyton Jones (2018) -- Build Systems a la Carte"
-description: "Our reading of Build systems à la carte."
-source:
-  - den-ag-design:used/summaries/mokhov-2018-build-systems-a-la-carte.md
+description: "A summary of Build systems à la carte and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ A. Mokhov, N. Mitchell, and S. P. Jones, "Build systems à la carte," *Proceedin
 
 [doi:10.1145/3236774](https://doi.org/10.1145/3236774) · [read the paper](https://dl.acm.org/doi/pdf/10.1145/3236774)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -21,7 +19,7 @@ Mokhov, Mitchell, and Peyton Jones observe that build systems -- despite being u
 
 The answer is a purely functional, executable framework implemented in approximately 400 lines of Haskell that models any build system as the composition of two independent choices: a **scheduler** (how tasks are ordered) and a **rebuilder** (how the system decides whether a task needs re-execution). The framework's central abstraction is the polymorphic task type `Task c k v = Task { run :: forall f. c f => (k -> f v) -> f v }`, where `c` is a constraint (`Applicative` for static dependencies, `Monad` for dynamic), `k` is the key type, and `v` is the value type. A task description is completely isolated from stores, caches, and schedulers -- it only knows how to compute one output given a `fetch` callback for its dependencies. The constraint `c` on the functor `f` classifies tasks: `Task Applicative` permits static dependency extraction via the `Const` functor trick (S3.7), while `Task Monad` enables dynamic dependencies where the identity of a dependency depends on intermediate computation results (S3.5).
 
-Three schedulers are identified (S4.1). **Topological** (Make, CloudBuild, Buck) pre-computes a linear build order from statically known dependencies, requiring `c = Applicative`. **Restarting** (Excel, Bazel) processes tasks in an arbitrary order, aborting and deferring when an out-of-date dependency is discovered. **Suspending** (Shake, Nix) suspends the currently running task when a dependency is requested, recursively bringing it up to date before resuming -- the task "blocks" on its dependency, and the scheduler recurses. The suspending scheduler naturally handles dynamic dependencies and achieves minimality when combined with appropriate traces.
+Three schedulers are identified (S4.1). **Topological** (Make, CloudBuild, Buck) pre-computes a linear build order from statically known dependencies, requiring `c = Applicative`. **Restarting** (Excel, Bazel) processes tasks in an arbitrary order, aborting and deferring when an out-of-date dependency is discovered. **Suspending** (Shake, Nix) suspends the running task when a dependency is requested, recursively bringing it up to date before resuming -- the task "blocks" on its dependency, and the scheduler recurses. The suspending scheduler naturally handles dynamic dependencies and achieves minimality when combined with appropriate traces.
 
 Four rebuilders are identified (S4.2). **Dirty bit** (Make, Excel) -- one bit per key, set when inputs change; supports minimality but not early cutoff. **Verifying traces** (Shake, Ninja) -- record dependency hashes from the previous build; verify by checking if current hashes match; supports dynamic dependencies, minimality, and early cutoff. **Constructive traces** (Bazel, CloudBuild) -- store actual result values alongside dependency hashes in a shared cloud cache; enable downloading pre-built results without local execution. **Deep constructive traces** (Buck, Nix) -- record only terminal input hashes, ignoring intermediate dependencies; enable cloud lookup from inputs alone at the cost of requiring deterministic tasks and losing early cutoff.
 
@@ -51,13 +49,13 @@ The paper also addresses engineering concerns (S6): partial stores and exception
 
 - **Memoization Subsumption (S7.3).** A minimal build system with dynamic dependencies subsumes memoization (demonstrated via Levenshtein edit distance as `Tasks Monad`), and additionally provides incremental recomputation -- an optimization memoization alone cannot achieve.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+gen splits the paper's two dimensions across two libraries. Nix's laziness is the scheduler, and gen-scope's evaluator runs on it. gen-memo is the rebuilder.
 
-**gen-scope (Minor -- architectural foundation recognized, not directly implemented)**
+### gen-scope: the suspending scheduler
 
-The paper's classification of Nix as occupying the (Suspending scheduler, Deep Constructive Traces) cell in Table 2 informed a critical architectural insight for gen-scope: Nix's lazy evaluation is not merely "similar to" a suspending scheduler -- it IS a suspending scheduler in the formal sense of S4.1.3. When gen-scope's `result.get "host:igloo" "region"` forces an `_eval` thunk that depends on another node's attribute, Nix suspends evaluation of the current thunk, recursively evaluates the dependency, and resumes. This is exactly the `suspending` scheduler from Figure 9:
+The paper places Nix in the (Suspending scheduler, Deep Constructive Traces) cell of Table 2. Nix's lazy evaluation is a suspending scheduler in the formal sense of S4.1.3. When gen-scope's `get "host:igloo" "region"` forces an `_eval` thunk that depends on another node's attribute, Nix suspends the current thunk, evaluates the dependency, and resumes. This is the `suspending` scheduler from Figure 9:
 
 ```
 suspending rebuilder tasks target store = fst $ execState (fetch target) (store, Set.empty)
@@ -71,65 +69,38 @@ suspending rebuilder tasks target store = fst $ execState (fetch target) (store,
           ...
 ```
 
-The `done` set that prevents redundant work in the paper's `suspending` scheduler corresponds to gen-scope's `_eval` memoization: once a thunk is forced, Nix caches the result, and subsequent accesses return the cached value without re-evaluation. The paper's abstract `fetch` callback is gen-scope's `self.get id attrName`. The paper's `Task` is an attribute equation `self: id: value`.
+- The paper's `done` set corresponds to gen-scope's `_eval` memoization: once a thunk is forced, Nix caches the result.
+- The paper's `fetch` callback is gen-scope's `self.get id attrName`.
+- The paper's `Task` is an attribute equation `self: id: value`.
 
-gen-scope does NOT implement the rebuilder dimension. There is no persistent trace store, no dirty-bit tracking, no cross-build incrementality. Each `nix-instantiate` or `nix eval` evaluation is a fresh build from scratch -- the "store" is empty at the start of every evaluation. Nix's content-addressed store provides some build-level caching (derivation output hashing), but gen-scope operates entirely within a single evaluation, where the only "trace" is Nix's native thunk memoization.
+### gen-memo: the rebuilder
 
-- **Files:** `eval` function in gen-scope (scheduler = Nix lazy evaluation), `_eval` co-located cache (rebuilder = not applicable, single-evaluation model)
-- **Mapping:** Paper's `suspending` scheduler (S4.1.3, S5.3, Figure 9) = Nix lazy thunk evaluation; Paper's `done :: Set k` = Nix thunk memoization (forced thunks cached); Paper's `fetch` callback = `self.get`; Paper's `Task` = attribute equation `self: id: value`
+gen-memo cites this paper as its theory and implements the rebuilder half of the decomposition. It never evaluates. Given the last evaluation, it decides whether a key must be recomputed, and it is correct when its output is byte-identical to a cold evaluation.
 
-**gen-algebra (Minor -- conceptual parallel, retired)**
+- **Verifying traces (S4.2.2)** -- `build` records a per-key trace `{ deps; hash }`, the verifying-trace shape.
+- **Reuse strategies** (`lib/strategies.nix`) -- `verify` is the paper's verifying-trace check (S4.2). `earlyCutoff` stops propagation when a recomputed value hashes the same as before (S2.3). `needsEval` is Reps' pre-cutoff test.
+- **Invalidation** -- `dirtySet`, `affected` and `affectedSet` propagate a change along reverse dependencies to find the keys that must be recomputed.
+- **Parametric over the dependency oracle** -- the rebuilder takes its dependency graph as an argument, the same parametricity the paper gives its rebuilders.
 
-gen-algebra's `search` namespace (Palmer §3's Search monad and its `converge` runner, retired: ADR-0008 §1, gen-scope is the sole evaluator) was structurally similar to the paper's iterative computation pattern (S6.6): iterate until a fixed point, with a bounded iteration count as safety guard. The paper notes that build systems rarely support cyclic dependencies but cites Pottier (2009) and Radul (2009) for monotonic fixed-point computation frameworks. gen-algebra's search monad operated in this space -- monotonic index accumulation with convergence detection -- though it derived from Palmer rather than from this paper directly.
+The paper's rebuilder consults build information that persists from one invocation to the next. A pure Nix evaluation has no such persistence, so gen-memo's memory is the trace from earlier in the same evaluation. It reuses work across overrides and repeated demands within one evaluation. Cross-invocation reuse is left to Nix's store at the derivation level.
 
-### Relevance to Den v2 HOAG Pipeline
-
-The Build Systems a la Carte framework provides the classification vocabulary for understanding den v2's evaluation architecture:
-
-| Paper concept | Den v2 realization |
-|---|---|
-| Suspending scheduler (S4.1.3) | Nix lazy evaluation -- attribute thunks suspend/resume on dependency access |
-| `fetch` callback | `self.get id attrName` in gen-scope |
-| `Task c k v` | Attribute equations `self: id: value` |
-| `c = Monad` (dynamic deps) | Attribute bodies can conditionally access different attributes based on intermediate values |
-| `done` set | `_eval` memoization -- each thunk evaluated at most once |
-| Deep constructive traces (S4.2.4) | Nix store derivation output hashing (at build level, not within gen-scope evaluation) |
-| Correctness (Definition 3.1) | AG well-formedness: attribute values consistent with their defining equations against the final tree |
-| Minimality (Definition 2.1) | Demand-driven evaluation: only attributes actually accessed are computed |
-| Early cutoff (S2.3) | Not applicable within single evaluation; at Nix store level, content-addressed outputs provide cutoff |
-
-The paper's key insight for den v2 is that the suspending scheduler is the most powerful: it handles dynamic dependencies, achieves minimality, and composes with any rebuilder. Nix's lazy evaluation provides this for free. The gen-scope architecture exploits this by defining attributes as pure functions and letting Nix's evaluator schedule their computation. No explicit topological sort, no restarting with aborts, no calc chain -- just recursive thunk forcing.
-
-The rebuilder dimension is where future work lies. Currently den v2 has no cross-evaluation incrementality: every `nix eval` recomputes everything from scratch. The paper's trace taxonomy (verifying, constructive, deep constructive) provides a roadmap for adding incrementality. The natural fit would be verifying traces (Shake-style): record which attributes were accessed and their content hashes, and on re-evaluation, skip attribute computation when all dependencies have unchanged hashes. Combined with the existing suspending scheduler, this would place den v2 in the (Suspending, Verifying Traces) cell -- the Shake cell -- achieving minimal, incremental, early-cutoff-capable attribute evaluation.
-
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-- **Verifying traces for attribute-level incrementality (S4.2.2, S5.3).** The paper's `vtRebuilder` records dependency hashes after each task execution and skips re-execution when hashes match. Applied to gen-scope, this would mean recording which `_eval` entries were accessed during attribute computation and their content hashes, then on re-evaluation checking if the hash of each dependency still matches. This is the core mechanism for incremental AG re-evaluation -- the missing rebuilder dimension in gen-scope.
+- **Constructive traces for attribute caching across evaluations (S4.2.3, S5.4).** Constructive traces store actual results indexed by dependency hashes. For gen, this would mean a persistent attribute cache: given the same graph structure and the same input declarations, attribute values could be looked up rather than recomputed. This extends Nix's derivation-level content-addressing down to the attribute level, and needs a store that outlives one evaluation.
 
-- **Constructive traces for attribute caching across evaluations (S4.2.3, S5.4).** Beyond verifying "is this still valid?", constructive traces store actual results indexed by dependency hashes. For gen-scope, this would mean a persistent attribute cache: given the same scope graph structure and the same input declarations, attribute values can be looked up rather than recomputed. This extends Nix's derivation-level content-addressing down to the attribute level.
+- **Self-tracking for aspect change detection (S6.5).** The paper models self-tracking as tasks depending on their own formula. In gen, this would mean treating an aspect definition as a hashable input to the attributes computed from it, so a change to the definition itself invalidates exactly those attributes.
 
-- **Self-tracking for aspect change detection (S6.5).** The paper models self-tracking as tasks depending on their own formula. In den v2, this would mean detecting when an aspect definition changes (not just its inputs) and selectively re-evaluating affected attributes. Currently, any change to any aspect triggers full re-evaluation. Modeling aspect definitions as hashable inputs to the attribute computation would enable targeted invalidation.
-
-- **Early cutoff at the attribute level (S2.3, S4.2.1-4.2.2).** When an attribute is recomputed and produces the same value as before, dependents need not be recomputed. gen-scope's `_eval` provides no cutoff -- once a thunk is forced, all downstream thunks that reference it will be forced regardless of whether the value changed. Implementing attribute-level early cutoff would require explicit hash comparison after computation, matching the paper's description of Shake's mechanism (S5.3, `vtRebuilder`).
-
-- **Task constraint classification for static analysis (S3.4, S3.7).** The paper's `Applicative`/`Monad` distinction enables static dependency extraction for applicative tasks. In gen-scope, most attributes are monadic (they conditionally access different dependencies), but some are purely applicative (e.g., `inherit'` always walks the parent chain regardless of values). Identifying applicative attributes would enable static dependency graph construction for those attributes, supporting pre-computation of evaluation order and parallel evaluation.
-
-### Potential New Libraries or Features
-
-- **gen-trace -- Attribute-level verifying traces.** A library that wraps gen-scope's `eval` to record dependency hashes during evaluation and provides a `verify` function that checks if cached attribute values are still valid. Architecture: intercept `self.get` calls to record `(sourceId, sourceAttr, hash)` tuples; persist traces to a JSON/Nix file; on re-evaluation, verify traces before forcing thunks. Scope: moderate -- requires instrumenting gen-scope's accessor chain without breaking laziness. Interaction: gen-scope provides the evaluation substrate; gen-trace adds the rebuilder dimension. Combined, they place the system in the Shake cell (Suspending + Verifying Traces).
-
-- **gen-scope `applicativeAttr` combinator.** An attribute constructor that guarantees `Applicative`-only dependency access, enabling the `Const [k]` dependency extraction trick from S3.7. The combinator would take a list of dependency declarations and a pure function, rather than a `self: id:` callback. Scope: small -- a restricted attribute constructor with static dependency metadata. Interaction: enables pre-computation of partial evaluation orders, static cycle detection without `evalDebug`, and potential parallel evaluation of independent applicative attributes.
-
-- **Incremental `eval` for gen-scope.** An `evalIncremental` variant that takes a previous evaluation result and a set of changed node IDs, and returns a new result that only recomputes affected attributes. Implementation would combine verifying traces (to detect which attributes are invalidated) with the existing suspending scheduler (to recompute on demand). Scope: large -- requires persistent trace storage, invalidation propagation, and careful interaction with `_eval` memoization. Interaction: the primary consumer (den v2) would benefit from sub-second re-evaluation when a single aspect changes in a large fleet configuration.
+- **Task constraint classification for static analysis (S3.4, S3.7).** The paper's `Applicative`/`Monad` distinction enables static dependency extraction for applicative tasks. In gen-scope, most attributes are monadic (they conditionally access different dependencies), but some are purely applicative (e.g., `inherit'` always walks the parent chain regardless of values). Identifying applicative attributes would give a static dependency graph for them, supporting precomputed evaluation order.
 
 ### Research Directions
 
-- **Optimal trace granularity for Nix-embedded AGs.** The paper's trace taxonomy (verifying, constructive, deep constructive) applies at the task/key level. In gen-scope, the "task" is an attribute equation and the "key" is a (nodeId, attrName) pair. The question is: what is the right granularity for traces? Per-attribute traces give maximal incrementality but high storage overhead. Per-node traces (invalidate all attributes when any input to the node changes) are coarser but cheaper. Per-subtree traces (invalidate at the scope-graph subtree level) align with den v2's entity boundaries. The trade-off space has not been characterized for lazy-evaluation-embedded AGs.
+- **Optimal trace granularity for Nix-embedded AGs.** The paper's trace taxonomy (verifying, constructive, deep constructive) applies at the task/key level. In gen-scope, the "task" is an attribute equation and the "key" is a (nodeId, attrName) pair. Per-attribute traces give maximal incrementality but high storage overhead. Per-node traces (invalidate all attributes when any input to the node changes) are coarser but cheaper. Per-subtree traces align with entity boundaries. The trade-off space has not been characterized for lazy-evaluation-embedded AGs.
 
-- **Content-addressing as deep constructive traces.** Nix already provides deep constructive traces at the derivation level: a derivation's output is determined by the recursive hash of all terminal inputs. Can this mechanism be extended inward, to attribute-level caching? If an attribute's value is a function of (a) the scope graph structure hash and (b) the declaration content hashes, then the attribute value could be looked up in a content-addressed cache without re-evaluation. This would fuse gen-scope's evaluation model with Nix's store model, potentially enabling cross-evaluation attribute sharing.
+- **Content-addressing as deep constructive traces.** Nix already provides deep constructive traces at the derivation level: a derivation's output is determined by the recursive hash of all terminal inputs. If an attribute's value is a function of (a) the graph structure hash and (b) the declaration content hashes, the attribute value could be looked up in a content-addressed cache without re-evaluation. This would join gen-scope's evaluation model to Nix's store model and allow cross-evaluation attribute sharing.
 
-- **Suspending scheduler with non-deterministic tasks for policy dispatch.** The paper models non-determinism via `MonadPlus` (S6.3). In den v2, policy dispatch through gen-derive produces non-deterministic effects (multiple rules may fire, producing different action sets depending on evaluation order). The paper's correctness definition for non-deterministic tasks (S6.3: `getValue k result \`elem\` computeND task result`) could formalize what it means for den v2's policy dispatch to be "correct" -- the final configuration must be one of the possible results of the non-deterministic task, regardless of rule firing order.
+- **Non-deterministic tasks and rule dispatch.** The paper models non-determinism via `MonadPlus` (S6.3). When several gen rules fire at one node, the result should not depend on the order they fire in. The paper's correctness definition for non-deterministic tasks (S6.3: `getValue k result \`elem\` computeND task result`) gives a way to state that requirement: the final configuration must be one of the possible results of the task, whatever the firing order.
 
-- **Self-adjusting computation bridge (S7.2).** The paper notes the deep connection between build systems and self-adjusting computation (Acar et al. 2002, 2007). The gen ecosystem's fixpoint loops (gen-scope `circular`, gen-derive `fixpoint`; gen-algebra `converge` was a third such loop before its retirement, ADR-0008 §1) are all instances of self-adjusting computation within a single evaluation. The question is whether the incremental/adaptive computation literature provides algorithms that can be applied to gen-scope's evaluation model to achieve sub-linear re-evaluation cost when inputs change incrementally, beyond what trace-based rebuilders provide.
+- **Self-adjusting computation bridge (S7.2).** The paper notes the connection between build systems and self-adjusting computation (Acar et al. 2002, 2007). gen's fixpoint loops (gen-scope's circular attributes, which also iterate gen-dispatch's one-shot rule dispatch to a fixpoint, and gen-program's model computation) are instances of self-adjusting computation within a single evaluation. Whether the incremental computation literature gives sub-linear re-evaluation cost for them when inputs change, beyond what trace-based rebuilders provide, is open.
+

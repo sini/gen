@@ -1,0 +1,160 @@
+---
+title: Graphs and Queries
+description: Reachability, ordering, cycles, labelled path queries, selectors and graph products over your own data.
+---
+
+This example places two machines of a web platform in a graph. `contains` edges run from the
+`prod` environment to its datacenters, and from each datacenter to its machines. One `connects`
+edge says the webserver talks to the database.
+
+```nix title="platform-graph.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  graph = gen.graph;
+
+  links = [
+    { from = "prod";    to = "us-east"; label = "contains"; }
+    { from = "prod";    to = "us-west"; label = "contains"; }
+    { from = "us-east"; to = "web-1";   label = "contains"; }
+    { from = "us-west"; to = "db-1";    label = "contains"; }
+    { from = "web-1";   to = "db-1";    label = "connects"; }
+  ];
+  targets = label: id: map (e: e.to) (builtins.filter (e: e.label == label && e.from == id) links);
+  nodes = [ "prod" "us-east" "us-west" "web-1" "db-1" ];
+
+  contains = { edges = targets "contains"; inherit nodes; };
+  labelled = graph.labeledFrom { contains = targets "contains"; connects = targets "connects"; } nodes;
+in
+{
+  machines = graph.leaves contains;
+  inProd = graph.reachableFrom contains "prod";
+  holdsDb = graph.dependents { } contains "db-1";
+  order = graph.topoOrder { } { edges = targets "contains"; inherit nodes; };
+  cycles = graph.cycles contains;
+
+  # Follow any number of `contains` edges, then exactly one `connects` edge.
+  reachedDbs = graph.query { } {
+    graph = labelled;
+    from = "prod";
+    follow = graph.regex.seq [
+      (graph.regex.star (graph.regex.lit "contains"))
+      (graph.regex.lit "connects")
+    ];
+  };
+}
+```
+
+```console
+$ nix eval --impure --json --file platform-graph.nix
+{
+  "cycles": [],
+  "holdsDb": ["prod", "us-west"],
+  "inProd": ["us-east", "us-west", "web-1", "db-1"],
+  "machines": ["db-1", "web-1"],
+  "order": { "ok": true, "order": ["db-1", "us-west", "web-1", "us-east", "prod"] },
+  "reachedDbs": ["db-1"]
+}
+```
+
+The graph is your data. gen reads it through an **accessor record**: a set of functions such as
+`edges = id: [ ... ]`, plus the node list where a query needs one. Nothing is copied into a
+gen-specific structure first.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Enumerate | `roots`, `leaves`, `select` | Nodes with no incoming edges, with no outgoing edges, or matching a predicate over node data |
+| Reach | `reachableFrom`, `reachableVia`, `reachableWhere`, `canReach` | Everything a node reaches, optionally restricted by edge or node |
+| Impact | `dependents`, `dependentsOf`, `directDependents`, `impactOf` | Everything that reaches a node, directly or transitively |
+| Walk | `ancestorsOf`, `pathsBetween`, `expandPreorder`, `foldPreorder`, `foldReach` | Parent chains, bounded path enumeration, preorder walks and folds |
+| Order | `topoOrder`, `topoOrderKahn`, `phaseOrder` | A dependency order, or the cycles that prevent one |
+| Cycles | `cycles`, `cyclePaths`, `condensation`, `lowlink` | Strongly connected components and the acyclic graph between them |
+| Closure | `transitiveClosure`, `transitiveReduction` | Every implied edge, or the fewest edges with the same reachability |
+| Labelled queries | `labeledFrom`, `query`, `regex.lit`, `regex.seq`, `regex.star`, `queryFold`, `queryArrivals` | Nodes at the end of paths whose edge labels match a regular expression |
+| Edge algebra | `unionEdges`, `intersectEdges`, `differenceEdges`, `transpose`, `compose`, `materialize` | Combine and reverse edge relations |
+| Selectors | `matches`, `attrs`, `and`, `not`, `any`, `has`, `kind`, `within`, `child`, `descendant` | Composable node predicates, written as data |
+| Products | `cartesian`, `tensor`, `strong`, `lexicographic`, `productN`, `restrict`, `slice`, `fiber` | A graph over pairs of nodes, for example hosts × users |
+
+## Details
+
+### The accessor record
+
+A query reads only the fields it needs:
+
+| Field | Type | Read by |
+|---|---|---|
+| `edges` | `id -> [ id ]` | every traversal |
+| `nodes` | `[ id ]` | whole-graph queries such as `roots`, `leaves`, `cycles` and `topoOrder` |
+| `parent` | `id -> id or null` | `ancestorsOf` and other containment walks |
+| `nodeData` | `id -> attrs` | `select` and selectors |
+
+A missing field fails with an error naming the function and the field, for example
+`gen-graph.ancestorsOf: required field 'parent' is missing`.
+
+### Options come first
+
+`dependents`, `ancestorsOf`, `topoOrder`, `query` and `pathsBetween` take an options set before the
+graph. Pass `{ }` for the defaults. Calling one without it fails with
+`'edges' is not an option of this door; the options are closed`, because the graph was read as the
+options set.
+
+### Ordering reports cycles as data
+
+`topoOrder` returns `{ ok = true; order = [ ... ]; }` on an acyclic graph. On a cyclic graph it
+returns `{ ok = false; cycles = [ [ "a" "b" ] ]; }`, so the caller decides how to report it.
+
+### Labelled path queries
+
+`labeledFrom` builds a labelled graph from one edge function per label. `query` walks it from a start
+node and returns every node where a path ends whose label sequence matches `follow`. The expression
+language has `lit`, `seq` and `star`. The walk runs over pairs of (node, expression state), so it
+terminates on cyclic graphs.
+
+### Selectors
+
+A selector is a predicate written as data, so it can be stored, compared and reused. An adapter tells
+it how to read your nodes:
+
+```nix title="prod-webservers.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  select = gen.select;
+  hosts = {
+    web-1 = { role = "webserver"; env = "prod"; };
+    web-2 = { role = "webserver"; env = "dev"; };
+    db-1  = { role = "database";  env = "prod"; };
+  };
+  ctx = select.adapters.registry.mkContext {
+    nodes = builtins.attrNames hosts;
+    data = id: hosts.${id};
+    parent = _: null;
+  };
+  prodWebservers = select.and [ (select.attrs { role = "webserver"; }) (select.attrs { env = "prod"; }) ];
+in
+builtins.filter (id: select.matches prodWebservers id ctx) (builtins.attrNames hosts)
+```
+
+```console
+$ nix eval --impure --json --file prod-webservers.nix
+["web-1"]
+```
+
+Adapters exist for registries, scope graphs, plain graphs and products (`adapters.registry`,
+`adapters.scope`, `adapters.graph`, `adapters.product`). One selector runs against any of them.
+
+### Products
+
+A graph product is itself an accessor record, so every query above runs on it. `productN
+"cartesian"` over hosts and users gives one node per (host, user) pair. The coordinates are registry
+entries carrying an `id_hash` (see [Kinds, Registries and Identity](/features/registries/)).
+`restrict` keeps the pairs a membership relation lists, since not every user exists on every host.
+`slice` fixes some coordinates and keeps the rest, and `fiber` keeps the cells over one entry of one
+dimension.
+
+For the model behind this page, see [Your Configuration as a Graph](/understand/graph/).
+
+---
+
+**Provided by** gen-graph (queries, ordering, labelled paths), gen-select (selectors) and gen-product
+(products).

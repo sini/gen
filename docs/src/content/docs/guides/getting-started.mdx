@@ -1,5 +1,5 @@
 ---
-title: Getting started
+title: Getting Started
 description: The shortest path from an empty flake to a resolved graph.
 source:
   - README.md
@@ -7,16 +7,17 @@ source:
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-gen is not a framework you install. It's a roster of small libraries, and the fastest way in is
-to take exactly one of them. No hub, no nixpkgs, no NixOS module — a flake, ten lines of
-data, and a question answered.
+<Aside type="caution">gen is pre-release and its API is still changing.</Aside>
+
+gen is a set of small Nix libraries, and you can use any one of them on its own. This guide
+takes `gen-graph`, gives it four nodes, and asks two questions about them. You need a flake
+and ten lines of data. No nixpkgs input is required.
 
 <Steps>
 
 1. ##### Add one library
 
-   Every gen library is a flake that exports one `.lib`. Take `gen-graph` — pure graph
-   queries, nothing else pulled in:
+   Every gen library is a flake that exports a `.lib`. `gen-graph` answers graph queries:
 
    ```nix
    # flake.nix
@@ -27,14 +28,14 @@ data, and a question answered.
        let
          graph = gen-graph.lib;
 
-         myData = {
+         myData = {                                        # (1)
            web = { deps = [ "api" ]; };
            api = { deps = [ "cache" "database" ]; };
            cache = { deps = [ "database" ]; };
            database = { deps = [ ]; };
          };
 
-         g = {
+         g = {                                             # (2)
            edges = id: myData.${id}.deps or [ ];
            parent = id: myData.${id}.parent or null;
            nodes = builtins.attrNames myData;
@@ -42,15 +43,17 @@ data, and a question answered.
          };
        in
        {
-         reachableFromWeb = graph.reachableFrom g "web";
+         reachableFromWeb = graph.reachableFrom g "web";   # (3)
          roots = graph.roots g;
        };
    }
    ```
 
-   `myData` is your own data — nothing here is gen vocabulary yet. `g` is the one thing
-   gen-graph asks for: four accessor functions over it. Nothing is copied or re-shaped;
-   `edges` and `nodeData` just read `myData` directly.
+   1. `myData` is your own data. None of its field names mean anything to gen.
+   2. `g` is an accessor record: four functions that tell gen-graph how to read your data.
+      `edges` returns the nodes a node points to, `parent` returns its container, `nodes`
+      lists every node and `nodeData` returns a node's attributes.
+   3. Each output is a query over `g`.
 
 2. ##### Ask it a question
 
@@ -62,33 +65,30 @@ data, and a question answered.
    # ["web"]
    ```
 
-   That's a resolved graph: `web` depends (transitively) on everything gen-graph just
-   listed, and `web` is the only node nothing else points at.
+   `web` depends on the three listed nodes, directly or through other nodes. `web` is the
+   only node that no other node points to.
 
 </Steps>
 
-<Aside type="tip">
-No `nixpkgs` input, no lock beyond `gen-graph`'s own transitive `gen-prelude`. Both commands
-above were run against `github:sini/gen-graph` at HEAD to write this page.
-</Aside>
-
 ## What just happened
 
-`myData` held the nodes. The `deps` field held the relation between them — an edge. `g`
-told gen-graph how to read both off data you already owned. `reachableFrom` and `roots`
-are queries over that relation; gen-graph never stored a graph of its own, it answered
-questions about yours.
+`myData` held the nodes, and its `deps` fields held the edges between them. `g` told
+gen-graph how to read both from data you already had. `reachableFrom` and `roots` are
+queries over that relation. gen-graph keeps no copy of the graph.
 
-That's the whole model the rest of the ecosystem builds on: nodes are data, relations are
-edges, and you get answers by asking rather than by assembling them by hand.
+The rest of gen builds on the same model. Hosts, users and features are nodes, the
+relations between them are edges, and you get results by querying the graph.
+
+Every gen library runs its test suite on every push under three evaluators: upstream Nix,
+Determinate Nix and Lix, each pinned to its latest release. See [Trust](/trust/).
 
 ## Where to go next
 
 <CardGrid>
-  <LinkCard title="Your first graph" href="/guides/first-graph/"
-    description="Richer nodes, more relations, and reading attributes back out." />
-  <LinkCard title="Add gen to a flake" href="/guides/flake/"
-    description="Wire the hub for the full compose-to-NixOS route, and what each piece is for." />
-  <LinkCard title="The roster" href="/libraries/roster/"
-    description="One concern per library, across four strata. gen-graph is one of them." />
+  <LinkCard title="Your First Graph" href="/guides/first-graph/"
+    description="More queries, a second relation, and reading attributes back out." />
+  <LinkCard title="Add gen to a Flake" href="/guides/flake/"
+    description="Use one library, or wire the hub to build NixOS systems." />
+  <LinkCard title="Libraries" href="/reference/libraries/"
+    description="Every library and the features it provides." />
 </CardGrid>

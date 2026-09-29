@@ -1,0 +1,121 @@
+---
+title: Incremental Rebuild
+description: Re-compose after an edit, reuse what did not change, read what was reused and why, and share work across similar nodes.
+---
+
+The homelab raises its monitoring retention. gen re-composes from the previous result, reuses the
+option the edit did not touch, and reports what it did. The warm result equals a cold run.
+
+```nix title="warm-edit.nix"
+let
+  gen = builtins.getFlake "github:sini/gen";
+  inherit (gen.lib.mkGenLibs { }) merge;
+
+  base = {
+    options.monitoring.retention = merge.mkOption { type = merge.types.str; default = "7d"; };
+    options.ssh.port = merge.mkOption { type = merge.types.int; default = 22; };
+  };
+  edit = { monitoring.retention = "30d"; };
+
+  first = gen.lib.compose { modules = [ base ]; specialArgs = { }; };
+  warm = first.override { modules = [ edit ]; };
+  cold = gen.lib.compose { modules = [ base edit ]; specialArgs = { }; };
+in
+{
+  warm = warm.values.monitoring.retention;
+  cold = cold.values.monitoring.retention;
+  same = warm.values == cold.values;
+  inherit (warm.trace) mode inert reused remerged reason;
+}
+```
+
+```console
+$ nix eval --impure --json --file warm-edit.nix
+{
+  "cold": "30d",
+  "inert": false,
+  "mode": "warm",
+  "reason": null,
+  "remerged": { "monitoring.retention": "edited-def" },
+  "reused": ["ssh.port"],
+  "same": true,
+  "warm": "30d"
+}
+```
+
+`override` appends modules to the original composition. The result is the same value a cold
+composition of all the modules gives. Only the work differs: `ssh.port` was reused, and
+`monitoring.retention` was merged again because the edit defined it.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Compose and edit | `gen.lib.compose { modules; specialArgs; }`, `.override { modules?; specialArgs?; }` | Compose a module tree, then re-compose after an edit |
+| Read the trace | `.trace.mode`, `reused`, `remerged`, `reason`, `inert` | What a re-composition reused and what it merged again |
+| Decide reuse | `memo.warmAdmits`, `warmTrace`, `warmDecision` | Whether an edit's shape allows a warm pass, and the record of the decision |
+| Propagate changes | `memo.build`, `propagate`, `propagateEager`, `dirtySet`, `affected` | Recompute the nodes an edit can reach, and nothing else |
+| Stop early | `earlyCutoff` | Stop propagating where a recomputed value equals the old one |
+| Explain | `why`, `whyFor`, `whyNot`, `whyNotFor` | Why a node was or was not recomputed |
+| Cycles | `runScc` | Recompute a group of mutually dependent nodes together |
+| Share a core | `class.mkClasses { nodes; keyOf; }`, `mkCore`, `applyCoreMerge`, `applyCoreExtend`, `gateCore` | Compute shared configuration once for a class of similar nodes |
+
+## Details
+
+### The trace
+
+A result reached through `override` carries `trace`. A first composition carries none.
+
+| Field | Meaning |
+|---|---|
+| `mode` | `"warm"` when the previous result was reused, `"cold"` otherwise |
+| `reason` | why a warm pass was refused, `null` when it ran |
+| `reused` | options taken from the previous result |
+| `remerged` | options merged again, each with the cause (`edited-def` for an option the edit defines) |
+| `modules` | the modules the edit added |
+| `inert` | `true` when a warm pass had nothing to reuse, `null` when the evaluator does not say |
+
+A warm pass is allowed only when the edit changes `modules` alone. An edit that also changes
+`specialArgs` runs cold, with `mode = "cold"` and a `reason`. The value is the same either way.
+
+`override` has three merge rules. `modules` are appended to the originals. `specialArgs` and
+`engineArgs` are merged over the originals, with the edit winning per key. To retract a definition,
+append a module that overrides it with `mkForce`.
+
+### Change propagation
+
+gen-memo decides what to recompute over any graph you describe with an accessor, a `recompute`
+function and a `hashOf` function. `dirtySet` and `affected` compute the nodes an edit can reach.
+`propagate` recomputes them in dependency order, and `earlyCutoff` stops at a node whose new value
+hashes the same as its old one. `runScc` handles a cycle by recomputing its strongly connected
+component as one unit.
+
+gen-memo decides and never evaluates. The evaluator it serves does the work, so the output is the
+evaluator's output.
+
+### Shared cores
+
+Hosts that play the same role often compute the same configuration. `mkClasses` groups nodes by a
+key:
+
+```nix
+gen.class.mkClasses {
+  nodes = { web-1.role = "webserver"; web-2.role = "webserver"; db-1.role = "database"; };
+  keyOf = _name: node: node.role;
+}
+# [ { key = "database";  members = [ "db-1" ];           archetype = "db-1";  … }
+#   { key = "webserver"; members = [ "web-1" "web-2" ]; archetype = "web-1"; … } ]
+```
+
+`mkCore` finds the class's shared **core**: the keys present in every member with the same value as
+the archetype's. `applyCoreMerge` and `applyCoreExtend` apply the core back onto a member, so the
+member computes only what differs. `gateCore` compares the core-applied result with the member's
+real result by SHA-256 and returns the decision as a record. Reuse is allowed only when the two
+are equal.
+
+For the theory, see [Rebuilding Only What Changed](/understand/incremental/).
+
+---
+
+**Provided by** the gen hub (`compose`), gen-memo (reuse decisions and change propagation) and
+gen-class (shared cores).

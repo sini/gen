@@ -1,0 +1,72 @@
+---
+title: Rebuilding Only What Changed
+description: After an edit, gen reuses every result the edit cannot affect and returns exactly what a full run returns (incremental computation, as in build systems and self-adjusting computation).
+---
+
+The homelab is evaluated once. Then you change one line: the server's ssh port moves from 22 to
+2222. The laptop's desktop setting has nothing to do with that edit, and evaluating it again would
+be wasted work.
+
+gen's `compose` returns a handle for exactly this case. `override` applies an edit to a previous
+result, reuses what the edit leaves alone, and reports what it did.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  homelab = {
+    options.server.sshPort = m.mkOption { type = m.types.int; default = 22; };
+    options.laptop.desktop = m.mkOption { type = m.types.str; default = "gnome"; };
+  };
+  edit = { config.server.sshPort = 2222; };
+
+  first = inputs.gen.lib.compose { modules = [ homelab ]; specialArgs = { }; };
+  warm = first.override { modules = [ edit ]; };
+  cold = inputs.gen.lib.compose { modules = [ homelab edit ]; specialArgs = { }; };
+in
+{
+  same = warm.values == cold.values;
+  inherit (warm.trace) mode reused remerged;
+}
+```
+
+```text
+{ same = true;
+  mode = "warm";
+  reused = [ "laptop.desktop" ];
+  remerged = { "server.sshPort" = "edited-def"; }; }
+```
+
+## How it works
+
+A **cold** run evaluates everything from scratch. A **warm** run starts from a previous result and
+an edit. `override` appends the edit's modules to the originals, decides which options the edit
+can affect, merges those again, and carries every other value over unchanged.
+
+The result is always the value a cold run over the same modules gives. The example checks this
+directly: `warm.values` equals `cold.values`. Reuse changes only how much work is done.
+
+The trace says what happened. `mode` is `"warm"` when the previous result was used. `reused`
+lists the options carried over, and `remerged` lists the options merged again with the reason for
+each. When a warm run has nothing to reuse, `inert` is `true`, so a warm run that saved no work is
+visible in the trace.
+
+gen's incremental library applies the same approach to any graph of computed values. It tracks
+which values depend on which, marks the values an edit could affect, and recomputes those. When a
+recomputed value comes out the same as before, the values that depend on it are kept as they are.
+The [Benchmarks](/benchmarks/) page measures the savings.
+
+## The theory
+
+**Incremental computation** reuses earlier results after a change to the input. Mokhov, Mitchell
+and Peyton Jones describe a build system as two parts: a scheduler that decides the order of work,
+and a rebuilder that decides whether a stored result is still valid. In gen, Nix's lazy evaluation
+is the scheduler and the incremental library is the rebuilder, including the step that stops when a
+recomputed value is unchanged. Acar, Blelloch and Harper's self-adjusting computation is the same
+idea for general programs: record what each result depended on, and after a change redo only the
+parts whose inputs changed. See our readings of
+[Mokhov et al. (2018)](/reference/papers/mokhov-2018-build-systems-a-la-carte/) and
+[Acar et al. (2002)](/reference/papers/acar-2002-adaptive-functional-programming/).
+
+Next: [Which Tool for Which Job](/understand/choosing/).

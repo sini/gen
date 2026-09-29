@@ -1,8 +1,6 @@
 ---
 title: "Sloane et al. (2010) -- A Pure Object-Oriented Embedding of Attribute Grammars"
-description: "Our reading of A pure object-oriented embedding of attribute grammars."
-source:
-  - den-ag-design:used/summaries/sloane-2010-kiama-ag-embedding.md
+description: "A summary of A pure object-oriented embedding of attribute grammars and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ A. M. Sloane, L. C. L. Kats, and E. Visser, "A pure object-oriented embedding of
 
 [doi:10.1016/j.entcs.2010.08.043](https://doi.org/10.1016/j.entcs.2010.08.043)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -51,78 +49,42 @@ Section 7 notes future work on collection attributes (Boyland 2005; Magnusson, E
 
 - **Collection Attributes (Future Work):** Mentioned in S7 as planned. Multi-contributor aggregation attributes where multiple tree nodes contribute values that are folded into a single result via tree traversal. (S7, refs [4,15])
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-scope
 
-**gen-scope (MAJOR -- directly implements three Kiama constructs)**
+gen-scope implements three of the paper's constructs directly.
 
-1. **`_eval` co-located cache = CachedAttribute (S3.2, Figure 6).** Every scope graph node receives an `_eval` attrset -- a lazy Nix attrset where each key is an attribute computation. Nix's lazy evaluation means the thunk for `_eval.region` is evaluated at most once and cached automatically by the Nix evaluator. This is structurally identical to `CachedAttribute`'s identity hash map: the hash map key is the node identity (Kiama uses an `IdentityHashMap[T, Option[U]]`; gen-scope uses the node's `id` as the attrset key), and the cached value is the thunk's forced result. The sentinel-based cycle detection from Figure 6 is replaced by Nix's native infinite-recursion detection, which serves the same purpose. The critical design insight is that caches are co-located ON nodes (like JastAdd's field-based caching, unlike Kiama's separate attribute objects), but achieve the same O(1) amortized access.
+1. **`_eval` co-located cache = CachedAttribute (S3.2, Figure 6).** Every scope graph node receives an `_eval` attrset -- a lazy Nix attrset where each key is an attribute computation. Nix's lazy evaluation means the thunk for `_eval.region` is evaluated at most once and cached automatically by the Nix evaluator. This is structurally identical to `CachedAttribute`'s identity hash map: the hash map key is the node identity (Kiama uses an `IdentityHashMap[T, Option[U]]`; gen-scope uses the node's `id` as the attrset key), and the cached value is the thunk's forced result. The sentinel-based cycle detection from Figure 6 is replaced by Nix's native infinite-recursion detection, which serves the same purpose. The caches live on the nodes, like JastAdd's field-based caching and unlike Kiama's separate attribute objects, with the same O(1) amortized access.
 
-   - **Files:** `eval` function in gen-scope, `_eval` construction during `children`/`derived-children` wrapping
    - **Mapping:** `CachedAttribute.apply(t)` = Nix attrset lazy thunk evaluation; `CachedAttribute.memo` = the `_eval` attrset itself; `memo.get(t) match { case Some(Some(u)) => u }` = subsequent attrset access returning cached value
 
-2. **`circular` = Circular Fixed-Point Attributes (S2.2, Figure 3-4).** gen-scope's `circular { init; eq; maxIter; } f self id` constructor evaluates an attribute by iterating from `init` until `eq prev next` returns true or `maxIter` is reached. This implements the Magnusson-Hedin algorithm that Kiama wraps in `CircularAttribute`. The `init` parameter corresponds to Kiama's `circular(Set[String]())`, the convergence check replaces Kiama's built-in equality, and `maxIter` adds a safety bound absent in the original.
+2. **`circular` = Circular Fixed-Point Attributes (S2.2, Figure 3-4).** gen-scope's `circular { carrier; } f` declares an attribute computed by iterating `f` from the carrier's `bottom` value until it stops changing. The carrier also declares the order `leq`, a finite `height`, and whether the order is over a `quotient` of the values, and the evaluator bounds the iteration by the declared heights. This implements the Magnusson-Hedin algorithm that Kiama wraps in `CircularAttribute`. `bottom` corresponds to Kiama's initial value (`circular(Set[String]())`), and the declared height gives a termination bound Kiama leaves implicit.
 
-   - **Files:** `circular` in gen-scope attribute combinators
-   - **Mapping:** Kiama `circular (init : U) (f : T => U)` = gen-scope `circular { init; eq; maxIter; } f self id`; Magnusson-Hedin iteration loop = gen-scope's recursive `go` with convergence check
+   - **Mapping:** Kiama `circular (init : U) (f : T => U)` = gen-scope `circular { carrier; } f`, with `carrier.bottom` as `init`; the Magnusson-Hedin iteration loop = gen-scope's evaluator reading the declaration at demand time
 
 3. **`collectionAttr` = Collection Attributes (S7, future work realized).** Kiama's S7 mentions collection attributes as planned future work, citing Boyland (2005) and Magnusson, Ekman, Hedin (2007). gen-scope implements this as `collectionAttr { traverse; extract; combine; filter; }`, which traverses the scope graph along a specified axis (imports, children, siblings, ancestors, custom label, or arbitrary function), extracts values from matching nodes, and folds them with `combine`. This realizes what Sloane described as "extending attribute grammars with collection attributes -- evaluation and applications."
 
-   - **Files:** `collectionAttr` in gen-scope attribute combinators
    - **Mapping:** Boyland/Magnusson's collection attributes (Kiama ref [4,15]) = gen-scope `collectionAttr`; the `traverse` parameter generalizes Silver's fold-over-tree to arbitrary graph traversal strategies
 
-**gen-scope (MINOR -- conceptual influence)**
+It also shares one pattern with the paper:
 
 4. **Inherited attributes via `inherit'`.** gen-scope's `inherit' { resolve }` walks the parent chain until `resolve node` returns non-null. This captures the same pattern as Kiama's `childAttr` and parent-matching inherited attributes (S2.1 `globmin`), but inverts the perspective: Kiama matches on the parent to define the child's value, while gen-scope walks upward from the child. Both achieve the same result -- propagation of values down the tree without explicit copy rules.
 
-### Relevance to Den v2 HOAG Pipeline
-
-The central thesis of Kiama -- that a sufficiently expressive host language can serve as the AG evaluator, eliminating the need for a custom generator -- is the architectural foundation of den v2. The mapping is:
-
-| Kiama concept | Scala mechanism | Den v2 / Nix mechanism |
-|---|---|---|
-| CachedAttribute memoization | IdentityHashMap in attribute objects | `_eval` lazy attrset on scope nodes; Nix thunk evaluation = memo |
-| Demand-driven scheduling | `apply()` evaluates on first access | Nix lazy evaluation: thunks forced only when demanded |
-| Pattern-matching equations | Scala `case` in anonymous functions | Nix `if/else` chains and pattern matching in attribute bodies |
-| Circular fixed-point | `CircularAttribute` iterates to convergence | `circular` combinator with `eq`-based convergence check |
-| Trait-based modularity | Scala traits + mixin composition | Aspect composition + gen-derive rule dispatch |
-| Dynamic extension (`+=`) | Partial function list with scoped activation | gen-derive's rule override/priority system with fixpoint convergence |
-| Host-language laziness as AG evaluator | Scala lazy vals (limited -- Kiama uses explicit caching instead) | Nix lazy evaluation (native -- every attrset value is a lazy thunk) |
-
-The last row highlights a key difference: Kiama notes (S6) that Scala's lazy values could theoretically replace explicit caching, but doing so "would require attribute definitions to reside in the abstract syntax classes, which goes against modularity." Nix does not have this constraint. Because Nix attrsets are inherently lazy and `lib.fix` provides self-referential binding, gen-scope achieves what Kiama could not -- true host-language laziness as the evaluation mechanism with no explicit caching infrastructure, while preserving full modularity (attributes are defined externally and composed into `_eval` at node construction time). **Nix IS the AG evaluator** in a way that Scala could not fully be for Kiama.
-
-The HOAG pipeline in den v2 operates as follows, with Kiama concepts at each stage:
-
-1. **Graph construction** -- `buildNodes` creates scope graph nodes (entities, aspects) with P/I edges. Each node is a minimal descriptor.
-2. **Attribute definition** -- Consumer (den) defines attributes as `self: id: value` functions. These are the "equations" in Kiama terms.
-3. **`_eval` wrapping** -- `eval` wraps each node with `_eval`, a lazy attrset of attribute computations. This is the `CachedAttribute` instantiation.
-4. **Demand-driven evaluation** -- When den needs a value (`result.get "host:igloo" "resolved-aspects"`), Nix forces the corresponding `_eval` thunk. The thunk may recursively force other `_eval` entries on other nodes -- inherited attributes walk parent chains, synthesized attributes walk children, import-following attributes traverse I edges. All of this is scheduled by Nix's native lazy evaluator.
-5. **Circular convergence** -- Pipe convergence (where multiple aspects contribute to a collection that feeds back into aspect resolution) uses `circular` attributes that iterate to a fixed point, directly implementing the liveness-analysis pattern from S2.2.
-6. **Collection aggregation** -- `collectionAttr` realizes the S7 future work for aggregating contributions from multiple scope graph positions into pipes and collections.
-
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-- **Dynamic attribute extension with scoped activation (S4.2).** Kiama's `+=` operator and `using` block provide run-time attribute equation extension with guaranteed cleanup. gen-scope's attributes are currently static -- defined once at `eval` time. A dynamic extension mechanism would allow aspects to inject additional attribute equations at evaluation time, useful for plugin systems or conditional attribute augmentation. The scoped `using` pattern (try/finally semantics) maps naturally to Nix's `let ... in` scoping but would require gen-scope to support attribute equation composition post-construction.
+- **Dynamic attribute extension with scoped activation (S4.2).** Kiama's `+=` operator and `using` block provide run-time attribute equation extension with guaranteed cleanup. gen-scope's attributes are static, defined once at `eval` time. A dynamic extension mechanism would allow aspects to inject additional attribute equations at evaluation time, useful for plugin systems or conditional attribute augmentation. The scoped `using` pattern (try/finally semantics) maps naturally to Nix's `let ... in` scoping but would require gen-scope to support attribute equation composition post-construction.
 
 - **`isDefinedAt` domain checking (S3.2, Figure 6).** Kiama's `CachedAttribute` inherits `isDefinedAt` from `PartialFunction`, enabling completeness checking -- verifying that every node type has a defining equation. gen-scope attributes are total functions (`self: id: value`) that must handle all node types or throw. A partial-attribute mechanism with domain introspection could catch missing equation cases at definition time rather than evaluation time.
 
 - **Structural property initialization via Product trait (S3.1).** Kiama's `Attributable` automatically derives `parent`, `next`, `prev`, `index` from case class constructor fields using Scala's `Product` interface. gen-scope requires explicit `parent` fields on node descriptors. An auto-derivation mechanism for structural properties from node declaration shape (similar to `buildNodes` but more granular) could reduce boilerplate for complex node hierarchies.
 
-### Potential New Libraries or Features
-
-- **gen-scope dynamic attributes.** A `dynamicAttr` combinator that wraps an attribute with an extension list, supporting `extend` (add equations) and `scope` (delimited activation). This would directly implement Kiama S4.2 in Nix. Scope: moderate -- requires changes to `_eval` construction to compose base + extension equations. Interaction: gen-derive could use this to inject rule-produced attribute equations during fixpoint convergence, rather than requiring all attributes to be defined upfront.
-
-- **gen-scope partial attributes with domain checking.** An `assertComplete` wrapper that takes a set of node types and an attribute definition, verifying at construction time that the attribute's pattern covers all declared types. Scope: small -- purely a validation wrapper. Interaction: gen-schema's kind declarations could provide the node type universe for completeness checking.
-
-- **gen-scope attribute profiling.** Kiama's performance evaluation (S5) highlights that knowing which attributes are evaluated, how often, and whether caching is beneficial is important for optimization. A `profile` wrapper on `eval` that counts thunk forces per attribute per node type would help identify over-evaluation in large den configurations. Scope: moderate -- requires instrumenting `_eval` without breaking laziness.
-
 ### Research Directions
 
 - **Optimal caching granularity.** Kiama caches in attribute objects; JastAdd caches in tree nodes; gen-scope caches in co-located `_eval` attrsets. The trade-off between memory footprint and access speed across these strategies has not been formally characterized for lazy host languages where the evaluator itself provides memoization. A formal analysis of when explicit caching (gen-scope's `_eval`) adds value over bare Nix laziness would inform whether some attributes can safely omit `_eval` wrapping.
 
-- **Incremental re-evaluation.** Kiama's dynamic extension mechanism (S4.2) and the broader AG literature on incremental evaluation (Reps, Teitelbaum 1984) suggest a path toward incremental den reconfiguration: when an aspect changes, only affected attribute values should be recomputed. Nix's content-addressed store provides some of this at the derivation level, but attribute-level incrementality within a single evaluation is an open problem for Nix-embedded AGs.
+- **Incremental re-evaluation.** Kiama's dynamic extension mechanism (S4.2) and the broader AG literature on incremental evaluation (Reps, Teitelbaum 1984) concern recomputing only the attribute values an edit affects. gen-memo does this for gen within a single evaluation, reusing work across overrides. Reuse across separate evaluations remains open for Nix-embedded AGs, where Nix's content-addressed store provides it only at the derivation level.
 
 - **Static completeness guarantees for embedded AGs.** Kiama notes (S6) that sealed case classes give partial completeness checking via Scala's exhaustiveness warnings. Nix has no equivalent. Whether Nix's type-level tooling (e.g., NixOS module type declarations) can provide analogous coverage guarantees for AG equations is unexplored. gen-schema's kind/type system could potentially serve as the "sealed class" equivalent, constraining the node type universe.

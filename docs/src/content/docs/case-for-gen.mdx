@@ -1,0 +1,64 @@
+---
+title: The Case for gen
+description: What gen changes for people who run Nix configuration, and where the project stands today.
+---
+
+Nix describes a whole machine as code: its packages, services, users and settings. Teams use it to
+run laptops, homelabs and fleets of servers from one repository. As that repository grows, most of
+the effort moves from the features themselves to the wiring between them. Someone has to remember
+which machine gets which feature, which feature needs which other one, and which value each file
+expects to be handed.
+
+gen is a set of Nix libraries that turn that wiring into a graph. Machines, users and features
+become nodes, and the relationships between them become edges that software can check, query and
+explain. The sections below describe what that changes.
+
+## Write a feature once
+
+A feature in gen, called an aspect, is written once and shared by every machine that uses it. When
+the feature needs something about the machine it lands on, such as its address or its users, it
+asks for the machine as an argument and gen passes it in. The same SSH feature gives each machine
+its own list of allowed users, with no copy per machine.
+
+Features can include other features. A monitoring feature that needs SSH says so once, and every
+machine that runs monitoring gets SSH as well. The [landing page](/) shows this for a two-machine
+homelab.
+
+## Every piece of configuration has an identity
+
+gen gives every machine, user and feature an identity computed from its content. Two things with
+the same content get the same identity, every time. That one property pays off in three places.
+
+**Reuse and speed.** gen recognises work it has already done. After an edit, it reuses every result
+the edit did not affect, and the output is identical to a full rebuild. In gen's benchmarks,
+re-evaluating six edits against earlier work costs a quarter of evaluating each from scratch. On a
+real three-machine fleet, an edit to one machine skips two thirds of the fleet's composition work.
+The [benchmarks](/benchmarks/) page has the figures and how they are measured.
+
+**Errors that point at the cause.** Every declared option records which file set
+it, at which priority, and which other definitions it replaced. The next step builds on
+identity: reporting a failure against the machine and feature that caused it, where plain Nix
+reports a stack of evaluation steps. The [Roadmap](/roadmap/) tracks that work.
+
+**Seeing the whole configuration.** gen can load the graph and the results of its rules into one
+set of facts. You can query those facts with SQL, ask why a relationship exists and get the rules
+that produced it, and draw the graph as a diagram. Interactive graph tools are planned.
+
+## Works with the module systems you already use
+
+gen's module system follows the same rules as the one in nixpkgs for everything the two share, and
+a test suite compares the two on every change. A feature's NixOS content is an ordinary NixOS
+module, evaluated by a NixOS system builder at the end. gen passes values into modules written for
+other evaluators through the same argument injection it uses for its own. The longer-term goal is
+to offer gen's extensions to modules written for any framework.
+
+## Checked on three Nix implementations
+
+Every gen library's test suite runs on each push under upstream Nix, Determinate Nix and Lix. The
+[Trust](/trust/) page lists each guarantee gen makes and the check behind it.
+
+## Where it stands
+
+gen is pre-release: the libraries ship and are tested on every push, their APIs are still changing,
+and the first framework built on the full toolkit is in progress. The [Roadmap](/roadmap/) says what
+comes next.

@@ -1,8 +1,6 @@
 ---
 title: "Kiczales et al. (1997) -- Aspect-Oriented Programming"
 description: "Our reading of Aspect-oriented programming."
-source:
-  - den-ag-design:reference-catalog/summaries/kiczales-1997-aspect-oriented-programming.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ G. Kiczales et al., "Aspect-oriented programming," *ECOOP'97, LNCS 1241*, pp. 22
 
 [doi:10.1007/BFb0053381](https://doi.org/10.1007/BFb0053381)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -42,52 +40,50 @@ Kiczales et al. explicitly connect AOP to computational reflection and metaobjec
 - **Tangling bloat metric** -- `(tangled_size - component_size) / aspect_program_size`. Values > 1 indicate AOP benefit.
 - **Weaving** -- The process of integrating component and aspect programs into a unified executable. Can be compile-time (CT) or runtime (RT).
 
-## Ecosystem Relevance
+## How gen uses this
 
 ### Conceptual Influence
 
-The den/gen ecosystem inherits AOP's core insight -- that configuration concerns cross-cut entity structure -- but realizes it through attribute grammar evaluation rather than program weaving. The conceptual mapping:
+gen's terminology cites Kiczales 1997 for cross-cutting concerns and aspect weaving, as a conceptual ancestor. gen keeps AOP's core observation, that configuration concerns cut across entity structure, and realises it through attribute grammar evaluation instead of program weaving.
 
-- **Pointcuts --> Policy guards / gen-derive conditions.** AOP pointcuts select join points where advice should apply. In den, policies use destructuring signatures (`{ host, ... }:`) to match scope contexts, and gen-derive rules use selectors (gen-select) as conditions. Both are declarative predicates that control where cross-cutting logic fires. The key difference: pointcuts pattern-match over program execution points, while den's guards pattern-match over scope graph positions.
+- **Pointcuts and rule conditions.** An AOP pointcut selects the join points where advice applies. In gen, a gen-dispatch rule's condition, often a gen-select selector or a function's argument pattern (`{ host, ... }:`), selects the scope-graph positions where a rule fires. Both are declarative predicates controlling where cross-cutting logic applies. Pointcuts match program execution points, and gen's conditions match scope-graph positions.
 
-- **Advice --> Class content delivery / gen-aspects trait dispatch.** AOP advice is the code that executes at matched join points. In den, aspect content keyed to registered classes (nixos, darwin, homeManager) is the "advice" -- configuration fragments delivered to output systems. gen-aspects' trait system classifies aspect keys and dispatches content to the appropriate class output, analogous to how a weaver routes advice to matched join points.
+- **Advice and class content.** AOP advice is the code run at matched join points. In gen, aspect content under a class key (`nixos`, `darwin`, `homeManager`) is delivered to that output system. gen-aspects classifies each aspect key with `keyCategory` and routes class content to its class, as a weaver routes advice to matched join points.
 
-- **Join points --> Scope graph positions.** AOP join points are implicit semantic elements of the component program (data-flow edges, method invocations). In den, the analogous positions are nodes in the scope graph -- entities (hosts, homes, users) and aspects at specific scope identities. Resolution traverses P (parent) and I (import) edges rather than intercepting execution flow.
+- **Join points and scope-graph positions.** AOP join points are implicit elements of the component program, such as data-flow edges and method invocations. In gen the analogous positions are scope-graph nodes: entities such as hosts and users, and aspects at specific scope identities. Resolution follows parent and import edges instead of intercepting execution.
 
-- **Weaving --> AG evaluation.** The weaver integrates component and aspect programs into tangled output. Den replaces weaving entirely with demand-driven attribute grammar evaluation (gen-scope). There is no separate weaving phase: class content, collection data, and structural edges are synthesized attributes computed lazily as the scope graph is traversed. The "integration" happens through Nix's native lazy evaluation rather than a code-generation pass.
+- **Weaving and attribute grammar evaluation.** The weaver merges component and aspect programs into tangled output. gen has no weaving phase. Class content, channel data and structural edges are attributes computed lazily by gen-scope as the graph is traversed.
 
-- **Component language / aspect language separation --> Key classification trifecta.** AOP mandates separate languages for components and aspects. Den achieves separation within a single language (Nix) through key classification: class keys exit to external evaluation (component output), collection keys route data internally (aspect coordination), and nested keys recurse into sub-aspects. The structural separation is in the *type* of the key, not the *language* of the program.
+- **Separate languages and key categories.** AOP separates the component language from the aspect language. gen separates concerns within one language, Nix, by the category of a key: class keys leave for external evaluation, channel keys carry data between scopes, and keys with no declared category become nested aspects.
 
-### Why Reference Rather Than Used
+### Where gen differs
 
-Den references Kiczales 1997 as a conceptual ancestor but diverges from the AOP execution model in several fundamental ways:
+1. **No weaving pass.** AOP needs a weaver that generates tangled output from separate inputs. gen generates no code. Content flows through the scope graph as demand-driven attributes, so adding or changing an aspect needs no re-weaving, and gen-memo can decide reuse incrementally.
 
-1. **No weaving pass.** Traditional AOP requires a weaver that generates tangled output code from separate inputs. Den has no code generation phase. Content flows through the scope graph as demand-driven attributes. This eliminates the weaver as a complexity bottleneck and makes the system incrementally evaluable -- changing one aspect does not require re-weaving the entire system.
+2. **Declarative aspects.** AOP aspect programs are imperative procedures over join point representations, such as the loop-fusion program that edits data-flow graph nodes. gen aspects are declarative attrsets whose keys the framework classifies and routes, written in ordinary Nix syntax.
 
-2. **Declarative rather than imperative aspects.** AOP aspect programs are imperative procedures that manipulate join point representations (e.g., the loop fusion program that edits data-flow graph nodes). Den aspects are declarative attrsets whose keys are classified and routed by the framework. The "aspect language" is just Nix attrset syntax with structural conventions, not a separate imperative DSL.
+3. **Scope graphs in place of execution join points.** AOP join points depend on the component language's execution semantics. gen's positions belong to a scope graph, an algebraic structure (Néron 2015; Mokhov 2017) independent of any execution model. That makes cross-cutting resolution open to formal analysis (well-formedness, shadowing, specificity).
 
-3. **Scope graphs replace execution-model join points.** AOP join points are tied to the component language's execution semantics (data flow, method dispatch). Den's "join points" are positions in a static scope graph -- an algebraic structure (Neron 2015; Mokhov 2017) independent of any execution model. This makes den's cross-cutting resolution amenable to formal analysis (well-formedness, shadowing, specificity) in ways that execution-trace-based AOP is not.
+4. **Attribute evaluation in place of batch weaving.** AOP weaving is a batch transformation from component and aspect to tangled output. Attribute evaluation is demand-driven and compositional: attributes are memoised per node, references resolve through import edges and collection attributes aggregate across subtrees. Adding an aspect adds a node or an edge.
 
-4. **Attribute grammar evaluation subsumes weaving.** Where AOP weaving is a batch transformation (component + aspect --> tangled output), AG evaluation is demand-driven and compositional. Attributes are memoized per node, cross-node references resolve through import edges, and collection attributes aggregate across subtrees. The AG model provides the same integration power as weaving but with better compositionality -- adding an aspect means adding a node or edge, not modifying a weaver.
+5. **Identity in place of pointcut precision.** AOP relies on precise pointcut expressions to avoid applying advice twice. gen gives each aspect a structural identity (`aspectId` in gen-aspects, following Palmer's intensional identity), so an aspect reached along several paths is included once. Identity is a property of the aspect, independent of any matching expression.
 
-5. **Identity-based dedup replaces pointcut precision.** AOP relies on precise pointcut expressions to avoid duplicate advice application. Den uses Palmer's intensional identity (program-point identity + conservative equality) for diamond dedup in aspect collection, rule dedup in gen-derive fixpoint loops, and gate dedup in the pipeline. Identity is a structural property of the aspect, not a property of the matching expression.
-
-6. **Collections replace shared-state aspects.** AOP's loop fusion and memoization aspects coordinate through imperative manipulation of shared data structures. Den's collection attributes (gen-scope, gen-schema) provide named multi-contributor aggregation with declarative merge strategies. Data flows through the graph via traversal modes (imports, children, siblings, ancestors) rather than through imperative graph editing.
+6. **Channels in place of shared-state aspects.** AOP's loop-fusion and memoisation aspects coordinate by editing shared data structures. In gen, several scopes contribute to a named channel, and gen-scope's folds combine the contributions with a declared combining operation, traversing the graph instead of editing it.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Tangling bloat metric as a design diagnostic.** Kiczales' `(tangled - component) / aspect` ratio could be adapted to measure den's own separation effectiveness. Computing the ratio of "what would NixOS modules look like without den" vs "total aspect code" would quantify whether den's abstractions actually reduce cross-cutting complexity or merely relocate it.
+- **The tangling bloat metric as a diagnostic.** Kiczales' ratio `(tangled - component) / aspect` could measure how well a gen configuration separates concerns: compare the size of the equivalent hand-written NixOS modules with the total aspect code, to test whether aspects reduce cross-cutting complexity or only move it.
 
-- **Multiple aspect languages with distinct composition rules.** The paper envisions different aspect languages for different cross-cutting concerns (loop fusion, memoization, memory allocation each got separate aspect programs). Den currently uses a single aspect syntax for all concerns. Domain-specific sub-languages for particular cross-cutting patterns (e.g., a dedicated collection routing DSL, a constraint propagation DSL) could improve expressiveness for specialized concerns.
+- **Several aspect languages.** The paper uses a separate aspect program for each concern (loop fusion, memoisation, memory allocation). gen uses one aspect syntax for all concerns. Dedicated sub-languages for particular patterns, such as channel routing or constraints, could make specialised concerns easier to express.
 
-- **Aspect language design principles.** The paper's observation that component languages must "not pre-empt what aspects need to control" is a design principle den has internalized (deferredModule content is inspectable before forcing, per Lorenzen 2025). But the inverse -- that aspect languages should make cross-cutting composition rules explicit and natural -- could inform the design of den's policy language and collection routing syntax.
+- **Aspect language design.** The paper's principle that a component language must "not pre-empt what aspects need to control" appears in gen as class content kept as an inspectable `deferredModule` (Lorenzen 2025). The converse, that an aspect language should make its composition rules explicit, could guide the syntax for rules and channels.
 
 ### Research Directions
 
-- **Formal cross-cutting analysis over scope graphs.** Kiczales identifies cross-cutting as the root problem but provides no formal characterization. Combining scope graph well-formedness (van Antwerpen 2016) with gen-derive's stratified dispatch could yield a formal definition: two concerns cross-cut when their collection traversal modes are non-comparable in the scope graph's edge-label partial order.
+- **A formal account of cross-cutting over scope graphs.** Kiczales names cross-cutting as the root problem without a formal definition. Scope-graph well-formedness (van Antwerpen 2016) could supply one: two concerns cross-cut when their traversals are incomparable in the partial order on edge labels.
 
-- **Quantitative AOP assessment for configuration frameworks.** The paper explicitly calls for empirical studies measuring AOP's utility for development and maintenance. No such study exists for AG-based configuration frameworks. Measuring aspect count, collection fan-out, and scope graph depth against maintenance metrics (time to add a host, time to refactor a cross-cutting policy) would validate or challenge den's architectural choices.
+- **Quantitative assessment.** The paper calls for empirical studies of AOP's value for development and maintenance. Measuring aspect count, channel fan-out and scope-graph depth against maintenance tasks, such as adding a host or refactoring a cross-cutting rule, would test the design of an attribute-grammar configuration framework.
 
-- **Aspect interaction detection.** Thum et al. (2014) study feature interaction in software product lines -- the configuration-domain analog of aspect interference. gen-derive's conflict resolution (override suppression, priority sort, specificity) is an operational answer, but a static analysis pass that detects potential aspect interactions before evaluation (analogous to AspectJ's static analysis warnings) would catch configuration conflicts earlier.
+- **Aspect interaction detection.** Thüm et al. (2014) study feature interaction in product lines, the configuration analogue of aspect interference. gen-dispatch resolves conflicts operationally with overrides, priority and `exclusive`. A static pass that finds potential interactions before evaluation, like AspectJ's static warnings, would catch conflicts earlier.

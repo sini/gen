@@ -1,8 +1,6 @@
 ---
 title: "Chitil (2012) — Practical Typed Lazy Contracts"
 description: "Our reading of Practical typed lazy contracts."
-source:
-  - den-ag-design:used/summaries/chitil-2012-practical-typed-lazy-contracts.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ O. Chitil, "Practical typed lazy contracts," *ICFP'12: ACM SIGPLAN International
 
 [doi:10.1145/2364527.2364539](https://doi.org/10.1145/2364527.2364539)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -29,7 +27,7 @@ Chitil introduces **pattern contracts** — combinators like `pNil`, `pCons` tha
 list c = pNil |> pCons c (list c)
 ```
 
-This structural parallel between type definitions and contract definitions is not accidental — the paper identifies contracts as a practical subtyping system for algebraic data types, particularly useful for compiler passes that operate on overlapping AST variants.
+The paper builds on this structural parallel between type definitions and contract definitions, identifying contracts as a practical subtyping system for algebraic data types, particularly useful for compiler passes that operate on overlapping AST variants.
 
 The central theoretical result is that contracts are **projections** — they are both partial identities and (claimed) idempotent. Lemma 4.1 proves the partial identity property: `assert c <= id` in the information-theoretic ordering, meaning a contract can only reduce information (replace parts with bottom), never add it. Claim 4.2 asserts idempotence: `assert c . assert c = assert c`. The paper provides a proof appendix (Appendix A) establishing the partial identity property by structural induction on contract combinators, and shows that idempotence follows from idempotence of conjunction (`c & c = c`), which is claimed but left as requiring stronger proof methods than equational reasoning.
 
@@ -47,90 +45,75 @@ The paper extends the basic system with blame tracking (Section 5.1, following F
 
 - **Contracts as projections (Lemma 4.1 + Claim 4.2)**: `assert c` is a partial identity (`assert c v <= v`) and is idempotent (`assert c . assert c = assert c`). This means applying a contract twice is the same as applying it once, and a contract can only remove information from a value.
 
-- **The `false` contract and its blame direction**: `false` always blames the client (not the server), which is practically useful in contra-variant positions: `true >-> false >-> true` on `const` correctly blames the server (the function definition) if the second argument is demanded, because `false` is in a contra-variant position where blame is flipped.
+- **The `false` contract and its blame direction**: `false` always blames the client, which is practically useful in contra-variant positions: `true >-> false >-> true` on `const` correctly blames the server (the function definition) if the second argument is demanded, because `false` is in a contra-variant position where blame is flipped.
 
-- **Witness tracing (Section 5.2)**: Beyond binary blame, the contract system reports a *witness* — the path through constructors from root to the violation point. This is strictly more informative than Findler-Felleisen blame and is unique to this system.
+- **Witness tracing (Section 5.2)**: Beyond binary blame, the contract system reports a *witness* — the path through constructors from root to the violation point. This is strictly more informative than Findler-Felleisen blame.
 
-- **Strict data types degenerate to eager contracts (Section 7.3)**: When all constructor arguments are strict, demanding the top constructor forces the entire structure, so lazy and eager contracts produce identical behavior. This is a pleasant property: the system adapts automatically.
+- **Strict data types degenerate to eager contracts (Section 7.3)**: When all constructor arguments are strict, demanding the top constructor forces the entire structure, so lazy and eager contracts produce identical behavior. The system adapts automatically.
 
 - **Non-commutativity parallels lazy Booleans**: The contract algebra mirrors the algebra of `&&` and `||` over lazy Booleans — neither conjunction nor disjunction commutes, the standard distribution laws fail, but guarded commutativity and absorption laws hold. This parallel is both a proof technique and an intuition guide.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-bind: contracts on injected arguments
 
-#### gen-bind — Module Binding (MAJOR)
+gen-bind cites Chitil's central result, contracts as partial identities (S4.2), for its lazy contracts on the values it injects into NixOS modules.
 
-gen-bind implements Chitil's central theorem (contracts as partial identities, S4.2) as the foundation of its lazy contract system for NixOS module argument injection.
+- `contract.mk` creates a contract record around a `check` predicate. The predicate is Chitil's `prop` combinator for flat types (S2): it tests a value without forcing anything beyond what the predicate demands.
+- `contract.apply` is `assert c`, the partial identity: it returns the value unchanged when the check passes and throws with blame information when it fails. Its provenance argument carries the source and scope into the error message, which is the blame tracking of S5.1.
+- `contract.hasFields`, `contract.isType` and `contract.nonEmpty` are ready-made flat contracts, specific instances of `prop`.
+- `wrap` applies contracts inside each binding's thunk, so an assertion runs only when `evalModules` forces that argument. This is Chitil's core guarantee that unevaluated parts never violate a contract (S2, the Fibonacci example). A module that takes `{ host, ... }:` and never reads `host.system` never triggers a contract on `system`.
+- `wrapAll` computes contracts once for a list of modules. Sharing them is sound because a contract is idempotent (Claim 4.2).
 
-**Concrete mapping:**
+gen-bind's contracts are flat `assert`-style checks. It does not implement the `a -> Maybe a` contract type, pattern contracts or disjunction, since the values crossing the binding boundary are mostly flat attrsets and Nix has no user-defined algebraic data types to pattern-match on.
 
-- `contract.mk { message; } check` in `nix/lib/contract.nix` creates a contract record. The `check` predicate corresponds to Chitil's `prop` combinator for flat types (S2) — it tests a predicate on the value without forcing anything beyond what the predicate itself demands.
+### gen-schema: lazy refinements
 
-- `contract.apply contract value prov` in `contract.nix` implements `assert c` — the partial identity that returns the value unchanged if the check passes, or throws with blame information if it fails. The `prov` (provenance) parameter maps to Chitil's blame tracking (S5.1), carrying the source and scope through to error messages.
+gen-schema applies Chitil's lazy semantics to refinement types on registry instances.
 
-- `contract.hasFields`, `contract.isType`, `contract.nonEmpty` are pre-built flat-type contracts corresponding to specific `prop` instances.
+- `refined` attaches refinements `{ check; message; lazy ? false; }` to a type. Each refinement is a predicate that acts as a partial identity on the type's values.
+- When an instance registry validates its fields, a refinement with `lazy = true` does not run at validation time. The field's value is wrapped with `builtins.addErrorContext` and a check that throws on access, so the value behaves exactly like the unwrapped one until the violating part is demanded. This is Lemma 4.1, `assert c v <= v`. Refinements without `lazy` fail immediately.
+- A list of refinements on one type is a conjunction: every refinement must pass. Lemma A.5, `assert c2 . assert c1 = assert (c1 & c2)`, is why checking them in sequence is correct.
 
-- The wrapping pipeline in `wrap.nix` applies contracts via `applyContracts`, which wraps each binding value in a thunk: the assertion fires only when `evalModules` forces the bound argument. This is the direct implementation of Chitil's core guarantee — unevaluated parts never trigger violations (S2, the Fibonacci example). A module that declares `{ host, ... }:` but never accesses `host.system` will never trigger a contract on `system`.
+`blame` builds a `{ field, message }` record for field-level error attribution. It is producer-side reporting of which field and which predicate failed, and does not implement Chitil's higher-order blame or witness tracing.
 
-- The `wrapAll` batch API pre-computes contracts once across a module list, which is sound because contracts are projections (applying the same contract to the same value is idempotent, Claim 4.2).
+gen-schema uses `builtins.addErrorContext` and a deferred throw as its laziness mechanism, where the paper constructs `Maybe`-wrapped values. The guarantee is the same: the check runs only when the value is demanded.
 
-**Divergences from the paper:** gen-bind uses flat `assert`-style contracts rather than the full `a -> Maybe a` type with pattern contracts and disjunction. This is appropriate because Nix values at the binding boundary are almost always flat attrsets — there is no need for constructor-level pattern matching over algebraic data types. The `Maybe` wrapping and `|>` disjunction combinator are not implemented because Nix's type system does not have user-defined algebraic data types in the Haskell sense.
+### Why laziness matters here
 
-#### gen-schema — Typed Record Registries (MAJOR)
+A gen configuration is evaluated on demand. Scope-graph attributes are computed only when something needs them, and class content stays as `deferredModule` thunks until `evalModules` imports it. Lazy contracts keep that property.
 
-gen-schema implements Chitil's lazy contract semantics for refinement types, enabling deferred validation that preserves demand-driven evaluation.
-
-**Concrete mapping:**
-
-- `schema.types.refined` in `nix/lib/refined.nix` attaches predicate refinements to NixOS types. Each refinement record `{ check; message; lazy?; }` is a contract in Chitil's sense — a predicate that acts as a partial identity on the type's value space.
-
-- The `lazy = true` flag on a refinement switches from eager validation (check runs during `applyPipeline`) to lazy validation: the value is wrapped with `builtins.addErrorContext`, deferring the check to access time. This directly implements Chitil's partial-identity semantics (Lemma 4.1): `assert c v <= v`, where the wrapped value behaves identically to the unwrapped value until the violating part is actually demanded.
-
-- `schema.blame` in `blame.nix` implements field-level error attribution, combining Chitil's witness tracing (S5.2) with Findler's blame assignment (S5.1). The `{ field, message }` record identifies both *what* violated the contract and *where* in the structure it occurred.
-
-- Composed refinements (passing a list to `schema.types.refined`) implement Chitil's conjunction combinator (`&`): all refinements must pass, and they are checked in sequence. The associativity and identity laws (Lemmas A.9-A.11) hold because `assert c2 . assert c1 = assert (c1 & c2)` (Lemma A.5).
-
-**Divergences from the paper:** gen-schema uses `builtins.addErrorContext` as the laziness mechanism rather than constructing `Maybe`-wrapped values. This is the Nix-native equivalent — `addErrorContext` attaches an error message to a thunk without forcing it, achieving the same semantic guarantee: the check runs only when the value is demanded.
-
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2's demand-driven Higher-Order Attribute Grammar pipeline is fundamentally lazy — scope graph attributes are computed only when demanded, and class content (NixOS modules) is packaged as `deferredModule` thunks that evaluate only when `evalModules` imports them. Chitil's lazy contracts are critical to this architecture in three ways:
-
-**1. Contracts cannot break demand-driven evaluation.** In the HOAG pipeline, a host's attribute is computed only when something downstream demands it (e.g., a NixOS configuration builds and forces the `nixos` class output). If contracts were eager (Findler-style), attaching a contract to a binding would force evaluation of that binding's value, which would force evaluation of the attribute, which would force evaluation of the entire subtree — defeating the demand-driven model. Chitil's partial-identity guarantee (Lemma 4.1) ensures that `assert c v` is informationally no greater than `v`, so the contract cannot introduce new demands.
-
-**2. Unbuilt hosts have zero contract cost.** Den's fleet model may declare hundreds of hosts, but a single `nix build` targets one. gen-bind's contracts, following Chitil's semantics, are thunks attached to binding values. For unbuilt hosts, the binding values are never demanded, the thunks are never forced, and the contracts never run. This is the lazy contract property from S2: "a computation may succeed without any contract violation error, if it only demands those data structure parts that meet the contract."
-
-**3. Refinement contracts compose with the scope graph evaluation order.** gen-schema's lazy refinements on entity kinds (e.g., a `host` kind with `schema.types.refined port { check = p: p > 0 && p < 65536; lazy = true; }`) defer validation to the point where a host's port is actually accessed. In the HOAG pipeline, this means the refinement check integrates seamlessly with gen-scope's attribute evaluation — the check fires as part of the natural evaluation cascade, not as a separate validation pass that would require materializing the entire graph.
-
-**4. Idempotence enables safe re-emission.** The HOAG pipeline may resolve the same aspect multiple times through different scope graph paths (diamond patterns). Chitil's idempotence claim (Claim 4.2) means that applying the same contract to a value that has already been contracted is a no-op. gen-bind's `wrapIdentity` dedup prevents redundant module emission, but when the same binding flows through multiple paths, the contract's idempotence ensures correctness regardless of dedup behavior.
+- **Contracts add no demand.** If contracts were eager, attaching one to a binding would force the binding, which forces the attribute behind it and possibly a whole subtree. Lemma 4.1 says `assert c v` is no more defined than `v`, so a contract cannot introduce new demand.
+- **Unbuilt hosts cost nothing.** A fleet may declare hundreds of hosts while one `nix build` targets one host. The other hosts' bindings are never demanded, so their contracts never run. This is the S2 property: "a computation may succeed without any contract violation error, if it only demands those data structure parts that meet the contract."
+- **Checks run where values are used.** A lazy refinement on a registry field, for example a port with `check = p: p > 0 && p < 65536; lazy = true;`, fires when that host's port is read, as part of normal evaluation, with no separate pass that materialises the whole graph.
+- **Repeated application is safe.** The same aspect can be reached along several scope-graph paths. Idempotence (Claim 4.2) means a contract applied twice to a value behaves as if applied once, independent of `wrapIdentity` deduplication.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Dependent function contracts (Section 9, the `>>->` combinator).** Chitil defines `>>->` where the post-condition can reference the actual argument value, but notes it breaks laziness. In a Nix context, this would allow contracts like "the output module's `networking.hostName` must equal the input `host.name`" — a relational contract between binding input and module output. The challenge is the same as in the paper: such a contract forces evaluation of the argument to check the post-condition. However, in Den's pipeline, certain binding relationships are *known* to be forced eventually (e.g., the host entity context is always demanded by the host's NixOS configuration). For these statically-known-to-be-demanded bindings, dependent contracts would not introduce new evaluation costs.
+- **Dependent function contracts (Section 9, `>>->`).** Chitil's `>>->` lets the post-condition read the actual argument, and notes that this breaks laziness. In Nix it would allow relational contracts such as "the output module's `networking.hostName` equals the input `host.name`". Such a contract forces the argument. Some bindings, such as a host's entity context, are always forced by the host's configuration, and for those a dependent contract adds no evaluation cost.
 
-- **Pattern contracts for algebraic data types (Sections 3-4).** gen-bind uses flat predicate contracts only. Pattern contracts with disjunction (`|>`) would enable structural contracts on nested attrsets: "this attrset is either `{ type = "host"; addr = ...; }` or `{ type = "user"; shell = ...; }`" — matching only the outermost constructor (top-level keys) and attaching sub-contracts to fields. This maps to Chitil's `pCons`/`pNil` with the attrset constructor replacing list constructors.
+- **Pattern contracts (Sections 3-4).** gen-bind has flat predicate contracts only. Pattern contracts with disjunction (`|>`) would give structural contracts on nested attrsets, such as "either `{ type = "host"; addr = ...; }` or `{ type = "user"; shell = ...; }`", matching the top-level keys and attaching sub-contracts to fields. This is Chitil's `pCons` and `pNil` with the attrset replacing the list constructors.
 
-- **Witness tracing with path accumulation (Section 5.2).** gen-bind's blame messages include provenance (source, scope) but not a structural *witness* — the path through the data structure to the violation. Chitil's witness tracing accumulates `String -> String` context transformers along the path. In Nix, this could be implemented as attrpath accumulation: `host.users.tux.{shell}` indicating the violation is at `shell` within the `tux` user within `host.users`.
+- **Witness tracing (Section 5.2).** gen-bind's blame messages carry provenance (source, scope) and no structural witness, the path through the data to the violation. Chitil accumulates `String -> String` context transformers along the path. In Nix this is attrpath accumulation, reporting `host.users.tux.shell`.
 
-- **Algebra of contracts for optimization (Section 4, Figure 4).** The laws `true & c = c`, `c & true = c`, `true >-> true = true` enable compile-time simplification of contract expressions. gen-bind and gen-schema do not currently exploit these laws — every contract is checked independently. A contract composition layer could fuse `hasFields ["name"] & hasFields ["system"]` into `hasFields ["name" "system"]`, and `true >-> true` on pass-through bindings could be eliminated entirely.
+- **Contract algebra for simplification (Section 4, Figure 4).** The laws `true & c = c`, `c & true = c` and `true >-> true = true` allow simplifying contract expressions ahead of time. gen-bind and gen-schema check every contract independently. A composition layer could fuse `hasFields ["name"] & hasFields ["system"]` into `hasFields ["name" "system"]` and drop `true >-> true` on pass-through bindings.
 
-- **IO/abstract type contracts (Section 7.2).** Chitil defines `io c = \io -> Just (io >>= return . assert c)` for the IO monad, noting that abstract types need their own contract combinators built from the type's `map` function. In Nix, the analogous abstract types are derivations and paths — values that are opaque until built. A derivation contract might wrap the derivation's output with a check that runs post-build, which would be a fundamentally different execution model but follows the same principle of type-directed contract combinators.
+- **Contracts for abstract types (Section 7.2).** Chitil defines `io c = \io -> Just (io >>= return . assert c)` for IO and notes that abstract types need combinators built from their `map`. The Nix analogues are derivations and paths, opaque until built. A derivation contract would check the output after the build, a different execution model built on the same type-directed principle.
 
 ### Potential New Libraries or Features
 
-- **gen-contract: a contract combinator library.** Scope: ~200 LOC. Provide `mk` (flat), `hasFields` (pattern-like for attrsets), conjunction `all`, disjunction `any` (try first, fall back), `not` (negated pattern), and `fn` (function contract: pre/post). Built on gen-algebra pure tier. Currently gen-bind and gen-schema each implement their own contract primitives — a shared library would unify the vocabulary and enable the algebraic laws from Figure 4 for optimization. Interaction: gen-bind and gen-schema would both consume gen-contract; gen-schema's `refined` would become a thin wrapper over `gen-contract.mk`.
+- **A shared contract combinator vocabulary.** gen-bind and gen-schema each define their own contract primitives. A shared vocabulary of `mk` (flat), `hasFields`, conjunction, disjunction (try the first, fall back), negation and function contracts (pre and post) would unify them and make the Figure 4 laws available for simplification.
 
-- **Structural witness tracing for gen-bind blame messages.** Scope: ~80 LOC addition to `contract.nix`. Implement Chitil's `(String -> String)` context accumulator as attrpath prefix threading. When `contract.apply` is called on a nested attrset, each level of access appends to the path. Violation messages change from `"value must have fields: name, system"` to `"at host.users.tux: value must have fields: name, system"`. Interaction: requires gen-bind's `wrap` to pass path context through recursive wrapping of imports-attrset modules.
+- **Structural witness tracing for gen-bind.** Thread an attrpath prefix through `contract.apply` on nested attrsets, so a violation reads `at host.users.tux: value must have fields: name, system`. `wrap` would pass path context through its recursive wrapping.
 
-- **Dependent contracts for known-forced bindings.** Scope: ~60 LOC. For bindings where the consumer guarantees eventual evaluation (e.g., entity context bindings that are always destructured by every module), allow `contract.dependent { pre; post; }` where `post` receives both the input binding and the module's output. This is Chitil's `>>->` restricted to the safe case where the pre-condition value is known to be forced. Interaction: requires gen-bind to distinguish "always-forced" bindings (entity context) from "maybe-forced" bindings (enrichment, pipes) in its signature metadata.
+- **Dependent contracts for bindings that are always forced.** For bindings every consumer destructures, allow `contract.dependent { pre; post; }` where `post` receives both the input binding and the module's output. This is `>>->` restricted to the safe case, and needs gen-bind's signature to mark which bindings are always forced.
 
 ### Research Directions
 
-- **Completeness vs. meaning preservation tradeoff in Nix.** Degen, Thiemann, and Wehr (2012, cited as [8]) prove that no contract system can be both meaning-preserving and complete. Chitil's system is meaning-preserving but not complete — some contract violations are never detected because the violating part is never demanded. In Den's fleet model, this is a feature: unbuilt hosts silently pass contracts. But for fleet-wide validation tooling (e.g., `den check`), a user might want a *complete* mode that forces all contracts regardless of demand. The question is whether a single contract library can expose both modes cleanly, or whether completeness requires a fundamentally different mechanism (full-graph materialization + eager checking).
+- **Completeness against meaning preservation.** Degen, Thiemann and Wehr (2012, cited as [8]) prove no contract system is both meaning-preserving and complete. Chitil's system preserves meaning and is incomplete: a violation in a part never demanded is never detected. For a fleet that is useful, since unbuilt hosts pass silently. Fleet-wide validation tooling would want a complete mode that forces every contract. Whether one library can offer both modes cleanly, or whether completeness needs full materialisation and eager checking, is open.
 
-- **Contract inference from NixOS option types.** gen-schema requires manual refinement declarations. Chitil's type-directed contract combinators suggest an automatic approach: given a NixOS option type (`lib.types.int`, `lib.types.str`, `lib.types.enum`), mechanically derive a contract combinator. `lib.types.int` yields `contract.isType "int"`; `lib.types.enum vals` yields `contract.mk { } (v: lib.elem v vals)`; `lib.types.attrsOf t` yields a recursive pattern contract. This would reduce the annotation burden for gen-schema kind definitions.
+- **Contract inference from option types.** gen-schema refinements are declared by hand. Chitil's type-directed combinators suggest deriving contracts from NixOS option types: `lib.types.int` gives `contract.isType "int"`, `lib.types.enum vals` gives a membership check, and `lib.types.attrsOf t` gives a recursive pattern contract.
 
-- **Contract-preserving mixin composition.** gen-schema's `mkMixin`/`composeMixins` operate on records. If records carry contracts (refinements), mixin composition should preserve the contracts from both the parent and the mixin, using Chitil's conjunction law: `(c1 >-> c2) & (c3 >-> c4) = (c3 & c1) >-> (c2 & c4)` (Lemma A.22). Currently, mixin application does not compose contracts — refinements from the parent and the mixin are independent. A contract-aware mixin combinator would ensure that the composed record carries the conjunction of both refinement sets, with the algebraic laws guaranteeing that the result is still a valid projection.
+- **Contract-preserving mixin composition.** gen-schema's `mkMixin` and `composeMixins` operate on records. If records carry refinements, composition should keep both the parent's and the mixin's, using Chitil's conjunction law `(c1 >-> c2) & (c3 >-> c4) = (c3 & c1) >-> (c2 & c4)` (Lemma A.22). Mixin composition does not combine refinements today. A contract-aware combinator would give the composed record the conjunction of both sets, and the laws guarantee the result is still a projection.

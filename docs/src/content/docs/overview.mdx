@@ -1,107 +1,100 @@
 ---
 title: Overview
-description: What gen is, and the one idea the rest follows from.
-source:
-  - README.md
+description: What gen is, the six ideas it is built from, and which page to read next.
 ---
 
-import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-A package's dependencies, a host's own configuration, the network that host sits on, the services
-depending on each other across it, the fleet those hosts belong to — every one of those is a
-graph. gen is the one evaluation layer underneath all of it. It is not itself a configuration
-framework — it declares no domain entity and fixes no vocabulary. What it fixes instead is
-narrower and does more work: one graph, one evaluator, one incremental plane over that evaluator,
-a query algebra, and the interface through which a framework supplies its own names. A framework
-built on gen brings the words — `host`, `aspect`, `service`, whatever it needs — and gen brings the
-machine that resolves them, whether the graph in front of it is one laptop or a fleet.
+A Nix configuration is mostly relationships. This host runs that feature. This feature needs that
+one. This user may log in to those machines. In plain Nix you record each relationship by hand:
+an entry in an `imports` list, an argument passed down through `specialArgs`, an `mkIf` that tests
+a flag someone else set. Move the entry or rename the argument and the relationship is lost, and
+nothing reports it.
 
-## One graph, one node notion
+gen records relationships as data. Hosts, users and features are nodes in one graph, and what
+relates them is an edge. You declare the nodes and edges, and gen answers questions over them:
+which features a host reaches, which hosts a rule applies to, what value an option ends up with and
+which file set it.
 
-A package, a host, a network, a service, a fleet — whatever a framework calls its content units,
-they sit on one graph, and there is exactly one node notion for the whole ecosystem. A node is an
-identity, a set of attributes — some declared, some computed — and its incident labelled edges. A
-"kind" isn't a second notion sitting beside that: it's schema-level data a node carries, and
-nothing in the substrate reads a kind to decide what a node *is*. That's what makes `aspect` and
-`entity` ordinary gen-declared kinds rather than special cases wired into the core.
+## What gen is
 
-An edge carries a label and nothing else. A relation that needs to carry content can't be an edge,
-so it becomes a node instead — a binding node, identified by which relation it is and what it
-relates, minted by the one hashing authority the whole ecosystem shares. Nothing else invents an
-identity, and where one can't be minted totally, the substrate refuses by name rather than guessing.
+gen is a set of Nix libraries for building configuration frameworks. It provides the graph, a
+typed module system that runs without nixpkgs, reusable features called aspects, rules that add
+edges, values computed on demand, incremental rebuilds, and delivery of each node's configuration
+to a builder you supply.
 
-## Declarations become a program you can ask questions of
+A framework built on gen brings its own words, such as `host` or `role`.
 
-A framework's policy declarations compile into a logic program, and gen-scope — the only library
-in the roster allowed to evaluate — solves it stratified, so a rule can never observe the truth
-value of its own still-open conclusion. What a rule concludes joins the same graph as a dynamic
-edge, carrying its own label so it's never mistaken for something a framework declared by hand.
-That's the whole trick: relationships stop being call order you have to get right, and become
-answers to a question you ask the graph.
+## Core concepts
 
-<CardGrid>
-  <Card title="Nodes and edges" icon="puzzle">
-    One identity, one set of attributes, one incident-edge list — for every content unit any
-    framework built on gen will ever declare.
-  </Card>
-  <Card title="Policies solve, they don't run" icon="random">
-    A rule fires when its guard holds and adds an edge. Negation is stratified, so a rule can't
-    watch its own conclusion form.
-  </Card>
-  <Card title="One evaluator, one incremental plane" icon="approve-check">
-    gen-scope is the only thing that evaluates. gen-memo decides reuse over it, defined by nothing
-    less than byte-identity to a cold run.
-  </Card>
-</CardGrid>
+| Concept | What it is | Read more |
+|---|---|---|
+| Node | One thing in your configuration, such as a host, a user or an aspect. It has an identity, attributes and the edges that touch it. | [Your Configuration as a Graph](/understand/graph/) |
+| Kind | The declared shape of a family of nodes: options, types and defaults. Every instance of a kind gets an identity derived from its content. | [Stable Identity for Everything](/understand/identity/) |
+| Edge | A labelled relation from one node to another. You can ask which nodes a path of edges with given labels leads to. | [Your Configuration as a Graph](/understand/graph/) |
+| Aspect | A named, reusable bundle of configuration. It carries content for each class, such as `nixos`, and includes other aspects through edges. | [Reusable Features](/understand/features/) |
+| Rule | A statement that a relation holds between nodes when some conditions hold and others do not. gen solves all rules together as one logic program. | [Rules That Add Relationships](/understand/rules/) |
+| Terminal | The function that receives a node's finished configuration for one class, such as a NixOS system builder. You supply it. | [From an Aspect to a NixOS System](/guides/aspects-to-nixos/) |
 
-## Two planes, one crossing
+The [terminology](/reference/terminology/) page defines every other term.
 
-Composition is pure. gen-types, gen-merge and gen-schema resolve a framework's module tree to
-values without ever calling nixpkgs's `lib.evalModules` — the merge, the priority discharge, the
-freeform absorption, all of it reimplemented rather than wrapped. A realization eventually has to
-touch real nixpkgs — a NixOS closure, a home-manager profile — and that contact is confined to the
-terminal a realization is handed; nothing upstream of it ever imports nixpkgs.
+## How the pieces fit
 
-Across that crossing, gen types never leave the pure evaluator and only values cross — held today as a declared interim rather than a permanent settlement, unqualified only once every crossing site works this way by construction rather than by a documented exception.
+A framework's declarations travel one path to a built system. The Understand and Features
+sections cover each stage.
 
-That's the same one-way trade [adios](https://github.com/adisbladis/adios) takes on its own
-value-injection boundary — a pure engine that can't be driven by foreign, nixpkgs-shaped module
-libraries, for the same reason described above.
+```mermaid
+flowchart LR
+  decl["Declarations"] --> graph["The graph"]
+  graph --> rules["Rules"]
+  rules -- "new edges" --> graph
+  graph --> values["Values computed on demand"]
+  values --> delivery["Delivery"]
+  delivery --> terminal["Your terminal"]
+  memo["Incremental rebuild"] -. "reuses unchanged work" .-> values
+```
 
-## One concern per library
+1. Declarations from many files merge into one set of typed nodes, each with a stable identity.
+2. Rules read the graph and add edges. A rule can require another rule's conclusion to be false.
+   When two rules each require the other to be false, both get the value *undefined*, and reading
+   either one as true or false fails with an error.
+3. Attributes on each node are computed when something reads them, and at most once.
+4. Delivery collects each node's content for each class and hands it to the terminal for that
+   class.
+5. After an edit, gen reuses every result the edit did not affect. The output is always identical
+   to a full rebuild.
 
-The roster isn't a convention, it's a total, explicit map: every library declares exactly one
-stratum — substrate, modules, aspects, or framework — and a library with no declared stratum is a
-build error, not a member of some implicit default bucket. The direction of dependence between
-strata runs one way, checked on every run, with exactly one exception printed rather than hidden.
+## Using gen
 
-Every library exports exactly one `.lib` and resolves its own dependencies. Depending on
-`inputs.gen-graph.lib` alone pulls in gen-graph and nothing this hub does — the hub is a
-convenience for the full stack, never a requirement for one piece of it.
+Each library is its own flake, so you can depend on one, such as the graph library alone. The gen
+flake gathers them all: `inputs.gen.lib.mkGenLibs { }` returns every library under a short name,
+such as `gen.graph`, `gen.merge` and `gen.aspects`. [Libraries](/reference/libraries/) lists each
+one and the feature pages it provides.
 
-## What holds it accountable
+gen is pre-release, and its APIs are still changing. [Roadmap](/roadmap/) says what ships now and
+what comes next.
 
-Every promise this ecosystem makes names the mechanism that checks it, down to the command that
-re-runs it. Where the enforcer is a person's judgment rather than a command's exit code, that's
-said outright instead of folded into a green build somewhere else.
+## Where to go next
 
 <CardGrid>
-  <LinkCard title="Trust" href="/trust/" description="Every promise, and what enforces it." />
-  <LinkCard title="Validation" href="/validation/" description="The oracles every landing passes, and what each proves." />
-</CardGrid>
-
-## Who it's for
-
-gen's primary consumer is [den](https://github.com/denful/den), a NixOS / nix-darwin /
-home-manager configuration framework. None of the roster's libraries know what NixOS is — the
-substrate doesn't lean on den's vocabulary any more than it would lean on a framework with nothing
-in common with den beyond composing through the same graph.
-
-## Keep reading
-
-<CardGrid>
-  <LinkCard title="Why gen" href="/motivation/" description="The problem hand-assembled configuration has, and what a graph replaces it with." />
-  <LinkCard title="Architecture" href="/explanation/architecture/" description="The one path a framework's declarations take, library by library." />
-  <LinkCard title="The roster" href="/libraries/roster/" description="Every library, its stratum, and how to depend on one alone." />
-  <LinkCard title="Getting started" href="/guides/getting-started/" description="One library, ten lines of data, a question answered." />
+  <LinkCard
+    title="Building a framework"
+    href="/understand/core-concepts/"
+    description="Start with Core Concepts, then the Features pages and the Reference section."
+  />
+  <LinkCard
+    title="Using den"
+    href="/guides/den-on-gen/"
+    description="den is a framework built on gen. How its features map onto gen's toolkit."
+  />
+  <LinkCard
+    title="Using gen as a library"
+    href="/guides/getting-started/"
+    description="Answer a question about your own data with one library."
+  />
+  <LinkCard
+    title="Deciding whether gen matters"
+    href="/case-for-gen/"
+    description="What gen changes for people who run Nix configuration, without the code."
+  />
 </CardGrid>

@@ -1,8 +1,6 @@
 ---
 title: "Erdweg et al. (2015) -- Evaluating and Comparing Language Workbenches"
 description: "Our reading of Evaluating and comparing language workbenches."
-source:
-  - den-ag-design:reference-catalog/summaries/erdweg-2015-language-workbenches.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ S. Erdweg et al., "Evaluating and comparing language workbenches," *Computer Lan
 
 [doi:10.1016/j.cl.2015.08.007](https://doi.org/10.1016/j.cl.2015.08.007) · [read the paper](https://ir.cwi.nl/pub/23990/23990B.pdf)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -44,51 +42,51 @@ A key finding running through the paper is a convergence trend: workbenches are 
 - **Benchmark Problem**: a self-contained, implementable, feasible, indicative challenge that highlights a specific tool capability independently from others
 - **Concrete Syntax Trees vs. ASTs**: Rascal's preservation of parse trees (including whitespace/comments) enables format-preserving transformations; most tools work at AST level and lose layout
 
-## Ecosystem Relevance
+## How gen uses this
 
 ### Landscape Context
 
-The ten workbenches surveyed represent the traditional approach to language engineering: external tools that generate or interpret standalone languages with their own syntax, editors, and toolchains. gen-scope's embedding approach occupies a fundamentally different point in this design space -- rather than building an external AG evaluator that generates code or interprets models, gen-scope embeds attribute grammar evaluation directly into the host language (Nix) by leveraging its native lazy evaluation for demand-driven computation and `lib.fix` for memoization.
+The ten surveyed workbenches are external tools that generate or interpret standalone languages with their own syntax, editors and toolchains. gen-scope sits at a different point in this design space. It embeds attribute grammar evaluation in the host language, Nix, and uses Nix's lazy evaluation for demand-driven computation, memoisation and cycle detection.
 
-This positions gen-scope closest to **Kiama** (Sloane et al., 2010, not a LWC participant but cited in the gen ecosystem's theoretical foundations). Kiama embeds AGs in Scala using Scala's lazy vals and higher-order functions. gen-scope takes this further: where Kiama still defines an explicit evaluator with caching strategies, gen-scope's `_eval` is simply a lazy attrset -- the Nix runtime IS the evaluator. There is no separate evaluation phase.
+This places gen-scope closest to **Kiama** (Sloane et al. 2010, not an LWC participant), which embeds attribute grammars in Scala using lazy vals and higher-order functions. Kiama defines an explicit evaluator with caching strategies. In gen-scope each node carries a lazy attrset of its attribute computations, `_eval`, and the Nix runtime is the evaluator. There is no separate evaluation phase.
 
-The surveyed systems that come closest to gen's concerns are:
+The surveyed systems closest to gen's concerns:
 
-- **JastAdd** (referenced but not a LWC'13 participant): demand-driven AG evaluation, aspect-oriented modular extension. JastAdd's aspect-oriented decomposition of AG specifications (where attributes can be added to existing node types without modifying the type definition) directly parallels gen-aspects' trait system and the `neededBy` reverse-edge mechanism. JastAdd compiles to Java; gen-scope stays in Nix.
-- **Spoofax/NaBL**: Spoofax's NaBL declarative name binding is the precursor to the scope graph formalism (Neron 2015) that gen-scope implements. Where NaBL generates a name resolver for a defined DSL, gen-scope provides scope graph resolution as a library primitive that den wires with domain semantics.
-- **SugarJ**: library-based syntactic extensibility, where extensions are activated by import. This mirrors den's aspect `includes` mechanism -- both use import-style edges to compose independently developed language fragments. SugarJ's composition is syntactic; den's is semantic (scope graph I-edges).
-- **MPS**: unlimited projectional composition without parsing. MPS's NodeAttribute (metadata that attaches to nodes without the node's definition knowing about it) is structurally similar to gen-aspects' `neededBy` -- both enable reverse-direction extension where the target does not declare the extension point.
+- **JastAdd** (referenced, not an LWC'13 participant): demand-driven attribute grammar evaluation with aspect-oriented modular extension, where attributes can be added to existing node types without changing their definition. gen-aspects composes configuration concerns in the same modular way. JastAdd compiles to Java, and gen-scope stays in Nix.
+- **Spoofax/NaBL**: NaBL's declarative name binding is the precursor of the scope graph formalism (Néron 2015) that gen-scope implements. NaBL generates a name resolver for a defined DSL. gen-scope provides scope-graph resolution as a library primitive that a framework gives domain meaning.
+- **SugarJ**: library-based syntactic extensibility, where extensions are activated by import. A gen aspect's `includes` works the same way, composing independently developed fragments through import-style edges. SugarJ composes syntax, and gen composes through scope-graph import edges.
+- **MPS**: projectional composition without parsing. MPS's NodeAttribute attaches metadata to nodes whose definition does not know about it. gen-view's `neededBy` is the reverse half of reference resolution: it gathers the nodes that reference a target without the target declaring them.
 
-The key differentiator: every surveyed workbench is a **tool for building languages**. The gen ecosystem is a **set of libraries for building frameworks**. The workbenches produce DSLs consumed by end users; gen produces evaluation machinery consumed by framework authors (den). This is a level-of-indirection difference -- gen operates at the meta-framework level where the surveyed tools operate at the meta-language level.
+Every surveyed workbench is a tool for building languages. gen is a set of libraries for building frameworks. The workbenches produce DSLs for end users, and gen produces evaluation machinery for framework authors. gen works one level up, at the meta-framework level where the surveyed tools work at the meta-language level.
 
 ### Applicable Insights
 
-**Feature model as evaluation framework.** The six-subcategory feature model (notation, semantics, editor, validation, testing, composability) could serve as a structured checklist for evaluating den's user-facing capabilities. Den currently excels in semantics (the fx pipeline) and composability (aspects, policies, classes), but has no story for notation (no custom syntax), editor support (no IDE integration), or debugging (trace-based only). The feature model clarifies what den is NOT trying to be -- it is purely a semantic composition framework, not a full workbench.
+**The feature model as an evaluation checklist.** The six-part feature model (notation, semantics, editor, validation, testing, composability) is a structured checklist for a framework built on gen. gen concentrates on semantics and composability. It defines no custom notation and ships no editor integration. Its inspection support is gen-inspect, which queries a configuration graph and renders it as a diagram.
 
-**Composability as the hardest problem.** The paper's most consistent finding is that composability varies the most across tools and remains the most challenging feature. This validates den's design focus: the entire pipeline exists to solve the composition problem (aspects composing into class outputs, policies mediating cross-entity relationships, pipes routing data between scopes). The benchmark problems on extension composition, language embedding, and beyond-grammar restrictions map directly to den's aspect composition, policy-driven cross-entity delivery, and guard/constraint mechanisms.
+**Composability is the hardest problem.** The paper's most consistent finding is that composability varies most across tools and remains the hardest feature. gen is organised around that problem: aspects composing into class outputs, rules adding relationships between entities, and channels carrying data between scopes. The benchmark problems on extension composition, language embedding and beyond-grammar restrictions correspond to aspect composition, rule-driven delivery between entities, and guards.
 
-**Interpreters compose better than generators.** Enso's working hypothesis (Section 4.1) that interpretive semantics compose more cleanly than translational semantics resonates with gen-scope's design. gen-scope's demand-driven attribute evaluation is essentially an interpreter for the scope graph -- attributes are computed on demand, not generated ahead of time. This is why gen-scope can compose arbitrary attribute definitions without code generation conflicts.
+**Interpreters compose better than generators.** Enso's working hypothesis (Section 4.1) is that interpretive semantics compose more cleanly than translational semantics. gen-scope's demand-driven attribute evaluation interprets the scope graph: attributes are computed on demand with no code generated ahead of time. Attribute definitions from different sources therefore compose without generation conflicts.
 
-**Convergence toward multi-notation.** The trend toward hybrid notation (textual + graphical + tabular in the same environment) suggests that if den ever grows IDE tooling, it should plan for multiple views from the start. The diag/ subsystem (C4, Mermaid, Dot, fleet views) is already a step in this direction -- it provides read-only graphical projections of the scope graph.
+**Multiple notations.** The trend toward hybrid notation (textual, graphical and tabular in one environment) suggests planning for several views of a configuration from the start. gen-inspect's renderers, such as Mermaid output over the same materialised graph, are read-only graphical projections of this kind.
 
-**Benchmark methodology.** The paper's benchmark problem design criteria (self-contained, implementable, feasible, indicative, state-of-the-art) and evaluation criteria (assumptions, implementation, variants, usability, impact, composability, limitations) could inform den's own test suite design. The CI suite already has 133+ test files, but they test internal correctness, not user-facing capability benchmarks.
+**Benchmark methodology.** The paper's criteria for a benchmark problem (self-contained, implementable, feasible, indicative) and for evaluating a solution (assumptions, implementation, variants, usability, impact, composability, limitations) could shape capability benchmarks for gen that test what a user can do, alongside the libraries' correctness suites.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**Declarative validation as a composable concern.** Spoofax's NaBL (declarative name binding) and MPS's type system DSL demonstrate that validation can be specified declaratively and composed modularly. gen-schema's refinement types and gen-bind's contracts provide pieces of this, but den has no unified declarative validation language. A gen-validate library that composes validation rules with the same modularity as aspects would close this gap.
+**Declarative validation as a composable concern.** Spoofax's NaBL and MPS's type system DSL show validation specified declaratively and composed modularly. gen-schema's refinement types, gen-types' validators and gen-bind's contracts provide pieces of this. A validation vocabulary that composes with the same modularity as aspects would join them.
 
-**Structure migration as a first-class operation.** The benchmark on structure migration (changing AST representation while preserving syntax) maps to den's version upgrade problem. When den.aspects gain new structural keys or pipe semantics change, existing configurations need migration. A declarative migration mechanism (analogous to database schema migrations) could be built on gen-derive's rule dispatch -- migration rules fire on old-shape aspects and produce new-shape equivalents.
+**Structure migration as a first-class operation.** The structure-migration benchmark (changing the AST representation while preserving syntax) corresponds to upgrading configurations when a framework changes its aspect keys or channel semantics. A declarative migration mechanism, like a database schema migration, could run on gen-dispatch: migration rules fire on old-shape aspects and produce new-shape equivalents.
 
-**Computed properties in scope graphs.** The benchmark on computed properties (editor displays derived read-only values inline) maps to gen-scope's synthesized attributes. Currently, scope graph attributes are internal to the pipeline. Surfacing selected attributes as user-visible computed annotations on den configuration (e.g., showing which policies fired, which classes received content) would improve debuggability.
+**Computed properties in scope graphs.** The computed-properties benchmark (the editor shows derived read-only values inline) corresponds to gen-scope's synthesised attributes. Surfacing selected attributes as user-visible annotations, such as which rules fired or which classes received content, would help debugging.
 
-**Beyond-grammar restrictions via selectors.** The benchmark on context-sensitive restrictions (triggerself only valid inside state machine actions) maps directly to gen-select's selector algebra. gen-select can express "this pattern is only valid when an ancestor matches predicate X" via the `within` combinator. This is currently used for gen-derive rule conditions but could be exposed as a user-facing constraint mechanism in den aspects.
+**Beyond-grammar restrictions through selectors.** The context-sensitive restriction benchmark (`triggerself` is valid only inside state machine actions) maps onto gen-select's selector algebra. `within` expresses "this pattern is valid only when an ancestor matches X". Selectors serve as rule conditions and could also be offered as a user-facing constraint on aspects.
 
 ### Research Directions
 
-**Embedding benchmark for gen-scope.** Implementing the LWC'13 QL/QLS challenge as a gen-scope attribute grammar (questionnaire structure as scope graph nodes, validation as inherited/synthesized attributes, rendering as terminal attributes) would provide a concrete comparison point against the ten surveyed workbenches. This would quantify the abstraction advantage (or cost) of the embedded AG approach vs. dedicated workbenches.
+**An embedding benchmark for gen-scope.** Implementing the LWC'13 QL/QLS challenge as a gen-scope attribute grammar, with the questionnaire as scope-graph nodes, validation as inherited and synthesised attributes and rendering as output attributes, would give a concrete comparison with the ten workbenches and measure the cost or benefit of the embedded approach.
 
-**Composability metrics.** The paper notes that no workbench achieves full composability across all six subcategories. Developing formal metrics for composability -- measuring how many independently developed aspects can be combined without glue code, merge conflicts, or semantic interference -- would provide a rigorous way to evaluate den's claim that aspects are the right composition granularity.
+**Composability metrics.** No workbench achieves full composability across all six parts. Formal metrics, such as how many independently developed aspects combine without glue code, merge conflicts or semantic interference, would test whether aspects are the right composition granularity.
 
-**Projectional editing for scope graphs.** MPS demonstrates that projectional editing enables unlimited syntactic composition because there is no parsing ambiguity. A projectional editor for den configurations -- where the user edits a projection of the scope graph rather than raw Nix -- would bring den closer to a full workbench. The scope graph's hierarchical structure (nodes with P/I edges) is naturally projectable as both tree views and graph diagrams.
+**Projectional editing for scope graphs.** MPS shows that projectional editing allows unlimited syntactic composition because nothing is parsed. An editor where the user edits a projection of the scope graph instead of raw Nix would move a gen framework toward a full workbench. The scope graph's hierarchy, nodes with parent and import edges, projects naturally as tree views and graph diagrams.

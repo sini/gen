@@ -1,155 +1,125 @@
 ---
 title: Terminology
-description: The vocabulary the rest of the documentation is written in.
+description: Definitions of the terms used across the gen documentation.
 source:
   - TERMINOLOGY.md
 ---
 
-import { Aside } from '@astrojs/starlight/components';
-
-One vocabulary runs through every page in this documentation, grounded in specific academic
-results rather than invented for the occasion — Knuth's attribute grammars, Néron's scope graphs,
-well-founded semantics for logic programs with negation. Every term below means the same thing on
-every page it appears on. This is the fast path to a definition; the hub's own `TERMINOLOGY.md`
-carries the full per-library vocabulary, with a citation for every term, including everything below
-that's specific enough to one library that it doesn't earn a place here.
-
-<Aside type="tip" title="What's not here">
-Library-specific vocabulary — gen-schema's *mixin*, gen-bind's *contract*, gen-dispatch's *NAC* —
-belongs on that library's own page, and is documented in full in `TERMINOLOGY.md`. This page holds
-only the terms load-bearing enough to appear in more than one place.
-</Aside>
+Each term below means the same thing on every page. The hub's `TERMINOLOGY.md` has the full
+vocabulary of each library, with a citation for every term.
 
 ## The graph
 
-**Node** — A position with attributes and incident labelled edges: an identity, some attributes
-(declared or computed), and the edges touching it. There is exactly one node notion for the whole
-substrate. See [the graph model](/explanation/graph-model/).
+**Node.** One thing in your configuration, such as a host, a user or an aspect. A node has an
+identity, attributes and the edges that touch it. See [Your Configuration as a
+Graph](/understand/graph/).
 
-**Edge** — A labelled relationship between two nodes, carrying a label and no interpreted content.
-Anything that needs to carry content is represented as a node instead. See [the graph
-model](/explanation/graph-model/).
+**Edge.** A relation from one node to another. An edge carries a label and no other content.
 
-**Kind** — A schema-level datum a node carries, not a partition of the substrate. `aspect` and
-`entity` are ordinary gen-declared kinds, not cases the substrate treats specially. See [the graph
-model](/explanation/graph-model/).
+**Label.** The name of the relation an edge stands for, such as `calls` or `includes`. A path query
+is a regular expression over the labels along a path. See [Graphs and Queries](/features/graphs/).
 
-**Identity (`hashIdentity`)** — The one identity-minting authority for the whole ecosystem: a
-kind-tagged canonical hash. The substrate refuses rather than inventing an identity it cannot mint
-totally. See [the graph model](/explanation/graph-model/).
+**Binding node.** A node that stands for a relation which needs to carry content. It is identified
+by the relation it stands for and the nodes it relates. See [Stable Identity for
+Everything](/understand/identity/).
 
-**Binding node** — A reified relation, identified by which relation it is and what it relates,
-used whenever a relationship needs to carry content that a plain edge can't. See [the graph
-model](/explanation/graph-model/).
+**Scope graph.** The graph names are resolved against. A name is looked up through a node's parents
+and imports, and the most specific match wins. See [Delivery](/features/delivery/).
 
-**Scope graph** — The graph a name resolves against, kept separate from whatever tree produced it.
-Query combinators resolve names over it with import/parent specificity. See
-[gen-scope](/libraries/scope/).
+**Selector.** A pattern that matches nodes by kind, attribute or position in the graph, in the style
+of CSS selectors. See [Graphs and Queries](/features/graphs/).
 
-**Attribute** — A computed value on a node, demand-driven and memoized by Nix's own laziness — the
-classical *inherited* / *synthesized* distinction from attribute-grammar theory. See
-[gen-scope](/libraries/scope/).
+**Graph product.** A graph built from two others, such as hosts × users, whose nodes are pairs. See
+[Graphs and Queries](/features/graphs/).
 
-## The roster
+## Kinds and identity
 
-**Roster** — The libraries `lib/mkGenLibs.nix` names as required arguments. Total and
-explicit: a library not named there does not wire into the hub, full stop. See [the
-roster](/libraries/roster/).
+**Kind.** A declared shape for a family of nodes: its options, their types and their defaults. A
+host and an aspect are both kinds. See [Kinds, Registries and Identity](/features/registries/).
 
-**Stratum** — One of four ordered layers (`substrate < modules < aspects < framework`) plus a
-fifth, unordered lifecycle state (`retiring`) for a member on its way off the roster. Every member
-declares exactly one. See [strata](/explanation/strata/).
+**Instance.** A node of a given kind, with the kind's defaults filled in.
 
-**Sole evaluator** — gen-scope, the one library in the roster permitted to evaluate at all. Every
-other library, including gen-inspect, implements no semantics of its own and never evaluates. See
-[execution](/explanation/execution/).
+**Registry.** The set of instances of one kind, keyed by name.
 
-**Incremental plane** — gen-memo, the one decision layer over the evaluator. It never evaluates,
-only decides reuse, and its definition is a byte-parity oracle against a cold run rather than a
-description of what it does internally. See [execution](/explanation/execution/).
+**Identity.** A hash derived from a node's kind and content. Equal content always gives the same
+identity. `hashIdentity` computes every identity in gen. See [Stable Identity for
+Everything](/understand/identity/).
 
-**Byte-parity oracle** — The bar gen-memo is defined against: a plane output must be
-byte-identical to what a full, cold evaluation would have produced. A plane that accumulates its
-own evaluation state to get there has failed by construction, not merely underperformed. See
-[execution](/explanation/execution/).
+## Configuration
 
-**Assembly** — The step that unions a framework's contributions commutatively — shapes merge,
-content folds — and hands the result to the one graph, without ever evaluating while doing it. See
-[gen-assemble](/libraries/assemble/).
+**Module.** A unit of configuration that declares options, sets values, or both. gen-merge merges a
+tree of modules without nixpkgs. See [An Enhanced Module Type System](/understand/module-types/).
 
-## Policies and programs
+**Priority.** A number attached to a definition. When two definitions set the same option, the one
+with the lower number wins. `mkDefault` and `mkForce` set it.
 
-**Policy** — A rule in a logic program, not a callback or a hook. The edges a policy produces are
-the program's model: the atoms that follow from what's declared. See
-[policies](/explanation/policies/).
+**Provenance.** The record of which file set a value, and at what priority. gen records it for every
+merged value. See [Inspection](/features/inspection/).
 
-**Program** — What gen-program turns a framework's policy declarations into: every rule becomes a
-head, a positive body, a negative body, and the relata the head relates. gen-scope then solves it.
-See [policies](/explanation/policies/).
+**Argument injection.** Passing a module function the arguments it names, such as the host it
+configures. See [Automatic Argument Injection](/understand/argument-injection/).
 
-**Stratification** — Solving a program stratum by stratum, so a rule can never depend on the very
-fact it's still deciding. A cycle through negation can't be expressed in the first place, because a
-consumed query only ever observes already-materialized declarations, never the still-evolving
-relation. See [policies](/explanation/policies/).
+**Settings layer.** One of an ordered list of overrides, from least to most specific, that a
+setting is resolved against. The result records which layer set each field. See [Typed
+Configuration](/features/configuration/).
 
-**Well-founded model** — The result of solving a stratified program with negation. An atom whose
-truth depends on itself through negation comes out **UNDEFINED** — a named third value, not an
-error and not an arbitrary pick between true and false. See [policies](/explanation/policies/).
+## Aspects
 
-**Dynamic edge** — An admitted atom from a policy program, joining the one graph with its
-predicate as the label and its relata as the endpoints. It keeps that label, so it is never
-mistakable for a declared edge just by looking at the graph. See
-[policies](/explanation/policies/).
+**Aspect.** A named, reusable bundle of configuration, such as `ssh` or `monitoring`. An aspect can
+include other aspects, and those includes are edges. See [Reusable Features](/understand/features/).
 
-## Views and movement
+**Key category.** The declared meaning of a key inside an aspect. A key can name a class such as
+`nixos`, or other content the framework defines. See [Aspects](/features/aspects/).
 
-**View** — A named, materialized query result over the selector algebra. A projection has a name
-and a defining query, or it is not a view.
+**Guard.** A condition, written as data, that decides whether an aspect is included.
 
-**Movement** — Content moving between graph positions, expressed as two ends of one idea: a
-collector receiving content by query, and a broadcaster declaring it available. Neither copies
-content by hand.
+## Rules
 
-**Collector** — A receiver-rooted query: what a position gathers from the graph around it.
+**Rule.** A statement of the form "this relation holds between these nodes when these conditions
+hold and these others do not". gen solves all rules together as one logic program. See [Rules That
+Add Relationships](/understand/rules/).
 
-**Broadcaster** — A producer's declaration paired with a standing query: what a position makes
-available to whatever asks for it.
+**Atom.** One fact a rule can conclude, such as `link:a:b`.
 
-## Aspects and entities
+**Program.** The set of rules gen-program builds from a framework's declarations. Each rule has a
+head, positive conditions, negative conditions, and the nodes it relates. See
+[Rules](/features/rules/).
 
-**Aspect** — A submodule with structural identity and freeform content — gen's composable
-configuration unit, and, per the graph model, an ordinary declared kind like any other. See
-[gen-aspects](/libraries/aspects/).
+**Model.** The solution of a program: the verdict for every atom.
 
-**Entity** — A structural kind a framework declares for the things its domain is actually about —
-a host, a user. It follows the same rule an aspect does: the substrate does not read it specially.
+**Well-founded model.** The model gen computes. Each atom is true, false or undefined. An atom is
+undefined when its truth depends on its own negation.
 
-**Trait** — The aspect type: one type, with dispatch happening in merge rather than in a type
-hierarchy. See [gen-aspects](/libraries/aspects/).
+**Undefined.** The third verdict. Reading an undefined atom as true or false fails with an error
+naming the atom.
+
+**Stratification.** Ordering rules so that a rule which negates a relation runs after the rules
+that produce it.
+
+**Dispatch rule.** A condition paired with an action, applied step by step by gen-dispatch. It is a
+separate mechanism from the rules of a logic program. See [Rules](/features/rules/).
+
+## Evaluation
+
+**Attribute.** A value computed on a node when something reads it, as in an attribute grammar. It
+is computed at most once per node. See [Values Computed on Demand](/understand/on-demand/).
+
+**Assembly.** Combining many layered contributions into one node set before evaluation. See
+[Evaluation](/features/evaluation/).
+
+**Warm run.** A re-evaluation after an edit that reuses results from an earlier run. Its output is
+always equal to a cold run's. See [Rebuilding Only What Changed](/understand/incremental/).
+
+**Class share.** Computing one shared core for a group of nodes with the same shape, then applying
+it to each member. See [Incremental Rebuild](/features/incremental/).
 
 ## Delivery
 
-**Class** — A registered output target — `nixos`, `darwin`, `homeManager`, or a framework's own.
-Content exits the scope graph into external evaluation through a class. Not to be confused with
-gen-class's *class-share*, an unrelated mechanism for reusing computation across nodes with the
-same shape — see [gen-class](/libraries/class/).
+**View.** A named query that moves content along chosen edge labels. When several sources
+contribute, the nearest one wins, and the view reports the rest as shadowed. See
+[Delivery](/features/delivery/).
 
-**Terminal** — The target-owned evaluator a delivery class's collected content is finally handed
-to — a `nixosSystem`, a `darwinSystem`, or a framework's own.
+**Class.** An output target for content, such as `nixos`, `darwin` or `homeManager`.
 
-**Two-plane split** — The composition plane (pure, no `nixpkgs.lib`) and the terminal plane
-(`nixpkgs`), with exactly one sanctioned crossing between them.
-
-**Value-injection** — Composing purely, then injecting resolved config *values* — never gen types — into a consumer's `nixpkgs` evaluation; only values cross the one sanctioned crossing, held under a declared interim until every crossing site meets the condition that closes it, so the boundary is expected to tighten, not to stay where it is indefinitely.
-
-## Selection and dispatch
-
-**Selector** — A `{ __sel = tag; ... }` attrset matched against an accessor context — gen's
-pattern matching over graph positions, closely modelled on CSS selectors. See
-[gen-select](/libraries/select/).
-
-**Rule** — A guarded transformation unit: a condition, an action producer, and an identity. See
-[gen-dispatch](/libraries/dispatch/).
-
-**Settings layer** — An ordered, least-to-most-specific contribution to a resolved settings value,
-folded with a per-field provenance chain. See [gen-settings](/libraries/settings/).
+**Terminal.** The function a class's content is finally handed to, such as a NixOS system builder.
+You supply it. See [From an Aspect to a NixOS System](/guides/aspects-to-nixos/).

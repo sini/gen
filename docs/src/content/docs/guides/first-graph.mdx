@@ -1,24 +1,23 @@
 ---
-title: Your first graph
+title: Your First Graph
 description: Declaring nodes, relating them, and reading the result back.
 source:
   - README.md
-  - gen-demo:README.md
 ---
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-[Getting started](/guides/getting-started/) resolved one relation over four nodes. This
-page does the same three things with a graph big enough to be worth asking about: declare
-the nodes, relate them, read the answer back — still one library, `gen-graph`, still no
-hub.
+<Aside type="caution">gen is pre-release and its API is still changing.</Aside>
+
+[Getting Started](/guides/getting-started/) asked two questions of four nodes. This guide
+uses six services and asks six questions, then adds a second relation over a different node
+set. It still uses one library, `gen-graph`.
 
 <Steps>
 
 1. ##### Declare the nodes
 
-   Nodes are just your data. Nothing here is gen vocabulary — `type` is a field you
-   invented, not a keyword gen-graph knows about:
+   The nodes are your data. `type` is a field you chose. gen-graph gives it no meaning:
 
    ```nix
    services = {
@@ -33,9 +32,8 @@ hub.
 
 2. ##### Relate them
 
-   The relation is the `deps` field, and an accessor record is how you tell gen-graph
-   to read it. `edges` is the only field a traversal needs; `nodeData` is what lets a
-   query read a node's other attributes back out:
+   The accessor record tells gen-graph where the edges are. `edges` is all a traversal
+   needs. `nodeData` lets a query read the other attributes:
 
    ```nix
    g = {
@@ -50,16 +48,23 @@ hub.
 
    ```nix
    {
-     entryPoints  = graph.roots g;                           # nothing depends on these
-     datastores   = graph.leaves g;                           # these depend on nothing
-     webDeps      = graph.reachableFrom g "web";               # everything "web" needs, transitively
-     dbImpact     = graph.dependents g "db";                   # everything that needs "db"
-     backendNodes = graph.select g (d: d.type == "backend");   # a query over nodeData, not deps
+     entryPoints  = graph.roots g;                              # (1)
+     datastores   = graph.leaves g;                             # (2)
+     webDeps      = graph.reachableFrom g "web";                # (3)
+     dbImpact     = graph.dependents { } g "db";                # (4)
+     backendNodes = graph.select g (d: d.type == "backend");    # (5)
      hasCycles    = graph.cycles g != [ ];
    }
    ```
 
-   Evaluated against `gen-graph` at HEAD, this returns:
+   1. Nodes that nothing depends on.
+   2. Nodes that depend on nothing.
+   3. Everything `web` needs, transitively.
+   4. Everything that needs `db`. `dependents` takes an options set first, and `{ }`
+      selects the defaults.
+   5. A query over `nodeData`. It reads each node's `type` field.
+
+   This returns:
 
    ```json
    {
@@ -72,16 +77,15 @@ hub.
    }
    ```
 
-   Only membership is a contract worth relying on — the order of `webDeps` and
-   `dbImpact` is whatever the traversal visits first, not something to build logic on.
+   Rely on which nodes each list contains. The order of `webDeps` and `dbImpact` is the
+   order the traversal visited them in.
 
 </Steps>
 
-## A second relation, for free
+## A second relation
 
-`g` above declares `parent = _: null;` — every node relates to nothing by containment.
-Give it a real containment relation instead and the same accessor record answers a
-different kind of question, `ancestorsOf` instead of `reachableFrom`:
+`g` declares `parent = _: null`, so no node has a container. Give the nodes a real
+containment relation and `ancestorsOf` answers questions about it:
 
 ```nix
 hosts = {
@@ -97,38 +101,28 @@ g2 = {
   nodeData = id: hosts.${id};
 };
 
-graph.ancestorsOf g2 "host:web"   # [ "env:prod" ]
+graph.ancestorsOf { } g2 "host:web"   # [ "env:prod" ]
 ```
 
-`edges` and `parent` are two different relations over the same node set, read by two
-different accessors. Nothing stops a real graph from declaring both, plus a third for
-whatever else your data relates by.
+`edges` and `parent` are two relations over the same node set, read by two accessors. A
+real graph can declare both, and more.
 
-## The same model, at any scale
+Several gen-graph functions take an options set before the accessor record:
+`dependents`, `ancestorsOf`, `topoOrder`, `query` and `pathsBetween`. Pass `{ }` for the
+defaults. Leaving it out fails with an error.
 
-This is the graph the rest of gen builds on, not a simplified stand-in for it. A
-framework's hosts, users and aspects are nodes exactly like `services` above; what a
-framework adds is more relations (declared, and some produced by policies rather than
-written by hand) and a vocabulary of its own. [The graph model](/explanation/graph-model/)
-covers what a node and an edge are in gen's own terms; [Policies](/explanation/policies/)
-covers the ones a program produces instead of you writing them.
+## The same model at any scale
 
-<Aside type="note" title="gen eats its own graph">
-gen ships its own acceptance corpus, `gen-demo` — a graph like this one, declared against
-every capability the roster ships, in deliberately invented vocabulary. It's not written to
-teach; it's written so a regression in the hub shows up there before a real framework ever
-sees it.
-</Aside>
+A framework built on gen uses this same graph. Its hosts, users and features are nodes like
+`services` above. It adds more relations, some declared by hand and some produced by
+[rules](/understand/rules/), and its own names for things. [Your Configuration as a
+Graph](/understand/graph/) explains nodes and edges in full.
 
 ## Going further
 
 <CardGrid>
-  <LinkCard title="gen-graph reference" href="/libraries/graph/"
-    description="The full query surface: traversal, condensation, phase order, edge algebra." />
-  <LinkCard title="gen-scope" href="/libraries/scope/"
-    description="Nodes with computed attributes and dynamic growth, for when a plain accessor graph isn't enough." />
+  <LinkCard title="Graphs and Queries" href="/features/graphs/"
+    description="Traversal, ordering, cycles, labelled path queries and selectors." />
+  <LinkCard title="From an Aspect to a NixOS System" href="/guides/aspects-to-nixos/"
+    description="Put features on these nodes and build real NixOS systems." />
 </CardGrid>
-
-gen-graph's structural combinators (`overlay`, `connect`, the edge-map algebra) are
-informed by Mokhov's algebraic graph construction — see [our reading](/reference/papers/mokhov-2017-algebraic-graphs/)
-if you want the theory behind them.

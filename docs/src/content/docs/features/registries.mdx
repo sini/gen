@@ -1,0 +1,137 @@
+---
+title: Kinds, Registries and Identity
+description: Declare kinds with typed options, keep registries of instances with defaults and content-derived identities, and reference one instance from another.
+---
+
+The homelab declares two kinds, `host` and `user`, and an `admin` kind that inherits from `user`.
+A registry holds the instances of each kind. Alice's `home` names a host, and reading it returns
+that host.
+
+```nix title="homelab-registries.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  inherit (gen.merge) evalModuleTree mkOption types;
+
+  kinds = gen.schema.evalSchema {
+    modules = [{
+      config.schema.host = {
+        options.system = mkOption { type = types.str; default = "x86_64-linux"; };
+        options.address = mkOption { type = types.str; };
+      };
+      config.schema.user = {
+        options.shell = mkOption { type = types.str; default = "bash"; };
+        options.home = mkOption { type = gen.schema.declarationOf "host"; };
+      };
+      config.schema.admin = {
+        inherits = [ "user" ];
+        options.sudo = mkOption { type = types.bool; default = true; };
+      };
+    }];
+  };
+
+  result = evalModuleTree {
+    modules = [ ({ config, ... }: {
+      options.hosts = gen.schema.mkInstanceRegistry kinds.host { };
+      options.admins = gen.schema.mkInstanceRegistry kinds.admin { refs.home = config.hosts; };
+
+      config.hosts.laptop = { address = "10.0.0.2"; };
+      config.hosts.server = { address = "10.0.0.1"; system = "aarch64-linux"; };
+      config.admins.alice = { home = "server"; shell = "zsh"; };
+    }) ];
+  };
+  inherit (result.config) hosts admins;
+in
+{
+  laptop = { inherit (hosts.laptop) address system id_hash; };
+  alice = { inherit (admins.alice) shell sudo id_hash; homeAddress = admins.alice.home.address; };
+}
+```
+
+```console
+$ nix eval --impure --json --file homelab-registries.nix
+{
+  "alice": {
+    "homeAddress": "10.0.0.1",
+    "id_hash": "admin:2733efb07661f1df2f8c48b2fef538cba5b525baa178f90d042fba9dc088b4a4",
+    "shell": "zsh",
+    "sudo": true
+  },
+  "laptop": {
+    "address": "10.0.0.2",
+    "id_hash": "host:d73fdc6dbae0273c2c37827ad53b637330304355d6ba5648689a0e73bc3d8ae8",
+    "system": "x86_64-linux"
+  }
+}
+```
+
+A **kind** is a named set of typed options, like a NixOS submodule type with a name. A **registry**
+is an option holding the instances of one kind, keyed by name. Each instance gets its kind's
+defaults (`laptop.system`, `alice.sudo`) and an `id_hash`.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Declare kinds | `schema.evalSchema { modules; }` | Build a set of kinds from modules under `config.schema.<kind>` |
+| Inherit | `inherits = [ "<kind>" ];` | Give a kind every option of another kind |
+| Mix in | `mkMixin`, `applyMixin`, `composeMixins` | Add a reusable group of options to several kinds |
+| Hold instances | `mkInstanceRegistry kind { refs?; extraModules?; }` | An option holding a kind's instances, with defaults and `id_hash` |
+| Validate | `validateInstances` | Check every instance against its kind's validators |
+| Refine an option | `schema.refined type [ schema.refinements.tcpPort ]`, `checkRefinements` | Narrow an option's type with named predicates such as `positive`, `nonEmpty` and `tcpPort` |
+| Reference | `declarationOf "<kind>"`, `fieldRef`, `isFieldRef` | An option whose value is another instance, given by name or by value |
+| Document | `renderDocs` | Render a kind's options as documentation |
+| Mint identities | `identity.hashIdentity kind labels valueOf` | A stable `kind:digest` string for any labelled value |
+| Compare kinds | `kindEq` | Whether two kind values are the same declaration |
+| Comparable functions | `algebra.mkIntensional`, `conservativeEq`, `identityOf` | Give a function an identity so it can be compared |
+
+## Details
+
+### Identity
+
+`id_hash` is the kind's name, a colon, and a SHA-256 digest of the instance's primitive option
+values together with the kind's own identity. It follows from content:
+
+- Evaluating the same instance twice gives the same `id_hash`.
+- A `host` and a `user` with identical values have different hashes, because the kind is part of the
+  digest.
+- Key order does not matter.
+
+Compare instances by `id_hash`. Nix's `==` on module values can recurse forever or fail, and a
+string comparison always terminates. An option marked `identity = false` is left out of the digest.
+
+`hashIdentity` mints the same kind of identity for data outside a registry:
+
+```nix
+gen.identity.hashIdentity "host" [ "name" ] (label: { name = "server"; }.${label})
+# "host:8bf83a5f135bc461271c7a93c6fc8095041ceaff75782d6da38165f2ebae2f9f"
+```
+
+See [Stable Identity for Everything](/understand/identity/) for why gen gives every value an
+identity.
+
+### References
+
+`declarationOf "host"` types an option whose value is a host. Bind it to a registry with
+`refs.<option>` on `mkInstanceRegistry`. The value can be written as the host's name (`"server"`) or
+as the host itself (`config.hosts.server`). Either way, reading it returns the registry entry.
+
+A name with no entry fails with an error listing the names that exist:
+
+```
+gen-schema: ref field 'home' on kind 'user': reference 'desktop' not found in instance registry (available: server)
+```
+
+Each reference is also an edge. The schema publishes `_refEdges` (for example
+`{ from = "user"; field = "home"; to = "host"; }`) and `_edges`, which adds the `inherits` edges, so
+the kind graph can be queried with the functions on [Graphs and Queries](/features/graphs/).
+
+### Inheritance
+
+`inherits` copies options by kind name. A kind can list several parents, and a chain of parents
+resolves one level per pass. Each child has its own registry and its own identity tag, so an admin
+named `root` and a user named `root` are different instances.
+
+---
+
+**Provided by** gen-schema (kinds, registries, references), gen-identity (`hashIdentity`) and
+gen-algebra (comparable functions).

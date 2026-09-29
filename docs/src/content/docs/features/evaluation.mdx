@@ -1,0 +1,119 @@
+---
+title: Evaluation
+description: Build a tree of typed nodes, compute attributes on demand with inheritance down the tree, and assemble node sets from many contributions.
+---
+
+The web platform has two environments. Each host inherits `region` and `logLevel` from its
+environment unless it sets its own. `motd` is computed per host from the other two attributes.
+
+```nix title="platform-attributes.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  scope = gen.scope;
+
+  tree = scope.buildRoots {
+    kinds = scope.mkKinds [ (scope.mkKind { } "env") (scope.mkKind { } "host") ];
+    types = { prod = "env"; dev = "env"; web-1 = "host"; db-1 = "host"; web-2 = "host"; };
+    parentGraph = scope.overlay
+      (scope.star "prod" [ "web-1" "db-1" ])
+      (scope.star "dev" [ "web-2" ]);
+    decls = {
+      prod  = { region = "us-east"; logLevel = "warn"; };
+      dev   = { region = "us-west"; logLevel = "debug"; };
+      web-1 = { role = "webserver"; };
+      db-1  = { role = "database"; region = "us-west"; };
+      web-2 = { role = "webserver"; };
+    };
+  };
+
+  result = scope.eval { } {
+    children = _self: _id: { };
+    region = scope.inherit' { } (node: node.decls.region or null);
+    logLevel = scope.inherit' { } (node: node.decls.logLevel or null);
+    motd = self: id: "${id} (${self.get id "region"}, log ${self.get id "logLevel"})";
+  } tree;
+in
+{
+  hosts = builtins.attrNames (result.nodesOfType "host");
+  web-1 = result.get "web-1" "motd";
+  db-1 = result.get "db-1" "motd";
+  web-2 = result.get "web-2" "motd";
+}
+```
+
+```console
+$ nix eval --impure --json --file platform-attributes.nix
+{
+  "db-1": "db-1 (us-west, log warn)",
+  "hosts": ["db-1", "web-1", "web-2"],
+  "web-1": "web-1 (us-east, log warn)",
+  "web-2": "web-2 (us-west, log debug)"
+}
+```
+
+`db-1` sets its own region and inherits its log level. An attribute is computed only when something
+reads it, and once per node.
+
+## What you can do
+
+| Feature | Functions | Purpose |
+|---|---|---|
+| Declare kinds | `mkKind`, `mkKinds` | Name the node types a tree may contain |
+| Build a tree | `buildRoots { kinds; types; parentGraph; decls; }` | Turn declarations and a containment graph into a node set |
+| Shape the tree | `vertices`, `star`, `overlay`, `connect`, `edge` | Combine containment graphs from small pieces |
+| Evaluate | `eval { } attributes tree` → `get`, `nodesOfType`, … | Compute attributes on demand, memoised per node |
+| Inherit down the tree | `inherit' { } select` | Take a value from the nearest ancestor that declares one |
+| Collect | `collect`, `collectByType`, `collectByLabel`, `collectImports` | Gather values from related nodes |
+| Grow the tree | `spawns.<kind>` and `nta` on a kind | Let computed values create new nodes |
+| Fixpoints | `circular`, `ascend` | Attributes that depend on themselves, iterated until they stop changing |
+| Warm evaluation | `evalWarm` | Re-evaluate after an edit, reusing unchanged attributes |
+| Assemble node sets | `assemble.assemble`, `union`, `mkId`, `parseId`, `idsOf` | Build one node set from many layered contributions |
+| Check a schedule | `view.boundedWellDefinedSchedule` | Check that every attribute's dependencies can be ordered before running anything |
+
+## Details
+
+### Attributes
+
+The second argument to `eval` is a set of attribute definitions. Each is a function of `self` (the
+evaluator, for reading other attributes) and the node id. `self.get id "name"` reads an attribute
+of any node, so an attribute can depend on its parent, its children or a node it references.
+
+Attributes come in two directions:
+
+- **Inherited** attributes flow down: a host reads its environment's `region`. `inherit'` walks up
+  the containment graph to the nearest node that answers.
+- **Synthesized** attributes flow up or stay local: `motd` combines values already on the node.
+
+Nix evaluates lazily, so an attribute nobody reads is never computed, and a computed one is shared
+by every reader.
+
+### Kinds and the tree
+
+`buildRoots` needs a kind for every node (`types`), and a containment graph (`parentGraph`) built
+from `star`, `vertices` and `overlay`. `decls` is each node's own data, readable as `node.decls`
+inside `inherit'`. `nodesOfType "host"` lists the nodes of one kind.
+
+### Growing the tree
+
+`children` selects among nodes the tree already has. It cannot add nodes: a record under an unknown
+key fails with an error naming the node and the keys. New nodes are declared on the kind they grow
+from:
+
+- `spawns.<kind>` creates nodes of a kind listed in this kind's `below`. Every such expansion moves
+  down the kind order, so growth terminates.
+- `nta` grows nodes of the node's own kind from the node's computed values.
+
+Grown nodes are evaluated like declared ones. `nodesOfType` lists them with the rest.
+
+### Fixpoints
+
+A `circular` attribute starts from a bottom value and is recomputed until it stops changing. Use it
+for values that depend on themselves through the graph, such as a reachability set on a cyclic
+graph.
+
+For the theory, see [Values Computed on Demand](/understand/on-demand/).
+
+---
+
+**Provided by** gen-scope (trees, attributes, fixpoints), gen-assemble (node-set assembly) and
+gen-view (schedule checking).

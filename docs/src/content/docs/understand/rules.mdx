@@ -1,0 +1,109 @@
+---
+title: Rules That Add Relationships
+description: Rules with positive and negative conditions are solved together as one stratified logic program, under the well-founded model, and the relations that hold become edges.
+---
+
+The web platform needs an access list: which webservers may connect to which databases. The
+company's rule is short. A webserver may reach a database in the same environment, unless
+that database is down. Writing out every allowed pair by hand would repeat that sentence for every
+pair of hosts, and the list would go stale the moment a host changes.
+
+In gen you state the sentence once as a **rule** and let gen work out the pairs.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+
+  hosts = {
+    web-prod-east = { role = "webserver"; env = "prod"; dc = "us-east"; };
+    web-prod-west = { role = "webserver"; env = "prod"; dc = "us-west"; };
+    web-dev-west = { role = "webserver"; env = "dev"; dc = "us-west"; };
+    db-prod-east = { role = "database"; env = "prod"; dc = "us-east"; };
+    db-prod-west = { role = "database"; env = "prod"; dc = "us-west"; };
+    db-dev-west = { role = "database"; env = "dev"; dc = "us-west"; };
+  };
+  named = role: builtins.filter (h: hosts.${h}.role == role) (builtins.attrNames hosts);
+  webservers = named "webserver";
+  databases = named "database";
+
+  # One rule per (webserver, database) pair:
+  #   reach:W:D  holds if  same-env:W:D  holds,  and not  down:D
+  reachRules = builtins.concatMap (w: map (d: {
+    head = "reach:${w}:${d}";
+    pos = [ "same-env:${w}:${d}" ];
+    neg = [ "down:${d}" ];
+    relata = [ w d ];
+  }) databases) webservers;
+
+  facts =
+    builtins.concatMap (w: builtins.concatMap (d:
+      if hosts.${w}.env == hosts.${d}.env
+      then [ { head = "same-env:${w}:${d}"; relata = [ w d ]; } ]
+      else [ ]) databases) webservers
+    ++ [ { head = "down:db-prod-west"; relata = [ "db-prod-west" ]; } ];
+
+  acl = gen.program.model {
+    program = gen.program.program {
+      declarations = facts ++ reachRules;
+      frozen = builtins.attrNames hosts;
+    };
+    interpretation = [ ];
+    prior = null;
+    complete = true;
+  };
+in
+# Each reach rule whose head holds becomes an edge between its relata.
+map (r: {
+  from = builtins.elemAt r.relata 0;
+  to = builtins.elemAt r.relata 1;
+  label = "may-reach";
+}) (builtins.filter (r: (acl.resolve r.head).included) reachRules)
+```
+
+```text
+[ { from = "web-dev-west";  to = "db-dev-west";  label = "may-reach"; }
+  { from = "web-prod-east"; to = "db-prod-east"; label = "may-reach"; }
+  { from = "web-prod-west"; to = "db-prod-east"; label = "may-reach"; } ]
+```
+
+## How it works
+
+A rule has a **head**, the fact it concludes, and two lists of conditions. Every fact in `pos`
+must hold and no fact in `neg` may hold. A declaration with no conditions is a plain fact, such as
+`down:db-prod-west`. `relata` names the nodes the head is about.
+
+`program` collects the rules, and `model` solves them all together. `acl.resolve` then gives a
+verdict for each fact. `web-prod-west` may not reach `db-prod-west`, because that database is
+down. It may still reach `db-prod-east`, which is in the same environment. The last step turns
+each concluded `reach` fact into a labelled edge, and from there the queries from
+[Your Configuration as a Graph](/understand/graph/) work on the result.
+
+Bring `db-prod-west` back up by deleting one fact, and the allowed pairs change with it.
+
+## When rules contradict each other
+
+Some rule sets have no clear answer. Suppose each production database is the primary only if the
+other one is not:
+
+```nix
+{ head = "primary:db-prod-east"; neg = [ "primary:db-prod-west" ]; relata = [ "db-prod-east" ]; }
+{ head = "primary:db-prod-west"; neg = [ "primary:db-prod-east" ]; relata = [ "db-prod-west" ]; }
+```
+
+Neither fact can be settled, so gen gives both a third verdict, **undefined**. They are listed in
+the model's `undefinedAtoms`, and their `flag` reads `"U"`. Asking for a plain yes or no with
+`included` fails with an error that says the fact is undefined. A contradiction in your rules
+always shows up in `undefinedAtoms`, and any plain read of it stops evaluation.
+
+## The theory
+
+A set of rules with negative conditions is a **logic program**. When no fact depends on its own
+negation, the program can be solved in layers, called strata: settle everything a negation reads
+first, then everything that uses it. Apt, Blair and Walker showed that such stratified programs
+have one natural answer. For programs where negation does form a cycle, as in the primary
+example, the **well-founded model** gives every fact true, false or undefined. gen's solver
+computes that model with Van Gelder's alternating fixpoint. See our readings of
+[Apt, Blair & Walker (1988)](/reference/papers/apt-1988-towards-theory-declarative-knowledge/)
+and [Van Gelder (1993)](/reference/papers/van-gelder-1993-alternating-fixpoint/).
+
+Next: [Values Computed on Demand](/understand/on-demand/).

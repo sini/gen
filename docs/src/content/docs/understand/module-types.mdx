@@ -1,0 +1,91 @@
+---
+title: An Enhanced Module Type System
+description: Typed options and priority merging in a module system that runs without nixpkgs, with every value's source recorded (typed merging, types as checked contracts).
+---
+
+The homelab's `ssh` feature declares two options: a port and a list of allowed users. A hardening
+module suggests a different port as a default. The server's own file picks the port it actually
+uses and adds a user. Three files set the same two options, and gen has to decide the result.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  server = m.evalModuleTree {
+    modules = [
+      {
+        _file = "ssh.nix";
+        options.ssh.port = m.mkOption { type = m.types.int; default = 22; };
+        options.ssh.allowUsers = m.mkOption { type = m.types.listOf m.types.str; default = [ ]; };
+        config.ssh.allowUsers = [ "alice" ];
+      }
+      {
+        _file = "hardening.nix";
+        config.ssh.port = m.mkDefault 2200;
+      }
+      {
+        _file = "hosts/server.nix";
+        config.ssh.port = 2222;
+        config.ssh.allowUsers = [ "bob" ];
+      }
+    ];
+  };
+in
+{
+  inherit (server) config;
+  why = server.provenance.ssh.port;
+}
+```
+
+```text
+{ config.ssh = { allowUsers = [ "bob" "alice" ]; port = 2222; };
+  why = {
+    defaulted = false;
+    winners = [ { file = "hosts/server.nix"; } ];
+    priority = 100;
+    defs = [ { file = "hosts/server.nix"; priority = 100; }
+             { file = "hardening.nix"; priority = 1000; }
+             { file = "<default>"; priority = 1500; } ];
+  }; }
+```
+
+## How definitions merge
+
+This is the module system Nix users know from NixOS, reimplemented in gen's `merge` library with
+no dependency on nixpkgs. Every definition has a priority, and a lower number wins. A plain
+definition has priority 100, `mkDefault` has 1000, and an option's `default` has 1500. So the
+server's `2222` beats the hardening module's `2200`, which beats the built-in `22`. List options
+merge instead: `allowUsers` combines the users from both files. `mkIf`, `mkForce`, `mkMerge` and
+submodules work as they do in NixOS.
+
+## What gen adds
+
+**Provenance.** The result carries `provenance` next to `config`. For every option it records
+which file won, at which priority, and every definition it considered. When a value surprises you,
+the answer to "who set this?" is one attribute away.
+
+**Types with readable errors.** Each type checks a value and returns a message when it fails.
+Set the server's port to the string `"2222"` and evaluation stops with:
+
+```text
+gen-merge: a definition for option `ssh.port' is not of the expected type:
+expected type 'int' but value "2222" is of type 'string'
+```
+
+The same checks work on plain values, outside any module:
+`gen.types.int.verify "22"` returns `"expected type 'int' but value \"22\" is of type 'string'"`, and `gen.types.int.verify 22` returns `null`.
+Refined types add a condition to a type:
+`gen.types.refined gen.types.int [ gen.types.refinements.positive ]` accepts `3` and rejects `0`
+with the message `must be positive`.
+
+## The theory
+
+A type in gen is a **contract**: a check attached to a value, which reports the value and the
+expectation it failed when the check fails. Findler and Felleisen worked out how to check
+contracts on higher-order values and how to report which party is to blame for a failure.
+gen's refined types and kind validators are contracts in that sense, and its argument injection
+(next page) attaches contracts to the values it passes in and names their source on failure.
+See our reading of [Findler & Felleisen (2002)](/reference/papers/findler-2002-contracts-higher-order/).
+
+Next: [Automatic Argument Injection](/understand/argument-injection/).

@@ -1,0 +1,186 @@
+---
+title: Typed Configuration
+description: Types with readable errors, module merging without nixpkgs, per-value provenance, argument injection and layered settings.
+---
+
+Three homelab modules set the SSH port. gen merges them and records which file set the value, at
+which priority, and which definitions lost.
+
+```nix title="ssh-port.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  inherit (gen.merge) evalModuleTree mkOption mkDefault types;
+
+  result = evalModuleTree {
+    modules = [
+      {
+        _file = "/homelab/ssh.nix";
+        options.ssh.port = mkOption { type = types.int; default = 22; };
+        options.ssh.allowUsers = mkOption { type = types.listOf types.str; default = [ ]; };
+      }
+      { _file = "/homelab/hardening.nix"; ssh.port = mkDefault 2222; ssh.allowUsers = [ "alice" ]; }
+      { _file = "/homelab/server.nix"; ssh.port = 22022; ssh.allowUsers = [ "bob" ]; }
+    ];
+  };
+in
+{
+  config = result.config;
+  port = { inherit (result.provenance.ssh.port) winners priority defs; };
+}
+```
+
+```console
+$ nix eval --impure --json --file ssh-port.nix
+{
+  "config": { "ssh": { "allowUsers": ["bob", "alice"], "port": 22022 } },
+  "port": {
+    "defs": [
+      { "file": "/homelab/server.nix", "priority": 100 },
+      { "file": "/homelab/hardening.nix", "priority": 1000 },
+      { "file": "<default>", "priority": 1500 }
+    ],
+    "priority": 100,
+    "winners": [ { "file": "/homelab/server.nix" } ]
+  }
+}
+```
+
+The module language is the one NixOS uses: `options`, `config`, `mkDefault`, `mkIf`, `mkMerge`,
+`types.*`. The engine needs no nixpkgs. Every result carries `provenance`, one record per option.
+
+## What you can do
+
+| Feature | Functions and options | Purpose |
+|---|---|---|
+| Check a value | `types.int`, `str`, `bool`, `listOf`, `attrsOf`, `struct`, `union`, `enum`, `refined`, `typedef`, each with `.verify` | Test a value against a type and get a readable error string, or `null` when it passes |
+| Merge modules | `merge.evalModuleTree { modules; specialArgs?; check?; }` | Evaluate a module tree to `config`, `options` and `provenance` |
+| Declare options | `mkOption`, `merge.types.*`, `submodule` | Typed options, nested submodules and freeform attribute sets |
+| Override | `mkDefault`, `mkForce`, `mkOverride`, `mkIf`, `mkMerge` | Priorities and conditional definitions, with the NixOS semantics |
+| Order lists | `mkBefore`, `mkAfter`, `mkOrder` | Place a definition's elements before or after the others |
+| Trace a value | `.provenance.<option>` | The winning file, its priority and every definition considered |
+| Find mistakes | `.undeclared`, `.deprecations`, `lint` | Definitions with no option, deprecated options, and constructs outside the subset shared with nixpkgs |
+| Fold layers | `algebra.record.foldLayers`, `foldNestedLayers` | Merge ordered records field by field, with `replace`, `append` or `recursive` per field |
+| Inject arguments | `bind.wrap`, `bind.wrapAll`, `mkThunk`, `resolveThunks` | Give module functions extra arguments such as `host` |
+| Layered settings (experimental) | `settings.mkSchema`, `resolveOne`, `resolveAll`, `ref`, `assertAcyclic` | Resolve per-field values through ordered scopes, keeping each field's chain of sources |
+
+## Details
+
+### Types
+
+Every gen type is a record with a `name`, a `check` predicate and a `verify` function. `verify`
+returns `null` when the value fits and a message when it does not. Nested types name the position
+that failed:
+
+```nix
+gen.types.int.verify 22                              # null
+gen.types.int.verify "22"                            # "expected type 'int' but value \"22\" is of type 'string'"
+(gen.types.listOf gen.types.str).verify [ "alice" 7 ]
+# "in listOf<string> element: expected type 'string' but value 7 is of type 'int'"
+```
+
+The module engine uses the same checks. A definition of the wrong type fails with
+``gen-merge: a definition for option `ssh.port' is not of the expected type: expected type 'int' but value "22" is of type 'string'``.
+
+### Merging and priority
+
+The lowest priority number wins, and definitions at the same priority merge. A plain definition is
+priority 100, `mkDefault` 1000, an option's `default` 1500, and `mkForce` 50. Definitions at equal
+priority merge in reverse module order, as in nixpkgs: that is why `allowUsers` above is
+`[ "bob" "alice" ]`. `mkBefore` and `mkAfter` reorder list elements after priorities are resolved.
+
+`evalModuleTree` returns these fields:
+
+| Field | Contents |
+|---|---|
+| `config` | the merged values |
+| `options` | the merged option declarations, for introspection |
+| `provenance` | per option: `defs`, `winners`, `priority` |
+| `undeclared` | definitions that matched no option, each with its file and path |
+| `deprecations` | declared options whose type carries a deprecation message |
+| `type` | a type that nests this tree inside a parent tree as a submodule |
+| `warmDecision`, `freeformConfig`, `freeformProv` | internal records an incremental re-run reads (see [Incremental Rebuild](/features/incremental/)) |
+
+A definition for an option that does not exist fails with
+``gen-merge: option `ssh.prot' does not exist (no freeformType to absorb it)``. With
+`check = false` the evaluation continues, and `undeclared` lists
+`{ file = "/homelab/server.nix"; path = [ "ssh" "prot" ]; }`.
+
+gen's merge engine is tested against nixpkgs' `lib.evalModules` for the module grammar the two share.
+`lint` flags a module that uses a construct outside that shared subset.
+
+### Argument injection
+
+`bind.wrap` gives a module function arguments the module system does not know about. The wrapped
+module asks only for what is left:
+
+```nix title="hostname.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  inherit (gen) merge bind;
+
+  wrapped = bind.wrap { bindings = { host = { name = "server"; }; }; }
+    ({ host, config, ... }: { networking.hostName = host.name; });
+
+  result = merge.evalModuleTree {
+    modules = [
+      { options.networking.hostName = merge.mkOption { type = merge.types.str; }; }
+      wrapped.module
+    ];
+  };
+in
+{
+  hostName = result.config.networking.hostName;
+  stillAsks = wrapped.advertisedArgs;
+}
+```
+
+```console
+$ nix eval --impure --json --file hostname.nix
+{ "hostName": "server", "stillAsks": { "config": false } }
+```
+
+`host` came from the binding. `config` is still requested from the module system, and `false` means
+it is a required argument. See [Automatic Argument Injection](/understand/argument-injection/).
+
+### Layered settings
+
+This feature is experimental. A settings schema names its fields and how each merges. `resolveOne`
+folds ordered layers, least specific first, and keeps where each field's value came from:
+
+```nix title="firewall-settings.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  schema = gen.settings.mkSchema {
+    aspect = {
+      name = "firewall";
+      id_hash = gen.identity.hashIdentity "aspect" [ "name" ] (label: { name = "firewall"; }.${label});
+    };
+    fields = {
+      allowedTCP = { default = [ 22 ]; merge = "append"; };
+      logLevel = { default = "warn"; };
+    };
+  };
+  result = gen.settings.resolveOne {
+    inherit schema;
+    layers = [
+      { scope = { env = "prod"; }; rendered = "prod"; via = null; value = { allowedTCP = [ 443 ]; }; }
+      { scope = { host = "web-1"; }; rendered = "web-1"; via = null;
+        value = { allowedTCP = [ 80 ]; logLevel = "info"; }; }
+    ];
+  };
+in
+{ inherit (result) value; logLevelFrom = map (p: p.rendered) result.provenance.logLevel; }
+```
+
+```console
+$ nix eval --impure --json --file firewall-settings.nix
+{ "logLevelFrom": ["default", "web-1"], "value": { "allowedTCP": [22, 443, 80], "logLevel": "info" } }
+```
+
+For how gen's types relate to the NixOS module system, see
+[An Enhanced Module Type System](/understand/module-types/).
+
+---
+
+**Provided by** gen-types (types), gen-merge (module merging and provenance), gen-algebra (layered
+records), gen-bind (argument injection) and gen-settings (layered settings).

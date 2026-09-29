@@ -1,8 +1,6 @@
 ---
 title: "Hedin & Magnusson (2003) -- JastAdd: An Aspect-Oriented Compiler Construction System"
 description: "Our reading of JastAdd—an aspect-oriented compiler construction system."
-source:
-  - den-ag-design:used/summaries/hedin-2003-jastadd-aspect-oriented-ag.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ G. Hedin and E. Magnusson, "JastAdd—an aspect-oriented compiler construction s
 
 [doi:10.1016/s0167-6423(02)00109-0](https://doi.org/10.1016/s0167-6423(02)00109-0) · [read the paper](https://www.sciencedirect.com/science/article/pii/S0167642302001090/pdf)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -53,71 +51,64 @@ The paper also discusses interface injection (S3.4), where Jadd modules add inte
 
 - **Composition of visitors with aspects (S3.5):** JastAdd supports both techniques simultaneously. Visitors remain useful for regular traversals; aspects handle everything else. The two interoperate: visitor methods access aspect-defined fields and attributes.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-scope
 
-**gen-scope (Minor -- demand-driven evaluation pattern, aspect-oriented extension model)**
+gen-scope's evaluation follows JastAdd's demand-driven evaluator, with Nix's lazy evaluation in place of explicit cache-flag methods.
 
-gen-scope's evaluation architecture parallels JastAdd's demand-driven evaluator, though gen-scope implements this via Nix's native lazy evaluation rather than explicit cache-flag methods:
+- **Demand-driven attribute evaluation (S5.3).** JastAdd's recursive evaluator computes an attribute when it is accessed, caches it and returns the cached value afterwards. In gen-scope each node carries an `_eval` attrset whose entries are lazy thunks, computed on first access and memoised by Nix. JastAdd's cache flag is implicit: a forced thunk is the cached value. The cycle flag corresponds to Nix's infinite-recursion detection, or to `evalDebug`'s structured cycle traces.
 
-- **Demand-driven attribute evaluation.** JastAdd's optimal recursive evaluator (S5.3) computes an attribute only when accessed, caches it, and returns cached values on subsequent access. gen-scope's `_eval` cache co-located on each node is the same pattern implemented in Nix: each entry in the `_eval` attrset is a lazy thunk that computes on first access and is memoized by Nix's native thunk forcing semantics. The cache flag from JastAdd (S5.3) is implicit in Nix's lazy evaluation -- a forced thunk IS the cached value. The cycle flag maps to Nix's infinite recursion detection (or gen-scope's `evalDebug` for structured cycle traces). Relevant code: `eval` entry point, `_eval` attrset construction during node wrapping.
+- **Modular extension of attributes (S3.2).** JastAdd lets separate modules contribute attributes to the same AST class. In gen-scope the caller supplies the attribute definitions, independent definitions are composed into one attribute map, and any attribute can read any other attribute on any node through `self.get`. JastAdd weaves at generation time. gen-scope composes at evaluation time through the `self` accessor, so adding an attribute does not regenerate anything.
 
-- **Aspect-oriented modular extension of attributes.** JastAdd's inter-type declarations allow separate modules to contribute attributes to the same AST class (S3.2). gen-scope's `attributes` parameter to `eval` serves an analogous role: independent attribute definitions are composed into a single attribute map, and each attribute can access any other attribute on any node via `self.get`. The key difference is timing: JastAdd weaves at code generation time (static), while gen-scope composes at evaluation time (dynamic, via the `self` accessor). This dynamic composition is more flexible -- attributes added by the consumer don't require regenerating the evaluator.
+- **Inherited attribute propagation (S5.2).** JastAdd's `ParentOfX` interfaces propagate inherited attributes by parent delegation. gen-scope's `inherit'` walks the parent chain until its `resolve` function returns a non-null value. JastAdd's disambiguation parameter (`theStmt`) is unnecessary because gen-scope nodes are identified by unique IDs instead of child position.
 
-- **Inherited attribute propagation.** JastAdd's `ParentOfX` interface pattern (S5.2) propagates inherited attributes via parent delegation. gen-scope's `inherit'` combinator implements the same pattern: walk the parent chain until `resolve` returns non-null. The disambiguation parameter (`theStmt`) from JastAdd's translation is unnecessary in gen-scope because nodes are identified by unique IDs rather than positional children. Relevant code: `inherit'` combinator.
+- **Circular attributes with declared lattices.** gen-scope's `circular` returns a declaration record carrying its carrier (bottom, order, height) and step, which the evaluator reads when the attribute is demanded. This follows JastAdd's practice of declaring a circular attribute together with its lattice data, as described by Söderberg and Hedin 2013 (§2.4, Figure 5).
 
-**gen-derive (Minor -- open action types with framework-owned dispatch)**
+### gen-dispatch
 
-gen-derive's architecture mirrors a specific JastAdd design principle: the framework owns dispatch while actions/behavior are open for extension:
+gen-dispatch's README credits JastAdd with its design of open action types under framework-owned dispatch.
 
-- **Framework-owned dispatch with open action types.** JastAdd's class weaver dispatches to the correct method implementation via Java's virtual method table -- the framework (weaver) owns the dispatch mechanism, while users contribute implementations in aspect modules. gen-derive follows the same separation: `dispatch` and `fixpoint` own the dispatch protocol (NAC check, condition match, override, priority, fire, classify, group), while action types are opaque -- consumers define them via `mkActions` and the consumer-provided `classify` function routes them. The consumer contributes the "aspect modules" (rules); the framework weaves them into a coherent dispatch. Relevant code: `dispatch`, `fixpoint`, `mkActions`, `classify`.
+- **Framework-owned dispatch, open action types.** JastAdd's weaver owns dispatch through Java's virtual method table, and users contribute implementations in aspect modules. gen-dispatch separates the same way. `dispatch` owns the protocol (NAC and condition matching, overrides, priority, firing, classification into groups), and the actions are opaque: consumers define them with `mkActions` and route them with their own `classify` function. Consumers contribute rules as independently written modules, and `dispatch` combines them.
 
-- **Aspect-as-rule modularity.** JastAdd modules are independently authored and the weaver resolves their interactions. gen-derive rules are independently authored and dispatch resolves their interactions through conflict resolution (override suppression, priority sort, specificity). The `fromFunction` pattern -- where a Nix function's argument signature IS the condition (analogous to how a Jrag equation's position in a class IS its applicability) -- directly parallels JastAdd's declarative style where the equation's class context determines where it applies.
+- **Rules as modular units.** Jadd modules are written independently and the weaver resolves their interactions. gen-dispatch rules are written independently and `dispatch` resolves their interactions through overrides, priority and the `exclusive` mode. With `fromFunction`, a Nix function's argument pattern is the rule's condition, as a Jrag equation's class context determines where it applies.
 
-### Relevance to Den v2 HOAG Pipeline
+### JastAdd's ideas in a gen configuration
 
-JastAdd's three core ideas -- demand-driven evaluation, aspect-oriented modular extension, and AST-as-symbol-table -- directly structure den v2's architecture:
+- **Demand-driven evaluation.** JastAdd built its cache flag, cycle flag and demand triggering in Java. A gen scope graph gets them from Nix: attributes compute only when accessed and import edges resolve only when queried.
 
-- **Demand-driven evaluation is Nix laziness.** JastAdd's optimal recursive evaluator (cache flag + cycle flag + demand triggering) is exactly what Nix provides natively. Den v2's scope graph is a lazy structure: nodes exist only when demanded, attributes compute only when accessed, import edges resolve only when queried. JastAdd had to build this machinery in Java; den v2 gets it for free from the host language. The `_eval` cache on gen-scope nodes is the Nix-native version of JastAdd's per-attribute cache flag.
+- **The scope graph as symbol table (S3.3).** JastAdd uses the AST as its symbol table, with reference attributes (`myDecl`) linking uses to declarations. A scope graph plays the same role: nodes carry declarations in `decls`, import edges link scopes, and `query` (Néron 2015, D \< I \< P) finds declarations along them.
 
-- **Inter-type declarations parallel `neededBy`.** JastAdd's Jadd modules add fields and methods to classes they don't own -- a type-checking aspect can extend `Decl` with a `type` attribute without modifying the name analysis module. Den v2's `neededBy` declarations serve the same role: an aspect declares that it needs to be injected into scope nodes it doesn't own, adding its content as an import edge (reverse I edge) on the target. Both mechanisms achieve the same thing: modular, after-the-fact extension of a node's behavior by independently authored units.
+- **A declarative core with imperative consumers (S4.2).** JastAdd recommends a declarative core consumed by imperative modules. In gen, gen-scope is the declarative substrate of attributes and equations, and rules evaluated by gen-program and gen-dispatch read those attributes and produce actions that add structure to the graph.
 
-- **Scope graph as symbol table.** JastAdd uses the AST itself as the symbol table (S3.3): reference attributes (`myDecl`) link use-sites to declaration-sites, and subsequent aspects access declaration data through these links. Den v2's scope graph serves the identical role: scope nodes carry declarations in `decls`, reference attributes (import edges) link scopes to other scopes, and resolution via `query` (Neron 2015 D \< I \< P) finds declarations through these links. The scope graph IS the "symbol table" of the configuration.
-
-- **Hybrid declarative/imperative aspect composition.** JastAdd's recommendation (S4.2) of a declarative core consumed by imperative modules maps to den v2's architecture: gen-scope provides the declarative evaluation substrate (attributes, equations as attribute functions), while gen-derive provides the imperative dispatch layer (rules, effects, fixpoint). Policies in den v2 are the imperative aspects -- they access declaratively-computed attributes on scope nodes and produce effects (spawn, edge, inject) that modify the graph.
-
-- **Interface injection maps to class dispatch.** JastAdd's interface injection (S3.4) allows aspects to add shared interfaces to unrelated AST classes (e.g., `Env` on `Block`, `Method`, `Class`). Den v2's class system (gen-aspects) achieves a similar cross-cutting capability: a single aspect can emit content into multiple classes (`nixos`, `darwin`, `homeManager`), and classes are the "interfaces" that different output systems implement. The key classification trifecta (class key, collection key, nested key) is den's version of JastAdd's determination of which aspect contributions go where.
+- **Interface injection and classes (S3.4).** JastAdd lets aspects add a shared interface to unrelated AST classes. A gen aspect can contribute content to several classes (`nixos`, `darwin`, `homeManager`), and each class is an output interface that different systems implement. gen-aspects' `keyCategory` decides which part of an aspect goes where.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-- **Explicit synthesized/inherited attribute classification (S4, S5.1-5.2).** JastAdd formally distinguishes synthesized attributes (computed locally, propagated up) from inherited attributes (defined by parent, propagated down), with different translation strategies for each. gen-scope makes this distinction informally: `inherit'` is explicitly inherited, but other attributes are just `self: id:` functions with no formal classification. Formalizing synthesized vs. inherited could enable static dependency analysis and better error messages when attribute dependencies are misconfigured.
+- **Declared attribute classification (S4, S5.1-5.2).** JastAdd distinguishes synthesised attributes (computed locally, passed up) from inherited ones (defined by the parent, passed down) and translates them differently. In gen-scope `inherit'` is explicitly inherited, and other attributes are plain `self: id:` functions. Declaring the classification for every attribute would enable static dependency analysis and clearer errors.
 
-- **Equation-based attribute specification (S4).** JastAdd's Jrag equations define attributes declaratively: `type = "int"` rather than `type = self: id: "int"`. The equation notation makes the data flow explicit (which attribute of which child is being defined). gen-scope's `attributes` parameter uses opaque functions, which are more flexible but less analyzable. An equation-based layer on top of gen-scope could provide both analyzability and flexibility.
+- **Equation-based attribute specification (S4).** Jrag equations define attributes declaratively and make the data flow explicit (which attribute of which child is defined). gen-scope's caller-supplied functions are flexible and hard to analyse. An equation layer over gen-scope could offer both.
 
-- **ParentOf interface pattern for type-safe inherited attributes (S5.2).** JastAdd generates `ParentOf<X>` interfaces that statically ensure every parent of an X node provides its inherited attributes. gen-scope has no equivalent static guarantee -- if a `children` attribute creates a node whose `inherit'` attribute walks to a parent that doesn't resolve the attribute, the error surfaces at evaluation time, not at definition time.
+- **Type-safe inherited attributes (S5.2).** JastAdd generates `ParentOf<X>` interfaces that guarantee every parent of an X node provides its inherited attributes. gen-scope has no such guarantee: if `inherit'` walks to parents that never resolve the attribute, the error appears at evaluation time.
 
-- **Composition of grammar modules (S7, Conclusion).** The paper's conclusion identifies grammar composition -- separately authored abstract grammar modules composed into a unified grammar -- as future work. This maps to gen-scope's lack of schema-level composition: multiple consumers cannot independently extend the set of node types and attributes with composition guarantees. gen-schema's kind extension mechanism addresses this partially, but the formal grammar composition theory from JastAdd's subsequent work (Ekman & Hedin 2007, JastAdd II) has not been exploited.
+- **Composition of grammar modules (S7).** The paper names composition of separately written abstract grammar modules as future work, developed later in JastAdd II (Ekman and Hedin 2007). gen-schema's kind inheritance covers part of this for node kinds. Composition guarantees for independently extended attribute sets are not developed.
 
-- **Dynamic aspect modularization via joinpoints (S6).** JastAdd uses only static aspects (inter-type declarations). The paper notes interest in dynamic aspects from AspectJ's joinpoint model -- inserting code at dynamically selected execution points. gen-derive's rule dispatch is conceptually similar (rules fire at dynamically determined positions in the scope graph), but a formal joinpoint model could enable more precise control over when and where aspects contribute their content.
+- **Dynamic aspects through join points (S6).** JastAdd uses only static aspects. The paper notes interest in AspectJ's join-point model. gen-dispatch rules fire at positions determined during evaluation, which is conceptually close, and a formal join-point model could give more precise control over where contributions land.
 
 ### Potential New Libraries or Features
 
-- **gen-scope: Formal attribute classification layer.**
-  A declarative layer where attributes are explicitly classified as `synthesized`, `inherited`, or `reference`, following JastAdd's S4 formalism. `synthesized` attributes would be constrained to access only the current node and children; `inherited` attributes would be constrained to parent-provided values; `reference` attributes would be validated to point to existing nodes. This layer sits atop gen-scope's existing `attributes` parameter as a validation/documentation wrapper. Scope: small. Would consume gen-scope, produce enhanced error messages and enable static dependency analysis.
+- **Attribute classification in gen-scope.** A layer where attributes are declared `synthesized`, `inherited` or `reference`, following S4: synthesised attributes read only the node and its children, inherited attributes read parent-provided values, and reference attributes must point to existing nodes. It would validate and document the existing attribute definitions and support static dependency analysis.
 
-- **gen-aspects: Equation-based aspect content specification.**
-  A declarative notation for aspect content inspired by JastAdd's Jrag equation syntax. Instead of opaque functions (`nixos.services.foo.enable = true`), aspects would declare equations with explicit data flow annotations. This would enable gen-scope to analyze aspect contributions statically -- detecting conflicts between aspects that define the same attribute on the same class without merge strategies. Scope: medium. Interacts with gen-aspects' classification and gen-scope's attribute system.
+- **Equation-based aspect content.** A declarative notation for aspect content with explicit data flow, after Jrag equations. It would let tools detect aspects that define the same attribute of the same class without a merge strategy.
 
-- **gen-scope: ParentOf-style inherited attribute contracts.**
-  Extend `inherit'` with a contract mechanism (leveraging gen-bind's contract system) that declares what the parent chain MUST provide. When a node is synthesized by `children`, the contract checks that the parent node (or its ancestors) can satisfy the inherited attribute. Surfaces errors at node-synthesis time rather than attribute-access time. Scope: small. Bridges gen-scope and gen-bind.
+- **Contracts for inherited attributes.** Extend `inherit'` with a contract, using gen-bind's contracts, stating what the parent chain must provide. The check would run when a node is created, instead of when the attribute is read.
 
 ### Research Directions
 
-- **Formal relationship between JastAdd class weaving and NixOS module merge.** JastAdd weaves aspect contributions into classes at generation time; NixOS merges module contributions into options at evaluation time. Both are modular composition mechanisms with conflict potential (two aspects defining the same method vs. two modules setting the same option). A formal comparison could characterize when NixOS module merge provides the same guarantees as JastAdd's weaving, and where it diverges (NixOS has `mkForce`/`mkDefault` priority; JastAdd has no conflict resolution -- last-definition-wins is an error).
+- **JastAdd weaving and NixOS module merge.** JastAdd weaves aspect contributions into classes at generation time, and the NixOS module system merges contributions into options at evaluation time. Both can conflict: two aspects defining the same method, two modules setting the same option. The NixOS module system resolves conflicts with priorities (`mkForce`, `mkDefault`), and JastAdd treats a duplicate definition as an error. A formal comparison would show where the guarantees coincide.
 
-- **Incremental aspect weaving for configuration drift detection.** JastAdd's class weaving is a batch operation. In a fleet management scenario, changes to one aspect should only recompute affected scope graph regions. Combining JastAdd's modular aspect tracking (which classes each module touches) with gen-scope's demand-driven evaluation could yield an incremental recomputation strategy: when an aspect module changes, only nodes whose `_eval` cache includes contributions from that module need invalidation.
+- **Incremental weaving.** When one aspect changes, only the scope-graph regions it touches need recomputation. Tracking which nodes each aspect contributes to, as JastAdd tracks which classes a module touches, would give gen-memo a precise dirty set for an aspect edit.
 
-- **Aspect interaction analysis via dependency graph extraction.** JastAdd's translation (S5) produces a concrete dependency graph between attributes. Extracting an analogous graph from gen-scope attribute functions -- which attributes does each attribute access, and on which nodes -- could enable automatic detection of aspect interactions: two aspects that both contribute to the same class and access overlapping attributes are potential conflicts. This extends the OAG orderedness check (Theorem 4.1 via the Vogt 1989 reduction) to the scope graph setting.
+- **Aspect interaction analysis from dependencies.** JastAdd's translation (S5) yields a concrete dependency graph between attributes. Extracting the same graph from gen-scope attributes, which attributes each reads and on which nodes, would flag two aspects that contribute to the same class and read overlapping attributes as possible conflicts, extending the OAG orderedness check (Theorem 4.1, via Vogt 1989) to scope graphs.

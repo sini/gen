@@ -120,88 +120,66 @@ export default defineConfig({
 					label: 'Gen',
 					items: [
 						{ label: 'Overview', slug: 'overview' },
-						{ label: 'Why gen', slug: 'motivation' },
-						{ label: 'Trust', slug: 'trust' },
-						{ label: 'Validation', slug: 'validation' },
-						{ label: 'Benchmarks', slug: 'benchmarks' },
+						{ label: 'The Case for gen', slug: 'case-for-gen' },
+						{ label: 'Roadmap', slug: 'roadmap' },
+						{ label: 'History', slug: 'history' },
 					],
 				},
 				{
 					label: 'Understand',
 					items: [
-						{ label: 'Architecture', slug: 'explanation/architecture' },
-						{ label: 'Strata', slug: 'explanation/strata' },
-						{ label: 'The Graph Model', slug: 'explanation/graph-model' },
-						{ label: 'Policies', slug: 'explanation/policies' },
-						{ label: 'Execution', slug: 'explanation/execution' },
+						{ label: 'Core Concepts', slug: 'understand/core-concepts' },
+						{ label: 'Your Configuration as a Graph', slug: 'understand/graph' },
+						{ label: 'Reusable Features', slug: 'understand/features' },
+						{ label: 'Stable Identity for Everything', slug: 'understand/identity' },
+						{ label: 'An Enhanced Module Type System', slug: 'understand/module-types' },
+						{ label: 'Automatic Argument Injection', slug: 'understand/argument-injection' },
+						{ label: 'Rules That Add Relationships', slug: 'understand/rules' },
+						{ label: 'Values Computed on Demand', slug: 'understand/on-demand' },
+						{ label: 'Rebuilding Only What Changed', slug: 'understand/incremental' },
+						{ label: 'Which Tool for Which Job', slug: 'understand/choosing' },
 					],
 				},
 				{
-					label: 'Start',
+					label: 'Features',
+					items: [
+						{ label: 'Graphs and Queries', slug: 'features/graphs' },
+						{ label: 'Typed Configuration', slug: 'features/configuration' },
+						{ label: 'Kinds, Registries and Identity', slug: 'features/registries' },
+						{ label: 'Aspects', slug: 'features/aspects' },
+						{ label: 'Rules', slug: 'features/rules' },
+						{ label: 'Evaluation', slug: 'features/evaluation' },
+						{ label: 'Incremental Rebuild', slug: 'features/incremental' },
+						{ label: 'Delivery', slug: 'features/delivery' },
+						{ label: 'Inspection', slug: 'features/inspection' },
+					],
+				},
+				{
+					label: 'Building with gen',
 					items: [
 						{ label: 'Getting Started', slug: 'guides/getting-started' },
-						{ label: 'Add Gen to a Flake', slug: 'guides/flake' },
+						{ label: 'Add gen to a Flake', slug: 'guides/flake' },
 						{ label: 'Your First Graph', slug: 'guides/first-graph' },
+						{ label: 'From an Aspect to a NixOS System', slug: 'guides/aspects-to-nixos' },
+						{ label: 'Coming From the Module System', slug: 'guides/from-module-system' },
+						{ label: 'den, a Framework Built on gen', slug: 'guides/den-on-gen' },
 					],
 				},
-				// Grouped by the stratum `lib/mkGenLibs.nix` assigns each member, not
-				// alphabetically. That declaration is total — a member cannot join the
-				// roster without one — so it is the only grouping that cannot drift out
-				// of step with the roster itself.
 				{
-					label: 'Libraries',
+					label: 'Examples',
 					items: [
-						{ label: 'The Roster', slug: 'libraries/roster' },
-						{
-							label: 'Substrate',
-							items: [
-								{ label: 'gen-prelude', slug: 'libraries/prelude' },
-								{ label: 'gen-identity', slug: 'libraries/identity' },
-								{ label: 'gen-algebra', slug: 'libraries/algebra' },
-								{ label: 'gen-scope', slug: 'libraries/scope' },
-								{ label: 'gen-memo', slug: 'libraries/memo' },
-								{ label: 'gen-graph', slug: 'libraries/graph' },
-								{ label: 'gen-bind', slug: 'libraries/bind' },
-								{ label: 'gen-schema', slug: 'libraries/schema' },
-								{ label: 'gen-select', slug: 'libraries/select' },
-								{ label: 'gen-dispatch', slug: 'libraries/dispatch' },
-								{ label: 'gen-product', slug: 'libraries/product' },
-								{ label: 'gen-view', slug: 'libraries/view' },
-							],
-						},
-						{
-							label: 'Modules',
-							items: [
-								{ label: 'gen-types', slug: 'libraries/types' },
-								{ label: 'gen-merge', slug: 'libraries/merge' },
-							],
-						},
-						{
-							label: 'Aspects',
-							items: [
-								{ label: 'gen-aspects', slug: 'libraries/aspects' },
-								{ label: 'gen-link', slug: 'libraries/link' },
-								{ label: 'gen-class', slug: 'libraries/class' },
-							],
-						},
-						{
-							label: 'Framework',
-							items: [
-								{ label: 'gen-settings', slug: 'libraries/settings' },
-								{ label: 'gen-assemble', slug: 'libraries/assemble' },
-								{ label: 'gen-program', slug: 'libraries/program' },
-								{ label: 'gen-inspect', slug: 'libraries/inspect' },
-								{ label: 'gen-delivery', slug: 'libraries/delivery' },
-							],
-						},
+						{ label: 'A Homelab', slug: 'examples/homelab' },
+						{ label: 'A Web Platform', slug: 'examples/web-platform' },
 					],
 				},
 				{
 					label: 'Reference',
 					items: [
 						{ label: 'Terminology', slug: 'reference/terminology' },
-						{ label: 'References', slug: 'reference/papers' },
+						{ label: 'Libraries', slug: 'reference/libraries' },
+						{ label: 'Tooling', slug: 'reference/tooling' },
 						{ label: 'Reading List', slug: 'reference/reading-list' },
+						{ label: 'Papers', slug: 'reference/papers' },
 						// One page per paper we have written a reading of. Autogenerated
 						// because the list grows with the archive, and a hand-kept copy
 						// here would be a second place for it to fall out of step.
@@ -210,9 +188,13 @@ export default defineConfig({
 							collapsed: true,
 							items: [{ autogenerate: { directory: 'reference/papers' } }],
 						},
-						{ label: 'Retirements', slug: 'reference/retirements' },
-						{ label: 'CI and Checks', slug: 'reference/ci' },
-						{ label: 'Tooling', slug: 'reference/tooling' },
+					],
+				},
+				{
+					label: 'Trust',
+					items: [
+						{ label: 'Trust', slug: 'trust' },
+						{ label: 'Benchmarks', slug: 'benchmarks' },
 					],
 				},
 			],

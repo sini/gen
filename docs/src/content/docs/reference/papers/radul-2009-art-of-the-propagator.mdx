@@ -1,8 +1,6 @@
 ---
 title: "Radul & Sussman (2009) -- The Art of the Propagator"
-description: "Our reading of The art of the propagator."
-source:
-  - den-ag-design:used/summaries/radul-2009-art-of-the-propagator.md
+description: "A summary of The art of the propagator and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ A. Radul and G. J. Sussman, "The art of the propagator," *MIT CSAIL Technical Re
 
 [read the paper](http://hdl.handle.net/1721.1/44215)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -53,88 +51,53 @@ The paper closes (S7) by identifying open problems: demand-driven (normal-order)
 
 - **Compound propagators for modularity.** `compound-propagator` delays body construction until inputs are available, enabling recursive network definitions without infinite unfolding. This is the propagator analogue of lazy evaluation.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-scope
 
-#### gen-scope (Minor)
+**Monotonic convergence for circular attributes** (Radul S2-S4, merge contract). `circular { carrier; } f` declares an attribute computed as a least fixed point. The carrier states the lattice: a `bottom` to start from, an order `leq`, a finite `height`, and whether the order is over a `quotient` of the values. The evaluator iterates `f` from `bottom` until the value stops changing, within a bound derived from the declared heights. This is a single-cell propagator network: the cell's value is the attribute, the propagator is `f`, and quiescence is convergence. Radul's merge contract, where each step refines or repeats the cell's content, is the monotonicity the carrier declares.
 
-**Monotonic convergence for `circular` attribute iteration** (Radul S2-S4, merge contract). gen-scope's `circular` attribute combinator iterates a function on a node's attribute value until the result stabilizes (checked by `eq`). This is structurally identical to a single-cell propagator network where the cell's value is the attribute, the propagator is the iteration function, and quiescence is convergence. The monotonicity requirement -- iteration must converge rather than oscillate -- directly follows from Radul's merge contract: each iteration step must produce information that either refines (narrows) the previous value or equals it.
-
-**Cells accepting multiple sources as design influence on scope graph merging** (Radul S3, multiple-source merge). Scope graph nodes receive attribute contributions from multiple sources: inherited attributes from the parent chain, synthesized attributes from children, import-edge attributes from referenced scopes, and collection attributes aggregated across traversal. This multi-source model is conceptually a cell receiving information from multiple propagators. The `collectionAttr` combinator in particular -- traversing imports, children, siblings, or ancestors and combining extracted values via a merge function -- mirrors Radul's interval-intersection pattern where multiple independent measurements refine a shared estimate.
+**Cells with several sources** (Radul S3, multiple-source merge). A scope graph node receives values from several places: inherited attributes from the parent chain, synthesized attributes from children, attributes reached over import edges, and collection attributes aggregated across a traversal. `collectionAttr` traverses imports, children, siblings, ancestors or labelled edges and combines the extracted values, like Radul's interval-intersection pattern where several independent measurements refine one estimate.
 
 **Concrete mapping:**
-- `circular { init; eq; maxIter }` = single-cell propagator with quiescence check (S2 scheduling + S5 merge contract)
-- `collectionAttr { traverse; extract; combine }` = multi-source cell with domain-specific merge (S3 interval intersection pattern)
+- `circular { carrier; } f` = single-cell propagator with quiescence check (S2 scheduling + S5 merge contract)
+- `collectionAttr { traverse; extract; combine; }` = multi-source cell with domain-specific merge (S3 interval intersection pattern)
 - `inherit'` parent-chain resolution = unidirectional propagation following structural edges (S2 basic propagation)
-- `_eval` memoization cache = cell content caching (S2, a cell returns its stored content without recomputation)
+- `_eval` memoization = cell content caching (S2, a cell returns its stored content without recomputation)
 
-#### gen-derive (Minor)
+### gen-dispatch
 
-**Quiescence as stability criterion for fixpoint loop** (Radul S2 scheduling, S7 quiescence discussion). gen-derive's `fixpoint` iterates rule dispatch until the context stabilizes: `eq oldCtx newCtx` returns true, meaning no rule produced new information. This is precisely Radul's quiescence condition -- the network (set of rules) has reached a state where no propagator (rule) can add new information to any cell (the context). The `fired` set that prevents identified rules from re-firing across iterations is analogous to a propagator recognizing that its output cell already contains the information it would contribute (the "adding redundant information does nothing" branch of the merge contract).
+**Quiescence of rule dispatch** (Radul S2 scheduling, S7 quiescence). `dispatch` is a pure, one-shot function of rules and context: a given context always yields the same actions. Iteration belongs to the caller, which threads the domain state through repeated dispatch with a gen-scope circular attribute and reads the actions at the fixpoint. The fixpoint is Radul's quiescence: no rule adds new information to the context. Because the actions are recomputed from the converged state, they do not depend on the path the iteration took, and dispatch keeps no record of which rules already fired.
 
-**Monotonic context widening** (Radul S3-S4, monotonic merge). gen-derive's `combine` function merges old context with extracted feedback. The invariant that context only grows (new keys added, no keys removed) mirrors Radul's monotonic information accumulation in cells. Non-monotonic steps (context shrinking) would correspond to Radul's contradiction case.
+### gen-graph
 
-**Concrete mapping:**
-- `fixpoint` convergence loop = propagator network scheduling to quiescence (S2)
-- `eq` stability check = quiescence detection (S7, "no propagator can add new information")
-- `fired` set = merge contract's redundancy branch ("adding nothing already known does nothing")
-- `combine` = merge function on context domain (S5 generic merge)
-- `maxIter` = safety bound against non-convergent networks (not in paper; gen-derive's practical addition)
-
-#### gen-graph (Minor)
-
-**Monotonic convergence model underlies fixpoint iteration** (Radul S2-S4, monotonic accumulation). gen-graph's `fixpoint { seed, step, maxIter }` iterates edge-map transformations until stable. The monotonicity enforcement (throwing on edge-count shrinkage) directly encodes Radul's principle that cell content only grows. The edge map is a cell; `step` is a propagator; `seed` is the initial "nothing" state; convergence is quiescence.
+**Monotonic convergence for edge maps** (Radul S2-S4, monotonic accumulation). `fixpoint { maxIter; } step seed` iterates an edge-map transformation until it stops changing. It fails with an error naming the withdrawn edge when a step removes an edge the current map holds, which encodes Radul's principle that cell content only grows. The edge map is a cell, `step` is a propagator, `seed` is the initial state, and convergence is quiescence.
 
 **Concrete mapping:**
-- `graph.fixpoint` = single-cell propagator network (S2) with monotonicity invariant (S3-S4)
-- `graph.compose` = compound propagator combining two edge-map sources (S4 multidirectional)
-- `graph.transitiveClosure` = iterative refinement to quiescence (S2 Heron's method pattern, applied to reachability)
-- `graph.unionEdges` = merge (set union) on the edge-map semilattice (S5 generic merge on the set domain)
+- `fixpoint` = single-cell propagator network (S2) with a monotonicity check (S3-S4)
+- `compose` = compound propagator combining two edge-map sources (S4 multidirectional)
+- `transitiveClosure` = iterative refinement to quiescence (S2 Heron's method pattern, applied to reachability)
+- `unionEdges` = merge (set union) on the edge-map semilattice (S5 generic merge on the set domain)
 
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2's demand-driven HOAG over scope graphs embodies the propagator model at an architectural level, even though the implementation uses Nix lazy evaluation rather than an explicit propagator scheduler.
-
-**Scope nodes as cells.** Each scope graph node accumulates attribute values from multiple sources: policies contribute effects, aspects contribute class content, pipes deliver collection data, and `neededBy` injects reverse-edge aspects. This is Radul's core insight -- places receiving values from multiple sources. The node's attribute computation (`_eval`) serves as the merge point, combining contributions according to domain-specific rules (list concatenation for collections, `evalModules` merge for class content, set union for edges).
-
-**Policies and aspects as propagators.** Policies are autonomous functions that examine their scope context (input cells) and produce effects (output contributions). When a policy fires and enriches a scope's context, other policies sensitive to that context may fire in turn -- exactly the reactive alert-propagators chain from Radul S2. The gen-derive fixpoint loop manages the scheduling, but the conceptual model is a propagator network where policies push information through scope nodes.
-
-**Monotonic scope graph expansion.** The scope graph only grows: `spawn` adds nodes, `edge` adds edges, `enrich` adds declarations, `inject` adds modules. No operation retracts information. `drop` is modeled as a constraint (pruning resolution paths) rather than retraction, preserving monotonicity. This directly implements Radul's monotonic accumulation principle -- the scope graph state is a lattice value that only ascends.
-
-**Quiescence as pipeline termination.** The den v2 pipeline terminates when no policy can fire new effects and no `neededBy` scan discovers new reverse edges. This is Radul's quiescence: the network of policies has reached a state where no propagator can contribute new information. The finite declaration set (hosts, users, aspects are user-declared and bounded) guarantees that the ascending chain through scope graph states has finite height, ensuring quiescence is reached.
-
-**Pipe convergence as multi-source merge.** Den v2's pipe system -- `pipe.from`, `pipe.gather`, `pipe.ascend`, `pipe.source`, `pipe.target`, `pipe.channel` -- routes collection data through scope nodes. Multiple pipes may contribute to the same collection on the same node, requiring merge. This is Radul's interval-intersection pattern generalized: multiple independent sources contribute partial information to a cell, and the cell's merge strategy (list concatenation, attrset merge, or custom combine) produces the aggregate result.
-
-**Demand-driven as "pull" propagation.** Radul's S7 identifies demand-driven propagation as an open problem: propagators that "pull" needed information rather than eagerly pushing all deductions. Den v2 addresses this through Nix's native lazy evaluation -- attributes are thunks that compute only when demanded. gen-scope's `_eval` cache means each attribute is computed at most once, and only if demanded. This realizes the demand-driven propagation that Radul identifies as future work, using the host language's laziness as the scheduling mechanism.
-
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-**Truth Maintenance Systems for worldview management (S6.2).** The TMS mechanism -- cells holding multiple justified values, queryable under different worldview subsets -- has no analogue in the gen ecosystem. Den v2's scope graph holds a single worldview (the full set of declared entities and aspects). A TMS-backed scope graph could support: "what does this configuration look like if we remove host X?" or "what changes if we add aspect Y?" without re-evaluating the entire graph. Each worldview would be a premise set; the TMS would cache all derivations across worldviews.
+**Truth Maintenance Systems for worldview management (S6.2).** The TMS mechanism -- cells holding multiple justified values, queryable under different worldview subsets -- has no analogue in the gen ecosystem. gen's scope graph holds a single worldview (the full set of declared entities and aspects). A TMS-backed scope graph could support: "what does this configuration look like if we remove host X?" or "what changes if we add aspect Y?" without re-evaluating the entire graph. Each worldview would be a premise set; the TMS would cache all derivations across worldviews.
 
-**Dependency-directed backtracking for configuration conflict resolution (S6.3).** When den v2 encounters a conflict (e.g., two aspects setting the same NixOS option contradictorily), the current approach is to error with a diagnostic. Radul's dependency-directed backtracking could instead identify the minimal set of premises (entity declarations, aspect includes) that cause the conflict, and either report a precise nogood set or automatically explore alternative configurations. The `binary-amb` mechanism could power "try aspect A; if it conflicts, fall back to aspect B" semantics.
+**Dependency-directed backtracking for configuration conflict resolution (S6.3).** When gen encounters a conflict (e.g., two aspects setting the same NixOS option contradictorily), it fails with a diagnostic. Radul's dependency-directed backtracking could instead identify the minimal set of premises (entity declarations, aspect includes) that cause the conflict, and either report a precise nogood set or automatically explore alternative configurations. The `binary-amb` mechanism could power "try aspect A; if it conflicts, fall back to aspect B" semantics.
 
 **Provenance tracking for attribution (S6.1).** The `supported` value structure -- every computed result tagged with the premises that justify it -- would enable answering "why does this NixOS option have this value?" by tracing the support set back through scope graph edges to the original entity declarations and aspect content. gen-bind's provenance metadata is a step in this direction but operates at the binding level, not at the value level.
 
-**Multidirectional constraint propagation for bidirectional entity inference (S4).** Currently, den's information flow is primarily top-down: entity declarations produce scope graph nodes, policies fire forward, class content emits downward. Radul's bidirectional constraints would enable bottom-up inference: knowing a NixOS option's required value could propagate backward to constrain which aspects must be included, or knowing a user's required home-manager configuration could infer which host they must be assigned to.
+**Multidirectional constraint propagation for bidirectional entity inference (S4).** gen's information flow is primarily top-down: entity declarations produce scope graph nodes, rules fire forward, class content flows downward. Radul's bidirectional constraints would enable bottom-up inference: knowing a NixOS option's required value could propagate backward to constrain which aspects must be included, or knowing a user's required home-manager configuration could infer which host they must be assigned to.
 
 **Per-component dependency tracking for compound values (S7).** Radul notes that tracking separate dependencies for each component of a pair (or interval bound) eliminates spurious dependency accumulation (the overlap anomaly, Figure 2). In the gen ecosystem, collection attributes aggregate complex structures -- tracking per-field dependencies rather than per-aggregate dependencies would enable finer-grained cache invalidation and more precise provenance reporting.
-
-### Potential New Libraries or Features
-
-**gen-tms: Truth maintenance for Nix attrsets.** A library providing: `mkTms {}` (empty TMS), `addSupported tms value premises` (add justified value), `query tms worldview` (strongest consequence under premise subset), `nogoods tms` (discovered contradictions). Would enable multi-worldview configuration analysis without re-evaluation. Scope: ~300 lines core, ~100 lines gen-scope adapter. Interacts with gen-scope (TMS-backed cells) and gen-derive (nogood-guided backtracking). Complexity: medium -- the TMS data structures are straightforward, but integrating with Nix's lazy evaluation (where "alerting propagators" means invalidating thunks) requires careful design.
-
-**Provenance-tracked merge for gen-scope collections.** Extend `collectionAttr` with an optional `trackProvenance = true` mode that wraps contributed values in `{ value; source = nodeId; path = [...]; }` records. When enabled, the aggregate carries attribution metadata through the merge. Scope: ~80 lines in gen-scope, backward-compatible (new optional parameter). Interacts with gen-bind's existing provenance infrastructure.
-
-**Bounded fixpoint with semantic bounds for gen-derive.** Beyond the iteration-count `maxIter`, add support for semantic bounds: `bound = ctx: builtins.length (builtins.attrNames ctx) <= maxContextSize`. The fixpoint terminates when either `eq` detects convergence or `bound` is exceeded. This mirrors Radul's compound-propagator pattern where construction is gated on meaningful content. Scope: ~30 lines in gen-derive.
 
 ### Research Directions
 
 **Demand-driven propagation with explicit interest tracking.** Radul's S7 proposes representing "pulls" as explicit requests indicating interest in information. In the gen ecosystem, Nix's laziness provides implicit demand-driven evaluation, but there is no mechanism for a scope node to declare "I am interested in attributes X and Y from my imports, but not Z." Explicit interest declarations could enable selective attribute computation in gen-scope -- skipping expensive attributes that no downstream consumer demands. This connects to Mokhov 2018's minimal/constructive build systems.
 
-**Concurrent propagator evaluation for fleet-scale scope graphs.** Radul's S7 observes that only individual cells need synchronization in a concurrent propagator network. For fleet-scale den configurations (hundreds of hosts, thousands of aspects), concurrent evaluation of independent subtrees could dramatically reduce evaluation time. Nix's evaluator is single-threaded, but a multi-process architecture -- each process evaluating an independent scope subtree, coordinating via IPC on shared cells -- could exploit the propagator model's natural concurrency. The challenge is identifying independent subtrees in a scope graph with import edges.
+**Concurrent propagator evaluation for fleet-scale scope graphs.** Radul's S7 observes that only individual cells need synchronization in a concurrent propagator network. For fleet-scale configurations (hundreds of hosts, thousands of aspects), concurrent evaluation of independent subtrees could dramatically reduce evaluation time. Nix's evaluator is single-threaded, but a multi-process architecture -- each process evaluating an independent scope subtree, coordinating via IPC on shared cells -- could exploit the propagator model's natural concurrency. The challenge is identifying independent subtrees in a scope graph with import edges.
 
 **Merging worldviews for configuration diff and migration.** Given two TMS-backed worldviews (e.g., current production configuration and proposed change), computing the "diff" -- which cells' strongest consequences change -- would enable safe configuration migration. The nogood machinery could identify configurations that would introduce contradictions. This extends Radul's worldview switching from diagnostic exploration to operational tooling.
 

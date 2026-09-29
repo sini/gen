@@ -1,0 +1,221 @@
+---
+title: Delivery
+description: Move content along chosen edges with a declared precedence, project each node's class content, and realise it through terminals such as NixOS.
+---
+
+The homelab's laptop gets the `desktop` aspect, which includes `ssh`. The server gets `ssh` and
+`monitoring`. Delivery collects each host's class content and hands it to one terminal per class.
+
+```nix title="homelab-delivery.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  inherit (gen.merge) evalModuleTree mkOption types;
+
+  cnf = {
+    keySemantics.nixos.category = "class";
+    keySemantics.homeManager.category = "class";
+  };
+
+  result = evalModuleTree {
+    modules = [
+      ((gen.aspects.mkAspectSchema cnf).mkAspectModule { })
+      { options.hosts = mkOption { type = types.attrsOf types.raw; default = { }; }; }
+      {
+        aspects.ssh.nixos.services.openssh.enable = true;
+        aspects.desktop.includes = [ "ssh" ];
+        aspects.desktop.nixos.services.xserver.enable = true;
+        aspects.desktop.homeManager.programs.firefox.enable = true;
+        aspects.monitoring.nixos.services.prometheus.enable = true;
+
+        hosts.laptop.aspects = [ "desktop" ];
+        hosts.server.aspects = [ "ssh" "monitoring" ];
+      }
+    ];
+  };
+
+  # Each host receives its own aspects plus everything they include.
+  facts = gen.aspects.graphFacts cnf result.config.aspects;
+  withIncludes = names:
+    names ++ builtins.concatMap
+      (n: gen.graph.reachableFrom { edges = id: facts.includesOf.${id} or [ ]; } n) names;
+
+  projected = gen.delivery.project {
+    values = result.config;
+    inherit cnf;
+    selectNodes = values: builtins.mapAttrs
+      (_: host: host // { aspects = withIncludes host.aspects; }) values.hosts;
+  };
+in
+gen.delivery.realize {
+  inherit projected;
+  terminals.nixos = { name, modules, ... }:
+    "${name}: ${toString (builtins.length modules)} nixos modules";
+  terminals.homeManager = { name, modules, ... }:
+    "${name}: ${toString (builtins.length modules)} home modules";
+}
+```
+
+```console
+$ nix eval --impure --json --file homelab-delivery.nix
+{
+  "homeManager": { "laptop": "laptop: 1 home modules" },
+  "nixos": { "laptop": "laptop: 2 nixos modules", "server": "server: 2 nixos modules" }
+}
+```
+
+A **terminal** is a function that turns one node's modules for one class into a result. Here the
+terminals count modules. A real `nixos` terminal calls `nixosSystem`. The server has no
+`homeManager` content, so it does not appear under that class.
+
+## What you can do
+
+| Feature | Functions and options | Purpose |
+|---|---|---|
+| Project | `delivery.project { values; cnf; selectNodes; }` | Collect each node's modules per class from its aspects |
+| Realise | `delivery.realize { projected; terminals; bindings?; refinements?; layerOrder?; extraModules?; }` | Call one terminal per class per node, and return `{ <class>.<node> = result; }` |
+| Terminals | `bind.crossing.mkHostedTerminal`, `bind.crossing.mkOutputsTerminal` | Ready-made terminals for NixOS-style systems and for flake outputs |
+| Move content | `view.compositions.movement`, `carrier`, `scopeGraph`, `viewRelation` | Carry values along chosen edge labels, nearest source first |
+| See what lost | `.contributions`, `.shadowed`, `.withheld`, `.dropped` | Every value a view considered, and why each did or did not win |
+| Resolve names | `view.referenceResolution`, `neededBy` | Resolve a reference to the declaration it names, over the graph |
+| Trace a view | `view.trace`, `renderTrace`, `hashTrace` | A printable record of how a view resolved |
+| Wire a flake | `flakeModules.default` with the `gen.*` options | Compose, project and realise from a flake-parts flake |
+
+## What goes where
+
+| You want to... | Put it in | Delivered by |
+|---|---|---|
+| Configure a NixOS host for a feature | an aspect's `nixos` key | the `nixos` terminal, to every host that lists the aspect |
+| Configure a user's home | an aspect's `homeManager` key, declared as a class | a `homeManager` terminal you supply |
+| Add one host's hardware file | `gen.extraModules.<host>` | the `nixos` terminal, for that host only |
+| Pass the same argument to every node | `realize`'s `bindings` | every terminal, as `bindings` |
+| Pass an argument to one node | `realize`'s `refinements.<node>` | that node's terminals, over the global bindings |
+| Share settings with another framework | an aspect key declared as a `channel` | passed through unchanged, never realised |
+| Let the nearest scope's value win | a movement view over your edge labels | `viewRelation`'s `value` |
+| Read resolved values in flake modules | nothing: the flake module injects `genValues` | every flake module, as the `genValues` argument |
+
+## Details
+
+### Projection
+
+`project` reads each node's `aspects` list and collects, per class, the modules of those aspects. A
+key counts as a class only when `cnf` declares it `category = "class"` and the aspect gives it
+content. `project` does not follow `includes`: a node receives the aspects its list names, so the
+example adds the include closure itself in `selectNodes`.
+
+`selectNodes` names where your nodes live in `values`. It is required. Without it `project` fails:
+
+```
+gen-delivery: project: no node selector — `selectNodes` is required and has no default. It names WHICH resolved attrset of the caller's values holds the node instances.
+```
+
+### Realisation
+
+Each terminal receives one record per node:
+
+| Field | Contents |
+|---|---|
+| `name` | the node's key |
+| `modules` | this class's modules for the node, unevaluated |
+| `bindings` | the layered arguments, where `bindings.node` is the node itself |
+| `extent` | this class's realised set, for reading peer nodes lazily |
+| `extraModules` | modules addressed to this class at this node |
+
+Bindings fold in the order `projection`, `global`, `refinement` (`defaultLayerOrder`), so a
+per-node refinement overrides a global binding.
+
+### Movement views
+
+A movement view carries values along edges with a declared precedence. Here `web-1` sits in
+`us-east`, which sits in `prod`, and both scopes declare firewall ports:
+
+```nix title="nearest-firewall.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  view = gen.view;
+  labels = view.edgeLabels { letters = [ "within" ]; };
+  carrier = view.carrier {
+    inherit labels;
+    relations = view.relations { names = [ "firewall" ]; };
+    relatumLabels = view.relatumLabels { names = [ ]; };
+    labelWellFormedness = view.labelWellFormedness { alphabet = labels; expression = "within*"; };
+    labelOrder = view.labelOrder { alphabet = labels; layers = [ [ "within" ] ]; endOfPath = -1; };
+    dataOrder = view.dataOrder { channel = "firewall"; keyOf = _: "firewall"; };
+  };
+  firewall = view.compositions.movement {
+    channel = "firewall"; relation = "firewall"; root = "web-1"; direction = "outbound";
+    admission = carrier.labelWellFormedness; order = carrier.labelOrder; wellFormed = _: true;
+    empty = [ ]; tieSet = view.tieSets.union; combine = view.combines.listAppend;
+    dedup = view.dedups.byDatum;
+  };
+  graph = view.scopeGraph {
+    inherit carrier;
+    scopes = [ "web-1" "us-east" "prod" ];
+    edges.within = id: { web-1 = [ "us-east" ]; us-east = [ "prod" ]; }.${id} or [ ];
+    data = [
+      { scope = "us-east"; relation = "firewall"; datum = [ 443 ]; }
+      { scope = "prod";    relation = "firewall"; datum = [ 22 ]; }
+    ];
+  };
+  moved = view.viewRelation {
+    definition = firewall; marks = _: [ ]; inherit graph;
+    orderMark = view.labelOrder { alphabet = labels; layers = [ labels.letters ]; endOfPath = 0; };
+  };
+in
+{ inherit (moved) value; shadowedFrom = map (s: s.scope) moved.shadowed; }
+```
+
+```console
+$ nix eval --impure --json --file nearest-firewall.nix
+{ "shadowedFrom": ["prod"], "value": [443] }
+```
+
+`us-east` is one edge away and `prod` is two, so `us-east` wins. Each `shadowed` entry records the
+losing value, its scope, its distance and the full path, so a reader can see why it lost.
+`labelWellFormedness` decides which paths are admitted at all (here `within*`), and `labelOrder`
+decides which admitted path wins.
+
+### The flake module
+
+`flakeModules.default` runs the whole route inside a flake-parts flake. It composes `gen.tree` and
+`gen.modules`, projects over the registry at `gen.nodeRegistryPath`, and realises through
+`gen.terminals`. The `nixos` results become `nixosConfigurations`.
+
+```nix title="flake.nix"
+{
+  inputs = {
+    gen.url = "github:sini/gen";
+    nixpkgs.follows = "gen/nixpkgs";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+  };
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.gen.flakeModules.default ];
+      systems = [ "x86_64-linux" ];
+      gen = {
+        modules = [ ./homelab.nix ];
+        aspectCnf = import ./aspect-cnf.nix;
+        nodeRegistryPath = [ "hosts" ];
+      };
+    };
+}
+```
+
+| Option | Purpose |
+|---|---|
+| `gen.tree`, `gen.modules` | a directory of gen modules, and extra inline modules |
+| `gen.specialArgs` | extra module arguments for the composition |
+| `gen.aspectCnf` | the key categories, the same value your `mkAspectSchema` call takes |
+| `gen.nodeRegistryPath` | the attribute path of the registry holding the hosts; required |
+| `gen.nixpkgs` | the nixpkgs whose `nixosSystem` builds hosts; defaults to `inputs.nixpkgs` |
+| `gen.terminals` | terminals per class; a default `nixos` terminal is added |
+| `gen.extraModules.<node>` | extra NixOS modules for one host |
+| `gen.inject`, `gen.injectPerSystem` | which resolved values reach other flake modules, and whether `perSystem` gets them |
+| `gen.realized` | the realised results, read-only, for classes other than `nixos` |
+
+Without `nodeRegistryPath` the flake fails with an error listing the top-level keys it could have
+named. A path that stops at the wrong place fails at the segment that does not match.
+
+---
+
+**Provided by** gen-delivery (projection and realisation), gen-view (movement views, reference
+resolution, traces), gen-bind (terminals) and the gen hub (the flake module).

@@ -1,8 +1,6 @@
 ---
 title: "Van Antwerpen et al. (2016) — A Constraint Language for Static Semantic Analysis Based on Scope Graphs"
-description: "Our reading of A constraint language for static semantic analysis based on scope graphs."
-source:
-  - den-ag-design:used/summaries/van-antwerpen-2016-statix-constraint-scope-graphs.md
+description: "A summary of A constraint language for static semantic analysis based on scope graphs and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ H. van Antwerpen, P. Néron, A. Tolmach, E. Visser, and G. Wachsmuth, "A constra
 
 [doi:10.1145/2847538.2847543](https://doi.org/10.1145/2847538.2847543) · [read the paper](http://dl.acm.org/ft_gateway.cfm?id=2847543&type=pdf)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -53,67 +51,36 @@ The model language LMR (Language with Modules and Records) demonstrates the fram
 
 - **Non-deterministic constraint solver**: The solver (Fig. 12) branches when a reference resolves to multiple declarations, exploring all possibilities. Each branch maintains its own substitution state.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-scope
 
-**gen-scope (Minor influence)**
+gen-scope's resolution is traversal-based (Neron 2015), not constraint-solving, so the paper's core algorithm (Fig. 11) and solver (Fig. 12) are not implemented. Several of its patterns appear:
 
-The INDEX.md records this paper as a minor influence on gen-scope, specifically for "Statix-style constraint patterns for structural subtyping queries." gen-scope's resolution is fundamentally traversal-based (Neron 2015), not constraint-solving, so the core algorithm (Fig. 11) and solver (Fig. 12) are not implemented. However, specific design patterns from the paper appear:
+- **Parameterized visibility policies** (Section 3.4, Fig. 10): gen-scope's `query` accepts `localShadowsImport`, `importShadowsParent` and `transitiveImports`, which correspond to instantiations of the paper's label ordering and well-formedness regex. The default (D \< I \< P, `transitiveImports = false`) matches the paper's "non-transitive imports" row. `followEdge` (from van Antwerpen 2018, prefigured here in the generalized label set L) follows custom edge labels beyond P and I.
 
-- **Parameterized visibility policies** (Section 3.4, Fig. 10): gen-scope's `query` combinator accepts `localShadowsImport`, `importShadowsParent`, and `transitiveImports` parameters, which correspond to instantiations of the paper's label ordering and well-formedness regex. The default D \< I \< P policy matches the paper's "non-transitive imports" row. The `followEdge` function (from van Antwerpen 2018, but prefigured here in the generalized label set L) enables custom edge labels beyond P and I.
+- **Well-formedness as a structural constraint**: the `_seen` tracking in `query` (preventing import self-resolution) corresponds to the seen-imports set I in rule (N) and the seen-scopes set S in rule (T) of the resolution calculus. The paper formalizes what gen-scope implements operationally.
 
-- **Well-formedness as a structural constraint**: gen-scope's `_seen` tracking in `query` (preventing import self-resolution) corresponds to the seen-imports set I in rule (N) and the seen-scopes set S in rule (T) of the resolution calculus. The paper formalizes what gen-scope implements operationally.
+- **Structural subtyping queries**: `subtypeOf` checks that every declaration of scope A is also declared in scope B (with an optional per-key `eq`), the subset constraint N1 ⊆ N2 of Section 2.4. If one scope's declarations are a subset of another's, structural subtyping holds.
 
-- **Structural subtyping queries**: gen-scope's `subtypeOf` combinator expresses "are all declarations in scope A also in scope B?" — which maps to the paper's V(S) visible name collection and the subset constraint N1 subset N2 (Section 2.4). The Statix pattern is: if the visible declarations of one scope are a subset of another's, structural subtyping holds.
-
-**gen-aspects (indirect, via TERMINOLOGY.md)**
-
-The TERMINOLOGY.md lists "Constraints" as a core term with provenance "van Antwerpen 2016 (constraint-based scope graphs)." In gen-aspects, constraints are pruning rules that restrict resolution or composition and propagate via graph ancestry — a conceptual borrowing of the paper's constraint vocabulary applied to aspect composition rather than name resolution.
-
-### Relevance to Den v2 HOAG Pipeline
-
-Den v2's demand-driven HOAG over scope graphs shares the paper's graph structure but diverges at the resolution mechanism: den resolves eagerly via traversal (Neron 2015 calculus, implemented in gen-scope) where Statix solves constraints. The paper's contributions inform den v2 in several ways:
-
-**Specification vocabulary**: The paper provides a precise language for describing resolution policies. Den v2's `drop`, `reroute`, `edge`, and `inject` effects (TERMINOLOGY.md, Den v2 Vocabulary) can be understood as constraint-like declarations that modify the scope graph structure — `drop` corresponds to restricting reachability (removing edges from the well-formedness language), `reroute` corresponds to label substitution, `edge` corresponds to adding import edges (CG constraints), and `inject` corresponds to direct declaration emission.
-
-**Parameterized policies via label ordering**: Den v2's per-query visibility policies (inherited from gen-scope via van Antwerpen 2018) trace back to this paper's Section 3.4. The regular expression parameterization (E) and label ordering (\<) provide the formal foundation for den's class-specific resolution: different classes (nixos, darwin, homeManager) may use different visibility policies when resolving aspects.
-
-**Incomplete graph handling as a design pattern**: The paper's incremental solving over incomplete scope graphs (Section 4.2) validates den v2's demand-driven approach. In den, the scope graph is also "incomplete" at any given point during lazy evaluation — not all nodes and edges are materialized. The paper's stability property (Lemma 2) provides theoretical confidence that resolving against a partially-evaluated graph yields results consistent with full evaluation, which is exactly what Nix's lazy evaluation guarantees operationally.
-
-**Name collections for pipe/collection aggregation**: Den v2's collections (named data aggregation points) parallel the paper's name collections N. The `pipe.gather pred` operation (traverse and collect from matching scopes) is analogous to computing V(S) with a filter predicate. The `pipe.source pred` (only matching scopes contribute) mirrors the paper's scope-bounded collection semantics.
-
-**Constraint vocabulary for neededBy**: Den's `neededBy` (reverse I edges) can be formally understood as the paper's import constraints with inverted directionality. Where the paper writes S --I--> x_R (scope S imports the associated scope of x's resolution), neededBy declares the inverse: "aspect A should be imported by any scope matching a selector." The constraint framework provides the formal vocabulary even though den doesn't use constraint solving.
-
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-**Non-deterministic branching in resolution (Section 4.5, Fig. 12, S-RESOLVE)**: The solver branches when multiple declarations match. gen-scope's `query` returns a single result (most specific), and `queryAll` returns all results, but there is no branching exploration of alternatives. For den v2 policies that need to reason about ambiguity (e.g., "if this reference is ambiguous, apply a tiebreaker"), a structured branching mechanism could be useful.
+**Non-deterministic branching in resolution (Section 4.5, Fig. 12, S-RESOLVE)**: The solver branches when multiple declarations match. gen-scope's `query` returns a single result (most specific), and `queryAll` returns all results, but there is no branching exploration of alternatives. For rules that need to reason about ambiguity (e.g., "if this reference is ambiguous, apply a tiebreaker"), a structured branching mechanism could be useful.
 
-**Uniqueness and completeness constraints (Section 2.1, 2.4)**: The !D(S) uniqueness constraint and V(S) approximately-equal R(S) completeness constraint have no direct gen-scope analogue. gen-scope can detect ambiguity via `ambiguous`, but cannot declaratively assert "no duplicate declarations in this scope" or "all expected references are present." These would be valuable for den's configuration validation.
+**Uniqueness and completeness constraints (Section 2.1, 2.4)**: The !D(S) uniqueness constraint and V(S) approximately-equal R(S) completeness constraint have no direct gen-scope analogue. gen-scope can detect ambiguity via `ambiguous`, but cannot declaratively assert "no duplicate declarations in this scope" or "all expected references are present." These would be useful for configuration validation.
 
-**Scope graph constraints as a specification language (Section 2, Fig. 6)**: The full constraint extraction framework — where an AST walk produces constraints rather than directly building a graph — is not implemented. gen-scope builds graphs directly via `buildNodes` and algebraic constructors. A constraint-based specification layer would enable more declarative graph construction, potentially simplifying den's entity declaration processing.
+**Scope graph constraints as a specification language (Section 2, Fig. 6)**: The full constraint extraction framework — where an AST walk produces constraints rather than directly building a graph — is not implemented. gen-scope builds graphs directly via `buildNodes` and algebraic constructors. A constraint-based specification layer would make graph construction more declarative.
 
 **Brzozowski derivatives for path validation (Section 4, algorithm)**: The technique of using regular expression derivatives to incrementally validate resolution paths during traversal is not implemented. gen-scope's `query` uses hardcoded path logic (local -> imports -> parent). A derivative-based approach would enable arbitrary path well-formedness policies without per-policy code.
 
 **Association constraints for type-scope bridging (Section 2.4)**: The D --assoc--> S mechanism for connecting declarations to associated scopes via type resolution is not directly used. gen-scope has `followEdge` for explicit custom edges, but not the type-driven dynamic edge discovery that association constraints enable.
 
-### Potential New Libraries or Features
-
-**gen-scope: Declarative constraint layer**
-A thin constraint DSL over gen-scope's graph construction, allowing users to declare scope structure via constraints rather than imperative `buildNodes` calls. Scope: moderate (200-400 lines). Would consume gen-scope and gen-algebra. The constraint extraction pattern (Fig. 6) provides the template: each user declaration produces constraints, a simple solver (without unification — den doesn't need type inference) resolves scope variables and validates well-formedness.
-
-**gen-scope: Completeness checking combinator**
-A new combinator `complete { expected; actual; } self id` that checks V(S) approximately-equal R(S) style properties. Useful for den v2 to validate that all declared entity fields are initialized, all required aspects are present, etc. Scope: small (50-100 lines). Direct implementation of Section 2.4's completeness constraints.
-
-**gen-scope: Regular expression path policies**
-Replace the boolean parameters (`localShadowsImport`, `importShadowsParent`, `transitiveImports`) with a `policy = { wellFormedness = "P*.I?"; ordering = { D = 0; I = 1; P = 2; }; }` parameter that accepts the paper's formal parameterization directly. Would enable expressing all policies from Fig. 10 and arbitrary custom policies. Scope: moderate (150-300 lines). The Brzozowski derivative implementation is straightforward in Nix.
-
 ### Research Directions
 
 **Incremental constraint resolution**: The paper notes incremental evaluation as an open problem (Section 5, "many applications for semantic analysis require efficient incremental computation"). In the Nix context, where evaluation is batch (not interactive), the question becomes: can Nix's lazy evaluation be leveraged as a form of incremental computation, where only demanded constraints are solved? gen-scope's `_eval` memoization already achieves this for attributes; extending it to constraint satisfaction would require tracking which constraints contributed to which resolutions.
 
-**Constraint-based configuration validation**: The paper's constraint framework could inform a declarative validation language for den configurations. Rather than imperative assertions ("throw if X"), users would declare constraints ("!D(S) for scope S" meaning "no duplicate declarations"), and the framework would check satisfiability and produce targeted error messages. This aligns with the paper's vision of constraint-based analysis producing partial solutions with residual unsolvable constraints translatable to error messages (Section 5, "Prototype Implementation").
+**Constraint-based configuration validation**: The paper's constraint framework could inform a declarative validation language for configurations. Rather than imperative assertions ("throw if X"), users would declare constraints ("!D(S) for scope S" meaning "no duplicate declarations"), and the framework would check satisfiability and produce targeted error messages. This aligns with the paper's vision of constraint-based analysis producing partial solutions with residual unsolvable constraints translatable to error messages (Section 5, "Prototype Implementation").
 
-**Completeness guarantees for scope graph resolution**: The paper proves soundness but not completeness of the constraint solver. For den, the analogous question is: does gen-scope's traversal-based resolution find all resolutions that a constraint-based approach would? Since gen-scope implements the Neron 2015 calculus directly, and this paper proves the calculus sound and complete on ground graphs (Lemma 1), the answer is yes for fully-evaluated graphs. The open question is whether Nix's lazy evaluation introduces incompleteness by not forcing all edges — a formal treatment would require characterizing which evaluations are "sufficiently forced" for resolution completeness.
+**Completeness guarantees for scope graph resolution**: The paper proves soundness but not completeness of the constraint solver. For gen, the analogous question is: does gen-scope's traversal-based resolution find all resolutions that a constraint-based approach would? Since gen-scope implements the Neron 2015 calculus directly, and this paper proves the calculus sound and complete on ground graphs (Lemma 1), the answer is yes for fully-evaluated graphs. The open question is whether Nix's lazy evaluation introduces incompleteness by not forcing all edges — a formal treatment would require characterizing which evaluations are "sufficiently forced" for resolution completeness.

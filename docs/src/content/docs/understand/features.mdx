@@ -1,0 +1,76 @@
+---
+title: Reusable Features
+description: A feature (aspect) is a named bundle of configuration that hosts select and that can include other features, the unit of feature-oriented programming.
+---
+
+The homelab has three features. `ssh` turns on the ssh daemon. `monitoring` runs a metrics
+exporter. `desktop` starts a graphical session, and a desktop machine should also accept ssh, so
+`desktop` includes `ssh`. Each host lists the features it wants.
+
+In gen a feature is an **aspect**: a named bundle of configuration, with its content grouped by the
+**class** it targets, such as `nixos`.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  cnf.keySemantics.nixos.category = "class";
+  aspectSchema = gen.aspects.mkAspectSchema cnf;
+
+  homelab = m.evalModuleTree {
+    modules = [
+      (aspectSchema.mkAspectModule { })
+      { options.hosts = m.mkOption { type = m.types.attrsOf m.types.raw; default = { }; }; }
+      {
+        aspects.ssh.nixos.services.openssh.enable = true;
+        aspects.monitoring.nixos.services.prometheus.exporters.node.enable = true;
+        aspects.desktop.includes = [ "ssh" ];
+        aspects.desktop.nixos.services.xserver.enable = true;
+
+        hosts.laptop.aspects = [ "desktop" ];
+        hosts.server.aspects = [ "ssh" "monitoring" ];
+      }
+    ];
+  };
+
+  facts = gen.aspects.graphFacts cnf homelab.config.aspects;
+  includes = id: facts.includesOf.${id} or [ ];
+in
+{
+  includesOf = facts.includesOf;
+  desktopPullsIn = gen.graph.reachableFrom { edges = includes; } "desktop";
+}
+```
+
+```text
+{ desktopPullsIn = [ "ssh" ];
+  includesOf = { desktop = [ "ssh" ]; monitoring = [ ]; ssh = [ ]; }; }
+```
+
+## How it works
+
+`cnf` tells gen what each key of an aspect means. Here `nixos` is a class, so everything under
+`aspects.<name>.nixos` is NixOS configuration. A framework can declare more classes, such as
+one for user environments, and other key categories, such as channels.
+
+`includes` is a relation between aspects, so gen turns it into edges. `graphFacts` extracts those
+edges as data, and every query from [the previous page](/understand/graph/) works on them. The
+include closure of `desktop` is one `reachableFrom` call. Once `desktop` pulls in `ssh`, the
+laptop gets the ssh daemon without anyone writing it into the laptop's configuration.
+
+Because an aspect is data, a framework can inspect it before building anything: which classes it
+writes and which aspects it includes. Delivering each host's class content to
+a NixOS system builder is covered on [Aspects](/features/aspects/) and
+[Delivery](/features/delivery/).
+
+## The theory
+
+**Feature-oriented programming** builds a family of related programs from features: units of
+functionality that a product either includes or leaves out, and that can depend on each other.
+Each homelab host is one product of that family, assembled from the features it selects. See our
+reading of [Apel et al. (2009)](/reference/papers/apel-2009-overview-fosd/). The name
+*aspect* comes from aspect-oriented programming, where one unit of code can affect many places in
+a system ([Kiczales et al. 1997](/reference/papers/kiczales-1997-aspect-oriented-programming/)).
+
+Next: [Stable Identity for Everything](/understand/identity/).

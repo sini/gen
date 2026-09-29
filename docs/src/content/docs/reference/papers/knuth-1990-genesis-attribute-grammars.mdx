@@ -1,8 +1,6 @@
 ---
 title: "Knuth (1990) — The Genesis of Attribute Grammars"
 description: "Our reading of The genesis of attribute grammars."
-source:
-  - den-ag-design:reference-catalog/summaries/knuth-1990-genesis-attribute-grammars.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ D. E. Knuth, "The genesis of attribute grammars," *Lecture notes in computer sci
 
 [doi:10.1007/3-540-53101-7_1](https://doi.org/10.1007/3-540-53101-7_1)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -46,56 +44,52 @@ The document read is "The Genesis of Attribute Grammars" (1990), Knuth's retrosp
 - **Strongly non-circular grammars**: the class recognized by Knuth's original (incorrect) algorithm. A practical restriction: circularity can be tested on the grammar itself, independent of particular parse trees.
 - **Declarative semantics**: the philosophical contribution — meaning as a system of equations rather than an algorithm. "How simple to realize [semantic correctness] if you write a procedure. The problem is, however, to find a metalanguage for doing that in a declarative way, not in an operational way" (Caracciolo, quoted by Knuth).
 - **Parse tree as evaluation substrate**: attributes live on nodes of the derivation tree. The tree provides both the structure for dependency flow and the memoization boundary for attribute values.
-- **Top-down vs. bottom-up unification**: the framework eliminates the false dichotomy between top-down and bottom-up semantic analysis by allowing both directions simultaneously, governed by dependency order.
+- **Top-down and bottom-up unified**: the framework allows both directions of semantic analysis at once, governed by dependency order.
 
-## Ecosystem Relevance
+## How gen uses this
 
 ### Foundational Influence
 
-Knuth's inherited/synthesized attribute dichotomy is the conceptual bedrock of the gen ecosystem. Every library either directly implements AG concepts or operates on structures that are AG nodes.
+Knuth's split between inherited and synthesised attributes underlies gen. Each library either implements attribute grammar concepts or operates on structures whose nodes carry attributes.
 
-**gen-scope** is the direct descendant — a Higher-Order Attribute Grammar (HOAG) evaluator. Its `inherit'` combinator is Knuth's inherited attributes: walk the parent chain until a value resolves. Its synthesized attributes are computed from children via `children` and `derived-children`. The `_eval` lazy attrset on each node is the memoization cache that Knuth's framework requires — one attribute value per node, computed at most once. Nix's native lazy evaluation provides the demand-driven scheduling that sidesteps the need for an explicit topological sort of attribute dependencies.
+**gen-scope** is the direct descendant, a higher-order attribute grammar evaluator. Its `inherit'` combinator is Knuth's inherited attribute: walk the parent chain until a value resolves. Synthesised attributes are computed from a node's children. Each node's lazy `_eval` attrset is the memoisation Knuth's framework needs, one value per attribute per node, computed at most once. Nix's lazy evaluation supplies the demand-driven scheduling, so gen-scope needs no explicit topological sort of attribute dependencies.
 
-**gen-aspects** encodes aspect content as attribute values on scope graph nodes. Class keys (nixos, darwin, homeManager) are *terminal synthesized attributes* — the final output of the grammar, what Knuth called "the translation." Nested keys create sub-nodes, extending the tree structure. Guard functions are inherited-attribute consumers: they receive context (host, user) from above and produce class content below.
+**gen-aspects** gives aspect content the form of attribute values on scope-graph nodes. Class keys (`nixos`, `darwin`, `homeManager`) are the root's synthesised attributes, the value the grammar computes and hands out. Nested aspects extend the tree. Parametric aspects consume inherited attributes: they receive context such as the host or user from above and produce class content.
 
-**gen-algebra** implemented convergent fixpoint computation via a `search` namespace (Palmer §3's Search monad and a `converge` runner), which is the evaluation strategy for circular attribute grammars (an extension Knuth anticipated but left to successors) — the runner iterated until stability, the same quiescence condition that AG evaluators use for circular attributes. The namespace is **retired**: gen-scope is the sole evaluator (ADR-0008 §1).
+**gen-select**'s selectors run over the same tree and graph structures attributes are defined over. `within` and `parentMatches` navigate the tree, the substrate Knuth chose for attribute definitions.
 
-**gen-derive**'s stratified phases mirror the evaluation scheduling problem Knuth identified. Rules fire in dependency order determined by phase DAGs, analogous to how AG evaluators schedule attribute computations in dependency order.
+**gen-bind** addresses a problem Knuth touches only in passing, delivering context to functions that cannot reach the tree. In attribute grammar terms, its bindings are inherited attributes delivered to leaf-level modules.
 
-**gen-select**'s selectors operate on the same tree/graph structures that attributes are defined over. The `within` and `parentMatches` combinators correspond to navigating the parse tree — the substrate Knuth chose for attribute definition.
+A framework built on gen expresses its configuration as a demand-driven attribute grammar evaluated by gen-scope, replacing an operational pipeline that threads state through handlers with equations on a graph that the evaluator schedules. This is the move Knuth argued for: declarative semantics in place of operational semantics.
 
-**gen-bind** solves a problem Knuth touched on peripherally: how to inject contextual information into module functions. In AG terms, bindings are inherited attributes delivered to leaf-level modules that cannot access the tree directly.
+### Descendants
 
-**Den v2** replaces a ~7000-line imperative handler chain (the v1 fx-pipeline) with a demand-driven AG evaluated by gen-scope. This is exactly the transformation Knuth advocated: replacing operational semantics (compile-time algorithms that thread state through handlers) with declarative semantics (equations on a tree that the evaluator schedules automatically). The den effect vocabulary (`spawn`, `edge`, `drop`, `reroute`, `inject`) becomes attribute equations on scope graph nodes.
+**Vogt et al. 1989, Higher-Order Attribute Grammars.** Vogt allows attributes whose values are trees, non-terminal attributes (NTAs). In Knuth's framework attribute values are atomic. With NTAs an attribute computation can synthesise a subtree, which then takes part in further evaluation. gen-scope's `derived-children` grows the node set on demand this way, and its `nta` channel lets a node read the attributes of the children it synthesised.
 
-### Descendants in the Used Catalog
+**Hedin 2000, Reference Attributed Grammars.** Hedin allows attributes to hold references to other nodes. This breaks the strict parent-child flow of classical attribute grammars: a node can reach across the tree through a reference. gen-scope's import edges (`decls.__edges.I`) are such references, and they make cross-subtree resolution possible. The scope graph formalism gen-scope implements (Néron 2015) depends on this extension, since a tree alone cannot express imports.
 
-**Vogt et al. 1989 — Higher-Order Attribute Grammars.** Extends Knuth by allowing attributes whose values are *trees themselves* — non-terminal attributes (NTAs). In Knuth's framework, attributes are atomic values; Vogt lifts this restriction so an attribute computation can synthesize an entirely new subtree, which then participates in further attribute evaluation. gen-scope's `children` attribute is a direct NTA: a node computes its children as an attribute, and those children carry their own attributes. `derived-children` extends Vogt further with two-stage stratification (gen-scope's own design), where second-stage children can read sibling attributes from the first stage.
+**Hedin and Magnusson 2003, JastAdd.** JastAdd makes evaluation demand-driven (compute only what is accessed) and lets attributes be declared in separate modules. gen-scope's lazy `_eval` is demand-driven evaluation through Nix laziness. JastAdd showed that demand-driven evaluation removes the need for explicit scheduling, which is why gen-scope has no scheduler: Nix is the scheduler.
 
-**Hedin 2000 — Reference Attributed Grammars (RAGs).** Extends Knuth by allowing attributes to hold *references to other nodes* in the tree, not just values. This breaks the strict parent-child information flow of classical AGs — a node can "reach across" the tree via a reference. gen-scope's import edges (`decls.__edges.I`) are RAG references: they establish non-tree edges between scope graph nodes, enabling cross-subtree resolution. The entire scope graph formalism (Neron 2015) that gen-scope implements depends on Hedin's extension — Knuth's original tree-only structure cannot express import relationships.
+**Sloane et al. 2010, Kiama.** Kiama embeds attribute grammars in Scala with higher-order functions as attribute combinators. Sloane shows that `CachedAttribute`, a memoised function from node to value, is the core implementation pattern, and gen-scope's `_eval` is that pattern for non-parameterised attributes. Sloane's circular attribute combinator (iterate to a fixpoint) corresponds to gen-scope's `circular`.
 
-**Hedin and Magnusson 2003 — JastAdd.** Extends Knuth by making AG evaluation demand-driven (compute only what is accessed) and aspect-oriented (attributes can be declared in separate modules and woven together). gen-scope's lazy `_eval` cache is JastAdd's demand-driven evaluation realized through Nix laziness. gen-aspects' `neededBy` is inspired by JastAdd's aspect-oriented extension — the ability to inject attribute definitions from outside the original grammar. JastAdd proved that demand-driven evaluation eliminates the need for explicit scheduling, which is why gen-scope has no scheduler — Nix *is* the scheduler.
-
-**Sloane et al. 2010 — Kiama.** Embeds Knuth's framework in a general-purpose language (Scala) using higher-order functions as attribute combinators. Sloane showed that `CachedAttribute` (memoized function from node to value) is the fundamental implementation pattern. gen-scope's `_eval` is `CachedAttribute`. Sloane's `paramAttr` (parameterized attributes) mapped to gen-scope's own `paramAttr`, retired as a bare eta-expansion (`den-hoag-4kh.53.54`; gen-scope README, `#### Retired: paramAttr`). Sloane's circular attribute combinator (iterate until fixpoint) maps to gen-scope's `circular`. Sloane discussed collection attributes in section 7 as future work; gen-scope's `collectionAttr` implements them with configurable traversal modes.
-
-**Van Wyk et al. 2010 — Silver.** Extends Knuth with forwarding (a production can delegate to another production) and collection attributes (multi-contributor aggregation). Silver's collection attributes — where multiple tree nodes contribute values to a single named aggregation point — directly influence gen-scope's `collectionAttr` and gen-schema's collection fields. Silver's forwarding influenced den v1's forward compilation shape (`meta.__forward`) and remains relevant in den v2's `reroute` effect.
+**Van Wyk et al. 2010, Silver.** Silver adds forwarding (a production delegates to another) and collection attributes (several nodes contribute values to one named aggregate). Collection attributes correspond to gen-scope's folds over contributions.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**McCarthy's parameterized nonterminals.** Knuth describes a 1970 debate with John McCarthy, who proposed nonterminals with explicit parameters — `E(s)` where `s` is a symbol table — as an alternative to inherited attributes. McCarthy argued inherited attributes were unnecessary if you could parameterize grammar symbols directly. Neither won the debate. In the gen ecosystem, gen-scope's now-retired `paramAttr` (`den-hoag-4kh.53.54`) was closer to McCarthy's vision than to Knuth's inherited attributes: it took explicit parameters rather than relying on tree-positional inheritance. A systematic comparison of when an explicit-parameter attribute vs `inherit'` is preferable — and whether McCarthy's intuition about eliminating inherited attributes has practical merit in the Nix evaluation model — remains unexplored.
+**McCarthy's parameterised nonterminals.** Knuth recalls a 1970 debate with John McCarthy, who proposed nonterminals with explicit parameters, `E(s)` with `s` a symbol table, in place of inherited attributes. Neither side won. In gen-scope a parameterised attribute is written as a function of its parameter, which is closer to McCarthy's proposal, while `inherit'` follows Knuth. When each is preferable in Nix's evaluation model, and whether McCarthy's idea of eliminating inherited attributes has practical merit there, is unexplored.
 
-**Strongly non-circular subclasses.** Knuth's accidentally-useful incorrect circularity test defines a strict subclass of non-circular grammars that can be checked efficiently. The gen ecosystem does not perform static circularity analysis at all — it relies on Nix's lazy evaluation to detect cycles at runtime (infinite recursion). A compile-time well-formedness check, even for a restricted subclass like strongly non-circular grammars, could catch configuration cycles before evaluation rather than producing opaque Nix stack traces.
+**Strongly non-circular subclasses.** Knuth's flawed first circularity test defines a strict subclass of non-circular grammars that can be checked efficiently. gen does no static circularity analysis for attributes and relies on Nix to report a cycle at evaluation time as infinite recursion. A definition-time check, even for a restricted subclass such as strongly non-circular grammars, would catch cycles before evaluation with a clearer error.
 
-**Natural language semantics.** Knuth noted that inherited attributes map to context-dependent meaning in natural language (prepositions) and synthesized attributes to compositional meaning (number, gender, denotation). The gen ecosystem is purely in the programming-language/configuration domain. Whether the scope-graph + AG machinery could power structured NLP pipelines — where Nix expressions define compositional semantics over parse trees — is entirely uncharted.
+**Natural language semantics.** Knuth notes that inherited attributes correspond to context-dependent meaning in natural language and synthesised attributes to compositional meaning. gen works in the configuration domain. Whether the same machinery could drive structured language-processing pipelines is uncharted.
 
 ### Research Directions
 
-**Static cycle detection for scope graphs.** Knuth's circularity problem generalizes to scope graphs: can we statically determine that a den configuration will not produce a dependency cycle? The exponential lower bound (Jazayeri et al. 1975) applies to arbitrary AGs, but the restricted structure of den's scope graphs (bounded depth, regular topology from entity kinds) may admit polynomial-time checks. gen-schema's topology introspection (`_topology`, `_roots`, `_leaves`) already provides the structural metadata such an analysis would need.
+**Static cycle detection for scope graphs.** Knuth's circularity problem carries over to scope graphs: can a configuration be shown free of dependency cycles before evaluation? The exponential lower bound (Jazayeri et al. 1975) applies to arbitrary grammars, and the restricted structure of configuration graphs (bounded depth, regular topology from entity kinds) may admit polynomial checks. gen-schema's kind topology (`_topology`, `_roots`) gives the structural metadata such an analysis needs.
 
-**Incremental re-evaluation.** Knuth's framework assumes full re-evaluation from scratch. JastAdd (Hedin 2003) added demand-driven evaluation; the next step is *incremental* re-evaluation when a single attribute definition changes. In den's context, this would mean re-evaluating only affected NixOS modules when one aspect changes, rather than rebuilding the entire scope graph. Nix's content-addressed store provides a coarse form of incrementality at the derivation level, but attribute-level incrementality within a single evaluation is absent.
+**Incremental re-evaluation.** Knuth assumes evaluation from scratch. JastAdd added demand-driven evaluation, and the next step is re-evaluating only what a changed definition affects. gen-memo decides which keys must be recomputed after a change and reuses the rest, with a byte-identical result to a cold run.
 
-**Attribute grammar composition.** Knuth defined AGs monolithically — one grammar, one set of attributes. Silver (Van Wyk 2010) introduced modular composition of AG fragments. gen-aspects' `neededBy` and `includes` are ad hoc composition mechanisms. A formal algebra of AG fragment composition — with proven properties about when composed fragments preserve non-circularity — would put den's aspect composition on firmer theoretical ground.
+**Composition of grammar fragments.** Knuth defines a grammar as one monolithic unit. Silver introduced modular composition of fragments. An algebra of fragment composition with proven conditions under which composition preserves non-circularity would give aspect composition a firmer basis.
 
-**Circular attributes in practice.** Knuth excluded circular definitions; Sloane (2010) and others added controlled circular attributes with fixpoint semantics. gen-scope implements `circular` and gen-derive implements fixpoint dispatch, but neither provides guidance on *when* circularity is safe (monotonic lattice, bounded domain) vs. when it indicates a configuration error. A type-level distinction between monotonic and non-monotonic attributes could catch divergent fixpoints statically.
+**Circular attributes in practice.** Knuth excluded circular definitions, and Sloane (2010) and others added controlled circular attributes with fixpoint semantics. gen-scope's `circular` requires a declared carrier (bottom element, order and height), which records when iteration is expected to converge. Checking monotonicity of the step as well would catch divergent fixpoints before they run.

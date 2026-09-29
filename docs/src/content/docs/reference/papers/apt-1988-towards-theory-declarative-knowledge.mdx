@@ -1,8 +1,6 @@
 ---
 title: "Apt, Blair & Walker (1988) -- Towards a Theory of Declarative Knowledge"
 description: "Our reading of Towards a Theory of Declarative Knowledge."
-source:
-  - den-ag-design:used/summaries/apt-1988-towards-theory-declarative-knowledge.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ K. R. Apt, H. A. Blair, and A. Walker, "Towards a Theory of Declarative Knowledg
 
 [doi:10.1016/b978-0-934613-40-8.50006-3](https://doi.org/10.1016/b978-0-934613-40-8.50006-3) · [read the paper](https://ir.cwi.nl/pub/10404/10404D.pdf)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -37,17 +35,17 @@ A terminology caution for anyone citing this chapter, because two terms routinel
 
 ## Key Concepts
 
-- **Stratification is a partition of the program, and the two conditions are asymmetric.** DEFINITION 3 (p. 96): positive occurrences resolve within `U_{j<=i} P_j`, negative occurrences within `U_{j<i} P_j`. Same-stratum positive dependency is *permitted* -- that is the whole point, since it is what allows recursion to survive the restriction. Only negation is forced strictly downward. A guard that applies the strict rule to every read is not implementing this definition; it is implementing Clark's hierarchical constraint, which ABW explicitly distinguish (p. 144) as the recursion-free special case.
+- **Stratification is a partition of the program, and the two conditions are asymmetric.** DEFINITION 3 (p. 96): positive occurrences resolve within `U_{j<=i} P_j`, negative occurrences within `U_{j<i} P_j`. Same-stratum positive dependency is *permitted*, which is what allows recursion to survive the restriction. Only negation is forced strictly downward. A guard that applies the strict rule to every read implements Clark's hierarchical constraint, which ABW distinguish (p. 144) as the recursion-free special case.
 
-- **What gets stratified is a predicate symbol, not a ground atom.** DEFINITION 2 (p. 96) defines "the definition of a relation symbol", and DEFINITION 3 quantifies over relation symbols. The index of the discipline is therefore the *relation kind*, not the individual fact. The ground-atom refinement is Przymusinski's separate notion (p. 144).
+- **What gets stratified is a predicate symbol.** DEFINITION 2 (p. 96) defines "the definition of a relation symbol", and DEFINITION 3 quantifies over relation symbols. The index of the discipline is therefore the *relation kind*. The ground-atom refinement is Przymusinski's separate notion (p. 144).
 
-- **Sign-labelled dependency graph with a negative-cycle criterion.** DEFINITION 4 (p. 97) and LEMMA 1 (pp. 97-98): stratifiability is decidable as "no cycle contains a negative edge". Note the modelling detail that a single edge may be simultaneously positive and negative -- signs label the edge, not a pair of parallel edges.
+- **Sign-labelled dependency graph with a negative-cycle criterion.** DEFINITION 4 (p. 97) and LEMMA 1 (pp. 97-98): stratifiability is decidable as "no cycle contains a negative edge". A single edge may be both positive and negative, because the signs label the edge.
 
 - **SCC condensation as the canonical stratification.** LEMMA 1's converse decomposes the dependency graph into maximal strongly connected components and numbers the condensation, which is finite and acyclic hence well founded. This yields the finest stratification ("clusters", DEFINITION 12, p. 112) through which all others factor.
 
 - **Staged iteration `iter` over a sequence of nonmonotonic operators.** `N_0 = I`, `N_i = T_i^w(N_{i-1})` (p. 104). Developed abstractly for finitary/growing operators over local/raising sequences, then instantiated at `T_{P_i}`. Substitutes for Knaster-Tarski, which is unavailable because `T_P` is nonmonotonic under negation.
 
-- **Saturate each stratum before starting the next.** `M_i = T_{P_i}^w(M_{i-1})`, `M_P = M_n` (p. 108). Negation in stratum `i` is evaluated against a stratum that is already at fixed point and will not be revised. This is the operational content of the discipline: not "read less", but "read only what has finished".
+- **Saturate each stratum before starting the next.** `M_i = T_{P_i}^w(M_{i-1})`, `M_P = M_n` (p. 108). Negation in stratum `i` is evaluated against a stratum that is already at fixed point and will not be revised. The operational content of the discipline is to read only what has finished.
 
 - **Independence implies commutation.** DEFINITION 9 (p. 106) and THEOREM 3 (p. 107): independent operators commute under upward iteration. The lever for the uniqueness result.
 
@@ -55,71 +53,54 @@ A terminology caution for anyone citing this chapter, because two terms routinel
 
 - **A computation-free characterization.** THEOREM 12 (pp. 117-118): `M_P = M(P_n)` where each `M(P_i)` is the intersection of supported models of `P_i` agreeing with `M(P_{i-1})` below. The declarative reading of the same object.
 
-- **Consistency of Clark's completion for stratified programs.** THEOREMS 15-16 (p. 139). Stratification buys a standard soundness precondition. The completion and `M_P` are not the same view: `comp(P)` may leave undetermined what `M_P` decides.
+- **Consistency of Clark's completion for stratified programs.** THEOREMS 15-16 (p. 139). Stratification buys a standard soundness precondition. The completion and `M_P` differ: `comp(P)` may leave undetermined what `M_P` decides.
 
-## Implementation Mapping
+## How gen uses this
 
-### Current Usage in Gen Ecosystem
+### gen-scope: `stratify`
 
-#### den-hoag (MAJOR)
+gen-scope's `stratify` is gen's one stratification driver. An instance supplies a schedule of strata, a way to place each item in a stratum and a function that runs one stratum. The driver returns every stratum's settled output in schedule order. It cites ABW's construction `M_i = T_{P_i}^w(M_{i-1})` (p. 108) for the one guarantee it gives: when a stratum runs, every earlier stratum has reached its fixed point and its output is closed. This is why aggregation needs stratification. A fold over a set that is still growing answers about a prefix.
 
-den-hoag cites this chapter as the soundness law governing non-monotone reads in the kernel. The citation sites are `lib/stratum-scope.nix`, `lib/concern-derived.nix`, `lib/attributes/claim-accessor.nix`, `lib/attributes/resolution-relations.nix`, and the CI witnesses `ci/tests/negation-gate.nix`, `ci/tests/claim-negation.nix`, `ci/tests/claim-provide-witness.nix`.
+`stratify` imposes no visibility rule. DEFINITION 3 forces only negative occurrences strictly downward, and lets a positive occurrence resolve within the same stratum. Strictly-below indexing is a sufficient condition for a negated read to be sound, and a driver that enforced it on every read would reject programs the definition admits.
 
-**Stratum-scoped reads (L1).** `lib/stratum-scope.nix` splits the capability boundary into a silent source (`edgesBelowStratum`, where an out-of-scope edge is simply absent from the query surface) and a loud projection (`ceilingGate`, where reading a relation kind at or above the ceiling is replaced by a named throw). The correspondence to DEFINITION 3 is direct: a reader's ceiling is its stratum index `i`, and the question of which `U_{j..i} P_j` an edge must fall within is exactly the question the two conditions answer differently for positive and negative occurrences.
+The minting pass in gen-scope (`mintStrata`) is an instance. Each pass is a stratum, and a pass resolves identifiers only against what strictly earlier passes settled. So a cycle among minted nodes cannot be written.
 
-**Stratified claim negation (L4).** `lib/concern-derived.nix` rejects a `negates` entry that does not name a relation, on the grounds that an unrestricted negation would be unsound. That is the correct shape of the ABW restriction -- negation is admitted only where the negated thing is a relation whose definition can be located in a stratum.
+### gen-scope and gen-program: sign-labelled programs and the well-founded model
 
-**Discrepancies against the primary text, recorded here because they are what the archive is for.** Two substantive errors, plus one citation-hygiene ambiguity:
+gen-scope's `mkProgram` keeps the dependency graph of a rule program sign-labelled, as DEFINITION 4 does. The labels decide which semantics applies. ABW give a meaning to a program whose cycles are all positive, and give nothing to a cycle through a negative edge. gen-scope's `wellFoundedModel` computes Van Gelder's well-founded model, which assigns such a cycle the value *undefined* and agrees with the stratified model on every program ABW cover. gen-program builds rule programs that contain negation from a framework's declarations and solves them this way.
 
-1. *The comparison operator.* `lib/stratum-scope.nix` describes the discipline as "stratum n may only see facts at strata STRICTLY BELOW n". DEFINITION 3 condition 1 permits a *positive* occurrence to resolve at `j <= i`. Applying the strict rule uniformly is strictly stronger than ABW and forbids same-stratum positive recursion, which is the case stratification exists to allow. `REFERENCE.md` line 959 states it correctly ("same-stratum positive reads are permitted"); the two statements are not compatible and the archive sides with 959.
+### gen-graph: the graph half of LEMMA 1
 
-2. *What is indexed.* `gen-specs/den-hoag/REFERENCE.md` line 83 calls this "the local-stratification discipline of Apt, Blair & Walker (1988)". Local stratification is Przymusinski's and ranges over ground atoms; ABW's ranges over relation symbols (p. 144, and DEFINITIONS 2-3). This is not a naming quibble -- it determines whether a guard is keyed on a relation *kind* or on an individual *fact*, and ABW's notion is the kind-indexed one. The same line's gloss "a predicate may depend only on strictly-lower strata" repeats error (1).
+LEMMA 1 states that a program is stratified exactly when no cycle in its dependency graph contains a negative edge, and its proof decomposes the graph into strongly connected components. gen-graph's `cyclicEdgesWhere` implements that proof method: it partitions the graph into strongly connected components, then reports the labelled edges whose endpoints share a component. Which labels count as negative is the caller's choice, since gen-graph has no notion of programs or clauses.
 
-3. *Citation hygiene -- NOT a bad citation.* ABW's chapter has **no numbered sections**; it uses named headers ("Preliminaries", "Syntax", "Stratified Programs", "Fixed Points", "Iteration Versus Simultaneity", "Model Theory of Stratified Programs", "An Alternative Characterization of M_P", "An Elementary Interpreter", "Existence of the Interpreter", "Other Views of Negation and Stratified Programs", "Bibliographic Remarks"). The citable locator for the definition is therefore **"Stratified Programs", DEFINITION 3, p. 96**, and for the asymmetry stated in words, **the Lemma 1 proof, pp. 97-98**.
+### gen-view: DEFINITION 3 clause 2 by structure
 
-   That fact does *not* imply anyone cited a nonexistent ABW section. `§2.3` is **den-hoag's own spec section** -- the capability-scope section -- used correctly and consistently at ~69 sites across `lib/` and `ci/` (e.g. `lib/concern-productions.nix:121` "not in the compiled strata order (§2.3)"; `lib/compat/deliver.nix:3` "the §2.3 error cases"). The narrow defect is the two sites where the paper's name and our section number sit adjacent, so the number can be misread as the paper's:
-
-   - `lib/concern-derived.nix:55` -- "(unsound, Apt-Blair-Walker §2.3)" -- genuinely ambiguous.
-   - `ci/tests/negation-gate.nix:3` -- "(Apt-Blair-Walker stratified negation, §2.3)" -- milder; parses as "ABW stratified negation, [our] §2.3".
-
-   Both want a separator, not a rewrite.
-
-### Relevance to Den v2 HOAG Pipeline
-
-The pipeline's two-layer fixpoint is a staged iteration in exactly ABW's sense: forward expand, `neededBy` scan, repeat until stable. Where den-hoag admits a non-monotone step -- a negated claim, an absence check, a `drop` -- ABW's result says what makes it sound, and the condition is about *completeness of the lower context*, not about restricted visibility per se. A negative read is safe when the relation it negates has reached its fixed point; it is unsound when that relation could still grow. This reframes the guard: the invariant to enforce is "the negated relation's stratum has been saturated", and strictly-below indexing is the conservative way to guarantee that, not the property itself.
-
-The scope graph is den's dependency graph, and LEMMA 1 transfers directly: the check for admissibility of a negation set is "no cycle in the relation-dependency graph contains a negative edge", decidable by SCC condensation rather than by search over candidate stratifications. gen-graph already has the fixpoint and reachability machinery this needs.
-
-THEOREM 11 is the result with the most architectural weight and the least current uptake. It says the canonical model does not depend on which admissible stratification was chosen. The den-hoag analogue is that resolution output must not depend on the particular phase assignment the scheduler picked -- a property currently assumed rather than witnessed. The chapter also supplies the proof technique: refine to clusters (SCCs), show every stratification is a union of clusters, show unrelated clusters commute.
+gen-view's ordering takes a materialised view as its input, never the raw labelled edges, so no query's answer can decide whether an edge exists. A cycle of the form `includes → ¬holds → includes` therefore cannot be written, which gives DEFINITION 3's clause 2 by the shape of the input type instead of a check at read time.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited Ideas
 
-**The negative-cycle criterion as a static admissibility check (LEMMA 1, pp. 97-98).** den-hoag currently enforces stratification by construction -- the ceiling is declared and the gate throws at read time. ABW's criterion permits the dual: accept a declared relation graph, sign its edges, and *decide* whether a stratification exists at all. A program with a negation cycle is rejected at definition time with the cycle exhibited, rather than at read time with a ceiling violation. This is a better error and it is a graph query den already knows how to run.
+**Clusters as the canonical stratification (DEFINITION 12, p. 112).** The SCC condensation yields the finest admissible stratification. A framework that assigns strata by declaration could derive them instead: compute the finest layering the relation graph admits, and treat a declared stratum as an assertion checked against it.
 
-**Clusters as the canonical stratification (DEFINITION 12, p. 112).** The SCC condensation yields the finest admissible stratification. den-hoag assigns strata by declaration. Deriving them instead would remove a class of hand-tuning: the framework computes the finest layering the relation graph admits, and a user-declared ceiling becomes an assertion to check against it rather than the source of truth.
+**Stratification-independence as a testable property (THEOREM 11, p. 116).** The theorem generates tests. Evaluate under two admissible stratifications and require byte-identical output. This checks that admissible variation has no effect, which is stronger than checking that a violation throws.
 
-**Stratification-independence as a testable property (THEOREM 11, p. 116).** The theorem is a witness generator: evaluate under two different admissible stratifications and require byte-identical output. This is a stronger CI property than the current negation-gate witnesses, which check that a violation throws, not that admissible variation is inert.
+**The computation-free characterisation (THEOREM 12, pp. 117-118).** `M(P_i)` is the intersection of the supported models of `P_i` that agree with `M(P_{i-1})` below. This specifies what the output of resolution is without reference to the iteration order that produces it, which makes it a candidate oracle wherever current oracles are stated operationally.
 
-**The computation-free characterization (THEOREM 12, pp. 117-118).** `M(P_i)` = intersection of supported models of `P_i` agreeing with `M(P_{i-1})` below. A specification of what resolution output *is*, stated without reference to the iteration order that produces it -- useful as an oracle in exactly the places where the current parity oracles are phrased operationally.
-
-**Supportedness as a distinct invariant (THEOREM 7, p. 111).** ABW separate "is a model" from "is supported" (every atom has a ground clause justifying it). den-hoag has no corresponding check that every materialized fact has a producing rule whose body held. Unsupported facts are the shape of a bug where something is emitted by accident rather than derived.
+**Supportedness as a distinct invariant (THEOREM 7, p. 111).** ABW separate "is a model" from "is supported", where every true atom has a ground clause justifying it. A check that every materialised fact has a producing rule whose body held would catch facts emitted by accident.
 
 ### Potential New Libraries or Features
 
-**Signed dependency graph + stratifiability decision, in gen-graph.** `mkSignedGraph { nodes; edges = [{ from; to; sign; }]; }` with `stratify` returning either an assignment of nodes to strata or the offending negative cycle. Implements LEMMA 1's SCC-condensation proof directly. gen-graph already has SCC and fixpoint primitives; this is a labelling layer plus the numbering argument.
+**A stratifiability decision.** `cyclicEdgesWhere` answers the graph half of LEMMA 1. A caller that has programs could pair it with a numbering of the condensation to return either an assignment of relations to strata or the offending negative cycle, which is LEMMA 1's proof as a function.
 
-**Staged-iteration combinator.** `iter` over a sequence of operators with saturation at each stage (`N_i = T_i^w(N_{i-1})`, p. 104), plus the finitary/growing preconditions as documented obligations. den-hoag's phase loop is an instance; naming the abstraction makes the preconditions checkable rather than implicit.
-
-**Stratum-consistency assertion for negation sites.** For each declared `negates`, assert that the negated relation's stratum is strictly below the negating clause's, computed from the derived stratification rather than the declared ceiling -- and permit same-stratum *positive* reads explicitly, which is where the current strict-everywhere guard diverges from the paper.
+**Stratum-consistency assertion for negation sites.** For each negated relation, assert that its stratum is strictly below the negating rule's, computed from the derived stratification, and permit same-stratum positive reads explicitly.
 
 ### Research Directions
 
-**Local stratification, deliberately rather than by accident.** Przymusinski's ground-atom refinement (same Minker volume, pp. 193-216) admits programs whose predicate-level dependency graph has a negative cycle but whose ground instantiation does not. den-hoag's aspects are parametric, so the predicate-level graph is coarser than the instance-level one and there will be real cases rejected at kind level that are sound at instance level. That is a genuine reason to want the local notion -- but it should be adopted on purpose, with Przymusinski cited, not inherited through a mis-citation of ABW.
+**Local stratification, adopted deliberately.** Przymusinski's ground-atom refinement (same Minker volume, pp. 193-216) admits programs whose predicate-level dependency graph has a negative cycle while their ground instantiation has none. Parametric aspects make the predicate-level graph coarser than the instance-level one, so some programs rejected at kind level are sound at instance level. That is a reason to want the local notion, adopted with Przymusinski cited.
 
-**Whether den's fixpoint operators are actually "growing".** THEOREM 5 (p. 109) requires semi-positivity per stratum (`Neg_P n Def_P = phi`: no negated relation symbol appears in a head within the stratum). The chapter's guarantees rest on this. Whether den-hoag's per-phase operators satisfy the analogous condition is unverified, and it is the precondition most likely to be silently violated by a rule that both negates and produces the same relation kind.
+**Whether each stratum's operator is growing.** THEOREM 5 (p. 109) requires semi-positivity per stratum (`Neg_P ∩ Def_P = ∅`: no negated relation symbol appears in a head within the stratum). The chapter's guarantees rest on it. A rule that both negates and produces the same relation kind violates it.
 
-**Completion consistency as a den-level property (THEOREMS 15-16, p. 139).** ABW get consistency of Clark's completion as a corollary of stratification. The den analogue -- that the "if and only if" reading of the rule set is satisfiable, so no query can be answered both ways -- is a soundness property the framework currently has no statement of.
+**Completion consistency (THEOREMS 15-16, p. 139).** ABW obtain consistency of Clark's completion as a corollary of stratification. The analogue for a rule program is that the "if and only if" reading of its rules is satisfiable, so no query can be answered both ways.
 
-**Effectiveness without function symbols (pp. 136-137).** ABW note that for function-symbol-free programs the Herbrand base is finite and the interpreter terminates, with worst-case complexity no worse than ordinary depth-first search. den's entity graph is finite by construction, which is the same situation; the observation bounds what the resolution loop can cost and may be worth stating as a termination argument rather than relying on an iteration cap.
+**Effectiveness without function symbols (pp. 136-137).** For function-symbol-free programs the Herbrand base is finite and the interpreter terminates, with worst-case cost no worse than depth-first search. A configuration's entity graph is finite, which is the same situation. The observation bounds what resolution can cost and gives a termination argument.

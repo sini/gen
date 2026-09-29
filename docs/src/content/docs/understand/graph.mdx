@@ -1,0 +1,82 @@
+---
+title: Your Configuration as a Graph
+description: Hosts, users and features are nodes joined by labelled edges, and a question is a path over the labels, as in scope graphs.
+---
+
+Draw the homelab on a whiteboard and you get a graph. The hosts, users and features are boxes. The
+lines between them say what relates to what: the server has user `bob`, the laptop uses the
+`desktop` feature, and `desktop` includes `ssh`.
+
+gen keeps that picture as the configuration itself. Each box is a **node**. Each line is an
+**edge** with a **label** that says what kind of relation it is.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+
+  edges = [
+    { from = "laptop"; to = "alice"; label = "user"; }
+    { from = "laptop"; to = "desktop"; label = "feature"; }
+    { from = "server"; to = "alice"; label = "user"; }
+    { from = "server"; to = "bob"; label = "user"; }
+    { from = "server"; to = "ssh"; label = "feature"; }
+    { from = "server"; to = "monitoring"; label = "feature"; }
+    { from = "desktop"; to = "ssh"; label = "includes"; }
+  ];
+  nodes = [ "laptop" "server" "alice" "bob" "ssh" "monitoring" "desktop" ];
+
+  follow = label: id:
+    map (e: e.to) (builtins.filter (e: e.label == label && e.from == id) edges);
+
+  homelab = gen.graph.labeledFrom {
+    user = follow "user";
+    feature = follow "feature";
+    includes = follow "includes";
+  } nodes;
+
+  inherit (gen.graph) regex;
+in
+{
+  # Which features does the laptop get, counting what each feature includes?
+  laptopFeatures = gen.graph.query { } {
+    graph = homelab;
+    from = "laptop";
+    follow = regex.seq [ (regex.lit "feature") (regex.star (regex.lit "includes")) ];
+  };
+
+  # Which machines does alice have an account on?
+  aliceHosts = gen.graph.dependents { } {
+    edges = follow "user";
+    inherit nodes;
+  } "alice";
+}
+```
+
+```text
+{ aliceHosts = [ "laptop" "server" ]; laptopFeatures = [ "desktop" "ssh" ]; }
+```
+
+## How a question is asked
+
+The first query reads as a sentence: start at `laptop`, follow one `feature` edge, then follow any
+number of `includes` edges. The `follow` argument is a regular expression over edge labels.
+`regex.lit` matches one label, `regex.seq` matches labels in order, and `regex.star` matches zero or
+more repeats. The answer is every node at the end of a matching path.
+
+The second query walks edges backwards. `dependents` returns every node that can reach `alice`,
+which in the `user` relation means every host she has an account on.
+
+gen reads your data through the functions you pass (`follow` above), so the data can stay in
+whatever shape you already keep it in. The same approach answers the other common questions
+about a graph: roots and leaves, cycles, a safe build order, all paths between two nodes. The
+[Graphs and Queries](/features/graphs/) page lists them.
+
+## The theory
+
+A **scope graph** is a graph whose edges carry labels, used to resolve names in programming
+languages: to find what a name refers to, you follow edges whose labels match a regular
+expression. gen applies the same model to configuration. A host, a feature and an environment are
+scopes, and a question about them is a path over labelled edges. See our reading of
+[Neron et al. (2015)](/reference/papers/neron-2015-scope-graphs/).
+
+Next: [Reusable Features](/understand/features/).

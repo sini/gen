@@ -1,0 +1,51 @@
+---
+title: Libraries
+description: Every gen library and the feature pages that document what it provides.
+source:
+  - lib/mkGenLibs.nix
+  - lib/hubSubstrate.nix
+---
+
+gen is 22 libraries, each its own repository at `github:sini/gen-<name>`. The hub,
+`github:sini/gen`, pins all of them and hands them to you as one set. The documentation is organised
+by feature, so this table tells you which pages cover each library.
+
+| Library | What it provides | Documented on |
+|---|---|---|
+| gen-prelude | Utility functions the other libraries share, with no dependency on `nixpkgs.lib` | Used by the other libraries |
+| gen-identity | `hashIdentity`, the function that mints every content-derived identity | [Kinds, Registries and Identity](/features/registries/) |
+| gen-algebra | Layered records, comparable functions and `either` | [Typed Configuration](/features/configuration/), [Kinds, Registries and Identity](/features/registries/) |
+| gen-types | Type checkers that each give a readable error | [Typed Configuration](/features/configuration/) |
+| gen-merge | The module system: `evalModuleTree`, priorities, submodules and provenance | [Typed Configuration](/features/configuration/), [Inspection](/features/inspection/) |
+| gen-scope | The evaluator: node trees, attributes computed on demand, binding nodes and the rule solver | [Evaluation](/features/evaluation/), [Rules](/features/rules/), [Kinds, Registries and Identity](/features/registries/) |
+| gen-memo | Incremental rebuild: reuse, early cutoff, and a trace of what was reused | [Incremental Rebuild](/features/incremental/), [Inspection](/features/inspection/) |
+| gen-graph | Graph queries over your own data: reachability, ordering, cycles and label path queries | [Graphs and Queries](/features/graphs/) |
+| gen-bind | Argument injection into module functions, and the terminals content is delivered to | [Typed Configuration](/features/configuration/), [Delivery](/features/delivery/) |
+| gen-schema | Kinds with typed options, and registries of their instances | [Kinds, Registries and Identity](/features/registries/) |
+| gen-aspects | Aspects: declaration, key categories, guards and graph facts | [Aspects](/features/aspects/) |
+| gen-select | Selectors that match nodes by kind, attribute and position | [Graphs and Queries](/features/graphs/) |
+| gen-dispatch | Rules applied step by step as typed actions | [Rules](/features/rules/) |
+| gen-product | Graph products, such as hosts × users | [Graphs and Queries](/features/graphs/) |
+| gen-settings | Settings resolved against ordered override layers, with provenance | [Typed Configuration](/features/configuration/) |
+| gen-link | Aspect graphs federated from several flakes | [Aspects](/features/aspects/) |
+| gen-view | Views that move content along edges, name resolution and schedule checks | [Delivery](/features/delivery/), [Evaluation](/features/evaluation/) |
+| gen-program | Logic programs built from rule declarations, and their models | [Rules](/features/rules/) |
+| gen-delivery | Projecting each node's class content and realising it through terminals | [Delivery](/features/delivery/) |
+| gen-class | Sharing one computed core across nodes of the same shape | [Incremental Rebuild](/features/incremental/) |
+| gen-assemble | One node set assembled from many contributions | [Evaluation](/features/evaluation/) |
+| gen-inspect | Queries, explanations and diagrams over a built graph | [Inspection](/features/inspection/) |
+
+## Taking one library or all of them
+
+The hub gives you every library at once:
+
+```nix
+genLibs = inputs.gen.lib.mkGenLibs { };   # genLibs.graph, genLibs.merge, …
+```
+
+Outside a flake, `import <gen checkout> { }` returns the same set.
+
+A library also works on its own. Add `github:sini/gen-<name>` as an input and use
+`inputs.gen-<name>.lib`. Four libraries, gen-assemble, gen-delivery, gen-inspect and gen-program,
+publish `.lib` as a function of the libraries they build on, so you call it with those libraries
+first. The hub makes that call for you.

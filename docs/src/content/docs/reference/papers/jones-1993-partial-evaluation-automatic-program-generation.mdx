@@ -1,8 +1,6 @@
 ---
 title: "Jones, Gomard & Sestoft (1993) — Partial Evaluation and Automatic Program Generation"
 description: "Our reading of Partial Evaluation and Automatic Program Generation."
-source:
-  - den-ag-design:reference-catalog/summaries/jones-1993-partial-evaluation-automatic-program-generation.md
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -10,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 <Aside type="note" title="The paper">
 N. D. Jones, C. K. Gomard, and P. Sestoft, "Partial Evaluation and Automatic Program Generation," *Prentice Hall International*, ISBN 0-13-020249-5, 1993.
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 *With chapters by Lars Ole Andersen and Torben Mogensen. Prentice Hall International, 1993;
@@ -208,96 +206,50 @@ supercompilation and deforestation — more dramatic speedups, less automation.
 - **Termination (§14).** Online and offline termination are different problems; BTA can be
   strengthened to guarantee termination of specialization.
 
-## Ecosystem Relevance
+## How gen uses this
 
-### Why acquired
+### gen-bind: "The Trick" as an enforced precondition
 
-Acquired 2026-08-05 as source material for a **gen-bind redesign spike**, alongside
-`lewis-2000-implicit-parameters`. The pairing is deliberate: JGS supplies binding-time
-analysis and staged specialization; Lewis supplies dynamically-scoped parameters with static
-types. **No gen library currently cites this book, and nothing here has been through the
-architecture-alignment gate.** Read the contact points below as *candidates for review*, not
-as validated design.
+gen-bind cites §12.2. "The Trick" recovers staticness for a dynamic value known to range over a finite set of statically computable values, by dispatching on each value. gen-bind's `gate` step, where a binding is conditioned on such a value, treats finiteness as a precondition to enforce. A gate whose enumeration is not finite and determined before any target fixpoint fails at `declare`. With the precondition enforced, every branch is materialised, so the declared edge set is the union over all branches.
 
-### Applicable insights (candidates, not validated)
+### gen-link: per-node binding times
 
-- **A binding-time discipline is a lattice plus a congruence condition, not a convention.**
-  §5.2 fixes the shape: a two-point domain, a safe direction of approximation, and a stated
-  soundness condition on the classification. Any framework that distinguishes
-  "known at declaration time" from "known at resolve time" is computing a division, and the
-  question to put to it is whether its classification is congruent in JGS's sense.
+gen-link cites the book for its binding-time classification: each node of a linked subgraph is classified closed or open. This is a pointwise division in the sense of §4.9.1, one classification per node instead of one for the whole program.
 
-- **`lift` is the only legal coercion.** Static may be embedded in dynamic; the reverse is the
-  error. That asymmetry is a checkable invariant.
+### Applicable insights
 
-- **Well-annotatedness as typing (§8.3, §8.6).** JGS's argument for moving the binding-time
-  check from specialization time to a static type system is exactly the argument for making a
-  staging error a declaration-time failure rather than an evaluation-time one — and §8.3
-  states the motivation in the terms a framework author would use: an automatically generated
-  artefact must not be able to die with an error message.
+- **A binding-time discipline is a lattice plus a congruence condition.** §5.2 fixes the shape: a two-point domain, a safe direction of approximation and a soundness condition on the classification. A framework that separates "known at declaration time" from "known at resolve time" is computing a division, and the question to ask is whether its classification is congruent in JGS's sense.
 
-- **Pointwise divisions (§4.9.1) vs. one global division.** The "one classification for the
-  whole program" assumption is called out by the authors themselves as too coarse for
-  anything beyond small programs, and the per-point refinement is shown to cost nothing
-  structurally.
+- **`lift` is the only legal coercion.** Static may be embedded in dynamic, and the reverse is an error. That asymmetry is a checkable invariant.
 
-- **Dead static data (§4.9.2) is a *duplication* defect.** Carrying a static value that no
-  longer influences the result multiplies residual points that are textually identical. The
-  named remedy is liveness on the static variables.
+- **Well-annotatedness as typing (§8.3, §8.6).** JGS move the binding-time check from specialisation time into a static type system, which makes a staging error a declaration-time failure. §8.3 gives the motivation a framework author would give: an automatically generated artefact must not be able to fail with an error message.
 
-- **Partially static structures (§15.4, §10.6).** The interesting case is never "this whole
-  value is static"; it is a structure with static and dynamic parts — Launchbury's projections
-  are the theory for that, and the association-list-with-static-keys example is the shape a
-  configuration environment actually has.
+- **Pointwise divisions (§4.9.1).** The authors call one classification for the whole program too coarse for anything beyond small programs, and show that the per-point refinement costs nothing structurally.
 
-- **The generating-extension view (§5.8) and the third projection (§1.5.3).** A framework that
-  produces a specialized artefact per subject is in the `cogen` position; the projections say
-  what that object *is* and what equation it must satisfy.
+- **Dead static data (§4.9.2) duplicates work.** Carrying a static value that no longer influences the result multiplies textually identical residual points. The remedy is liveness analysis on static variables.
 
-- **Honest ceiling: linear speedup (§6.2).** JGS is explicit that partial evaluation buys a
-  constant factor. Any claim of an asymptotic win from staging alone should be checked against
-  §6.2–6.4 before it is made.
+- **Partially static structures (§15.4, §10.6).** The interesting case is a structure with static and dynamic parts. Launchbury's projections are the theory for it, and the association list with static keys is the shape of a configuration environment.
+
+- **The generating extension (§5.8) and the third projection (§1.5.3).** A framework that produces a specialised artefact per subject is in the `cogen` position, and the projections say what that object is and what equation it must satisfy.
+
+- **Linear speedup (§6.2).** Partial evaluation buys a constant factor. A claim of an asymptotic win from staging alone should be checked against §6.2-6.4.
 
 ## Appendix: Follow-up Work
 
 ### Unexploited ideas
 
-- **Congruence as a checkable predicate.** §5.2 states the safety condition precisely enough to
-  be tested rather than asserted. Extracting it as an oracle over a declaration/resolution
-  split is the most directly transferable thing in the book.
+- **Congruence as a checkable predicate.** §5.2 states the safety condition precisely enough to test. Extracting it as an oracle over a split between declaration and resolution is the most directly transferable idea in the book.
 
-- **BTA by constraint solving (§8.7) rather than by fixed-point iteration (§5.2).** Two
-  presentations of the same analysis with different implementation profiles; the constraint
-  form composes better across separately-analysed fragments.
+- **BTA by constraint solving (§8.7) instead of fixed-point iteration (§5.2).** The two presentations of one analysis have different implementation profiles, and the constraint form composes better across separately analysed fragments.
 
-- **"The Trick" (§12.2).** Recovering staticness for a value known to range over a finite
-  enumerable set, by dispatching. A general mechanism, not a hack, and the book treats it as
-  such.
-
-- **Speedup analysis (§6.3).** A method for predicting the speedup *before* specializing.
-  Rarely reimplemented; relevant wherever a staging decision needs a cost model.
+- **Speedup analysis (§6.3).** A method for predicting speedup before specialising, relevant wherever a staging decision needs a cost model.
 
 ### Research directions
 
-- **Does the congruence condition survive a demand-driven, lazily-evaluated host?** JGS's
-  divisions are computed by a whole-program prephase over an eagerly-scheduled specializer.
-  Whether "static" is even well-defined when the evaluator only forces what is demanded — and
-  whether congruence must then be stated per-demand rather than per-program-point — is not
-  addressed in the book and is the obvious first question to put to it.
+- **Congruence under demand-driven evaluation.** JGS compute divisions in a whole-program prephase for an eagerly scheduled specialiser. When the evaluator forces only what is demanded, it is open whether "static" is well defined and whether congruence must be stated per demand instead of per program point.
 
-- **Offline vs online in a setting with no self-application requirement (§7.3).** JGS chooses
-  offline BTA *because* it tames self-application. A framework that does not need `mix` to
-  specialize itself does not automatically inherit that reason, and the online/offline
-  trade-off (precision vs. predictability) may land elsewhere. This is a premise worth
-  checking before importing the offline discipline wholesale.
+- **Offline or online without self-application (§7.3).** JGS choose offline BTA because it tames self-application. A framework that never specialises itself does not inherit that reason, and the trade-off between precision and predictability may fall differently.
 
-- **Projection-based binding times (§15.4) vs. a flat two-point classification.** The flat
-  `{S, D}` lattice is a simplification the book itself abandons for real data. Whether a
-  design needs the projection generalization, or can stay flat because its values are already
-  decomposed, is a design fork the book poses but does not answer for any particular language.
+- **Projections or a flat classification (§15.4).** The book abandons the flat `{S, D}` lattice for real data. Whether a design needs projections, or can stay flat because its values are already decomposed, is a question the book poses without answering for a particular language.
 
-- **Relation to the archived incremental-computation corpus.** JGS's `mix` and the
-  Mokhov 2018 / Adapton / Acar line both split a computation into a stable part and a varying
-  part, but along different axes (staging by *input availability* vs. rebuilding by *change
-  propagation*). Whether a binding-time division and a dirty/clean dependency graph are two
-  views of one structure, or genuinely orthogonal, is unexamined here.
+- **Staging and incremental computation.** JGS's `mix` and the line of Mokhov 2018, Adapton and Acar both split a computation into a stable part and a varying part, along different axes: staging by input availability, and rebuilding by change propagation. Whether a binding-time division and a dirty/clean dependency graph are two views of one structure or orthogonal is open.

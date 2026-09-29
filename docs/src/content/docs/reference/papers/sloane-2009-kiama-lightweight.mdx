@@ -1,8 +1,6 @@
 ---
 title: "Sloane (2009) -- Lightweight Language Processing in Kiama"
-description: "Our reading of Lightweight language processing in Kiama."
-source:
-  - den-ag-design:reference-catalog/summaries/sloane-2009-kiama-lightweight.md
+description: "A summary of Lightweight language processing in Kiama and how gen uses it."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -12,7 +10,7 @@ A. M. Sloane, "Lightweight language processing in Kiama," *GTTSE 2009, LNCS 6491
 
 [doi:10.1007/978-3-642-18023-1_12](https://doi.org/10.1007/978-3-642-18023-1_12)
 
-This page is our reading of it, not a substitute for it.
+A summary of the paper and how gen uses it.
 </Aside>
 
 ## Paper Summary
@@ -45,7 +43,7 @@ The paper's central observation is that the two paradigms -- attribution and rew
 - **Explicit substitutions** -- Rewriting-only evaluation where capture-free substitution is decomposed into individual rewrite rules operating on a `Let` construct, making each substitution step an observable transformation.
 - **Unified embedding pattern** -- Both paradigms use the same mechanism: combinator function (`attr`/`rule`) wrapping a host-language pattern-matching function. This structural parallel reveals deep commonality between attribution and rewriting.
 
-## Ecosystem Relevance
+## How gen uses this
 
 ### Complementary to Sloane 2010
 
@@ -62,27 +60,23 @@ This 2009 paper covers territory absent from the 2010 paper:
 
 ### Applicable Concepts
 
-**Strategy combinators for gen-derive rule composition.** gen-derive currently provides `restrict`, `override`, and `chain` as rule composition operators. Kiama's strategy combinators suggest a richer algebra: deterministic choice (try rule A, fall back to rule B), sequential composition (apply A then B to the result), and repeat-until-stable. The `reduce` strategy -- repeatedly apply sub-term + top-level rules until fixpoint -- is structurally similar to gen-derive's fixpoint convergence but operates at the individual-rule level rather than the whole-dispatch level.
+**Strategy combinators for rule composition.** gen-dispatch provides `restrict`, `override`, and `chain` as rule composition operators. Kiama's strategy combinators suggest a richer algebra: deterministic choice (try rule A, fall back to rule B), sequential composition (apply A then B to the result), and repeat-until-stable. The `reduce` strategy -- repeatedly apply sub-term + top-level rules until fixpoint -- is structurally similar to iterating gen-dispatch to a fixpoint, but operates at the level of an individual rule rather than a whole dispatch.
 
-**Congruences for gen-scope tree transformation.** When den v2 needs to transform scope graph subtrees (e.g., rerouting class content, applying `meta.substitute`), congruence-like combinators would provide precise, constructor-aware traversal. A congruence for scope nodes could apply one strategy to child edges and another to import edges, without manually destructuring the node.
-
-**Explicit substitution pattern for den's `meta.substitute`.** Den's edge target replacement (`meta.substitute = { X = Y; }`) is conceptually an explicit substitution in the rewriting sense. The paper's technique of representing substitution as a first-class tree construct with propagation rules could inform a more principled implementation where substitution is a visible, composable operation in the scope graph rather than an imperative edge rewrite.
+**Congruences for gen-scope tree transformation.** When gen transforms scope graph subtrees (e.g., rerouting class content), congruence-like combinators would provide precise, constructor-aware traversal. A congruence for scope nodes could apply one strategy to child edges and another to import edges, without manually destructuring the node.
 
 **Reference attributes for cross-entity resolution.** The `lookup` parameterized attribute pattern -- traversing upward to find a binding node -- maps directly to gen-scope's `inherit'` combinator. But the paper's formulation as a true reference attribute (returning the node itself, not just its value) suggests that gen-scope could benefit from a `refAttr` combinator that returns node references with full attribute access, rather than requiring the caller to manually compose `inherit'` with `get`.
 
-**Failure-aware composition.** The `Strategy` type's explicit `Option` semantics -- combinators that branch on success/failure -- provide a model for error-aware attribute evaluation in gen-scope. Currently, gen-scope attributes are total functions that must handle all cases or throw. A partial-attribute mechanism with combinator-based fallback (try this equation, on failure try that one) would enable more modular attribute definitions.
+**Failure-aware composition.** The `Strategy` type's explicit `Option` semantics -- combinators that branch on success/failure -- provide a model for error-aware attribute evaluation in gen-scope. gen-scope attributes are total functions that must handle all cases or throw. A partial-attribute mechanism with combinator-based fallback (try this equation, on failure try that one) would enable more modular attribute definitions.
 
-## Appendix: Follow-up Work
+## Further directions
 
 ### Unexploited Ideas
 
-- **Strategy library for scope graph transformations.** Kiama's `bottomup`, `innermost`, `reduce`, and congruences form a complete vocabulary for controlled tree transformation. gen-scope currently has no transformation layer -- it evaluates attributes over a static graph. A `gen-transform` library providing strategy combinators over scope graphs (with gen-scope's accessor pattern as the structural interface) would enable declarative graph rewriting for operations like aspect substitution, edge rerouting, and graph normalization.
+- **Strategy library for scope graph transformations.** Kiama's `bottomup`, `innermost`, `reduce`, and congruences form a complete vocabulary for controlled tree transformation. gen-scope has no transformation layer -- it evaluates attributes over a static graph. A transformation layer providing strategy combinators over scope graphs (with gen-scope's accessor pattern as the structural interface) would enable declarative graph rewriting for operations like aspect substitution, edge rerouting, and graph normalization.
 
 - **Failure-propagating attribute combinators.** Kiama's `Strategy` returns `Option[Term]`, making failure explicit and composable. gen-scope attributes are total (`id -> value`). A `tryAttr` combinator returning `null` on undefined cases, composable via `<+` (try first, fall back to second), would support modular attribute definitions where different modules contribute partial equations for the same attribute without requiring coordination.
 
-- **Congruence generation from gen-schema kinds.** Kiama notes that automatic congruence generation requires abstract syntax knowledge. gen-schema's kind declarations provide exactly this: a typed description of node structure with named fields and known child positions. A bridge from gen-schema kinds to gen-scope/gen-transform congruences could auto-generate constructor-aware traversal strategies from schema declarations.
-
-- **Explicit substitution as a den effect.** The `Let`-based explicit substitution technique could inform den's `meta.substitute` implementation. Instead of eagerly rewriting edges, substitutions could be represented as scope graph nodes with their own identity and propagation semantics, making the substitution process observable, composable, and reversible.
+- **Congruence generation from gen-schema kinds.** Kiama notes that automatic congruence generation requires abstract syntax knowledge. gen-schema's kind declarations provide exactly this: a typed description of node structure with named fields and known child positions. A bridge from gen-schema kinds to congruences over gen-scope graphs could auto-generate constructor-aware traversal strategies from schema declarations.
 
 ### Research Directions
 
