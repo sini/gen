@@ -392,6 +392,13 @@
           ...
         }:
         let
+          # One `pins-compose-<member>` per roster member: that member's own ci `tests` plane at the
+          # hub's pins (`ci/pins-compose.nix`).
+          pinsCompose = import ./pins-compose.nix {
+            inherit (inputs) gen;
+            inherit pkgs lib system;
+          };
+
           # Build a check derivation: prints the oracle result (incl id_hash sample + teeth), and
           # FAILS the build if any required key is not `true` — a permanent byte-parity regression.
           mkParityCheck =
@@ -1210,7 +1217,7 @@
             };
           };
 
-          checks = {
+          checks = pinsCompose // {
             rehost-den-parity = mkParityCheck "rehost-den-parity" denParity denParityKeys;
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
             agents-md-hub-inputs = mkHubInputSheetCheck "agents-md-hub-inputs" hubInputSheet;
