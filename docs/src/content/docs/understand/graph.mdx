@@ -3,9 +3,10 @@ title: Your Configuration as a Graph
 description: Hosts, users and features are nodes joined by labelled edges, and a question is a path over the labels, as in scope graphs.
 ---
 
-Draw the homelab on a whiteboard and you get a graph. The hosts, users and features are boxes. The
-lines between them say what relates to what: the server has user `bob`, the laptop uses the
-`desktop` feature, and `desktop` includes `ssh`.
+A small fleet has two web servers and a database, two operator accounts, and a few features.
+Drawn on a whiteboard it is a graph: hosts, users and features are boxes, and the lines between
+them say what relates to what. `web-1` has the user `deploy`, `web-1` uses the `webserver`
+feature, and `webserver` includes `ssh`.
 
 gen keeps that picture as the configuration itself. Each box is a **node**. Each line is an
 **edge** with a **label** that says what kind of relation it is.
@@ -15,20 +16,21 @@ let
   gen = inputs.gen.lib.mkGenLibs { };
 
   edges = [
-    { from = "laptop"; to = "alice"; label = "user"; }
-    { from = "laptop"; to = "desktop"; label = "feature"; }
-    { from = "server"; to = "alice"; label = "user"; }
-    { from = "server"; to = "bob"; label = "user"; }
-    { from = "server"; to = "ssh"; label = "feature"; }
-    { from = "server"; to = "monitoring"; label = "feature"; }
-    { from = "desktop"; to = "ssh"; label = "includes"; }
+    { from = "web-1"; to = "deploy"; label = "user"; }
+    { from = "web-2"; to = "deploy"; label = "user"; }
+    { from = "db-1"; to = "deploy"; label = "user"; }
+    { from = "db-1"; to = "dba"; label = "user"; }
+    { from = "web-1"; to = "webserver"; label = "feature"; }
+    { from = "web-2"; to = "webserver"; label = "feature"; }
+    { from = "db-1"; to = "monitoring"; label = "feature"; }
+    { from = "webserver"; to = "ssh"; label = "includes"; }
   ];
-  nodes = [ "laptop" "server" "alice" "bob" "ssh" "monitoring" "desktop" ];
+  nodes = [ "web-1" "web-2" "db-1" "deploy" "dba" "webserver" "ssh" "monitoring" ];
 
   follow = label: id:
     map (e: e.to) (builtins.filter (e: e.label == label && e.from == id) edges);
 
-  homelab = gen.graph.labeledFrom {
+  fleet = gen.graph.labeledFrom {
     user = follow "user";
     feature = follow "feature";
     includes = follow "includes";
@@ -37,34 +39,34 @@ let
   inherit (gen.graph) regex;
 in
 {
-  # Which features does the laptop get, counting what each feature includes?
-  laptopFeatures = gen.graph.query { } {
-    graph = homelab;
-    from = "laptop";
+  # Which features does web-1 get, counting what each feature includes?
+  web1Features = gen.graph.query { } {
+    graph = fleet;
+    from = "web-1";
     follow = regex.seq [ (regex.lit "feature") (regex.star (regex.lit "includes")) ];
   };
 
-  # Which machines does alice have an account on?
-  aliceHosts = gen.graph.dependents { } {
+  # Which hosts have the dba account?
+  dbaHosts = gen.graph.dependents { } {
     edges = follow "user";
     inherit nodes;
-  } "alice";
+  } "dba";
 }
 ```
 
 ```text
-{ aliceHosts = [ "laptop" "server" ]; laptopFeatures = [ "desktop" "ssh" ]; }
+{ dbaHosts = [ "db-1" ]; web1Features = [ "ssh" "webserver" ]; }
 ```
 
 ## How a question is asked
 
-The first query reads as a sentence: start at `laptop`, follow one `feature` edge, then follow any
+The first query reads as a sentence: start at `web-1`, follow one `feature` edge, then follow any
 number of `includes` edges. The `follow` argument is a regular expression over edge labels.
 `regex.lit` matches one label, `regex.seq` matches labels in order, and `regex.star` matches zero or
 more repeats. The answer is every node at the end of a matching path.
 
-The second query walks edges backwards. `dependents` returns every node that can reach `alice`,
-which in the `user` relation means every host she has an account on.
+The second query walks edges backwards. `dependents` returns every node that can reach `dba`,
+which in the `user` relation means every host that has the account.
 
 gen reads your data through the functions you pass (`follow` above), so the data can stay in
 whatever shape you already keep it in. The same approach answers the other common questions

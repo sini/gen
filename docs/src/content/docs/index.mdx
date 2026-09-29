@@ -1,12 +1,14 @@
 ---
 title: gen
-description: Every layer of your infrastructure is connected, from library inputs to firewall rules in production. gen makes it one declarative graph you can query, evaluated in one place, from a single machine to thousands.
+description: Declare it once. Ask it anything. gen weaves every layer of what you run, from the code you build on to the machines, clusters and clouds you ship to, into one living graph.
 template: splash
 editUrl: false
 hero:
+  title: Declare it once. Ask it anything.
   tagline: |
-    Every layer of your infrastructure is connected: library inputs, services on hosts, firewall rules in production.
-    gen makes it one declarative graph you can query, evaluated in one place, from a single machine to thousands.
+    gen weaves every layer of what you run, from the code you build on to the machines, clusters
+    and clouds you ship to, into one living graph. It works the same on a single laptop as on
+    thousands of servers.
   actions:
     - text: The Case for gen
       link: /case-for-gen/
@@ -26,14 +28,18 @@ import HeroGraph from '../../components/HeroGraph.astro';
 
 ## What gen is
 
-Every layer of a system depends on the others: a service needs the libraries it is built from,
-runs on a machine, and is reachable only where a firewall rule allows it. gen treats all of it as
-one graph, where machines, users, services and features are nodes and the relationships between
-them are edges. gen is built on Nix, which describes each machine as code: its packages, services,
-users and settings. You write each feature once, every machine that selects it gets a copy filled
-in with its own values, and rules add further relationships from the ones you declared. Then you
-query the result: which features a machine has, which machines run a service, and which file set a
-value.
+Everything you run is tied to everything else. A service is built from libraries, lands on a
+machine, answers on a port that some rule has to open, and serves people who need a login. Today
+each of those threads lives in a different file, a different tool, and usually a different head.
+
+gen gathers the threads into one graph. Machines, users, services and features become nodes, and
+every relationship between them becomes an edge you can follow. You write a feature once, and every
+place that uses it receives its own tailored copy. Rules draw new connections from the ones you
+wrote. Then you ask questions of the whole thing: what runs where, what depends on what, and which
+file decided each value.
+
+gen is built on Nix, which already describes software and machines as code and builds them the same
+way every time. gen gives that code a shape you can reason about.
 
 <CardGrid>
   <Card title="For AI agents" icon="rocket">
@@ -51,11 +57,11 @@ value.
 
 <CardGrid>
   <Card title="Relationships are edges" icon="puzzle">
-    Hosts, users and features are nodes. What relates them is a labelled edge you can query.
+    Machines, users and features are nodes. What relates them is a labelled edge you can query.
     [Your Configuration as a Graph](/understand/graph/)
   </Card>
   <Card title="Features are written once" icon="pen">
-    A feature takes its host as an argument, and gen passes the host in.
+    A feature takes its machine as an argument, and gen passes the machine in.
     [Reusable Features](/understand/features/)
   </Card>
   <Card title="Rules add relationships" icon="random">
@@ -68,19 +74,59 @@ value.
   </Card>
 </CardGrid>
 
-## The wiring problem
+## One graph, many destinations
 
-Take two machines. Both run SSH. The server also exports metrics, and the laptop runs
-a desktop. In plain NixOS the wiring looks like this:
+A feature can carry configuration for more than one destination at once: a machine's operating
+system, a user's home directory, a cluster, a cloud account. gen calls each destination a *class*,
+and hands each class's configuration to a *terminal*, the builder for that destination. The same
+graph feeds all of them, so a connection you declare once reaches every layer it touches.
+
+The graph reaches down to the code you build on, too. Hand gen's graph library the inputs recorded
+in a flake's `flake.lock`, and it tells you every input that depends on a given library. Pointed
+at gen's own lock file, it finds that 18 of gen's 24 inputs are built on `gen-prelude`.
+
+| Destination | What gen does there |
+|---|---|
+| Linux servers, with NixOS | Hands each machine's configuration to NixOS's system builder. gen's flake-parts module provides this terminal. |
+| Macs and home directories, with nix-darwin and home-manager | Hands `darwin` and `home-manager` configuration to a terminal you register for that class, built from gen-bind's hosted terminal over the tool's own builder. |
+| Kubernetes, with nixidy | nixidy turns Nix into Kubernetes deployments for Argo CD. With a nixidy terminal you supply, gen hands it a service's manifests, from the same graph that places the service on its machines. |
+| Cloud infrastructure, with terranix | terranix writes Terraform in Nix. With a terranix terminal you supply, gen hands it firewall rules and cloud resources, drawn from the same edges that connect the services behind them. |
+| Any other Nix module system | gen-bind passes graph values into any module written as a function of named arguments, and an outputs terminal hands configuration to any builder you supply. |
+
+## Built on settled results
+
+gen stands on decades of published work, and each part of it has a proof behind it. Finding a
+setting is name resolution over a *scope graph*, the same technique language tools use to resolve
+imports. Rules form a Datalog program with stratified negation, solved under the well-founded
+semantics, so a rule can depend on another being false and every answer stays well defined.
+Rebuilding after an edit is demand-driven recomputation with early cutoff: work stops as soon as a result comes out unchanged. When you ask
+why gen behaves a certain way, the answer leads back to the literature as well as the source.
+
+<CardGrid>
+  <LinkCard title="The reading list" href="/reference/reading-list/"
+    description="The papers behind each part of gen." />
+  <LinkCard title="Trust" href="/trust/"
+    description="Every guarantee gen makes, and the check that holds it." />
+</CardGrid>
+
+## One destination, shown concretely
+
+Here is one class, `nixos`, followed through two machines: `web` serves traffic and `db` holds the
+data.
+
+### Wired by hand
+
+Both machines run SSH. `db` also exports metrics, and `web` runs nginx. In plain NixOS the wiring
+looks like this:
 
 ```nix
 nixosConfigurations = {
-  laptop = nixpkgs.lib.nixosSystem {
-    specialArgs = { addr = "10.0.0.2"; users = [ "alice" ]; };
-    modules = [ ./ssh.nix ./desktop.nix ];
+  web = nixpkgs.lib.nixosSystem {
+    specialArgs = { addr = "10.0.0.2"; users = [ "deploy" ]; };
+    modules = [ ./ssh.nix ./nginx.nix ];
   };
-  server = nixpkgs.lib.nixosSystem {
-    specialArgs = { addr = "10.0.0.1"; users = [ "alice" "bob" ]; };
+  db = nixpkgs.lib.nixosSystem {
+    specialArgs = { addr = "10.0.0.1"; users = [ "deploy" "dba" ]; };
     modules = [ ./ssh.nix ./monitoring.nix ]; # monitoring.nix needs ssh.nix
   };
 };
@@ -88,47 +134,47 @@ nixosConfigurations = {
 
 Three facts in that file live only in your head:
 
-- `monitoring.nix` needs `ssh.nix`. A host that lists the first and forgets the second still
+- `monitoring.nix` needs `ssh.nix`. A machine that lists the first and forgets the second still
   evaluates.
 - `addr` and `users` reach every module through `specialArgs`, whether the module reads them or not.
-- The module lists are the only record of which host has which feature. To answer "which hosts run
-  SSH?" you read every list.
+- The module lists are the only record of which machine has which feature. To answer "which
+  machines run SSH?" you read every list.
 
-## The same two machines in gen
+### The same two machines in gen
 
 Each feature is an *aspect*, a named bundle of configuration. An aspect can include other aspects,
-and each include is an edge in a graph. An aspect that needs to know its host takes `host` as an
-argument, and gen passes the host in.
+and each include is an edge in the graph. An aspect that needs to know its machine takes `host` as
+an argument, and gen passes the machine in.
 
 ```nix
 aspects.ssh.nixos = { host, ... }: {
   services.openssh.enable = true;
   services.openssh.settings.AllowUsers = host.users;
 };
-aspects.desktop.nixos.services.xserver.enable = true;
+aspects.nginx.nixos.services.nginx.enable = true;
 aspects.monitoring.includes = [ "ssh" ];
 aspects.monitoring.nixos = { host, ... }: {
   services.prometheus.exporters.node.listenAddress = host.addr;
 };
 
-hosts.laptop = { addr = "10.0.0.2"; users = [ "alice" ]; aspects = [ "desktop" "ssh" ]; };
-hosts.server = { addr = "10.0.0.1"; users = [ "alice" "bob" ]; aspects = [ "monitoring" ]; };
+hosts.web = { addr = "10.0.0.2"; users = [ "deploy" ]; aspects = [ "nginx" "ssh" ]; };
+hosts.db = { addr = "10.0.0.1"; users = [ "deploy" "dba" ]; aspects = [ "monitoring" ]; };
 ```
 
-The server lists only `monitoring`, and SSH arrives through the include edge. Each host's NixOS
+`db` lists only `monitoring`, and SSH arrives through the include edge. Each machine's NixOS
 configuration comes out filled in with its own address and users (output formatted for reading):
 
 ```console
 $ nix eval --file machines.nix
 {
-  includesOf = { desktop = [ ]; monitoring = [ "ssh" ]; ssh = [ ]; };
-  laptop.services = {
-    openssh = { enable = true; settings.AllowUsers = [ "alice" ]; };
-    xserver.enable = true;
-  };
-  server.services = {
-    openssh = { enable = true; settings.AllowUsers = [ "alice" "bob" ]; };
+  db.services = {
+    openssh = { enable = true; settings.AllowUsers = [ "deploy" "dba" ]; };
     prometheus.exporters.node.listenAddress = "10.0.0.1";
+  };
+  includesOf = { monitoring = [ "ssh" ]; nginx = [ ]; ssh = [ ]; };
+  web.services = {
+    nginx.enable = true;
+    openssh = { enable = true; settings.AllowUsers = [ "deploy" ]; };
   };
 }
 ```
@@ -136,8 +182,8 @@ $ nix eval --file machines.nix
 <details>
 <summary>The whole of `machines.nix`</summary>
 
-This file runs as it is, with no flake and no nixpkgs. The last step evaluates each host's modules
-with gen's own module system. In a real flake that step is a NixOS system builder.
+This file runs as it is, with no flake and no nixpkgs. The last step evaluates each machine's modules
+with gen's own module system. In a real flake that step is NixOS's system builder.
 
 ```nix
 let
@@ -159,7 +205,7 @@ let
             services.openssh.enable = true;
             services.openssh.settings.AllowUsers = host.users;
           };
-        aspects.desktop.nixos.services.xserver.enable = true;
+        aspects.nginx.nixos.services.nginx.enable = true;
         aspects.monitoring.includes = [ "ssh" ];
         aspects.monitoring.nixos =
           { host, ... }:
@@ -167,14 +213,14 @@ let
             services.prometheus.exporters.node.listenAddress = host.addr;
           };
 
-        hosts.laptop = {
+        hosts.web = {
           addr = "10.0.0.2";
-          users = [ "alice" ];
-          aspects = [ "desktop" "ssh" ];
+          users = [ "deploy" ];
+          aspects = [ "nginx" "ssh" ];
         };
-        hosts.server = {
+        hosts.db = {
           addr = "10.0.0.1";
-          users = [ "alice" "bob" ];
+          users = [ "deploy" "dba" ];
           aspects = [ "monitoring" ];
         };
       }
@@ -206,7 +252,7 @@ let
 in
 {
   inherit (facts) includesOf;
-  inherit (realized.nixos) laptop server;
+  inherit (realized.nixos) web db;
 }
 ```
 

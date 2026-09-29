@@ -5,24 +5,8 @@ description: The ideas gen is built from, each grounded in published research (s
 
 gen is a set of Nix libraries for building configuration frameworks. It stores a configuration as a
 graph, groups settings into reusable features, gives every part a stable identity, and computes
-only what a reader asks for. This section explains each of those ideas on its own page, using one
-example that grows as you read.
-
-## The running example
-
-Most pages follow a small **homelab**:
-
-- two hosts, `laptop` and `server`
-- two users, `alice` and `bob`
-- three features: `ssh`, `monitoring` and `desktop`
-
-The laptop is a desktop machine. The server runs ssh and monitoring. Alice has an account on both
-hosts, and Bob only on the server.
-
-Two pages need more structure than a few machines have, so they use a small **web platform**: two
-environments (`dev` and `prod`), two datacenters (`us-east` and `us-west`), and hosts that are
-either a `webserver` or a `database`. That example asks which webservers may reach which
-databases.
+only what a reader asks for. This section explains each idea on its own page. Every page sets up
+its own small example, so you can start on any of them.
 
 ## The ideas, in reading order
 
@@ -51,15 +35,30 @@ flowchart LR
 
 ## Words used throughout
 
-- A **node** is one thing in your configuration: a host, a user, a feature.
+- A **node** is one thing in your configuration: a host, a user, a service, a feature.
 - An **edge** connects two nodes and carries a **label**, such as `user` or `feature`.
 - A **kind** declares the shape of a node: its options and their types. A **registry** holds the
   nodes of one kind.
 - An **aspect** is gen's name for a feature: a named bundle of configuration.
-- A **class** is the target a piece of configuration is written for, such as `nixos`.
+- A **class** is the target a piece of configuration is written for, such as `nixos`. A framework
+  can declare any class it needs.
 - A **rule** states that a relation holds when some facts hold and others do not.
 
-The [terminology](/reference/terminology/) page defines every other term.
+gen declares none of these words for your domain. A framework built on gen brings its own kinds,
+such as `host` or `service`, and gen supplies the machinery around them. The
+[terminology](/reference/terminology/) page defines every other term.
+
+## Taking the libraries
+
+Each idea is provided by a small library, and each library can be used on its own as a flake
+input. The examples in this section bind all of them at once through the hub:
+
+```nix
+gen = inputs.gen.lib.mkGenLibs { };   # gen.graph, gen.merge, gen.aspects, ...
+```
+
+[Libraries](/reference/libraries/) lists which library provides which feature, and
+[Getting Started](/guides/getting-started/) shows one library taken alone.
 
 ## Where the ideas come from
 

@@ -3,8 +3,8 @@ title: Values Computed on Demand
 description: Each node's values are defined by equations over the node and its neighbours and computed only when read, once per node, as in attribute grammars.
 ---
 
-Every host on the web platform needs a fully qualified domain name, such as
-`db-prod-east.us-east.example.com`. The datacenter comes from the host itself. The domain comes
+A company runs web servers and databases in two environments, and every host needs a fully
+qualified domain name, such as `db-prod-east.us-east.example.com`. The datacenter comes from the host itself. The domain comes
 from the environment the host belongs to: production uses `example.com` and development uses
 `dev.example.com`. Nobody should have to copy the domain onto each host.
 
@@ -80,8 +80,9 @@ node or at a different one. Two shapes cover most needs:
 
 Nothing runs until something reads it. Reading `fqdn` at `db-prod-east` computes that node's `dc`
 and its `domain`, which it finds at `prod`. No other host computes anything.
-The `audit` attribute would stop evaluation with an error, but no one reads it, so it never runs. Each value is stored on its node the first time it is read, so a
-second read of the same attribute at the same node reuses it.
+The `audit` attribute would stop evaluation with an error, but no one reads it, so it never runs.
+Each value is stored on its node the first time it is read, so a second read of the same
+attribute at the same node reuses it.
 
 This lets a framework declare many values for thousands of nodes and pay only for the ones a
 build uses.
@@ -96,5 +97,11 @@ computing each attribute on demand, with caching, works for any grammar without 
 evaluator follows that design. See our readings of
 [Knuth (1990)](/reference/papers/knuth-1990-genesis-attribute-grammars/) and
 [Hedin (2000)](/reference/papers/hedin-2000-reference-ag/).
+
+Two more results shape the evaluator. Vogt's **higher-order attribute grammars** let an attribute
+compute new nodes, which is how gen grows child nodes from computed values
+([Vogt et al. 1989](/reference/papers/vogt-1989-higher-order-ag/)). The tree itself is built with
+the algebraic graph operations `overlay` and `star`, from
+[Mokhov (2017)](/reference/papers/mokhov-2017-algebraic-graphs/).
 
 Next: [Rebuilding Only What Changed](/understand/incremental/).

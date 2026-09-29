@@ -141,13 +141,13 @@ datacenters to reach `db-prod-east`. To keep traffic inside a datacenter, add a
 | `acl`, `g`, `reachableFrom`, `dependents`, `select` | edges and queries over them | [Graphs and Queries](/features/graphs/) |
 | asking why an edge exists | gen-inspect over the program and its model | [Inspection](/features/inspection/) |
 
-In a full configuration the hosts are instances in a registry, as in [A
-Homelab](/examples/homelab/), and the firewall rules on each database host are built from
+In a full configuration the hosts are instances in a registry, as in [A Small
+Deployment](/examples/small-deployment/), and the firewall rules on each database host are built from
 `whoReaches…` queries like the one above.
 
 <CardGrid>
-  <LinkCard title="A Homelab" href="/examples/homelab/"
-    description="Two hosts, two users and three features, built into NixOS systems." />
+  <LinkCard title="A Small Deployment" href="/examples/small-deployment/"
+    description="A web server and a database built into NixOS systems from shared features." />
   <LinkCard title="Which Tool for Which Job" href="/understand/choosing/"
     description="Rules, views, aspects or delivery: which one fits a goal." />
 </CardGrid>

@@ -3,11 +3,10 @@ title: Kinds, Registries and Identity
 description: Declare kinds with typed options, keep registries of instances with defaults and content-derived identities, and reference one instance from another.
 ---
 
-The homelab declares two kinds, `host` and `user`, and an `admin` kind that inherits from `user`.
-A registry holds the instances of each kind. Alice's `home` names a host, and reading it returns
-that host.
+A deployment has hosts, and an `admin` kind that inherits from `user`. Each user names the host that
+holds their home directory, and reading that field returns the host.
 
-```nix title="homelab-registries.nix"
+```nix title="hosts-and-admins.nix"
 let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   inherit (gen.merge) evalModuleTree mkOption types;
@@ -34,39 +33,39 @@ let
       options.hosts = gen.schema.mkInstanceRegistry kinds.host { };
       options.admins = gen.schema.mkInstanceRegistry kinds.admin { refs.home = config.hosts; };
 
-      config.hosts.laptop = { address = "10.0.0.2"; };
-      config.hosts.server = { address = "10.0.0.1"; system = "aarch64-linux"; };
-      config.admins.alice = { home = "server"; shell = "zsh"; };
+      config.hosts.web-1 = { address = "10.0.0.2"; };
+      config.hosts.db-1 = { address = "10.0.0.1"; system = "aarch64-linux"; };
+      config.admins.deploy = { home = "web-1"; shell = "zsh"; };
     }) ];
   };
   inherit (result.config) hosts admins;
 in
 {
-  laptop = { inherit (hosts.laptop) address system id_hash; };
-  alice = { inherit (admins.alice) shell sudo id_hash; homeAddress = admins.alice.home.address; };
+  db-1 = { inherit (hosts.db-1) address system id_hash; };
+  deploy = { inherit (admins.deploy) shell sudo id_hash; homeAddress = admins.deploy.home.address; };
 }
 ```
 
 ```console
-$ nix eval --impure --json --file homelab-registries.nix
+$ nix eval --impure --json --file hosts-and-admins.nix
 {
-  "alice": {
-    "homeAddress": "10.0.0.1",
-    "id_hash": "admin:2733efb07661f1df2f8c48b2fef538cba5b525baa178f90d042fba9dc088b4a4",
+  "db-1": {
+    "address": "10.0.0.1",
+    "id_hash": "host:cf1366d710f86decbddc7786f5a75f4fa7e5202941d13f32f168e4265681a629",
+    "system": "aarch64-linux"
+  },
+  "deploy": {
+    "homeAddress": "10.0.0.2",
+    "id_hash": "admin:8fdc148c005c84512c6ec67033ac62840f4f5156c06e2c6fa546437307b6bc79",
     "shell": "zsh",
     "sudo": true
-  },
-  "laptop": {
-    "address": "10.0.0.2",
-    "id_hash": "host:d73fdc6dbae0273c2c37827ad53b637330304355d6ba5648689a0e73bc3d8ae8",
-    "system": "x86_64-linux"
   }
 }
 ```
 
 A **kind** is a named set of typed options, like a NixOS submodule type with a name. A **registry**
 is an option holding the instances of one kind, keyed by name. Each instance gets its kind's
-defaults (`laptop.system`, `alice.sudo`) and an `id_hash`.
+defaults (`web-1.system`, `deploy.sudo`) and an `id_hash`.
 
 ## What you can do
 
@@ -102,9 +101,20 @@ string comparison always terminates. An option marked `identity = false` is left
 `hashIdentity` mints the same kind of identity for data outside a registry:
 
 ```nix
-gen.identity.hashIdentity "host" [ "name" ] (label: { name = "server"; }.${label})
-# "host:8bf83a5f135bc461271c7a93c6fc8095041ceaff75782d6da38165f2ebae2f9f"
+gen.identity.hashIdentity "host" [ "name" ] (label: { name = "db-1"; }.${label})
+# "host:f7667c0783634b1119fef6262e89bfb5cd0b3628948abf41c2f1291ba75e6735"
 ```
+
+Only inert data gets an identity: strings, booleans, integers, floats below 2^53 in magnitude,
+`null`, and lists and attribute sets of them. A function, a path or a derivation has no total
+encoding, so it gets no identity and the call fails, naming the kind and the label:
+
+```
+identity: a lambda in an identity position; kind "host", label "check"
+```
+
+The message never prints the rejected value. The encoder is private, so every library that mints an
+identity follows the same rules.
 
 See [Stable Identity for Everything](/understand/identity/) for why gen gives every value an
 identity.
@@ -112,13 +122,13 @@ identity.
 ### References
 
 `declarationOf "host"` types an option whose value is a host. Bind it to a registry with
-`refs.<option>` on `mkInstanceRegistry`. The value can be written as the host's name (`"server"`) or
-as the host itself (`config.hosts.server`). Either way, reading it returns the registry entry.
+`refs.<option>` on `mkInstanceRegistry`. The value can be written as the host's name (`"web-1"`) or
+as the host itself (`config.hosts.web-1`). Either way, reading it returns the registry entry.
 
 A name with no entry fails with an error listing the names that exist:
 
 ```
-gen-schema: ref field 'home' on kind 'user': reference 'desktop' not found in instance registry (available: server)
+gen-schema: ref field 'home' on kind 'admin': reference 'web-3' not found in instance registry (available: db-1, web-1)
 ```
 
 Each reference is also an edge. The schema publishes `_refEdges` (for example
@@ -130,6 +140,45 @@ the kind graph can be queried with the functions on [Graphs and Queries](/featur
 `inherits` copies options by kind name. A kind can list several parents, and a chain of parents
 resolves one level per pass. Each child has its own registry and its own identity tag, so an admin
 named `root` and a user named `root` are different instances.
+
+### Using gen-schema in a flake-parts flake
+
+gen-schema ships its own flake-parts module. It adds a `schema` option for kinds and passes the
+library to every module as `genSchema`. Kinds declared this way can use nixpkgs' `lib.types`:
+
+```nix title="flake.nix"
+{
+  inputs = {
+    gen-schema.url = "github:sini/gen-schema";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+  };
+  outputs = inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } ({ config, lib, genSchema, ... }: {
+      imports = [ inputs.gen-schema.flakeModules.default ];
+
+      options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
+
+      config = {
+        systems = [ ];
+        schema.host.options.address = lib.mkOption { type = lib.types.str; };
+        schema.host.options.role = lib.mkOption { type = lib.types.str; default = "worker"; };
+        hosts.web-1 = { address = "10.0.0.2"; role = "webserver"; };
+        hosts.db-1.address = "10.0.0.1";
+        flake.roles = lib.mapAttrs (_: host: host.role) config.hosts;
+      };
+    });
+}
+```
+
+```console
+$ nix eval --json .#roles
+{ "db-1": "worker", "web-1": "webserver" }
+```
+
+The module uses default settings. For custom `strict`, `baseModule`, `collections` or `computed`
+settings, call `schema.mkSchemaOption { … }` directly. To compose aspects and deliver hosts as well,
+use the gen hub's flake module instead (see [Delivery](/features/delivery/)).
 
 ---
 

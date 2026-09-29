@@ -34,14 +34,14 @@ gen library it uses comes from one revision.
 | den's diagrams and debugging | gen-inspect: SQL and selector queries over the graph, "why does this edge exist", mermaid rendering | [Inspection](/features/inspection/) |
 | batteries | framework content, which den provides itself | |
 
-## One laptop, two layers
+## One host, two layers
 
 In den, a host and an aspect look like this:
 
 ```nix
-den.hosts.x86_64-linux.laptop.users.alice = { };
+den.hosts.x86_64-linux.web-1.users.deploy = { };
 
-den.aspects.laptop = {
+den.aspects.web-1 = {
   includes = [ den.aspects.ssh ];
   nixos = { host, ... }: { networking.hostName = host.name; };
 };
@@ -51,7 +51,7 @@ The gen layer underneath holds the same facts in gen's terms. The host is an ins
 `host` kind, and the aspect's `nixos` module takes the host as `node`:
 
 ```nix
-hosts.laptop.aspects = [ "base" "ssh" ];
+hosts.web-1.aspects = [ "base" "ssh" ];
 
 aspects.base.nixos = { node, ... }: { networking.hostName = node.name; };
 aspects.ssh.includes = [ "base" ];

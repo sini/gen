@@ -3,8 +3,8 @@ title: Evaluation
 description: Build a tree of typed nodes, compute attributes on demand with inheritance down the tree, and assemble node sets from many contributions.
 ---
 
-The web platform has two environments. Each host inherits `region` and `logLevel` from its
-environment unless it sets its own. `motd` is computed per host from the other two attributes.
+Hosts sit inside two environments, `prod` and `dev`. Each host inherits `region` and `logLevel`
+from its environment unless it sets its own, and `motd` is computed per host from the other two.
 
 ```nix title="platform-attributes.nix"
 let
@@ -85,7 +85,9 @@ Attributes come in two directions:
 - **Synthesized** attributes flow up or stay local: `motd` combines values already on the node.
 
 Nix evaluates lazily, so an attribute nobody reads is never computed, and a computed one is shared
-by every reader.
+by every reader. Each node carries its own cache of computed attributes, so `get` on a node is a
+constant-time lookup. `allNodes` and `nodesOfType` build whole lists and cost time in
+proportion to the tree.
 
 ### Kinds and the tree
 
@@ -105,13 +107,26 @@ from:
 
 Grown nodes are evaluated like declared ones. `nodesOfType` lists them with the rest.
 
+### Assembly
+
+`assemble` builds one node set from many layered contributions and hands it to the evaluator. It
+does not evaluate anything itself. `substratePreconditions` lists the properties an assembly depends
+on. An assembly over libraries that lack one of them fails with an error naming the property,
+instead of producing a wrong node set.
+
+gen-assemble, gen-inspect and gen-memo never evaluate configuration: they prepare an evaluator's
+input, read its output, or decide what it must recompute.
+
 ### Fixpoints
 
 A `circular` attribute starts from a bottom value and is recomputed until it stops changing. Use it
 for values that depend on themselves through the graph, such as a reachability set on a cyclic
 graph.
 
-For the theory, see [Values Computed on Demand](/understand/on-demand/).
+For the theory, see [Values Computed on Demand](/understand/on-demand/). The evaluator is a
+[higher-order attribute grammar](/reference/papers/vogt-1989-higher-order-ag/), where attributes can
+create new tree nodes, and `circular` follows
+[circular reference attribute grammars](/reference/papers/soderberg-2013-circular-higher-order-reference-ag/).
 
 ---
 

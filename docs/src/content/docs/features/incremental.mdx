@@ -3,8 +3,9 @@ title: Incremental Rebuild
 description: Re-compose after an edit, reuse what did not change, read what was reused and why, and share work across similar nodes.
 ---
 
-The homelab raises its monitoring retention. gen re-composes from the previous result, reuses the
-option the edit did not touch, and reports what it did. The warm result equals a cold run.
+A deployed module tree gets one edit: the monitoring retention changes from 7 to 30 days. gen
+re-composes from the previous result, reuses the option the edit did not touch, and reports what it
+did. The warm result equals a cold run.
 
 ```nix title="warm-edit.nix"
 let
@@ -91,7 +92,10 @@ hashes the same as its old one. `runScc` handles a cycle by recomputing its stro
 component as one unit.
 
 gen-memo decides and never evaluates. The evaluator it serves does the work, so the output is the
-evaluator's output.
+evaluator's output. In the terms of [Build Systems à la Carte](/reference/papers/mokhov-2018-build-systems-a-la-carte/),
+gen-memo is the rebuilder, which decides whether a task must run, and keeps no store of its own.
+The scheduler, which runs tasks in order, is the caller's: usually Nix's own laziness. gen-memo's
+`reference/schedule.nix` is a small example scheduler you pass in.
 
 ### Shared cores
 

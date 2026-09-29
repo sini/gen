@@ -168,7 +168,7 @@ export default defineConfig({
 				{
 					label: 'Examples',
 					items: [
-						{ label: 'A Homelab', slug: 'examples/homelab' },
+						{ label: 'A Small Deployment', slug: 'examples/small-deployment' },
 						{ label: 'A Web Platform', slug: 'examples/web-platform' },
 					],
 				},

@@ -3,9 +3,10 @@ title: An Enhanced Module Type System
 description: Typed options and priority merging in a module system that runs without nixpkgs, with every value's source recorded (typed merging, types as checked contracts).
 ---
 
-The homelab's `ssh` feature declares two options: a port and a list of allowed users. A hardening
-module suggests a different port as a default. The server's own file picks the port it actually
-uses and adds a user. Three files set the same two options, and gen has to decide the result.
+A server's ssh setup is spread over three files. The ssh module declares two options, a port and
+a list of allowed users. A hardening module suggests a different port as a default. The server's
+own file picks the port it actually uses and adds a user. gen has to decide the result and say
+where each value came from.
 
 ```nix
 let
@@ -18,7 +19,7 @@ let
         _file = "ssh.nix";
         options.ssh.port = m.mkOption { type = m.types.int; default = 22; };
         options.ssh.allowUsers = m.mkOption { type = m.types.listOf m.types.str; default = [ ]; };
-        config.ssh.allowUsers = [ "alice" ];
+        config.ssh.allowUsers = [ "deploy" ];
       }
       {
         _file = "hardening.nix";
@@ -27,7 +28,7 @@ let
       {
         _file = "hosts/server.nix";
         config.ssh.port = 2222;
-        config.ssh.allowUsers = [ "bob" ];
+        config.ssh.allowUsers = [ "dba" ];
       }
     ];
   };
@@ -39,7 +40,7 @@ in
 ```
 
 ```text
-{ config.ssh = { allowUsers = [ "bob" "alice" ]; port = 2222; };
+{ config.ssh = { allowUsers = [ "dba" "deploy" ]; port = 2222; };
   why = {
     defaulted = false;
     winners = [ { file = "hosts/server.nix"; } ];
@@ -58,6 +59,14 @@ definition has priority 100, `mkDefault` has 1000, and an option's `default` has
 server's `2222` beats the hardening module's `2200`, which beats the built-in `22`. List options
 merge instead: `allowUsers` combines the users from both files. `mkIf`, `mkForce`, `mkMerge` and
 submodules work as they do in NixOS.
+
+**Compat mode.** The engine also accepts nixpkgs' own `lib.mkOption`, `lib.types` and
+`lib.mkDefault`, because nixpkgs option types use the same merge contract. An option declared with
+`lib.types.port` merges to the same result as above. This lets a module written for nixpkgs,
+including a custom `mkOptionType`, move over unchanged while a port is under way. A leaf type such
+as `port` costs nothing extra, while a nixpkgs `submodule` runs nixpkgs' own evaluator for each
+instance and gives back the speed of gen's engine. [Benchmarks](/benchmarks/) has the
+measurements.
 
 ## What gen adds
 
@@ -84,8 +93,9 @@ with the message `must be positive`.
 A type in gen is a **contract**: a check attached to a value, which reports the value and the
 expectation it failed when the check fails. Findler and Felleisen worked out how to check
 contracts on higher-order values and how to report which party is to blame for a failure.
-gen's refined types and kind validators are contracts in that sense, and its argument injection
-(next page) attaches contracts to the values it passes in and names their source on failure.
+gen's refined types and kind validators are contracts in that sense, and argument injection
+attaches contracts to the values it passes in and names their source on failure
+([Automatic Argument Injection](/understand/argument-injection/)).
 See our reading of [Findler & Felleisen (2002)](/reference/papers/findler-2002-contracts-higher-order/).
 
 Next: [Automatic Argument Injection](/understand/argument-injection/).

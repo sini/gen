@@ -30,8 +30,9 @@ feature. Import the hub's flake-parts module when you want a gen module tree bui
 }
 ```
 
-A flake that reads `inputs.gen-<name>.lib` does not need the hub. [Getting
-Started](/guides/getting-started/) is a complete example.
+A flake that reads `inputs.gen-<name>.lib` does not need the hub. Without flakes,
+`import ./gen-graph { }` on a checkout returns the same library, with its dependencies read
+from its own `flake.lock`. [Getting Started](/guides/getting-started/) is a complete example.
 
 </TabItem>
 <TabItem label="The hub">
@@ -54,7 +55,7 @@ Started](/guides/getting-started/) is a complete example.
         tree = ./gen-modules;                          # (2)
         aspectCnf = import ./aspect-cnf.nix;           # (3)
         nodeRegistryPath = [ "hosts" ];                # (4)
-        extraModules.laptop = [ ./hardware/laptop.nix ]; # (5)
+        extraModules.web = [ ./hardware/web.nix ];     # (5)
       };
     };
 }

@@ -3,17 +3,17 @@ title: Aspects
 description: Declare aspects, classify their keys, gate inclusion with guards, read the include graph and federate aspects from several flakes.
 ---
 
-The homelab has three features. `desktop` and `monitoring` both include `ssh`. Each aspect carries
-content for one or more classes, here `nixos` and `homeManager`.
+A web server needs nginx, monitoring and SSH, and monitoring itself needs SSH. Each feature is an
+aspect, and each aspect carries content for one or more classes, here `nixos` and `terranix`.
 
-```nix title="homelab-aspects.nix"
+```nix title="webserver-aspects.nix"
 let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   inherit (gen.merge) evalModuleTree mkOption types;
 
   cnf = {
     keySemantics.nixos.category = "class";
-    keySemantics.homeManager.category = "class";
+    keySemantics.terranix.category = "class";
   };
 
   result = evalModuleTree {
@@ -26,12 +26,11 @@ let
         aspects.monitoring.includes = [ "ssh" ];
         aspects.monitoring.nixos.services.prometheus.enable = true;
 
-        aspects.desktop.includes = [ "ssh" ];
-        aspects.desktop.nixos.services.xserver.enable = true;
-        aspects.desktop.homeManager.programs.firefox.enable = true;
+        aspects.webserver.includes = [ "monitoring" ];
+        aspects.webserver.nixos.services.nginx.enable = true;
+        aspects.webserver.terranix.resource.aws_security_group_rule.https.to_port = 443;
 
-        hosts.laptop.aspects = [ "desktop" ];
-        hosts.server.aspects = [ "monitoring" ];
+        hosts.web-1.aspects = [ "webserver" ];
       }
     ];
   };
@@ -40,15 +39,17 @@ let
 in
 {
   includesOf = facts.includesOf;
-  laptopNeeds = gen.graph.reachableFrom { edges = id: facts.includesOf.${id} or [ ]; } "desktop";
+  webserverNeeds = gen.graph.reachableFrom { edges = id: facts.includesOf.${id} or [ ]; } "webserver";
+  key = result.config.aspects.webserver.key;
 }
 ```
 
 ```console
-$ nix eval --impure --json --file homelab-aspects.nix
+$ nix eval --impure --json --file webserver-aspects.nix
 {
-  "includesOf": { "desktop": ["ssh"], "monitoring": ["ssh"], "ssh": [] },
-  "laptopNeeds": ["ssh"]
+  "includesOf": { "monitoring": ["ssh"], "ssh": [], "webserver": ["monitoring"] },
+  "key": "webserver",
+  "webserverNeeds": ["monitoring", "ssh"]
 }
 ```
 
@@ -78,7 +79,7 @@ Every key on an aspect other than `name`, `includes` and the other structural ke
 
 | Category | What the value is | Example |
 |---|---|---|
-| `class` | a module for one target, `null` when unset | `nixos`, `homeManager`, `darwin` |
+| `class` | a module for one target, `null` when unset | `nixos`, `darwin`, `homeManager`, `terranix`, or a name of your own |
 | `channel` | a raw value passed through unchanged | settings handed to another framework |
 | `facet` | a typed field declared by its own option | an aspect's port number |
 
@@ -99,13 +100,13 @@ aspect with key `hardware/cpu/intel`. Two aspects share a key only when they sit
 A name in `includes` that matches no aspect fails with an error naming the aspect and the position:
 
 ```
-gen-aspects.includes (aspect 'desktop', include position 0): reference 'sshd' names no entry of the registry
+gen-aspects.includes (aspect 'webserver', include position 0): reference 'sshd' names no entry of the registry
 ```
 
 ### Includes and delivery
 
 `includes` states edges between aspects. A consumer that wants a host to receive the content of
-every included aspect computes the include closure, as `laptopNeeds` does above.
+every included aspect computes the include closure, as `webserverNeeds` does above.
 [Delivery](/features/delivery/) shows the full route from aspects to a built host.
 
 ### Guards
@@ -122,7 +123,9 @@ origin label, so two flakes can both define `ssh` without a collision. `wire` fi
 declared holes with nodes from another flake. The result includes a manifest of every resolution,
 which can be diffed like a lock file.
 
-For the idea behind aspects, see [Reusable Features](/understand/features/).
+For the idea behind aspects, see [Reusable Features](/understand/features/). Guard records follow
+[Definitional Interpreters](/reference/papers/reynolds-1972-definitional-interpreters/): each
+predicate is first-order data read by one interpreter, `applyGuard`.
 
 ---
 

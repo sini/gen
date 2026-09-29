@@ -37,6 +37,11 @@ These ship today and are tested on every push under upstream Nix, Determinate Ni
   directly, delivery follows the includes between aspects, and one evaluator runs the whole path.
 - **Errors that name their cause.** Failures reported against the node and feature that caused
   them, built on stable identity.
+- **Ready-made terminals for the cloud and for Kubernetes.** Today you supply the terminal that
+  carries a class to its builder. Two will ship with gen. One is for terranix, which writes
+  Terraform in Nix, so firewall rules and cloud resources flow straight from the graph. The other is
+  for nixidy, which turns Nix into Kubernetes deployments for Argo CD, so a service's manifests come
+  from the same graph that places it on its machines.
 - **The first framework on the full toolkit.** A configuration framework built on all of gen's
   libraries from the start, exposing them to its power users.
 

@@ -3,9 +3,12 @@ title: Stable Identity for Everything
 description: Every node gets an identity computed from how it is defined (intensional identity), which gen uses for reuse, error messages and introspection.
 ---
 
-The homelab has two hosts of one **kind**, `host`. The kind declares what a host looks like: a
-`system` with a default, and a `role`. A **registry** holds the hosts. Each host it holds gets its
-defaults filled in and an identity, `id_hash`, computed from its definition.
+A fleet declares its machines as hosts. Each host has a `system` with a default and a `role`, and
+gen needs a way to tell two hosts apart that does not depend on where or when they were
+evaluated.
+
+A **kind** declares what a host looks like. A **registry** holds the hosts. Each host it holds
+gets its defaults filled in and an identity, `id_hash`, computed from its definition.
 
 ```nix
 let
@@ -23,46 +26,70 @@ let
     ];
   };
 
-  homelab = m.evalModuleTree {
+  fleet = m.evalModuleTree {
     modules = [
       {
         options.hosts = gen.schema.mkInstanceRegistry schema.host { };
-        config.hosts.laptop.role = "workstation";
-        config.hosts.server.role = "server";
+        config.hosts.web-1.role = "webserver";
+        config.hosts.db-1.role = "database";
       }
     ];
   };
 in
 {
-  laptop = homelab.config.hosts.laptop.id_hash;
-  server = homelab.config.hosts.server.id_hash;
-  serverSystem = homelab.config.hosts.server.system;
+  web = fleet.config.hosts.web-1.id_hash;
+  db = fleet.config.hosts.db-1.id_hash;
+  dbSystem = fleet.config.hosts.db-1.system;
 }
 ```
 
 ```text
-{ laptop = "host:da48f8b73e5c…";
-  server = "host:ca35c36e942e…";
-  serverSystem = "x86_64-linux"; }
+{ db = "host:edc7c2e86f31825b78559ec082722706ad14e07903785c2e3ae52bf3d2b64333";
+  dbSystem = "x86_64-linux";
+  web = "host:89c7faee4c1b03a58bf63e504be108df3b4d90818f487a2614eec179b00ca2c8"; }
 ```
 
 ## How identity is computed
 
 An identity is a hash over the kind name and the values of the kind's declared options, the
 host's `name` among them. Evaluate the same definition twice, on any machine, and you get the
-same identity. Change the laptop's role and its identity changes with it.
+same identity. Change a host's role and its identity changes with it.
 
 One function computes every identity in gen, `hashIdentity`. You can call it directly:
 
 ```nix
-gen.identity.hashIdentity "host" [ "name" ] (label: { name = "server"; }.${label})
-# => "host:8bf83a5f135b…", the same value on every call
+gen.identity.hashIdentity "host" [ "name" ] (label: { name = "db-1"; }.${label})
+# => "host:f7667c0783634b1119fef6262e89bfb5cd0b3628948abf41c2f1291ba75e6735" on every call
 ```
 
-A relation that carries data of its own becomes a node too. Alice's account on the laptop has a
-shell, so it is an `account` node related to `alice` and to `laptop`. Its identity is computed from
-the identities of the nodes it relates, so those nodes are identified first, in an earlier pass.
-A relation that names a node from its own pass fails with an error.
+## Relations that carry data
+
+A relation that carries data of its own becomes a node too, called a **binding node**. A user's
+account on a host has a shell, so it is an `account` node related to the user and to the host.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  minted = gen.scope.mintStrata { } [
+    { pass = 0; identifier = "web-1"; kind = "host"; relata = { }; content = { }; site = "web-1"; }
+    { pass = 0; identifier = "deploy"; kind = "user"; relata = { }; content = { }; site = "deploy"; }
+    { pass = 1; identifier = "account:deploy:web-1"; kind = "account";
+      relata = { user = "deploy"; host = "web-1"; }; content = { shell = "bash"; }; site = "account"; }
+  ];
+in
+{ inherit (minted) edges strata; }
+```
+
+```text
+{ edges = [ { from = "account:deploy:web-1"; label = "host"; to = "web-1"; }
+            { from = "account:deploy:web-1"; label = "user"; to = "deploy"; } ];
+  strata = 2; }
+```
+
+The account's identity is a hash over its kind, its identifier and the **identities** of the nodes
+it relates, never their names. Those nodes must therefore be identified first, in an earlier
+`pass`. An entry that relates a node from its own pass fails with an error. gen also turns each
+relatum into a labelled edge, so the account appears in graph queries like any other node.
 
 ## What identity is for
 
@@ -70,8 +97,9 @@ A relation that names a node from its own pass fails with an error.
   result computed for one identity is valid wherever that identity appears, in this evaluation or
   the next. See [Rebuilding Only What Changed](/understand/incremental/).
 - **Error messages.** Nix's own errors point at a line of source code. An error from gen can
-  also name the part of the configuration it concerns. The next two pages show errors that name
-  the option, the missing argument, and the host that supplied a bad value.
+  also name the part of the configuration it concerns, such as the option that got a wrong value
+  ([An Enhanced Module Type System](/understand/module-types/)) or the source of a bad argument
+  ([Automatic Argument Injection](/understand/argument-injection/)).
 - **Introspection.** Tools can ask about a node by its identity: what it relates to, and why an
   edge exists. [Inspection](/features/inspection/) shows the queries gen supports today. Interactive
   graph tools are on the [Roadmap](/roadmap/).

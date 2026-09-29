@@ -3,10 +3,9 @@ title: Automatic Argument Injection
 description: A module names the values it needs, such as the host it configures, and gen passes them in, with optional checks on each value (implicit parameters).
 ---
 
-The homelab's `monitoring` feature needs to know which host it is running on, so that it can
-publish a scrape target such as `server:9100`. The feature is written once, and both hosts could
-use it. The module asks for `host` in its argument list, and gen supplies the right host for each
-use.
+A server's monitoring feature needs to know which host it runs on, so that it can publish a
+scrape target such as `web-1:9100`. The feature is written once and used on many hosts. The
+module asks for `host` in its argument list, and gen supplies the right host for each use.
 
 ```nix
 let
@@ -18,22 +17,22 @@ let
     monitoring.target = "${host.name}:9100";
   };
 
-  forServer = gen.bind.wrap {
-    bindings.host = { name = "server"; };
+  forWeb1 = gen.bind.wrap {
+    bindings.host = { name = "web-1"; };
   } monitoring;
 
-  server = m.evalModuleTree {
+  web1 = m.evalModuleTree {
     modules = [
       { options.monitoring.target = m.mkOption { type = m.types.str; }; }
-      forServer.module
+      forWeb1.module
     ];
   };
 in
-server.config.monitoring.target
+web1.config.monitoring.target
 ```
 
 ```text
-"server:9100"
+"web-1:9100"
 ```
 
 ## How it works
@@ -43,10 +42,9 @@ the bound value in. Arguments without a binding, such as `config` or `lib`, are 
 module system to supply as usual. Bindings the module does not ask for are ignored, so one set of
 bindings can serve every feature a host uses.
 
-The wrapped result also describes the module's interface. `forServer.signature` lists the
-arguments that were bound and the ones still required, so a framework can check a module's needs
-before it evaluates anything. If a module asks for `host` and nothing binds it, evaluation fails
-with:
+The wrapped result also describes the module's interface. `forWeb1.signature` lists the arguments
+that were bound and the ones still required, so a framework can check a module's needs before it
+evaluates anything. If a module asks for `host` and nothing binds it, evaluation fails with:
 
 ```text
 gen-merge: module argument `host' is not defined
@@ -58,9 +56,9 @@ A binding can carry a contract and a note of where its value came from:
 
 ```nix
 gen.bind.wrap {
-  bindings.host = { name = "server"; };
+  bindings.host = { name = "web-1"; };
   contracts.host = gen.bind.contract.hasFields [ "name" "system" ];
-  provenance.host = { source = "homelab"; scope = "host=server"; };
+  provenance.host = { source = "fleet"; scope = "host=web-1"; };
 } monitoring
 ```
 
@@ -69,7 +67,7 @@ missing field and the source:
 
 ```text
 gen-bind: contract violation: value must have fields: name, system
-(provided by 'homelab' at scope 'host=server')
+(provided by 'fleet' at scope 'host=web-1')
 ```
 
 The contract runs when the module reads `host`. A module that never reads a binding never pays
@@ -78,6 +76,67 @@ for its check.
 When a binding has the same name as an argument the module system already provides, such as
 `lib`, the binding wins by default. You can choose per name to let the module system win or to
 make the collision an error.
+
+## One value, any module system
+
+A service `api` listens on port 8080. Its NixOS host, its cloud firewall rule and its Kubernetes
+Service all need that port. Each target has its own module format, and the same binding reaches
+all three.
+
+```nix
+let
+  gen = inputs.gen.lib.mkGenLibs { };
+  m = gen.merge;
+
+  service = { name = "api"; port = 8080; };
+
+  # Three modules, each shaped for a different tool, all asking for `service`.
+  forNixos = { service, ... }: {
+    services.nginx.virtualHosts.${service.name}.listen = [ { port = service.port; } ];
+  };
+  forTerranix = { service, ... }: {
+    resource.aws_security_group_rule.${service.name} = {
+      from_port = service.port;
+      to_port = service.port;
+    };
+  };
+  forKubernetes = { service, ... }: {
+    services.${service.name}.spec.ports = [ { port = service.port; } ];
+  };
+
+  # Evaluate one module with the value bound. The freeform type accepts any shape.
+  render = module:
+    (m.evalModuleTree {
+      modules = [
+        { freeformType = m.types.lazyAttrsOf m.types.anything; }
+        (gen.bind.wrap { bindings = { inherit service; }; } module).module
+      ];
+    }).config;
+in
+{
+  nixos = render forNixos;
+  terranix = render forTerranix;
+  kubernetes = render forKubernetes;
+}
+```
+
+```text
+{ kubernetes = { services.api.spec.ports = [ { port = 8080; } ]; };
+  nixos = { services.nginx.virtualHosts.api.listen = [ { port = 8080; } ]; };
+  terranix = { resource.aws_security_group_rule.api = { from_port = 8080; to_port = 8080; }; }; }
+```
+
+gen composes a configuration in its own evaluation, without nixpkgs, and passes the target tool
+plain values such as `service`. gen's own types stay on gen's side, so the target never has to
+understand them. This boundary is a declared interim: the target's own checks on these values are
+off by default, and each place a value is handed over without that check is recorded as a declared
+opt-out. Full nixpkgs is loaded only where a target needs it, for example when building a NixOS
+system.
+
+The example above evaluates each module with gen's engine to show the values. In a framework, a
+**terminal** hands the same wrapped modules to the target's own evaluator
+([Delivery](/features/delivery/)). The [adios](https://github.com/adisbladis/adios) module system
+uses the same value-passing boundary.
 
 ## The theory
 

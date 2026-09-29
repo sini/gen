@@ -3,8 +3,7 @@ title: Rules
 description: Write rules with positive and negative conditions, solve them together, read each atom's verdict and turn the results into edges.
 ---
 
-On the web platform, a webserver may reach a database in its own environment unless the database
-is in maintenance. `db-2` is in maintenance, so `web-2` gets no access.
+A web server may reach a database in its own environment unless the database is in maintenance. `db-2` is in maintenance, so `web-2` gets no access.
 
 ```nix title="platform-acl.nix"
 let
@@ -94,6 +93,9 @@ gen.program.program {
 | `P` | more rules may still arrive | `true` only when the atom is derived without any negation; otherwise it fails |
 | `U` | the atom is undefined | fails |
 
+An undefined atom's truth is suspended: the program gives it neither true nor false. Because each atom is one fact, one contested pair can be undefined while its
+neighbours in the same relation settle.
+
 Reading `included` where no answer exists fails with an error. It never returns `null` or `false`:
 
 ```
@@ -132,7 +134,10 @@ map (atom:
 [Inspection](/features/inspection/) shows these derived edges beside the declared ones, and answers
 why each exists.
 
-For the theory, see [Rules That Add Relationships](/understand/rules/).
+For the theory, see [Rules That Add Relationships](/understand/rules/). The engine computes the
+well-founded model of [The Alternating Fixpoint](/reference/papers/van-gelder-1993-alternating-fixpoint/).
+Dispatch is a production rule system in the style of [Rete](/reference/papers/forgy-1982-rete/),
+run over ordered groups.
 
 ---
 

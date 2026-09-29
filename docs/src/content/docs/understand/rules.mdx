@@ -3,9 +3,9 @@ title: Rules That Add Relationships
 description: Rules with positive and negative conditions are solved together as one stratified logic program, under the well-founded model, and the relations that hold become edges.
 ---
 
-The web platform needs an access list: which webservers may connect to which databases. The
-company's rule is short. A webserver may reach a database in the same environment, unless
-that database is down. Writing out every allowed pair by hand would repeat that sentence for every
+A company runs web servers and databases in two environments and needs an access list: which
+web servers may connect to which databases. The rule is short: a web server may reach a database
+in the same environment, unless that database is down. Writing out every allowed pair by hand would repeat that sentence for every
 pair of hosts, and the list would go stale the moment a host changes.
 
 In gen you state the sentence once as a **rule** and let gen work out the pairs.

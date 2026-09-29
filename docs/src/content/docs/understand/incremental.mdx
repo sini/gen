@@ -3,9 +3,9 @@ title: Rebuilding Only What Changed
 description: After an edit, gen reuses every result the edit cannot affect and returns exactly what a full run returns (incremental computation, as in build systems and self-adjusting computation).
 ---
 
-The homelab is evaluated once. Then you change one line: the server's ssh port moves from 22 to
-2222. The laptop's desktop setting has nothing to do with that edit, and evaluating it again would
-be wasted work.
+A configuration sets the ssh port of a web server and the retention period of a database's
+backups. You change one line: the web server's ssh port moves from 22 to 2222. The database
+setting has nothing to do with that edit, and evaluating it again would be wasted work.
 
 gen's `compose` returns a handle for exactly this case. `override` applies an edit to a previous
 result, reuses what the edit leaves alone, and reports what it did.
@@ -15,15 +15,15 @@ let
   gen = inputs.gen.lib.mkGenLibs { };
   m = gen.merge;
 
-  homelab = {
-    options.server.sshPort = m.mkOption { type = m.types.int; default = 22; };
-    options.laptop.desktop = m.mkOption { type = m.types.str; default = "gnome"; };
+  fleet = {
+    options.web.sshPort = m.mkOption { type = m.types.int; default = 22; };
+    options.db.retentionDays = m.mkOption { type = m.types.int; default = 30; };
   };
-  edit = { config.server.sshPort = 2222; };
+  edit = { config.web.sshPort = 2222; };
 
-  first = inputs.gen.lib.compose { modules = [ homelab ]; specialArgs = { }; };
+  first = inputs.gen.lib.compose { modules = [ fleet ]; specialArgs = { }; };
   warm = first.override { modules = [ edit ]; };
-  cold = inputs.gen.lib.compose { modules = [ homelab edit ]; specialArgs = { }; };
+  cold = inputs.gen.lib.compose { modules = [ fleet edit ]; specialArgs = { }; };
 in
 {
   same = warm.values == cold.values;
@@ -32,10 +32,10 @@ in
 ```
 
 ```text
-{ same = true;
-  mode = "warm";
-  reused = [ "laptop.desktop" ];
-  remerged = { "server.sshPort" = "edited-def"; }; }
+{ mode = "warm";
+  remerged = { "web.sshPort" = "edited-def"; };
+  reused = [ "db.retentionDays" ];
+  same = true; }
 ```
 
 ## How it works

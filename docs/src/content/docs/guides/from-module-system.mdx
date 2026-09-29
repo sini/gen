@@ -36,7 +36,7 @@ let
   m = genMerge;            # inputs.gen-merge.lib, or (inputs.gen.lib.mkGenLibs { }).merge
   t = m.types;
   result = m.evalModuleTree {
-    specialArgs = { site = "homelab"; };                                  # (1)
+    specialArgs = { site = "us-east"; };                                  # (1)
     modules = [
       {
         options.services.ssh.enable = m.mkOption { type = t.bool; default = false; };
@@ -66,7 +66,7 @@ This evaluates to:
 
 ```nix
 {
-  motd = "welcome to homelab";
+  motd = "welcome to us-east";
   networking.firewall.allowedTCPPorts = [ 2222 ];
   services.ssh = { enable = true; port = 2222; };
 }
@@ -81,10 +81,10 @@ Each option in the result carries its provenance:
 ```nix
 m.evalModuleTree { modules = [
   { options.services.ssh.port = m.mkOption { type = t.int; default = 22; }; }
-  { _file = "/homelab/ssh.nix"; services.ssh.port = m.mkDefault 2222; }
+  { _file = "/etc/gen/ssh.nix"; services.ssh.port = m.mkDefault 2222; }
 ]; }
 # .provenance.services.ssh.port
-# ⇒ { winners = [ { file = "/homelab/ssh.nix"; } ]; priority = 1000; defs = [ … ]; … }
+# ⇒ { winners = [ { file = "/etc/gen/ssh.nix"; } ]; priority = 1000; defs = [ … ]; … }
 ```
 
 `winners` names the file whose definition won, and `priority` is its priority. `mkDefault`
@@ -102,24 +102,53 @@ expected type 'int' but value "eighty" is of type 'string'
 - **No `lib` argument.** Modules receive `config`, `options` and your `specialArgs`. A module
   that reads `lib` fails with ``module argument `lib' is not defined``. Pass nixpkgs' `lib`
   in `specialArgs` if your modules need it.
-- **A smaller type set.** `int`, `float`, `str`, `bool`, `path`, `raw`, `anything`, `enum`,
+- **A smaller native type set.** `int`, `float`, `str`, `bool`, `path`, `raw`, `anything`, `enum`,
   `nullOr`, `either`, `oneOf`, `listOf`, `attrsOf`, `lazyAttrsOf`, `submodule` and
   `deferredModule` are available. `port`, `lines`, `package`, `strMatching` and
   `functionTo` are not, and there is no `mkEnableOption`. Write
-  `mkOption { type = types.bool; default = false; }` instead.
+  `mkOption { type = types.bool; default = false; }`, or bring the nixpkgs type along as
+  shown below.
 - **Argument injection by name.** gen-bind's `wrap` binds arguments such as `host` into a
   module function before the module system sees it:
 
   ```nix
-  w = genBind.wrap { bindings = { host = { name = "laptop"; }; }; }
+  w = genBind.wrap { bindings = { host = { name = "web-1"; }; }; }
         ({ host, ... }: { hostName = host.name; });
-  # evalModuleTree with w.module sets hostName = "laptop"
+  # evalModuleTree with w.module sets hostName = "web-1"
   ```
 
   See [Automatic Argument Injection](/understand/argument-injection/).
 - **Nodes and edges.** nixpkgs evaluates one machine at a time. In gen, hosts, users and
   features are nodes in one graph, so a module can ask which users belong to this host.
   [From an Aspect to a NixOS System](/guides/aspects-to-nixos/) shows this.
+
+## Bringing nixpkgs types along
+
+gen-merge also accepts nixpkgs' own `lib.mkOption`, `lib.types` and `lib.mkDefault`. nixpkgs
+option types use the same merge interface as gen-merge's, so a module written for nixpkgs can
+be evaluated by gen-merge while you port it:
+
+```nix
+genMerge.evalModuleTree {
+  specialArgs = { inherit (inputs.nixpkgs) lib; };
+  modules = [
+    ({ lib, ... }: {
+      options.services.ssh.port = lib.mkOption { type = lib.types.port; default = 22; };
+      options.services.ssh.banner = lib.mkOption { type = lib.types.lines; default = ""; };
+    })
+    ({ lib, ... }: { services.ssh.port = lib.mkDefault 2222; })
+    { services.ssh.banner = "authorised use only"; }
+  ];
+}
+# .config ⇒ { services.ssh = { banner = "authorised use only"; port = 2222; }; }
+```
+
+The result is identical to `lib.evalModules` over the same modules. gen's benchmark corpus,
+run this way, produces byte-identical output. Leaf types such as `port` and `lines` add no
+merge work of their own, because gen-merge does the merging. A nixpkgs `submodule` type runs
+`lib.evalModules` for every instance, so it gives back the speed gen-merge gains on nested
+records. Use this mode to carry custom nixpkgs types through a port. See
+[Benchmarks](/benchmarks/) for the figures.
 
 <CardGrid>
   <LinkCard title="An Enhanced Module Type System" href="/understand/module-types/"

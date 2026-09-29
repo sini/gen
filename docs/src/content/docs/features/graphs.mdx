@@ -3,9 +3,9 @@ title: Graphs and Queries
 description: Reachability, ordering, cycles, labelled path queries, selectors and graph products over your own data.
 ---
 
-This example places two machines of a web platform in a graph. `contains` edges run from the
-`prod` environment to its datacenters, and from each datacenter to its machines. One `connects`
-edge says the webserver talks to the database.
+A `prod` environment spans two datacenters, with a web server in one and a database in the other.
+`contains` edges run from the environment to its datacenters and from each datacenter to its
+machines. One `connects` edge says the web server talks to the database.
 
 ```nix title="platform-graph.nix"
 let
@@ -152,7 +152,9 @@ entries carrying an `id_hash` (see [Kinds, Registries and Identity](/features/re
 `slice` fixes some coordinates and keeps the rest, and `fiber` keeps the cells over one entry of one
 dimension.
 
-For the model behind this page, see [Your Configuration as a Graph](/understand/graph/).
+For the model behind this page, see [Your Configuration as a Graph](/understand/graph/). The edge
+algebra and `transpose` follow [Algebraic Graphs with Class](/reference/papers/mokhov-2017-algebraic-graphs/),
+where transposing a graph flips the arguments of `connect` and leaves `overlay` unchanged.
 
 ---
 

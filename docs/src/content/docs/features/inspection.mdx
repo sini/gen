@@ -3,9 +3,10 @@ title: Inspection
 description: Load a graph and its rules into one set of facts, query it with SQL or selectors, ask why an edge exists, render it, and read gen's common errors.
 ---
 
-This inspector loads the web platform's hosts, the declared `runsIn` and `maintenance` edges, and
-the access rule from [Rules](/features/rules/). The rule derives `reaches` edges that no declaration
-states.
+Four hosts run in two environments, and one database is in maintenance. An access rule lets a web
+server reach a database in its own environment unless the database is in maintenance. The inspector
+loads the hosts, the declared `runsIn` and `maintenance` edges, and the rule, which derives
+`reaches` edges that no declaration states.
 
 ```nix title="platform-inspector.nix"
 let
@@ -147,8 +148,8 @@ gen fails early and names what it expected. Each message below comes from the cu
 | `gen-graph.ancestorsOf: required field 'parent' is missing` | The accessor record lacks a field this query reads | Add the field, here `parent = id: …` |
 | ``gen-merge: a definition for option `ssh.port' is not of the expected type: expected type 'int' but value "22" is of type 'string'`` | A definition has the wrong type | Fix the value, or the option's `type` |
 | ``gen-merge: option `ssh.prot' does not exist (no freeformType to absorb it)`` | A definition has no matching option, often a typo | Correct the path, or declare the option |
-| `gen-schema: ref field 'home' on kind 'user': reference 'desktop' not found in instance registry (available: server)` | A reference names an instance the registry does not have | Use one of the listed names, or add the instance |
-| `gen-aspects.includes (aspect 'desktop', include position 0): reference 'sshd' names no entry of the registry` | An `includes` entry names no aspect | Correct the name; the position is the index in `includes` |
+| `gen-schema: ref field 'home' on kind 'admin': reference 'web-3' not found in instance registry (available: db-1, web-1)` | A reference names an instance the registry does not have | Use one of the listed names, or add the instance |
+| `gen-aspects.includes (aspect 'webserver', include position 0): reference 'sshd' names no entry of the registry` | An `includes` entry names no aspect | Correct the name; the position is the index in `includes` |
 | `gen-program: the membership 'primary:db-1' is UNDEFINED — …` | `included` was read on an atom whose rules contradict each other | Read `flag` and handle `"U"`; see [Rules](/features/rules/) |
 | `gen-program: 'a' is not in the frozen set of relata …` | A rule's `relata` names an identifier missing from `frozen` | Add it to `frozen` |
 | ``gen-delivery: project: no node selector — `selectNodes` is required and has no default. …`` | `project` was called without `selectNodes` | Pass `selectNodes = values: values.hosts` or your registry's path |

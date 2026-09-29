@@ -1,6 +1,6 @@
 ---
-title: A Homelab
-description: Two hosts, two users and three features, configured with gen.
+title: A Small Deployment
+description: A web server and a database built into NixOS systems from shared features.
 ---
 
 import { Aside, FileTree, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -11,26 +11,24 @@ Full integration demos will be linked here once the framework interfaces built o
 final.
 </Aside>
 
-A homelab has two hosts, `laptop` and `server`, and two users, `alice` and `bob`. Three
-features, `ssh`, `monitoring` and `desktop`, share a `base` aspect. `alice` is an
-administrator on both hosts, and `bob` has an account on the laptop only.
+A small deployment runs two NixOS hosts: `web`, a web server, and `db`, a database. Both need
+SSH and monitoring. Two operator accounts exist: `deploy` has admin rights on both hosts, and
+`dba` has an account on the database host only. Each feature is written once as an aspect, a
+named and reusable piece of configuration, and gen builds one NixOS system per host.
 
 | host | aspects it asks for | aspects it gets | users |
 |---|---|---|---|
-| `laptop` | `desktop` | `desktop`, `ssh`, `base` | `alice` (wheel), `bob` |
-| `server` | `monitoring` | `monitoring`, `ssh`, `base` | `alice` (wheel) |
-
-[From an Aspect to a NixOS System](/guides/aspects-to-nixos/) builds this project step by
-step. This page shows it whole.
+| `web` | `webserver` | `webserver`, `ssh`, `monitoring`, `base` | `deploy` (wheel) |
+| `db` | `database` | `database`, `ssh`, `monitoring`, `base` | `deploy` (wheel), `dba` |
 
 <FileTree>
 - flake.nix
 - aspect-cnf.nix
 - gen-modules/
-  - homelab.nix
+  - deployment.nix
 - hardware/
-  - laptop.nix
-  - server.nix
+  - web.nix
+  - db.nix
 </FileTree>
 
 ## The flake
@@ -54,8 +52,8 @@ step. This page shows it whole.
         tree = ./gen-modules;
         aspectCnf = import ./aspect-cnf.nix;
         nodeRegistryPath = [ "hosts" ];
-        extraModules.laptop = [ ./hardware/laptop.nix ];
-        extraModules.server = [ ./hardware/server.nix ];
+        extraModules.web = [ ./hardware/web.nix ];
+        extraModules.db = [ ./hardware/db.nix ];
       };
     };
 }
@@ -69,7 +67,7 @@ step. This page shows it whole.
 ```
 
 ```nix
-# hardware/laptop.nix (server.nix is the same)
+# hardware/web.nix (db.nix is the same)
 {
   nixpkgs.hostPlatform = "x86_64-linux";
   boot.loader.grub.enable = false;
@@ -82,7 +80,7 @@ The hub options are listed in [Add gen to a Flake](/guides/flake/).
 ## The tree
 
 ```nix
-# gen-modules/homelab.nix
+# gen-modules/deployment.nix
 { config, genAspects, genMerge, genSchema, ... }:
 let
   inherit (genMerge) mkOption types;
@@ -121,11 +119,11 @@ in
   options.users = genSchema.mkInstanceRegistry schema.user { };
 
   config = {
-    hosts.laptop.aspects = withIncludes [ "desktop" ];
-    hosts.server.aspects = withIncludes [ "monitoring" ];
+    hosts.web.aspects = withIncludes [ "webserver" ];
+    hosts.db.aspects = withIncludes [ "database" ];
 
-    users.alice = { hosts = [ "laptop" "server" ]; admin = true; };
-    users.bob.hosts = [ "laptop" ];
+    users.deploy = { hosts = [ "web" "db" ]; admin = true; };
+    users.dba.hosts = [ "db" ];
 
     aspects.base.nixos = { node, ... }: {
       networking.hostName = node.name;
@@ -142,11 +140,14 @@ in
     aspects.ssh.includes = [ "base" ];
     aspects.ssh.nixos.services.openssh.enable = true;
 
-    aspects.desktop.includes = [ "ssh" ];
-    aspects.desktop.nixos.services.xserver.enable = true;
-
-    aspects.monitoring.includes = [ "ssh" ];
+    aspects.monitoring.includes = [ "base" ];
     aspects.monitoring.nixos.services.prometheus.exporters.node.enable = true;
+
+    aspects.webserver.includes = [ "ssh" "monitoring" ];
+    aspects.webserver.nixos.services.nginx.enable = true;
+
+    aspects.database.includes = [ "ssh" "monitoring" ];
+    aspects.database.nixos.services.postgresql.enable = true;
   };
 }
 ```
@@ -155,23 +156,29 @@ in
 
 ```sh
 nix eval .#nixosConfigurations --apply builtins.attrNames
-# [ "laptop" "server" ]
+# [ "db" "web" ]
 
-nix eval --json .#nixosConfigurations.server.config.services.prometheus.exporters.node.enable
+nix eval --json .#nixosConfigurations.web.config.services.nginx.enable
 # true
 
-nix eval --json .#nixosConfigurations.laptop.config.users.users.alice.extraGroups
+nix eval --json .#nixosConfigurations.db.config.services.prometheus.exporters.node.enable
+# true
+
+nix eval --json .#nixosConfigurations.db.config.users.users.deploy.extraGroups
 # ["wheel"]
 
-nix build .#nixosConfigurations.laptop.config.system.build.toplevel
+nix build .#nixosConfigurations.db.config.system.build.toplevel
 ```
+
+`web` runs nginx and `db` runs PostgreSQL. Both run SSH and the Prometheus node exporter,
+which they reach through `includes`. `dba` has an account on `db` only.
 
 ## Each part, explained
 
 | part of the example | what it is | read more |
 |---|---|---|
 | `hosts`, `users`, `aspects` in one tree | nodes in one graph, related by `aspects`, `hosts` and `includes` | [Your Configuration as a Graph](/understand/graph/) |
-| `aspects.ssh`, `includes = [ "base" ]` | reusable features that include each other | [Reusable Features](/understand/features/) |
+| `aspects.webserver`, `includes = [ "ssh" "monitoring" ]` | reusable features that include each other | [Reusable Features](/understand/features/) |
 | `mkInstanceRegistry`, `node.name` | instances of a kind, each with a stable identity | [Stable Identity for Everything](/understand/identity/) |
 | `mkOption`, `types.listOf`, `evalSchema` | gen's own typed module system | [An Enhanced Module Type System](/understand/module-types/) |
 | `{ node, ... }:` in `aspects.base.nixos` | the host bound into the module by name | [Automatic Argument Injection](/understand/argument-injection/) |
@@ -185,5 +192,5 @@ relation as graph data for gen-graph queries. See [Aspects](/features/aspects/).
   <LinkCard title="A Web Platform" href="/examples/web-platform/"
     description="Environments, datacenters, roles and an access rule." />
   <LinkCard title="From an Aspect to a NixOS System" href="/guides/aspects-to-nixos/"
-    description="This project, built one step at a time." />
+    description="A project like this one, built one step at a time." />
 </CardGrid>

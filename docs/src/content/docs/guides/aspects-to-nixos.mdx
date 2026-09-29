@@ -7,9 +7,10 @@ import { Steps, Aside, FileTree, CardGrid, LinkCard } from '@astrojs/starlight/c
 
 <Aside type="caution">gen is pre-release and its API is still changing.</Aside>
 
-This guide builds the `laptop` of the [homelab example](/examples/homelab/) from nothing.
-You declare two kinds, `host` and `user`, a few aspects that carry NixOS configuration, and
-the hosts that use them. The hub turns each host into a `nixosConfiguration`.
+This guide builds two NixOS hosts from nothing: `web`, a web server, and `db`, a database.
+Both need SSH and monitoring. You declare two kinds, `host` and `user`, a few aspects that
+carry NixOS configuration, and the hosts that use them. The hub turns each host into a
+`nixosConfiguration`.
 
 An aspect is a named, reusable feature. It holds configuration for one or more classes,
 such as `nixos`, and can include other aspects. See [Reusable Features](/understand/features/).
@@ -20,10 +21,10 @@ The finished project has five files:
 - flake.nix
 - aspect-cnf.nix
 - gen-modules/
-  - homelab.nix
+  - deployment.nix
 - hardware/
-  - laptop.nix
-  - server.nix
+  - web.nix
+  - db.nix
 </FileTree>
 
 <Steps>
@@ -49,8 +50,8 @@ The finished project has five files:
            tree = ./gen-modules;
            aspectCnf = import ./aspect-cnf.nix;
            nodeRegistryPath = [ "hosts" ];                    # (1)
-           extraModules.laptop = [ ./hardware/laptop.nix ];   # (2)
-           extraModules.server = [ ./hardware/server.nix ];
+           extraModules.web = [ ./hardware/web.nix ];         # (2)
+           extraModules.db = [ ./hardware/db.nix ];
          };
        };
    }
@@ -60,7 +61,7 @@ The finished project has five files:
    2. Per-host NixOS modules. Here they hold the platform and file systems:
 
    ```nix
-   # hardware/laptop.nix
+   # hardware/web.nix (db.nix is the same)
    {
      nixpkgs.hostPlatform = "x86_64-linux";
      boot.loader.grub.enable = false;
@@ -86,7 +87,7 @@ The finished project has five files:
 3. ##### Declare the kinds
 
    A kind is a typed record type. Every `host` and every `user` is an instance of one. The
-   rest of this step and the next ones are in `gen-modules/homelab.nix`.
+   rest of this step and the next ones are in `gen-modules/deployment.nix`.
 
    ```nix
    { config, genAspects, genMerge, genSchema, ... }:                # (1)
@@ -122,17 +123,17 @@ The finished project has five files:
      options.users = genSchema.mkInstanceRegistry schema.user { };
 
      config = {
-       hosts.laptop.aspects = withIncludes [ "desktop" ];              # (3)
-       hosts.server.aspects = withIncludes [ "monitoring" ];
+       hosts.web.aspects = withIncludes [ "webserver" ];               # (3)
+       hosts.db.aspects = withIncludes [ "database" ];
 
-       users.alice = { hosts = [ "laptop" "server" ]; admin = true; };
-       users.bob.hosts = [ "laptop" ];
+       users.deploy = { hosts = [ "web" "db" ]; admin = true; };
+       users.dba.hosts = [ "db" ];
    ```
 
    1. Declares the `aspects` option, built from the class declaration in step 2.
    2. A registry holds the instances of one kind. Each instance gets its `name` and a stable
       identity. See [Stable Identity for Everything](/understand/identity/).
-   3. `withIncludes`, defined in the next step, adds every aspect that `desktop` includes.
+   3. `withIncludes`, defined in the next step, adds every aspect that `webserver` includes.
 
 5. ##### Write the aspects
 
@@ -152,11 +153,14 @@ The finished project has five files:
        aspects.ssh.includes = [ "base" ];                              # (3)
        aspects.ssh.nixos.services.openssh.enable = true;
 
-       aspects.desktop.includes = [ "ssh" ];
-       aspects.desktop.nixos.services.xserver.enable = true;
-
-       aspects.monitoring.includes = [ "ssh" ];
+       aspects.monitoring.includes = [ "base" ];
        aspects.monitoring.nixos.services.prometheus.exporters.node.enable = true;
+
+       aspects.webserver.includes = [ "ssh" "monitoring" ];
+       aspects.webserver.nixos.services.nginx.enable = true;
+
+       aspects.database.includes = [ "ssh" "monitoring" ];
+       aspects.database.nixos.services.postgresql.enable = true;
      };
    }
    ```
@@ -180,26 +184,26 @@ The finished project has five files:
    ```
 
    The hub delivers the aspects listed on each host. `withIncludes` computes the list by
-   following `includes`, so `laptop` gets `desktop`, `ssh` and `base`.
+   following `includes`, so `web` gets `webserver`, `ssh`, `monitoring` and `base`.
 
 6. ##### Evaluate and build
 
    ```sh
    nix eval .#nixosConfigurations --apply builtins.attrNames
-   # [ "laptop" "server" ]
+   # [ "db" "web" ]
 
-   nix eval --json .#nixosConfigurations.laptop.config.services.openssh.enable
+   nix eval --json .#nixosConfigurations.db.config.services.openssh.enable
    # true
 
-   nix eval --json .#nixosConfigurations.laptop.config.users.users.alice.extraGroups
+   nix eval --json .#nixosConfigurations.db.config.users.users.deploy.extraGroups
    # ["wheel"]
 
-   nix build .#nixosConfigurations.laptop.config.system.build.toplevel
+   nix build .#nixosConfigurations.db.config.system.build.toplevel
    ```
 
-   `laptop` has X11 from `desktop`, and SSH and its host name from `ssh` and `base`, which
-   it reaches through includes. It has accounts for `alice` and `bob`. `server` has SSH and
-   the Prometheus node exporter, and an account for `alice` only.
+   `db` runs PostgreSQL from `database`, and SSH, the node exporter and its host name from
+   `ssh`, `monitoring` and `base`, which it reaches through includes. It has accounts for
+   `deploy` and `dba`. `web` runs nginx and has an account for `deploy` only.
 
 </Steps>
 
@@ -217,8 +221,8 @@ A framework such as den hides most of this file behind its own vocabulary. The k
 registries, aspects and delivery underneath are the same.
 
 <CardGrid>
-  <LinkCard title="A Homelab" href="/examples/homelab/"
-    description="This project whole, with links to the pages that explain each part." />
+  <LinkCard title="A Small Deployment" href="/examples/small-deployment/"
+    description="A finished project like this one, with links to the pages that explain each part." />
   <LinkCard title="Delivery" href="/features/delivery/"
     description="Projection, terminals and building artifacts for other classes." />
   <LinkCard title="Aspects" href="/features/aspects/"

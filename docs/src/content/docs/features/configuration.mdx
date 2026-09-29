@@ -3,7 +3,7 @@ title: Typed Configuration
 description: Types with readable errors, module merging without nixpkgs, per-value provenance, argument injection and layered settings.
 ---
 
-Three homelab modules set the SSH port. gen merges them and records which file set the value, at
+Three modules set a host's SSH port. gen merges them and records which file set the value, at
 which priority, and which definitions lost.
 
 ```nix title="ssh-port.nix"
@@ -14,12 +14,12 @@ let
   result = evalModuleTree {
     modules = [
       {
-        _file = "/homelab/ssh.nix";
+        _file = "/modules/ssh.nix";
         options.ssh.port = mkOption { type = types.int; default = 22; };
         options.ssh.allowUsers = mkOption { type = types.listOf types.str; default = [ ]; };
       }
-      { _file = "/homelab/hardening.nix"; ssh.port = mkDefault 2222; ssh.allowUsers = [ "alice" ]; }
-      { _file = "/homelab/server.nix"; ssh.port = 22022; ssh.allowUsers = [ "bob" ]; }
+      { _file = "/modules/hardening.nix"; ssh.port = mkDefault 2222; ssh.allowUsers = [ "deploy" ]; }
+      { _file = "/modules/web-1.nix"; ssh.port = 22022; ssh.allowUsers = [ "dba" ]; }
     ];
   };
 in
@@ -32,15 +32,15 @@ in
 ```console
 $ nix eval --impure --json --file ssh-port.nix
 {
-  "config": { "ssh": { "allowUsers": ["bob", "alice"], "port": 22022 } },
+  "config": { "ssh": { "allowUsers": ["dba", "deploy"], "port": 22022 } },
   "port": {
     "defs": [
-      { "file": "/homelab/server.nix", "priority": 100 },
-      { "file": "/homelab/hardening.nix", "priority": 1000 },
+      { "file": "/modules/web-1.nix", "priority": 100 },
+      { "file": "/modules/hardening.nix", "priority": 1000 },
       { "file": "<default>", "priority": 1500 }
     ],
     "priority": 100,
-    "winners": [ { "file": "/homelab/server.nix" } ]
+    "winners": [ { "file": "/modules/web-1.nix" } ]
   }
 }
 ```
@@ -74,7 +74,7 @@ that failed:
 ```nix
 gen.types.int.verify 22                              # null
 gen.types.int.verify "22"                            # "expected type 'int' but value \"22\" is of type 'string'"
-(gen.types.listOf gen.types.str).verify [ "alice" 7 ]
+(gen.types.listOf gen.types.str).verify [ "deploy" 7 ]
 # "in listOf<string> element: expected type 'string' but value 7 is of type 'int'"
 ```
 
@@ -86,7 +86,7 @@ The module engine uses the same checks. A definition of the wrong type fails wit
 The lowest priority number wins, and definitions at the same priority merge. A plain definition is
 priority 100, `mkDefault` 1000, an option's `default` 1500, and `mkForce` 50. Definitions at equal
 priority merge in reverse module order, as in nixpkgs: that is why `allowUsers` above is
-`[ "bob" "alice" ]`. `mkBefore` and `mkAfter` reorder list elements after priorities are resolved.
+`[ "dba" "deploy" ]`. `mkBefore` and `mkAfter` reorder list elements after priorities are resolved.
 
 `evalModuleTree` returns these fields:
 
@@ -103,10 +103,45 @@ priority merge in reverse module order, as in nixpkgs: that is why `allowUsers` 
 A definition for an option that does not exist fails with
 ``gen-merge: option `ssh.prot' does not exist (no freeformType to absorb it)``. With
 `check = false` the evaluation continues, and `undeclared` lists
-`{ file = "/homelab/server.nix"; path = [ "ssh" "prot" ]; }`.
+`{ file = "/modules/web-1.nix"; path = [ "ssh" "prot" ]; }`.
 
 gen's merge engine is tested against nixpkgs' `lib.evalModules` for the module grammar the two share.
 `lint` flags a module that uses a construct outside that shared subset.
+
+### Modules written for nixpkgs
+
+`evalModuleTree` also accepts options declared with nixpkgs' `lib.mkOption` and `lib.types`, with no
+adapter. The same modules give the same `config` under both engines:
+
+```nix title="nixpkgs-types.nix"
+let
+  gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
+  lib = (builtins.getFlake "github:NixOS/nixpkgs/nixos-unstable").lib;
+  modules = [
+    { options.ssh.port = lib.mkOption { type = lib.types.port; default = 22; };
+      options.ssh.allowUsers = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ ]; }; }
+    { ssh.port = lib.mkDefault 2222; ssh.allowUsers = [ "deploy" ]; }
+    { ssh.port = 22022; ssh.allowUsers = [ "dba" ]; }
+  ];
+in
+{
+  gen = (gen.merge.evalModuleTree { inherit modules; }).config;
+  nixpkgs = (lib.evalModules { inherit modules; }).config;
+}
+```
+
+```console
+$ nix eval --impure --json --file nixpkgs-types.nix
+{
+  "gen": { "ssh": { "allowUsers": ["dba", "deploy"], "port": 22022 } },
+  "nixpkgs": { "ssh": { "allowUsers": ["dba", "deploy"], "port": 22022 } }
+}
+```
+
+This lets you port a module tree one option at a time. Leaf types such as `port` and `str` add no
+cost. A nixpkgs `submodule` hands its merge back to `lib.evalModules` for every instance, so it
+loses gen's speed advantage for that subtree. Replace those with `merge.types.submodule` when
+speed matters.
 
 ### Argument injection
 
@@ -118,7 +153,7 @@ let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   inherit (gen) merge bind;
 
-  wrapped = bind.wrap { bindings = { host = { name = "server"; }; }; }
+  wrapped = bind.wrap { bindings = { host = { name = "web-1"; }; }; }
     ({ host, config, ... }: { networking.hostName = host.name; });
 
   result = merge.evalModuleTree {
@@ -136,7 +171,7 @@ in
 
 ```console
 $ nix eval --impure --json --file hostname.nix
-{ "hostName": "server", "stillAsks": { "config": false } }
+{ "hostName": "web-1", "stillAsks": { "config": false } }
 ```
 
 `host` came from the binding. `config` is still requested from the module system, and `false` means

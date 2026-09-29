@@ -6,7 +6,10 @@ The gen documentation site: [Astro](https://astro.build) +
 
 ## Writing
 
-Every page under `src/content/docs/` follows these rules.
+Every page under `src/content/docs/` follows these rules. The landing page and the Gen group
+(overview, the case for gen, roadmap, history) are the exception: they are the front door and may
+use a warmer, persuasive voice, with imagery and rhythm. The accuracy and public-audience rules
+still apply to them in full.
 
 - **Plain technical English.** Write the way a good man page or a Rust book
   chapter reads. Short declarative sentences, common words, one idea per
@@ -29,6 +32,11 @@ Every page under `src/content/docs/` follows these rules.
   "refuses by name", "by construction", "load-bearing", "the whole trick",
   "nothing less than", "the crossing", "owes". Say "fails with an error naming
   X", "always", "required".
+- **Every page stands alone.** A reader may arrive on any page directly, so no
+  page leans on a story told elsewhere. No running cast (no "the homelab", no
+  recurring named people or machines carried between pages). Frame each
+  example in neutral terms the page itself sets up: "A server's monitoring
+  feature needs to know which host it runs on."
 - **Define a term once, where it first appears,** in one plain clause, and link
   to [terminology](src/content/docs/reference/terminology.mdx) for the rest.
 - **Sparing punctuation.** At most one dash aside per paragraph. No
