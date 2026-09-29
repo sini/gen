@@ -30,7 +30,7 @@ let
     (
       { inputs, config, ... }:
       {
-        flake.sawSelf = inputs.self.marker;
+        flake.sawSelf = (inputs.self or { }).marker or null;
         flake.sawSystems = config.systems;
         flake.sawInputs = builtins.attrNames inputs;
       }
