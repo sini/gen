@@ -23,8 +23,9 @@
 # `pin-coherence` takes and for the same reason: a cell that fetches 21
 # repositories to answer a question about wiring has bought nothing and made the gate non-hermetic.
 # What that leaves outside: this cell does not force a member, so it is silent about whether a
-# resolved node BUILDS. The flake path's force is `mkgenlibs-eval`'s, and the hub root's `roster`
-# output carries it under `nix flake check`.
+# resolved node BUILDS. The flake path's force is `mkgenlibs-eval`'s, which `deepSeq`s every roster
+# member under `nix flake check ./ci` (den-hoag-ydm94 R7 retired the root's own forcing output,
+# `roster`, once this check was confirmed to force the same key set more deeply).
 #
 # ── THE ARMING IS IN THE CELL, AND IT GATES ──
 # Three seeded defects are evaluated here on every run, each a DELTA against the live reading printed
@@ -289,7 +290,7 @@ in
     governs = "the hub's standalone entry (`default.nix`): which roster members it wires, and which repository's node each default resolves to";
     property = "the entry wires EVERY roster member, and each one defaults to a node of its own repository, at the member-scoped path [ <member> ]";
     observable = "the member-to-path record the entry hands `wire`, resolved through the entry's OWN `resolve` binding against the ROOT `flake.lock`, compared on `locked.repo`";
-    direction = "HERMETIC and EXACT over wiring; SILENT about building. Nothing is fetched and no member is forced, so a member that resolves correctly and then fails to evaluate is invisible here — that force is `mkgenlibs-eval`'s on the flake path and the root `roster` output's under `nix flake check`";
+    direction = "HERMETIC and EXACT over wiring; SILENT about building. Nothing is fetched and no member is forced, so a member that resolves correctly and then fails to evaluate is invisible here — that force is `mkgenlibs-eval`'s, which deepSeqs every roster member under `nix flake check ./ci`";
     domainSource = "`gen.lib.mkGenLibs { }`'s member keys minus `strata` — ADR-0015's roster of record — intersected with nothing and counted from nowhere else";
     ceiling = "`locked.repo` is neither `owner` nor node/revision identity: a member repointed to a DIFFERENT node of the RIGHT repository passes here. The entry's declared path is the only statement of intent, so there is no independent expectation to compare a node against";
 

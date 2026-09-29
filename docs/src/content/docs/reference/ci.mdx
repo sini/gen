@@ -44,9 +44,11 @@ And the trust-surface job:
 | `sole-evaluator-report` | `nix run ./ci#sole-evaluator-report` | **Reported, gated by nothing** — deliberately |
 | `fleet-consistency` | `nix run ./ci#fleet-consistency` | **Gates** — 9 arithmetic-consistency checks over committed baseline JSON, no live fleet evaluation |
 
-The `checks` job runs the root flake's own check first — its only relevant output is a `roster`
-binding that forces the roster to depth, so an unhealthy member reds it — and then every check
-declared in `ci/flake.nix`.
+The `checks` job runs `nix flake check` at the root first — that root declares no `checks` of its
+own — and then every check declared in `ci/flake.nix`, which is where the roster gets forced: the
+`mkgenlibs-eval` check builds the whole roster (via `mkGenLibs`) and `deepSeq`s every member, so an
+unhealthy member reds it there (den-hoag-ydm94 R7 retired the root's own forcing output, `roster`,
+once this check was confirmed to force the same key set more deeply).
 
 ## The 23 checks
 

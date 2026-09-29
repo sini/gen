@@ -92,7 +92,7 @@ flake's own `gen-*` inputs (`gen.inputs`, filtered by prefix) — so the next hu
 
 ## Exports
 
-Entry: `inputs.gen`. Root outputs are `lib`, `flakeModules` and `roster` — the Drift check output at the end of this sheet is the bound record. There are no
+Entry: `inputs.gen`. Root outputs are `lib` and `flakeModules` — the Drift check output at the end of this sheet is the bound record. There are no
 `packages`, `devShells`, `checks`, or `formatter` at the root.
 
 **`lib`**
@@ -262,7 +262,7 @@ Current output (verbatim):
 <!-- gen-drift:begin -->
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib","roster"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
 ```
 
 <!-- gen-drift:end -->
