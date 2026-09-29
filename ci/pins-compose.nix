@@ -49,14 +49,15 @@
 # in-memory revision differs from the file lock, so a substituted member cannot run it as it stands.
 {
   gen,
+  rosterMetaKeys,
   pkgs,
   lib,
   system,
 }:
 let
-  # The roster of record, as `pin-coherence.nix` derives it: bare keys minus `strata`, mapped through
-  # `"gen-" + k` (see that file's header for why the map is load-bearing).
-  rosterKeys = builtins.attrNames (builtins.removeAttrs (gen.lib.mkGenLibs { }) [ "strata" ]);
+  # The roster of record, as `pin-coherence.nix` derives it: bare keys minus that file's
+  # `rosterMetaKeys`, mapped through `"gen-" + k` (see its header for why the map is load-bearing).
+  rosterKeys = builtins.attrNames (builtins.removeAttrs (gen.lib.mkGenLibs { }) rosterMetaKeys);
   memberNames = map (k: "gen-" + k) rosterKeys;
   pinned = gen.inputs;
 
@@ -74,6 +75,8 @@ let
         own.sourceInfo
         // outputs
         // {
+          # A real flake's `sourceInfo`, and its `outPath` at the flake's own directory (`<root>/ci`).
+          inherit (own) sourceInfo outPath;
           inherit inputs outputs;
           _type = "flake";
         };

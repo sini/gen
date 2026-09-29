@@ -396,6 +396,7 @@
           # hub's pins (`ci/pins-compose.nix`).
           pinsCompose = import ./pins-compose.nix {
             inherit (inputs) gen;
+            inherit (pinCoherence) rosterMetaKeys;
             inherit pkgs lib system;
           };
 
