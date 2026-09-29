@@ -55,31 +55,26 @@ Section 7 notes future work on collection attributes (Boyland 2005; Magnusson, E
 
 ### Current Usage in Gen Ecosystem
 
-**gen-scope (MAJOR -- directly implements four Kiama constructs)**
+**gen-scope (MAJOR -- directly implements three Kiama constructs)**
 
 1. **`_eval` co-located cache = CachedAttribute (S3.2, Figure 6).** Every scope graph node receives an `_eval` attrset -- a lazy Nix attrset where each key is an attribute computation. Nix's lazy evaluation means the thunk for `_eval.region` is evaluated at most once and cached automatically by the Nix evaluator. This is structurally identical to `CachedAttribute`'s identity hash map: the hash map key is the node identity (Kiama uses an `IdentityHashMap[T, Option[U]]`; gen-scope uses the node's `id` as the attrset key), and the cached value is the thunk's forced result. The sentinel-based cycle detection from Figure 6 is replaced by Nix's native infinite-recursion detection, which serves the same purpose. The critical design insight is that caches are co-located ON nodes (like JastAdd's field-based caching, unlike Kiama's separate attribute objects), but achieve the same O(1) amortized access.
 
    - **Files:** `eval` function in gen-scope, `_eval` construction during `children`/`derived-children` wrapping
    - **Mapping:** `CachedAttribute.apply(t)` = Nix attrset lazy thunk evaluation; `CachedAttribute.memo` = the `_eval` attrset itself; `memo.get(t) match { case Some(Some(u)) => u }` = subsequent attrset access returning cached value
 
-2. **`paramAttr` = Parameterized Attributes (S3, Figure 4).** gen-scope's `paramAttr f self id param` constructor creates attributes parameterized by an additional value. The signature `f self id param` corresponds to Kiama's `paramAttr { n => { case ... } }` where the outer function receives the parameter and the inner function receives the node. Used for value-indexed attribute families such as name lookups parameterized by the identifier being sought.
-
-   - **Files:** `paramAttr` in gen-scope attribute combinators
-   - **Mapping:** Kiama `paramAttr (f : S => T ==> U)` = gen-scope `paramAttr f self id param` where `S` = param type, `T` = node id, `U` = result
-
-3. **`circular` = Circular Fixed-Point Attributes (S2.2, Figure 3-4).** gen-scope's `circular { init; eq; maxIter; } f self id` constructor evaluates an attribute by iterating from `init` until `eq prev next` returns true or `maxIter` is reached. This implements the Magnusson-Hedin algorithm that Kiama wraps in `CircularAttribute`. The `init` parameter corresponds to Kiama's `circular(Set[String]())`, the convergence check replaces Kiama's built-in equality, and `maxIter` adds a safety bound absent in the original.
+2. **`circular` = Circular Fixed-Point Attributes (S2.2, Figure 3-4).** gen-scope's `circular { init; eq; maxIter; } f self id` constructor evaluates an attribute by iterating from `init` until `eq prev next` returns true or `maxIter` is reached. This implements the Magnusson-Hedin algorithm that Kiama wraps in `CircularAttribute`. The `init` parameter corresponds to Kiama's `circular(Set[String]())`, the convergence check replaces Kiama's built-in equality, and `maxIter` adds a safety bound absent in the original.
 
    - **Files:** `circular` in gen-scope attribute combinators
    - **Mapping:** Kiama `circular (init : U) (f : T => U)` = gen-scope `circular { init; eq; maxIter; } f self id`; Magnusson-Hedin iteration loop = gen-scope's recursive `go` with convergence check
 
-4. **`collectionAttr` = Collection Attributes (S7, future work realized).** Kiama's S7 mentions collection attributes as planned future work, citing Boyland (2005) and Magnusson, Ekman, Hedin (2007). gen-scope implements this as `collectionAttr { traverse; extract; combine; filter; }`, which traverses the scope graph along a specified axis (imports, children, siblings, ancestors, custom label, or arbitrary function), extracts values from matching nodes, and folds them with `combine`. This realizes what Sloane described as "extending attribute grammars with collection attributes -- evaluation and applications."
+3. **`collectionAttr` = Collection Attributes (S7, future work realized).** Kiama's S7 mentions collection attributes as planned future work, citing Boyland (2005) and Magnusson, Ekman, Hedin (2007). gen-scope implements this as `collectionAttr { traverse; extract; combine; filter; }`, which traverses the scope graph along a specified axis (imports, children, siblings, ancestors, custom label, or arbitrary function), extracts values from matching nodes, and folds them with `combine`. This realizes what Sloane described as "extending attribute grammars with collection attributes -- evaluation and applications."
 
    - **Files:** `collectionAttr` in gen-scope attribute combinators
    - **Mapping:** Boyland/Magnusson's collection attributes (Kiama ref [4,15]) = gen-scope `collectionAttr`; the `traverse` parameter generalizes Silver's fold-over-tree to arbitrary graph traversal strategies
 
 **gen-scope (MINOR -- conceptual influence)**
 
-5. **Inherited attributes via `inherit'`.** gen-scope's `inherit' { resolve }` walks the parent chain until `resolve node` returns non-null. This captures the same pattern as Kiama's `childAttr` and parent-matching inherited attributes (S2.1 `globmin`), but inverts the perspective: Kiama matches on the parent to define the child's value, while gen-scope walks upward from the child. Both achieve the same result -- propagation of values down the tree without explicit copy rules.
+4. **Inherited attributes via `inherit'`.** gen-scope's `inherit' { resolve }` walks the parent chain until `resolve node` returns non-null. This captures the same pattern as Kiama's `childAttr` and parent-matching inherited attributes (S2.1 `globmin`), but inverts the perspective: Kiama matches on the parent to define the child's value, while gen-scope walks upward from the child. Both achieve the same result -- propagation of values down the tree without explicit copy rules.
 
 ### Relevance to Den v2 HOAG Pipeline
 
@@ -91,7 +86,6 @@ The central thesis of Kiama -- that a sufficiently expressive host language can 
 | Demand-driven scheduling | `apply()` evaluates on first access | Nix lazy evaluation: thunks forced only when demanded |
 | Pattern-matching equations | Scala `case` in anonymous functions | Nix `if/else` chains and pattern matching in attribute bodies |
 | Circular fixed-point | `CircularAttribute` iterates to convergence | `circular` combinator with `eq`-based convergence check |
-| Parameterized attributes | `paramAttr` curried function | `paramAttr f self id param` |
 | Trait-based modularity | Scala traits + mixin composition | Aspect composition + gen-derive rule dispatch |
 | Dynamic extension (`+=`) | Partial function list with scoped activation | gen-derive's rule override/priority system with fixpoint convergence |
 | Host-language laziness as AG evaluator | Scala lazy vals (limited -- Kiama uses explicit caching instead) | Nix lazy evaluation (native -- every attrset value is a lazy thunk) |
