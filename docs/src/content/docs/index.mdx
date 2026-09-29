@@ -1,22 +1,76 @@
 ---
 title: gen
-description: Nix libraries that model hosts, users and features as one graph. Write a feature once as a function of its host, and gen passes the host in.
+description: Every layer of your infrastructure is connected, from library inputs to firewall rules in production. gen makes it one declarative graph you can query, evaluated in one place, from a single machine to thousands.
 template: splash
 editUrl: false
 hero:
   tagline: |
-    Hosts, users and features form one graph.
-    Write each feature once, as a function of the host it lands on, and gen passes the host in.
+    Every layer of your infrastructure is connected: library inputs, services on hosts, firewall rules in production.
+    gen makes it one declarative graph you can query, evaluated in one place, from a single machine to thousands.
+  actions:
+    - text: The Case for gen
+      link: /case-for-gen/
+      icon: right-arrow
+    - text: Understand gen
+      link: /understand/core-concepts/
+      icon: document
+    - text: Build with gen
+      link: /guides/getting-started/
+      variant: minimal
 ---
 
-import { LinkButton } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import HeroGraph from '../../components/HeroGraph.astro';
 
 <HeroGraph />
 
+## What gen is
+
+Every layer of a system depends on the others: a service needs the libraries it is built from,
+runs on a machine, and is reachable only where a firewall rule allows it. gen treats all of it as
+one graph, where machines, users, services and features are nodes and the relationships between
+them are edges. gen is built on Nix, which describes each machine as code: its packages, services,
+users and settings. You write each feature once, every machine that selects it gets a copy filled
+in with its own values, and rules add further relationships from the ones you declared. Then you
+query the result: which features a machine has, which machines run a service, and which file set a
+value.
+
+<CardGrid>
+  <Card title="For AI agents" icon="rocket">
+    Check a change against the whole graph before it lands: types, includes and rules are
+    evaluated together, and a mistake fails with an error that names the option.
+  </Card>
+  <Card title="For operations engineers" icon="magnifier">
+    See what each machine is declared to run, and why: which features it selected, which
+    features those include, and which rule added a relationship.
+  </Card>
+  <Card title="For developers" icon="seti:config">
+    See what gets built for each machine, and which file set each declared option, at which priority.
+  </Card>
+</CardGrid>
+
+<CardGrid>
+  <Card title="Relationships are edges" icon="puzzle">
+    Hosts, users and features are nodes. What relates them is a labelled edge you can query.
+    [Your Configuration as a Graph](/understand/graph/)
+  </Card>
+  <Card title="Features are written once" icon="pen">
+    A feature takes its host as an argument, and gen passes the host in.
+    [Reusable Features](/understand/features/)
+  </Card>
+  <Card title="Rules add relationships" icon="random">
+    A rule relates nodes when its conditions hold. gen solves all rules together.
+    [Rules That Add Relationships](/understand/rules/)
+  </Card>
+  <Card title="Everything has an identity" icon="approve-check">
+    Every node gets an identity computed from its content, which gen uses to reuse work.
+    [Stable Identity for Everything](/understand/identity/)
+  </Card>
+</CardGrid>
+
 ## The wiring problem
 
-Take a homelab with two machines. Both run SSH. The server also exports metrics, and the laptop runs
+Take two machines. Both run SSH. The server also exports metrics, and the laptop runs
 a desktop. In plain NixOS the wiring looks like this:
 
 ```nix
@@ -40,7 +94,7 @@ Three facts in that file live only in your head:
 - The module lists are the only record of which host has which feature. To answer "which hosts run
   SSH?" you read every list.
 
-## The same homelab in gen
+## The same two machines in gen
 
 Each feature is an *aspect*, a named bundle of configuration. An aspect can include other aspects,
 and each include is an edge in a graph. An aspect that needs to know its host takes `host` as an
@@ -65,7 +119,7 @@ The server lists only `monitoring`, and SSH arrives through the include edge. Ea
 configuration comes out filled in with its own address and users (output formatted for reading):
 
 ```console
-$ nix eval --file homelab.nix
+$ nix eval --file machines.nix
 {
   includesOf = { desktop = [ ]; monitoring = [ "ssh" ]; ssh = [ ]; };
   laptop.services = {
@@ -80,7 +134,7 @@ $ nix eval --file homelab.nix
 ```
 
 <details>
-<summary>The whole of `homelab.nix`</summary>
+<summary>The whole of `machines.nix`</summary>
 
 This file runs as it is, with no flake and no nixpkgs. The last step evaluates each host's modules
 with gen's own module system. In a real flake that step is a NixOS system builder.
@@ -158,4 +212,15 @@ in
 
 </details>
 
-<LinkButton href="/guides/getting-started/" icon="right-arrow">Get started</LinkButton>
+## Where to next
+
+<CardGrid>
+  <LinkCard title="The Case for gen" href="/case-for-gen/"
+    description="What gen changes for people who run Nix configuration." />
+  <LinkCard title="Understand gen" href="/understand/core-concepts/"
+    description="The ideas gen is built from, in reading order." />
+  <LinkCard title="Features" href="/features/graphs/"
+    description="Everything gen does, one domain per page, each with a runnable example." />
+  <LinkCard title="Building with gen" href="/guides/getting-started/"
+    description="Add gen to a project and answer a question about your own data." />
+</CardGrid>

@@ -4,7 +4,7 @@ description: What gen changes for people who run Nix configuration, and where th
 ---
 
 Nix describes a whole machine as code: its packages, services, users and settings. Teams use it to
-run laptops, homelabs and fleets of servers from one repository. As that repository grows, most of
+run laptops, homelabs and thousands of servers from one repository. As that repository grows, most of
 the effort moves from the features themselves to the wiring between them. Someone has to remember
 which machine gets which feature, which feature needs which other one, and which value each file
 expects to be handed.
@@ -32,7 +32,8 @@ the same content get the same identity, every time. That one property pays off i
 **Reuse and speed.** gen recognises work it has already done. After an edit, it reuses every result
 the edit did not affect, and the output is identical to a full rebuild. In gen's benchmarks,
 re-evaluating six edits against earlier work costs a quarter of evaluating each from scratch. On a
-real three-machine fleet, an edit to one machine skips two thirds of the fleet's composition work.
+real set of three NixOS machines, an edit to one machine skips two thirds of the composition work
+for all three.
 The [benchmarks](/benchmarks/) page has the figures and how they are measured.
 
 **Errors that point at the cause.** Every declared option records which file set
