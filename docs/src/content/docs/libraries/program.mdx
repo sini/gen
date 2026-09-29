@@ -35,11 +35,15 @@ program = import "${genInputs.gen-program}/lib" {
 ```nix
 model = genProgram.model {
   program = genProgram.program { declarations = /* ... */; frozen = /* ... */; };
-  interpretation = [ { atom = "member:X"; verdict = "undefined"; } ];
+  interpretation = [ ];
   complete = false;
+  prior = null;
 };
 ```
 
-`engine.solve interpretation program` takes the program last; the interpretation is a prior pass's verdicts,
-crossing as themselves — a first pass supplies `[ ]` explicitly rather than falling back to an
-implicit default. No roster member currently builds on gen-program.
+`engine.solve interpretation program` takes the program last. Each pass solves its whole cumulative
+program from scratch, and no verdict of an earlier pass crosses: the interpretation is the caller's
+own assertions for this pass, restated at a later pass if they are to hold there, and a pass
+asserting nothing supplies `[ ]` explicitly rather than falling back to an implicit default. `prior`
+is the previous pass's result record, or `null` on a first pass; it only guards that the pass
+resubmits every earlier rule, and refuses by name otherwise. No roster member currently builds on gen-program.
