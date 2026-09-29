@@ -10,8 +10,8 @@ hero:
     and clouds you ship to, into one living graph. It works the same on a single laptop as on
     thousands of servers.
   actions:
-    - text: The Case for gen
-      link: /case-for-gen/
+    - text: Overview
+      link: /overview/
       icon: right-arrow
     - text: Understand gen
       link: /understand/core-concepts/
@@ -26,25 +26,50 @@ import HeroGraph from '../../components/HeroGraph.astro';
 
 <HeroGraph />
 
-## What gen is
+## You already work with graphs
 
-Everything you run is tied to everything else. A service is built from libraries, lands on a
-machine, answers on a port that some rule has to open, and serves people who need a login. Today
-each of those threads lives in a different file, a different tool, and usually a different head.
+A package and the libraries it depends on form a graph. So does a machine's configuration, and the
+network that machine sits on, and the services that call each other across it, and the clusters and
+cloud accounts those services are deployed to. Every layer of what you run has the same shape:
+things that need other things.
 
-gen gathers the threads into one graph. Machines, users, services and features become nodes, and
+Each layer is described in its own language, by its own tool. You tie them together by hand, at
+the seams between tools, and the seams are where things go wrong.
+
+## Every tool asks you to assemble
+
+You write the modules and wire them together. You remember which machine needs which user, which
+user needs which shell, which service needs which port opened in which firewall, and you encode all
+of it by hand, in the order each tool happens to need it. Each relationship lives in the shape of
+the code: a feature reaches a machine because a file sits in its `imports` list, a value reaches a
+module because three others pass it along, a setting applies because an `mkIf` somewhere tests the
+right flag. Move an entry, rename an argument or reorder a list, and the relationship changes with
+no error to say so. The relationships are the interesting part, and the evening goes on plumbing.
+
+## Declare the relationships instead
+
+gen gathers every layer into one graph. Machines, users, services and features become nodes, and
 every relationship between them becomes an edge you can follow. You write a feature once, and every
 place that uses it receives its own tailored copy. Rules draw new connections from the ones you
-wrote. Then you ask questions of the whole thing: what runs where, what depends on what, and which
-file decided each value.
+wrote. Then you ask the graph a question, and it answers: what runs where, what depends on what,
+and which file decided each value. One machine and a thousand machines are the same question,
+asked of a bigger graph.
+
+gen is one evaluation plane for every system you run. One graph, evaluated once, hands each
+ecosystem its finished configuration, and that ecosystem's own builder takes it from there:
+NixOS's system builder, or a terranix or nixidy terminal you supply.
 
 gen is built on Nix, which already describes software and machines as code and builds them the same
 way every time. gen gives that code a shape you can reason about.
 
+## Who it's for
+
+Anyone who has to know what a change will touch before it ships.
+
 <CardGrid>
   <Card title="For AI agents" icon="rocket">
-    Check a change against the whole graph before it lands: types, includes and rules are
-    evaluated together, and a mistake fails with an error that names the option.
+    Check a change against every system it touches before it lands. A type mistake fails with
+    an error that names the option.
   </Card>
   <Card title="For operations engineers" icon="magnifier">
     See what each machine is declared to run, and why: which features it selected, which
@@ -54,6 +79,10 @@ way every time. gen gives that code a shape you can reason about.
     See what gets built for each machine, and which file set each declared option, at which priority.
   </Card>
 </CardGrid>
+
+## The ideas
+
+Four ideas carry the rest of gen. Each has its own page.
 
 <CardGrid>
   <Card title="Relationships are edges" icon="puzzle">
@@ -99,14 +128,34 @@ gen stands on decades of published work, and each part of it has a proof behind 
 setting is name resolution over a *scope graph*, the same technique language tools use to resolve
 imports. Rules form a Datalog program with stratified negation, solved under the well-founded
 semantics, so a rule can depend on another being false and every answer stays well defined.
-Rebuilding after an edit is demand-driven recomputation with early cutoff: work stops as soon as a result comes out unchanged. When you ask
-why gen behaves a certain way, the answer leads back to the literature as well as the source.
+Rebuilding after an edit is demand-driven recomputation with early cutoff: work stops as soon as a
+result comes out unchanged. When you ask why gen behaves a certain way, the answer leads back to the
+literature as well as the source.
+
+## Take only what you need
+
+Each of gen's libraries is its own flake, and you can depend on any one of them alone. Take the
+graph library for your own data, with no module system attached, or take the module system without
+aspects. A flake that reads `inputs.gen-graph.lib` never touches the gen hub. The hub is a
+convenience that gathers every library under one name.
+
+## Promises you can check
+
+Every guarantee gen makes names the check that holds it. None of gen's libraries uses `nixpkgs.lib`,
+and a purity test in each library's own suite fails the moment one does. Every library's suite runs
+on each push under upstream Nix, Determinate Nix and Lix. Full nixpkgs comes in at the edge you
+choose: gen's flake-parts module builds each NixOS system with `gen.nixpkgs`, which defaults to your
+flake's own nixpkgs input.
 
 <CardGrid>
   <LinkCard title="The reading list" href="/reference/reading-list/"
     description="The papers behind each part of gen." />
   <LinkCard title="Trust" href="/trust/"
     description="Every guarantee gen makes, and the check that holds it." />
+  <LinkCard title="Libraries" href="/reference/libraries/"
+    description="Every library, and the features it provides." />
+  <LinkCard title="Add gen to a flake" href="/guides/flake/"
+    description="Depend on one library directly, or wire in the whole set." />
 </CardGrid>
 
 ## One destination, shown concretely
@@ -261,8 +310,8 @@ in
 ## Where to next
 
 <CardGrid>
-  <LinkCard title="The Case for gen" href="/case-for-gen/"
-    description="What gen changes for people who run Nix configuration." />
+  <LinkCard title="Overview" href="/overview/"
+    description="What gen is, what it gets you, and which page to read next." />
   <LinkCard title="Understand gen" href="/understand/core-concepts/"
     description="The ideas gen is built from, in reading order." />
   <LinkCard title="Features" href="/features/graphs/"

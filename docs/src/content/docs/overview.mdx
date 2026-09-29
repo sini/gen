@@ -1,29 +1,16 @@
 ---
 title: Overview
-description: What gen is, the six ideas it is built from, and which page to read next.
+description: What gen is, what it gets you, the six ideas it is built from, and which page to read next.
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-A Nix configuration is mostly relationships. This host runs that feature. This feature needs that
-one. This user may log in to those machines. In plain Nix you record each relationship by hand:
-an entry in an `imports` list, an argument passed down through `specialArgs`, an `mkIf` that tests
-a flag someone else set. Move the entry or rename the argument and the relationship is lost, and
-nothing reports it.
-
-gen records relationships as data. Hosts, users and features are nodes in one graph, and what
-relates them is an edge. You declare the nodes and edges, and gen answers questions over them:
-which features a host reaches, which hosts a rule applies to, what value an option ends up with and
-which file set it.
-
-## What gen is
-
-gen is a set of Nix libraries for building configuration frameworks. It provides the graph, a
-typed module system that runs without nixpkgs, reusable features called aspects, rules that add
-edges, values computed on demand, incremental rebuilds, and delivery of each node's configuration
-to a builder you supply.
-
-A framework built on gen brings its own words, such as `host` or `role`.
+gen is a set of Nix libraries for building configuration frameworks. It models machines, users
+and features as nodes in one graph, joined by labelled edges. It provides the graph and its
+queries, a typed module system that runs without nixpkgs, reusable features called aspects, rules
+that add edges, values computed on demand, incremental rebuilds, and delivery of each node's
+configuration to a builder you supply. A framework built on gen brings its own words, such as
+`host` or `role`.
 
 ## Core concepts
 
@@ -40,15 +27,17 @@ The [terminology](/reference/terminology/) page defines every other term.
 
 ## How the pieces fit
 
-A framework's declarations travel one path to a built system. The Understand and Features
-sections cover each stage.
+A framework's declarations travel one path to a built system. gen evaluates one graph once and
+hands each ecosystem its finished configuration, which that ecosystem's own builder, such as
+NixOS's system builder or a terminal you supply, then builds. The Understand and Features sections
+cover each stage.
 
 ```mermaid
 flowchart LR
-  decl["Declarations"] --> graph["The graph"]
-  graph --> rules["Rules"]
-  rules -- "new edges" --> graph
-  graph --> values["Values computed on demand"]
+  decl["Declarations"] --> g1["The graph"]
+  g1 --> rules["Rules"]
+  rules -- "new edges" --> g1
+  g1 --> values["Values computed on demand"]
   values --> delivery["Delivery"]
   delivery --> terminal["Your terminal"]
   memo["Incremental rebuild"] -. "reuses unchanged work" .-> values
@@ -63,6 +52,30 @@ flowchart LR
    class.
 5. After an edit, gen reuses every result the edit did not affect. The output is always identical
    to a full rebuild.
+
+## What you get
+
+**Identity pays for itself three times.** Every machine, user and feature gets an identity computed
+from its content, so two things with the same content always get the same identity.
+
+- *Reuse.* After an edit, gen reuses every result the edit did not affect, and the output is
+  identical to a full rebuild. Re-evaluating six edits against earlier work costs a quarter of
+  evaluating each from scratch, and on a real set of three NixOS machines an edit to one skips two
+  thirds of the composition work for all three. [Benchmarks](/benchmarks/) has the figures.
+- *Errors with a cause.* Every declared option records which file set it, at which priority, and
+  which definitions it replaced. Reporting a failure against the node and feature that caused it
+  builds on the same identity, and is on the [Roadmap](/roadmap/).
+- *Introspection.* gen loads the graph and the results of its rules into one set of facts. You
+  can query them with SQL, ask why a relationship exists and get the rules that produced it, and
+  draw the graph as a diagram. See [Inspection](/features/inspection/).
+
+**It works with the module systems you already use.** gen's module system follows the nixpkgs
+rules for everything the two share, and a test suite compares the two on every change. It also
+accepts nixpkgs' own option types: driven with real nixpkgs `lib.types` and `mkOption`, it gives
+byte-identical output on gen's benchmark corpus, so existing modules and custom types come along
+during a port. A feature's NixOS content stays an ordinary NixOS module, and gen passes values into
+modules written for other evaluators through the same argument injection it uses for its own.
+[Coming From the Module System](/guides/from-module-system/) shows both.
 
 ## Using gen
 
@@ -93,8 +106,8 @@ what comes next.
     description="Answer a question about your own data with one library."
   />
   <LinkCard
-    title="Deciding whether gen matters"
-    href="/case-for-gen/"
-    description="What gen changes for people who run Nix configuration, without the code."
+    title="Deciding whether to build on gen"
+    href="/trust/"
+    description="Every guarantee gen makes, and the check that holds it."
   />
 </CardGrid>

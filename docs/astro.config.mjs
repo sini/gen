@@ -120,7 +120,6 @@ export default defineConfig({
 					label: 'Gen',
 					items: [
 						{ label: 'Overview', slug: 'overview' },
-						{ label: 'The Case for gen', slug: 'case-for-gen' },
 						{ label: 'Roadmap', slug: 'roadmap' },
 						{ label: 'History', slug: 'history' },
 					],
