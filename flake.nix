@@ -143,7 +143,9 @@
       # supply, not their own flake's; the other 18 publish an applied set. What is written here is therefore the member's own L3 arm read off its published
       # surface, and it is LOUD if that arm ever changes — applying an already-applied set is
       # `attempt to call something which is not a function but a set`, and a member that went the
-      # other way arrives as a function and reds the `roster` output's own force below. The rejected
+      # other way arrives as a function and reds `ci/mkgenlibs-eval.nix`'s deepSeq force (den-hoag-ydm94
+      # R7 retired the root's own forcing output, `roster`, once that check was confirmed to force the
+      # same key set more deeply). The rejected
       # alternative was to arity-dispatch here (`if builtins.isFunction v then v { } else v`), which
       # makes the hub TOLERANT of either shape and so accepts a member that landed the wrong arm in
       # silence — the failure L3 exists to make loud.
