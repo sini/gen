@@ -715,24 +715,12 @@ let
       word = "host";
       clause = "ADR-0017: `assembleHost` retires as a name, and the retirement's execution is deferred";
     }
-    {
-      member = "bind";
-      at = "crossing.mkFlakeTerminal";
-      word = "flake";
-      clause = "HELD: the construction's disposition awaits the owner's re-affirmation of ADR-0027's agnosticism ruling and ADR-0031 F2 at this point of use (den-hoag-52hn7)";
-    }
-    # `crossing.mkFlakeTerminal:evalFlakeModule` [flake] had an entry here, HELD under the same
-    # den-hoag-52hn7. P2 L2 moved it into the door's record step, which the walk does not read (it
-    # reads step 1 only), so the entry went stale and was dropped. The name is HELD, not admitted:
-    # it is out of the walk's reach (OQ16), and nested per-step contracts would bring it back.
-    {
-      member = "bind";
-      at = "crossing.mkFlakeTerminal:systems";
-      word = "systems";
-      clause = "HELD: as `crossing.mkFlakeTerminal` (den-hoag-52hn7)";
-    }
   ];
 
+  # The `hub` arm walks `compose` only. `lib.flakePartsEvaluate` is outside it DELIBERATELY: it is
+  # ADR-0031 F1's interim flake-parts surface (re-affirmed 2026-09-28: "the one flake-parts binding
+  # lives in the marked-interim hub surface"), unwalked like `flakeModules.default`, whose native
+  # vocabulary it binds for gen-bind's `crossing.mkOutputsTerminal` (den-hoag-52hn7).
   vocabularySurface = builtins.removeAttrs genLibs [ declKey ] // {
     hub = {
       inherit (gen.lib) compose;

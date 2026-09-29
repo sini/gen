@@ -77,6 +77,24 @@ dissolved, and the settled framework interface arrives later. The shape above is
 current, but it is a surface still moving, not a stable v1 API to build tooling against.
 </Aside>
 
+## An outputs terminal over flake-parts
+
+gen-bind's `crossing.mkOutputsTerminal evaluate` is a terminal over whatever `evaluate` you hand
+it, and it names no module system. The hub's `lib.flakePartsEvaluate` is that `evaluate` for
+flake-parts: you supply flake-parts' own `evalFlakeModule`, and it returns the body's `flake`
+outputs.
+
+```nix
+genBind.crossing.mkOutputsTerminal (inputs.gen.lib.flakePartsEvaluate {
+  inherit (inputs.flake-parts.lib) evalFlakeModule;
+  inherit inputs self;
+  systems = [ "x86_64-linux" ];
+})
+```
+
+`lib.flakePartsEvaluate` is **interim** in the same way as `flakeModules.default`, and it leaves
+with that surface.
+
 ## The hub is optional
 
 Nothing above is required to use gen. `mkGenLibs` hands you the whole roster under short

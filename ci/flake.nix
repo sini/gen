@@ -194,6 +194,13 @@
       # construction. `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
       injectPayload = import ./inject-payload.nix { inherit (inputs) gen; };
 
+      # ── outputs-evaluate — the hub's flake-parts `evaluate` through gen-bind's outputs terminal ──
+      # Runs `lib.flakePartsEvaluate` (the interim surface's one flake-parts binding, den-hoag-52hn7)
+      # through `bind.crossing.mkOutputsTerminal` over the real flake-parts pinned here: the body's
+      # flake outputs, `self`, `systems` and the inputs reach it, with an empty-body control.
+      # `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
+      outputsEvaluate = import ./outputs-evaluate.nix { inherit (inputs) gen flake-parts; };
+
       # ── declared-content — the PERMANENT cell over the hub's DELIVERY-CLASS PROJECTION ──────
       # ADR-0028's Rider on BOTH measured arms: the contentless class (den-hoag-jwm8) and the
       # wrong-category channel (den-hoag-t3q9). Drives `genDelivery.project`/`realize` with the REAL
@@ -353,6 +360,8 @@
       flake.lib.hubInputSheet = hubInputSheet;
       #   nix eval ./ci#lib.injectPayload.gate --json | jq
       flake.lib.injectPayload = injectPayload;
+      #   nix eval ./ci#lib.outputsEvaluate.gate --json | jq
+      flake.lib.outputsEvaluate = outputsEvaluate;
       #   nix eval ./ci#lib.declaredContent.gate --json | jq
       flake.lib.declaredContent = declaredContent;
       #   nix eval ./ci#lib.direction.report --json | jq
@@ -896,6 +905,35 @@
                 ''}
                 cp "$reportPath" "$out"
               '';
+          # Build the outputs-evaluate check (den-hoag-52hn7): prints the per-key gate and FAILS the
+          # build if any key is not `true`. A failing key is the hub's flake-parts `evaluate` no longer
+          # carrying the body's flake outputs, `self`, `systems` or inputs through gen-bind's outputs
+          # terminal, or the empty-body control gone blind.
+          mkOutputsEvaluateCheck =
+            name: g:
+            let
+              allOk = builtins.all (k: g.gate.${k} == true) g.gateKeys;
+              failed = builtins.filter (k: g.gate.${k} != true) g.gateKeys;
+              report = builtins.toJSON {
+                inherit allOk failed;
+                results = g.gate;
+              };
+            in
+            pkgs.runCommand name
+              {
+                inherit report;
+                passAsFile = [ "report" ];
+              }
+              ''
+                echo "── ${name} ──"
+                cat "$reportPath"
+                echo
+                ${lib.optionalString (!allOk) ''
+                  echo "OUTPUTS TERMINAL REGRESSION — the hub's flake-parts evaluate no longer carries the body's flake outputs, self, systems or inputs through gen-bind's outputs terminal, or a control went blind" >&2
+                  exit 1
+                ''}
+                cp "$reportPath" "$out"
+              '';
           # Build the extra-modules-address check (den-hoag-9vkq): prints the per-key gate and FAILS
           # the build if any key is not `true`. A failing key is the hub's extras reaching a class or
           # node they were not addressed to, an address that does not realize going silent, the call
@@ -1177,6 +1215,7 @@
             mkgenlibs-eval = mkGenLibsCheck "mkgenlibs-eval" mkGenLibsEval;
             agents-md-hub-inputs = mkHubInputSheetCheck "agents-md-hub-inputs" hubInputSheet;
             inject-payload = mkInjectCheck "inject-payload" injectPayload;
+            outputs-evaluate = mkOutputsEvaluateCheck "outputs-evaluate" outputsEvaluate;
             declared-content = mkDeclaredContentCheck "declared-content" declaredContent;
             extra-modules-address = mkExtraModulesAddressCheck "extra-modules-address" extraModulesAddress;
             direction-of-dependence = mkDirectionCheck "direction-of-dependence" directionOfDependence;
