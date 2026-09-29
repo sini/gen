@@ -437,7 +437,10 @@ let
     # gen-scope f5f2b6550c → a650104f6f (kinds minted by a staged fold): the surface lost ONE name,
     # `isKindSet`, the registry provenance test the fold made redundant. Nothing was added and no
     # other member moved.
-    scope = "314c8d80846abb1c2cb290afa2a6eadcfc870dbaffc870870d6d79f3490d36c3";
+    #
+    # gen-scope c25d0e6db2 → b4418fa822 (den-hoag-4kh.53.54): the surface lost ONE name, `paramAttr`,
+    # the retired parameter-attribute accessor. Nothing was added and no other member moved.
+    scope = "480d3feece75c5d182c2d3962b5694bbe42cda1636e3656e24e971703f1bd9d3";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
     settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
     # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
