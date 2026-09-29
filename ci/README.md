@@ -47,6 +47,15 @@ engineArgs collision guard per owned key, and the cycle-walk cells. One cell can
 green is a stack overflow that `tryEval` does not catch, so the `checks` job reads
 `lib.composeParity.overflowPin` in a separate step and requires the eval to fail on it.
 
+`pins-compose.nix` — one check per roster member, `pins-compose-<member>`: that member's own ci
+`tests` plane, at the revision the hub pins, with every roster-named input its ci declares bound to
+the hub's pin of that member. Each member's CI evaluates its suite against its own ci lock; this is
+the evaluation that sees the pinned set together, so a pinned revision that breaks a sibling reds
+here even while the sibling's own CI is green. Non-roster inputs, and roster repositories pinned by
+revision under another name as fixtures, stay at the member's own lock. A failing cell fails the
+check at evaluation time, so `--keep-going` names every failing member in one run. The error plane
+is not covered.
+
 ## Architecture — the direction-of-dependence lint
 
 `direction-of-dependence.nix` — ADR-0015's enforcement half. No roster member may declare a root
