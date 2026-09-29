@@ -192,7 +192,10 @@
       # types), with the plain-clean and planted-caught controls in the same run. If a schema
       # change flips the predicate, this fails and the ADR-0023 disposition re-opens by
       # construction. `.gate` is the per-key record; `.gateKeys` the keys that MUST be `true`.
-      injectPayload = import ./inject-payload.nix { inherit (inputs) gen; };
+      injectPayload = import ./inject-payload.nix {
+        inherit (inputs) gen;
+        inherit lib;
+      };
 
       # ── outputs-evaluate — the hub's flake-parts `evaluate` through gen-bind's outputs terminal ──
       # Runs `lib.flakePartsEvaluate` (the interim surface's one flake-parts binding, den-hoag-52hn7)
