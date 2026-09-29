@@ -65,7 +65,7 @@ gen-bind cites Chitil's central result, contracts as partial identities (S4.2), 
 - `wrap` applies contracts inside each binding's thunk, so an assertion runs only when `evalModules` forces that argument. This is Chitil's core guarantee that unevaluated parts never violate a contract (S2, the Fibonacci example). A module that takes `{ host, ... }:` and never reads `host.system` never triggers a contract on `system`.
 - `wrapAll` computes contracts once for a list of modules. Sharing them is sound because a contract is idempotent (Claim 4.2).
 
-gen-bind's contracts are flat `assert`-style checks. It does not implement the `a -> Maybe a` contract type, pattern contracts or disjunction, since the values crossing the binding boundary are mostly flat attrsets and Nix has no user-defined algebraic data types to pattern-match on.
+gen-bind's contracts are flat `assert`-style checks. It does not implement the `a -> Maybe a` contract type, pattern contracts or disjunction, since the values passed through a binding are mostly flat attrsets and Nix has no user-defined algebraic data types to pattern-match on.
 
 ### gen-schema: lazy refinements
 
