@@ -53,8 +53,12 @@ the hub's pin of that member. Each member's CI evaluates its suite against its o
 the evaluation that sees the pinned set together, so a pinned revision that breaks a sibling reds
 here even while the sibling's own CI is green. Non-roster inputs, and roster repositories pinned by
 revision under another name as fixtures, stay at the member's own lock. A failing cell fails the
-check at evaluation time, so `--keep-going` names every failing member in one run. The error plane
-is not covered.
+check at evaluation time, so `--keep-going` names every failing member in one run.
+`pins-compose-error-<member>` is the same member's error plane at the same pins, for every member
+that declares one: its ci lock's roster-named root edges are grafted onto the hub's root lock
+through gen-harness's `lib.checks.errorPlane`, and its cells run in the build sandbox under the
+column's own evaluator, so a pinned revision that changes a message a sibling's cell asserts reds
+here when the check is built.
 
 ## Architecture — the direction-of-dependence lint
 

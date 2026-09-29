@@ -393,9 +393,10 @@
         }:
         let
           # One `pins-compose-<member>` per roster member: that member's own ci `tests` plane at the
-          # hub's pins (`ci/pins-compose.nix`).
+          # hub's pins, and `pins-compose-error-<member>` for its error plane (`ci/pins-compose.nix`).
           pinsCompose = import ./pins-compose.nix {
             inherit (inputs) gen;
+            errorPlane = inputs.gen-harness.lib.checks.errorPlane;
             inherit (pinCoherence) rosterMetaKeys;
             inherit pkgs lib system;
           };
