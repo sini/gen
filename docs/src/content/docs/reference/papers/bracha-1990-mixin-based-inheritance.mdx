@@ -73,7 +73,7 @@ The most direct implementation. gen-algebra's record algebra realizes Bracha's c
 
 - **Scoped labels via shadow stacks** — While the shadow stack representation comes from Leijen 2005, the stacking behavior interacts with Bracha's combination operator: `combine` on records with duplicate labels follows left-biased semantics per Bracha, while the stack preserves the shadowed value for potential restriction (Leijen's contribution).
 
-#### gen-schema (`nix/lib/mixin.nix`)
+#### gen-schema (`lib/mixin.nix`)
 
 gen-schema lifts Bracha's algebra to the schema/type level, applying mixin composition to kind definitions:
 
