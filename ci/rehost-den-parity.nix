@@ -123,50 +123,42 @@ let
   # den's kind topology + imports (options.nix:112-149), with real host/user/home entity options.
   #
   # `conf` composes into host/user/home and carries no options of its own — den's real shape, and
-  # independent of every kind that draws on it. §2.6 retires the idiom this composition used to
-  # spell, a kind's own `imports` list reading a sibling kind straight off the same-pass `config`,
-  # onto `inherits`, resolved by `evalSchema`'s staged pass — but `evalSchema` exists only on the
-  # pure engine (it is gen-schema `056ee9b`'s own export, and `refP` is a permanently frozen
-  # pre-relocation pin, ADR-0002, that will never gain it). Rewriting only `pureP` onto `inherits`
-  # was DRIVEN and measured to regress `parity-schema` for real, not merely asymmetrically:
-  # `inherits` joins `_edges` (gen-schema `056ee9b`), so the pure side gains an edge `refSchema`
-  # can never carry. The fix below removes the same-pass read the idiom is retired for — `conf` is
-  # frozen in its own prior pass and the later pass imports that frozen value — without
-  # `inherits`/`evalSchema`, so it is available identically on both engines and produces no edge on
-  # either, matching today's behaviour exactly (measured, same run).
+  # independent of every kind that draws on it. It is spelled here exactly as den spells it
+  # (denful/den `modules/options.nix`): each kind's own `imports` list reads `conf` off the SAME-pass
+  # `config`. On the pure engine that spelling is deprecated and read as `inherits = [ "conf" ]`
+  # with a warning (den-hoag-cxlc0, owner-ruled): it still composes where it is written, and the
+  # three names join `_edges` as `type = "inherits"` edges (gen-schema `056ee9b`). The frozen
+  # reference (`refP`, ADR-0002) predates `inherits` and can never carry them. That delta is the
+  # ruling, and `parity-schema` below asserts it exactly rather than dropping it.
   driveSchema =
     P:
     let
-      confPass = P.eval {
-        modules = [
-          { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
-          { config.schema.conf = { }; }
-        ];
-      };
-      frozenConf = confPass.config.schema.conf;
       eval = P.eval {
         modules = [
           { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
-          {
-            config.schema.conf = { };
-            config.schema.fleet = { };
-            config.schema.host = {
-              options.addr = P.mkOption { type = P.types.str; };
-              imports = [ frozenConf ];
-            };
-            config.schema.user = {
-              parent = "host";
-              options.uid = P.mkOption {
-                type = P.types.int;
-                default = 1000;
+          (
+            { config, ... }:
+            {
+              config.schema.conf = { };
+              config.schema.fleet = { };
+              config.schema.host = {
+                options.addr = P.mkOption { type = P.types.str; };
+                imports = [ config.schema.conf ];
               };
-              imports = [ frozenConf ];
-            };
-            config.schema.home = {
-              parent = "host";
-              imports = [ frozenConf ];
-            };
-          }
+              config.schema.user = {
+                parent = "host";
+                options.uid = P.mkOption {
+                  type = P.types.int;
+                  default = 1000;
+                };
+                imports = [ config.schema.conf ];
+              };
+              config.schema.home = {
+                parent = "host";
+                imports = [ config.schema.conf ];
+              };
+            }
+          )
         ];
       };
       s = eval.config.schema;
@@ -273,6 +265,21 @@ let
   # pure side — so an engine that stopped minting one at all fails loudly on the missing attribute
   # rather than passing narrowly; and `teeth-mutation-pure` carries the tracking load that
   # `teeth-parity` used to carry through the reference.
+  inheritsEdgesOf = s: builtins.filter (e: e.type == "inherits") s.edges;
+  withoutInherits = s: s // { edges = builtins.filter (e: e.type != "inherits") s.edges; };
+  aliasedInheritsEdges =
+    map
+      (k: {
+        field = null;
+        from = k;
+        to = "conf";
+        type = "inherits";
+      })
+      [
+        "home"
+        "host"
+        "user"
+      ];
   dropIdentity = builtins.mapAttrs (_: i: builtins.removeAttrs i [ "id_hash" ]);
   identitiesOf = builtins.mapAttrs (_: i: i.id_hash);
   nestedNonIdentity =
@@ -304,8 +311,13 @@ let
     addr2: builtins.mapAttrs (_: i: i // { id_hash = "host:0000"; }) (driveInstances pureP addr2);
 in
 {
-  # BYTE-PARITY on den's real registry topology/collections/computed
-  parity-schema = pureSchema == refSchema;
+  # BYTE-PARITY on den's real registry topology/collections/computed, with ONE ruled delta: den's
+  # `imports = [ conf ]` is read as `inherits = [ "conf" ]` by the pure engine (den-hoag-cxlc0), so
+  # its `_edges` carries three `inherits` edges the frozen reference can never carry. The edges are
+  # compared by partition: every other edge byte-identical, and the `inherits` partition EXACTLY
+  # the ruled set, so a fourth, a missing one, or one on the reference reds.
+  parity-schema =
+    withoutInherits pureSchema == refSchema && inheritsEdgesOf pureSchema == aliasedInheritsEdges;
   # BYTE-PARITY on den-shaped instances: key sets and every non-identity field (see the excluded
   # axis above — `id_hash` is compared by `teeth-mutation-pure`, not against the frozen witness)
   parity-instances =
