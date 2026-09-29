@@ -1407,7 +1407,7 @@ let
   };
 in
 {
-  inherit gate;
+  inherit gate rosterMetaKeys;
   gateKeys = builtins.attrNames gate;
 
   report = {
