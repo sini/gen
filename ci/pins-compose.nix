@@ -44,11 +44,20 @@
 # asserter), so no warm store output can stand in for it; a green's report records the hub revisions,
 # so a pin change is a new derivation.
 #
-# ── WHAT IT DOES NOT COVER ──
-# The error plane (`testsError`, `checks.tests-error`): the harness refuses any direct ci input whose
-# in-memory revision differs from the file lock, so a substituted member cannot run it as it stands.
+# ── THE ERROR PLANE, `pins-compose-error-<member>` ──
+# `checks.tests-error` judges `testsError` in the build sandbox over the member's ci lock FILE, so an
+# in-memory substitution cannot reach it: the harness refuses any direct ci input whose in-memory pin
+# differs from that file. So the lock is rebound instead (`errorPlane`'s `rebind`): the same roster-
+# NAMED root edges are grafted onto the hub's root `flake.lock`, whose closure carries every roster
+# edge beneath them at the hub's pin, and the substituted `inputs` above are handed in unchanged. The
+# harness's refusal then compares the hub's in-memory pins with that grafted file, so the two planes
+# cannot judge different revisions without a refusal naming the input. Only ROOT edges move, so the
+# frozen fixtures stay frozen here too. A member that declares no error plane gets no such check,
+# by the harness's own predicate over the substituted outputs. Unlike `tests`, the red is raised when
+# the check is BUILT: every cell runs in the sandbox under the column's own evaluator.
 {
   gen,
+  errorPlane,
   rosterMetaKeys,
   pkgs,
   lib,
@@ -60,8 +69,9 @@ let
   rosterKeys = builtins.attrNames (builtins.removeAttrs (gen.lib.mkGenLibs { }) rosterMetaKeys);
   memberNames = map (k: "gen-" + k) rosterKeys;
   pinned = gen.inputs;
+  hubLock = builtins.fromJSON (builtins.readFile "${gen.outPath}/flake.lock");
 
-  check =
+  compose =
     m:
     let
       src = pinned.${m};
@@ -100,19 +110,38 @@ let
         });
       };
     in
-    pkgs.runCommand "pins-compose-${m}"
-      {
-        inherit report;
-        passAsFile = [ "report" ];
-        # Its drvPath forces every `tests` cell at evaluation time; a failing cell is an eval error.
-        tests = outputs.checks.${system}.default;
-      }
-      ''
-        echo "── pins-compose-${m} ──"
-        cat "$reportPath"
-        echo
-        echo "$tests"
-        cp "$reportPath" "$out"
-      '';
+    {
+      "pins-compose-${m}" =
+        pkgs.runCommand "pins-compose-${m}"
+          {
+            inherit report;
+            passAsFile = [ "report" ];
+            # Its drvPath forces every `tests` cell at evaluation time; a failing cell is an eval error.
+            tests = outputs.checks.${system}.default;
+          }
+          ''
+            echo "── pins-compose-${m} ──"
+            cat "$reportPath"
+            echo
+            echo "$tests"
+            cp "$reportPath" "$out"
+          '';
+    }
+    // lib.optionalAttrs outputs.errorPlane.declared {
+      "pins-compose-error-${m}" = errorPlane {
+        inherit
+          pkgs
+          lib
+          system
+          inputs
+          ;
+        name = "pins-compose-error-${m}";
+        root = src.outPath;
+        rebind = {
+          lock = hubLock;
+          names = substituted;
+        };
+      };
+    };
 in
-lib.listToAttrs (map (m: lib.nameValuePair "pins-compose-${m}" (check m)) memberNames)
+lib.foldl' (acc: m: acc // compose m) { } memberNames
