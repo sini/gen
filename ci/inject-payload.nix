@@ -15,7 +15,7 @@
 # opt-out's ground gone. The two controls travel in the same run, per standing measurement law:
 # a plain payload reads clean (the walk does not refuse everything), and a planted closure at a
 # substrate-written position is caught (the predicate fires).
-{ gen }:
+{ gen, lib }:
 let
   roster = gen.lib.mkGenLibs { }; # the `lib` arg is vestigial (lib/mkGenLibs.nix)
 
@@ -111,15 +111,18 @@ let
     # TRUE today — the ADR-0023 (b) ground, re-measured on every gate run rather than remembered.
     payload-reaches-function = anyFunction payload;
     # The three positions the original O-INJ-2 named, pinned individually: `check` and `merge` are
-    # genuine functions at every one of them.
+    # genuine functions at every one of them. The kind is read FUNCTOR-AWARE (nixpkgs `lib.isFunction`):
+    # a gen record's `check` is a callable record, `{ __functor; … }`, the kind nixpkgs publishes for
+    # its own v2 checks, and `builtins.isFunction` answers `false` for it while it is still applied as
+    # a function (gen-merge README, "A check a wrapper states is carried").
     # The list is EXPLICIT, never `attrNames` — an empty options set would pass a vacuous `all`,
     # and a silently-vanished position is exactly what this cell must not miss.
     schema-type-functions-at-named-positions =
       builtins.all
         (
           n:
-          builtins.isFunction payload.schema.host.options.${n}.type.check
-          && builtins.isFunction payload.schema.host.options.${n}.type.merge
+          lib.isFunction payload.schema.host.options.${n}.type.check
+          && lib.isFunction payload.schema.host.options.${n}.type.merge
         )
         [
           "addr"
