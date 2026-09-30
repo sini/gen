@@ -385,7 +385,12 @@ CLASSSHARE_RATIO_MAX=0.30
 # RE-ANCHORED 1.096 → 1.097 (owner ruling on den-hoag-7gp66 G8, arm (a), 2026-09-28): the P2 door
 # price of gen-scope's L2 argument grammar, a CONSTANT +182 pure thunks per evaluation at gen-scope's
 # entry (750,941 → 751,123 at n=8000, the same +182 at n=2000; ref 684,857), linearity and alloc
-# unchanged. The cheaper path for gen-merge's knot is den-hoag-kvj78.
+# unchanged. WHAT THE LOOSENED BAND PAYS FOR (owner-confirmed 2026-09-30, den-hoag-kvj78 arm (a)): the
+# door cost is ONE-TIME construction PER gen-scope LIBRARY INSTANCE — 207 thunks built once per process
+# (at the scout's pinned pair), 0 per crossing (101 crossings measured, 356.0 thunks each with and without
+# the doors; identical on nix, Determinate and Lix). The lean door construction took 55 of it back; no
+# internal-only path reaches 1.096, and publishing unchecked cores to reach it was rejected. A landing that
+# brings wideFreeform back under 1.096 re-tightens this band.
 WIDEFREEFORM_RATIO_MAX=1.097
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──

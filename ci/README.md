@@ -516,7 +516,9 @@ on DECLARED option paths), so thunk-parity is the honest contract on that counte
 `WIDEFREEFORM_RATIO_MAX`, re-derived 2026-09-21 to the anchor itself — deterministic 1.096, margin
 0.000, because both constructions of the one-engine consolidation are ~free on this shape; re-anchored
 at 1.097 by the owner's ruling of 2026-09-28 as the price of gen-scope's argument grammar, a constant
-+182 pure thunks per evaluation with linearity and alloc unchanged; the former
++182 pure thunks per evaluation with linearity and alloc unchanged, which the owner confirmed on
+2026-09-30 is a one-time construction cost per gen-scope library instance (207 thunks once per process
+at the measured pair, 0 per crossing, identical on all three evaluators); the former
 1.3 was 1.099 + ~18% headroom and was absorbing a +19% pure-side move in silence). Its **cpu** used to ride a band
 of its own (`0.95`, against the 0.85 win-gate) on the ground that the cell is tiny (~0.07s at n=8000)
 and therefore load-sensitive. That band is retired with the rest of the cpu gating, and its

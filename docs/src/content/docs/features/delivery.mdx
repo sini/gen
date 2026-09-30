@@ -113,9 +113,11 @@ values: the node's modules and its bindings. Here `node` is injected into each m
 key counts as a class only when `cnf` declares it `category = "class"` and the aspect gives it
 content. A node with no content for a class does not appear under that class.
 
-`project` does not follow `includes`: a node receives the aspects its list names. To deliver included
-aspects too, compute the include closure in `selectNodes`. Here a web server and a database host
-share an `ssh` aspect, the web server also carries a firewall rule, and the terminals count modules:
+`project` follows `includes`: a node receives the content of the aspects its list names and of
+everything they include, breadth-first, each aspect once. Content written inline at an include
+position is delivered too; a parametric include (`{ host, ... }:`) is refused by name where a node
+reaches it. Here a web server and a database host share an `ssh` aspect, the web server also carries
+a firewall rule, and the terminals count modules:
 
 ```nix title="platform-delivery.nix"
 let
@@ -145,17 +147,10 @@ let
     ];
   };
 
-  # Each host receives its own aspects plus everything they include.
-  facts = gen.aspects.graphFacts cnf result.config.aspects;
-  withIncludes = names:
-    names ++ builtins.concatMap
-      (n: gen.graph.reachableFrom { edges = id: facts.includesOf.${id} or [ ]; } n) names;
-
   projected = gen.delivery.project {
     values = result.config;
     inherit cnf;
-    selectNodes = values: builtins.mapAttrs
-      (_: host: host // { aspects = withIncludes host.aspects; }) values.hosts;
+    selectNodes = values: values.hosts;
   };
 in
 gen.delivery.realize {

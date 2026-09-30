@@ -276,15 +276,13 @@ let
     ];
   };
 
-  # The include edges, and each host's aspects plus everything they reach.
+  # The include edges, as graph data. `project` follows them itself.
   facts = gen.aspects.graphFacts cnf declared.config.aspects;
-  withIncludes =
-    names: names ++ builtins.concatMap (gen.graph.reachableFrom { edges = a: facts.includesOf.${a}; }) names;
 
   projected = gen.delivery.project {
     values = declared.config;
     inherit cnf;
-    selectNodes = v: builtins.mapAttrs (_: h: h // { aspects = withIncludes h.aspects; }) v.hosts;
+    selectNodes = v: v.hosts;
   };
 
   # Each host's `nixos` modules, with `host` bound to that host's record.

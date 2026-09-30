@@ -358,7 +358,10 @@ let
     algebra = "574bd0dc735f14d4df6386d1928d9c9cc6cc3380445f4b5ce803e7c7b56e69d3";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
-    aspects = "5c3122bd668746dffa2e5e7e30aaac4978f54c5be4d74feadfa14c9375c07106";
+    # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
+    # gen-aspects' own guard-leaf predicate, which delivery reuses. `includeSitesOf` and `nodeIdOf`
+    # are `graphFacts` fields, not top-level names. Nothing was removed.
+    aspects = "9b5c03095cadca119740a733f2b625e105cfd04991a18aa54b35f499a487c0e7";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
@@ -391,7 +394,11 @@ let
     # gen-merge 1b95c7e → 9be19f2 (den-hoag-n6dh7 Unit 2, den-hoag-1n12c): the surface gained ONE
     # name, `moduleSyntax`, the reader's own structured/shorthand key lists, which gen-schema reads
     # instead of restating them. Nothing was removed and no other member moved.
-    merge = "b04fc4bea43025bcd0ea5d318b7b2ae982a7e053a74eb9aa91e373f8c2ef4330";
+    # gen-merge ec5a99d → aa61dd8 (den-hoag-zakjg U1, den-hoag-ydro3 arm (c)): the surface gained TWO
+    # names, `priorityBand` and `bandedLeaves`, each contributor's leaves sorted into force, set,
+    # default or unset. ydro3's `types.witnessRecord` is inside `types`, not a top-level name, so it
+    # moves no digest here. Nothing was removed.
+    merge = "c6be063754ff3fc763c435b08276df3e14d10c263203ef5df285cf4bb8177ca7";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -456,11 +463,16 @@ let
     # gen-types 496d882 → f6115ec (den-hoag-ydro3): the surface gained TWO names, `rewritesCheck` and
     # `witnessedCheck`, the check-witness protocol that detects a wrapper rewriting a record's
     # `check`. Nothing was removed.
-    types = "373eba6ac09bfc58bddaa69095fb91941572a2511c7144bcf7594bdd17aa8b67";
+    # gen-types f6115ec → 3f8b7ca (den-hoag-ydro3 arm (c)): the surface gained ONE name,
+    # `witnessRecord`, the one record `witnessedCheck` publishes twice, for a producer that publishes
+    # it itself. Nothing was removed.
+    types = "5facf6e368a8f0af30fe4109737c81d63f430e006cbf420f0dcb034b387c9e32";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
-    view = "8096b4aa7fe96047a1ab49783c3cb90aaccb60742b6318fd00c740d61546d348";
+    # gen-view 5d0835a → 47106a8 (den-hoag-zakjg U2/U3): the surface gained TWO names,
+    # `headPositions` and `joinedTrace`. Nothing was removed.
+    view = "581839da0a986d0f29941711b045ce4b165ec3868cd3b78fe51812da34b05e52";
   };
 
   # EXPORTED below, and that export is the only route that regenerates what this arm compares. It is

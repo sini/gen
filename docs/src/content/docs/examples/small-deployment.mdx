@@ -105,11 +105,6 @@ let
     builtins.filter (u: builtins.elem host config.users.${u}.hosts)
       (builtins.attrNames config.users);
 
-  # Every aspect a list of aspects reaches through `includes`.
-  withIncludes = names: map (x: x.key) (builtins.genericClosure {
-    startSet = map (key: { inherit key; }) names;
-    operator = x: map (key: { inherit key; }) (config.aspects.${x.key}.includes or [ ]);
-  });
 in
 {
   imports = [ (aspectSchema.mkAspectModule { }) ];
@@ -119,8 +114,8 @@ in
   options.users = genSchema.mkInstanceRegistry schema.user { };
 
   config = {
-    hosts.web.aspects = withIncludes [ "webserver" ];
-    hosts.db.aspects = withIncludes [ "database" ];
+    hosts.web.aspects = [ "webserver" ];
+    hosts.db.aspects = [ "database" ];
 
     users.deploy = { hosts = [ "web" "db" ]; admin = true; };
     users.dba.hosts = [ "db" ];
@@ -184,9 +179,10 @@ which they reach through `includes`. `dba` has an account on `db` only.
 | `{ node, ... }:` in `aspects.base.nixos` | the host bound into the module by name | [Automatic Argument Injection](/understand/argument-injection/) |
 | `aspect-cnf.nix`, `nodeRegistryPath`, `nixosConfigurations` | projection and realization through a terminal | [Delivery](/features/delivery/) |
 
-The hub delivers exactly the aspects listed on each host, so `withIncludes` computes the
-include closure in the tree. gen-aspects' `graphFacts` publishes the same `includes`
-relation as graph data for gen-graph queries. See [Aspects](/features/aspects/).
+Each host lists only the aspects it asks for. Delivery follows `includes` itself: a host
+receives the content of its aspects and of everything they include, so `web` gets
+`webserver`, `ssh`, `monitoring` and `base`. gen-aspects' `graphFacts`
+publishes the same `includes` relation as graph data for gen-graph queries. See [Aspects](/features/aspects/).
 
 <CardGrid>
   <LinkCard title="A Web Platform" href="/examples/web-platform/"

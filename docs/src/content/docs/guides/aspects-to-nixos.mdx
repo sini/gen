@@ -123,8 +123,8 @@ The finished project has five files:
      options.users = genSchema.mkInstanceRegistry schema.user { };
 
      config = {
-       hosts.web.aspects = withIncludes [ "webserver" ];               # (3)
-       hosts.db.aspects = withIncludes [ "database" ];
+       hosts.web.aspects = [ "webserver" ];                            # (3)
+       hosts.db.aspects = [ "database" ];
 
        users.deploy = { hosts = [ "web" "db" ]; admin = true; };
        users.dba.hosts = [ "db" ];
@@ -133,7 +133,7 @@ The finished project has five files:
    1. Declares the `aspects` option, built from the class declaration in step 2.
    2. A registry holds the instances of one kind. Each instance gets its `name` and a stable
       identity. See [Stable Identity for Everything](/understand/identity/).
-   3. `withIncludes`, defined in the next step, adds every aspect that `webserver` includes.
+   3. A host lists only the aspects it asks for. Delivery adds everything they include.
 
 5. ##### Write the aspects
 
@@ -170,21 +170,16 @@ The finished project has five files:
    2. A query over the `users` registry: the users that list this host.
    3. `ssh` includes `base`, so any host with `ssh` also gets `base`.
 
-   The two helpers go in the `let` block from step 3:
+   The helper goes in the `let` block from step 3:
 
    ```nix
      usersOn = host:
        builtins.filter (u: builtins.elem host config.users.${u}.hosts)
          (builtins.attrNames config.users);
-
-     withIncludes = names: map (x: x.key) (builtins.genericClosure {
-       startSet = map (key: { inherit key; }) names;
-       operator = x: map (key: { inherit key; }) (config.aspects.${x.key}.includes or [ ]);
-     });
    ```
 
-   The hub delivers the aspects listed on each host. `withIncludes` computes the list by
-   following `includes`, so `web` gets `webserver`, `ssh`, `monitoring` and `base`.
+   Delivery follows `includes`: a host receives the content of the aspects it lists and of
+   everything they include, so `web` gets `webserver`, `ssh`, `monitoring` and `base`.
 
 6. ##### Evaluate and build
 
