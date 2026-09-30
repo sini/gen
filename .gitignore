@@ -3,3 +3,4 @@ result
 .gcroots
 .worktrees/
 .pre-commit-config.yaml
+ci/__pycache__/

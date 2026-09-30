@@ -404,7 +404,8 @@ let
     # `checkGuarded`, the misplaced-option guard `door`'s `optionsStep` applies. Nothing was removed.
     prelude = "70b37e53523bb7178d3d0e45b23c22c8e81ce1d4bb7a8c10a314f0796b57c15b";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
-    program = "64b8889dcc0e5a41f98537e24baeb3ba3a879686dd573eaf422b217dd3859596";
+    # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
+    program = "bc197b0b34e0825734e19ed605e3f17228712406c0418d3573b4815365f438db";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
     # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
     # other member moved.
@@ -451,7 +452,11 @@ let
     # relock): the surface gained ONE name, `payloadOf`, the certifying reader of a checker's
     # `__payload`. Nothing was removed. gen-merge re-exports it inside its `types` namespace only,
     # so its own published names did not move.
-    types = "175d4758b46a1aed56241a1e7948001776c17039c762bf53305d3a845a464559";
+    #
+    # gen-types 496d882 → f6115ec (den-hoag-ydro3): the surface gained TWO names, `rewritesCheck` and
+    # `witnessedCheck`, the check-witness protocol that detects a wrapper rewriting a record's
+    # `check`. Nothing was removed.
+    types = "373eba6ac09bfc58bddaa69095fb91941572a2511c7144bcf7594bdd17aa8b67";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
