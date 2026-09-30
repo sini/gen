@@ -341,8 +341,10 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # plain module list is its own closure, and the merge path collects by breadth-first levels with no
 # minted id; gen-merge `7398fd3`). Read on hub 98c056c with `--at gen-merge=path:` at that tree,
 # host evaluator (reports/den-hoag-470xp-arm-f-build-v0.md §5).
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.557
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.533
+# RATCHETED 0.557 / 0.533 → 0.555 / 0.504 by the gen-scope eval cleanup (den-hoag-lk2ks: the nta
+# channel's incidental cost removed by construction; gen-scope `9a4db95`). Relock 44.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.555
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.504
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK

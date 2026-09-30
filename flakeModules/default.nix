@@ -289,8 +289,8 @@ let
   # over the `project` result above. Reads only `projected`, the terminals above, and per-node
   # extras — never the injected/built config below, so no cycle of the hub's own. A consumer can
   # still close one: gen-delivery checks every extras address before the realization is observable,
-  # so a `gen.extraModules` derived from `gen.realized` or `flake.nixosConfigurations` diverges
-  # (the option's description states it).
+  # so a `gen.extraModules` or projection derived from `gen.realized` or `flake.nixosConfigurations`
+  # diverges (the option's description states it).
   #
   # The extras are ADDRESSED to the `nixos` class — gen-delivery's inlet is class-major — which is
   # the reach `gen.extraModules`' description promises: NixOS modules handed to the nixos terminal,
@@ -472,9 +472,10 @@ in
         (`gen.nixpkgs = null` with no `gen.terminals.nixos`) is refused by name, e.g.
         `extraModules.nixos.<node> addresses a node with no declared nixos content`.
 
-        Must not be derived from `gen.realized` or `flake.nixosConfigurations`: every address is
-        checked before the realization can be observed, so a self-derived set diverges with an
-        uncatchable infinite recursion. Key it from your own node list.
+        Must not be derived from `gen.realized` or `flake.nixosConfigurations`: neither an
+        address set nor a projection may be derived from `realize`'s own output, because every
+        address and class is checked before the realization can be observed, so a self-derived
+        set diverges with an uncatchable infinite recursion. Key it from your own node list.
       '';
     };
 

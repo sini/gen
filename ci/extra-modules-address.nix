@@ -106,12 +106,16 @@ let
       !(forces (realizeHub { gamma = [ extra ]; }).nixos);
     extras-for-an-unprojected-node-refuse = !(forces (realizeHub { delta = [ extra ]; }).nixos);
     # The pre-9vkq call — the node-keyed map handed straight through — is the retired shape and
-    # refuses by name at the pinned gen-delivery.
+    # refuses by name at the pinned gen-delivery (R0). terminals provides peer so that the
+    # refusal discriminates from an unaddressed terminal-less class.
     node-keyed-extras-refuse =
       !(forces (
         genDelivery.realize {
           inherit projected;
-          terminals.nixos = reflect;
+          terminals = {
+            nixos = reflect;
+            peer = reflect;
+          };
           extraModules = {
             alpha = [ extra ];
           };
