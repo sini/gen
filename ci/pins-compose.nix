@@ -52,9 +52,14 @@
 # edge beneath them at the hub's pin, and the substituted `inputs` above are handed in unchanged. The
 # harness's refusal then compares the hub's in-memory pins with that grafted file, so the two planes
 # cannot judge different revisions without a refusal naming the input. Only ROOT edges move, so the
-# frozen fixtures stay frozen here too. A member that declares no error plane gets no such check,
-# by the harness's own predicate over the substituted outputs. Unlike `tests`, the red is raised when
-# the check is BUILT: every cell runs in the sandbox under the column's own evaluator.
+# frozen fixtures stay frozen here too. Unlike `tests`, the red is raised when the check is BUILT:
+# every cell runs in the sandbox under the column's own evaluator.
+#
+# ★ EVERY MEMBER GETS BOTH NAMES. Whether a member declares an error plane is the harness's own
+# predicate over the substituted outputs, and it is decided INSIDE `pins-compose-error-<member>`'s
+# value: a member whose ci outputs fail to evaluate at the hub's pins then reds its own two checks,
+# and the check name set, every other member's checks and the hub's own gates stay evaluable. A
+# member that declares no error plane gets a green marker saying so.
 {
   gen,
   errorPlane,
@@ -110,8 +115,8 @@ let
         });
       };
     in
-    {
-      "pins-compose-${m}" =
+    [
+      (lib.nameValuePair "pins-compose-${m}" (
         pkgs.runCommand "pins-compose-${m}"
           {
             inherit report;
@@ -125,23 +130,29 @@ let
             echo
             echo "$tests"
             cp "$reportPath" "$out"
-          '';
-    }
-    // lib.optionalAttrs outputs.errorPlane.declared {
-      "pins-compose-error-${m}" = errorPlane {
-        inherit
-          pkgs
-          lib
-          system
-          inputs
-          ;
-        name = "pins-compose-error-${m}";
-        root = src.outPath;
-        rebind = {
-          lock = hubLock;
-          names = substituted;
-        };
-      };
-    };
+          ''
+      ))
+      (lib.nameValuePair "pins-compose-error-${m}" (
+        if outputs.errorPlane.declared then
+          errorPlane {
+            inherit
+              pkgs
+              lib
+              system
+              inputs
+              ;
+            name = "pins-compose-error-${m}";
+            root = src.outPath;
+            rebind = {
+              lock = hubLock;
+              names = substituted;
+            };
+          }
+        else
+          pkgs.runCommand "pins-compose-error-${m}" { } ''
+            echo "${m} declares no error plane" | tee "$out"
+          ''
+      ))
+    ];
 in
-lib.foldl' (acc: m: acc // compose m) { } memberNames
+lib.listToAttrs (lib.concatMap compose memberNames)
