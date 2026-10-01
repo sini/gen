@@ -213,6 +213,8 @@ MATRIX=(
   "registry 500 small"
   "registry 2000 r,big"
   "lazyRegistry 2000 r"
+  "threadedRegistry 500 small"
+  "threadedRegistry 2000 r,big"
   "schemaHosts 400 small"
   "schemaHosts 1600 r,big"
   "aspects 400 small,noref"
@@ -280,6 +282,15 @@ ROW_ALLOC_MAX[registry,2000]=0.654
 # lazyRegistry n=2000 — anchors 0.777 / 0.632; ① 0.108440 / 0.101548, ② 0.064373 / 0.046891.
 ROW_THUNKS_MAX[lazyRegistry,2000]=0.809
 ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
+# threadedRegistry n=2000 — the registry shape over nixpkgs `attrsWith { placeholder = "host"; }`,
+# a container outside the six, so the pure stack folds through gen-merge's threaded rebuild channel
+# (its merge runs three times per option, nixpkgs' once). ANCHORS 0.772 / 0.675 at Nix 2.34.8, gen-merge
+# 202cbd5 (branch f8mgj, the landing that opens the channel). MARGIN 0.000, the tightest honest
+# reading on a deterministic counter (as entityMatch's): the row is new, so no consolidation delta
+# was ever measured on it, and a bound below the default COUNTER_RATIO_MAX is a tightening, which
+# needs no licence (ci/README.md). Arming: the planted stacks below, never a gated arm.
+ROW_THUNKS_MAX[threadedRegistry,2000]=0.772
+ROW_ALLOC_MAX[threadedRegistry,2000]=0.675
 # schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
 # The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
 # stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
@@ -669,6 +680,8 @@ OW_LIN_WARM=""
 declare -A KM_TR KM_AR KM_CR KM_BG KM_LIN
 KM_PLANT_TR=""
 KM_PLANT_AR=""
+TRA_PURE=""
+TRA_REF=""
 FAILURES=()
 CELL=""
 
@@ -878,7 +891,7 @@ for row in "${MATRIX[@]}"; do
   fi
 done
 
-for w in scalar registry schemaHosts aspects wideFreeform deepSubmodule; do
+for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1001,6 +1014,31 @@ KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[k
 if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"; then
   FAILURES+=("kindMatch arming: the planted per-node recompute read kind/attrs-ref thunks $KM_PLANT_TR ≤ ${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]} — the bound cannot see the class this row exists for")
 fi
+
+# ── threadedRegistry arming, every run: does the row reach the threaded path? ───────────────────
+# The planted element's `substSubModules` throws a token generated here and never written down
+# whenever it is handed anything but nixpkgs' module list. Only gen-merge's threaded rebuild channel
+# hands it anything else, so `pure-plant` must die naming the token and `ref-plant` must evaluate. A
+# pure arm that evaluates means the row folds some other way and its bounds price nothing of the
+# channel; a ref arm that dies means the plant does not isolate it.
+tra_token=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
+[[ ${#tra_token} -eq 24 ]] || { echo "perf-bench: could not generate the threadedRegistry arming token" >&2; exit 4; }
+for s in pure-plant ref-plant; do
+  status=0
+  nix-instantiate --eval --strict "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
+    --argstr stack "$s" --argstr workload threadedRegistry --arg n 4 --argstr token "$tra_token" \
+    >"$tmp/tra-$s.out" 2>"$tmp/tra-$s.err" || status=$?
+  hits=$(grep -c -- "$tra_token" "$tmp/tra-$s.err") || hits=0
+  if [[ "$s" == pure-plant ]]; then
+    TRA_PURE="exit $status, token lines $hits"
+    [[ $status -ne 0 && $hits -gt 0 ]] \
+      || FAILURES+=("threadedRegistry arming: pure-plant read $TRA_PURE — the pure arm does not reach gen-merge's threaded channel, so the row prices nothing of it")
+  else
+    TRA_REF="exit $status, token lines $hits"
+    [[ $status -eq 0 && $hits -eq 0 ]] \
+      || FAILURES+=("threadedRegistry arming: ref-plant read $TRA_REF — the plant fires without the threaded channel, so it does not isolate it")
+  fi
+done
 
 # ── entityMatch — instance identity at scale (den-hoag-l0y U2; the gate derivation is beside the constants) ──
 for fx in migrated sealed; do
@@ -1130,11 +1168,13 @@ emit_report() {
   echo "> track a grammar that moves by design ruling, so such a gate would red on ruled improvements"
   echo "> rather than on regressions. Their linearity gates and absolute counters are unaffected."
   echo
+  printf '> threadedRegistry arming (the planted element throws a fresh token only the threaded channel reaches): pure-plant %s (must die naming it); ref-plant %s (must evaluate).\n' "$TRA_PURE" "$TRA_REF"
+  echo
   echo "### linearity (pure stack, ×4 size step; linear ≈ 4.0, gate ≤ $GROWTH_MAX)"
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry schemaHosts aspects wideFreeform deepSubmodule; do
+  for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
