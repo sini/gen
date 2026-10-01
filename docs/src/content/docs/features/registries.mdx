@@ -77,7 +77,7 @@ defaults (`web-1.system`, `deploy.sudo`) and an `id_hash`.
 | Hold instances | `mkInstanceRegistry kind { refs?; extraModules?; }` | An option holding a kind's instances, with defaults and `id_hash` |
 | Validate | `validateInstances` | Check every instance against its kind's validators |
 | Refine an option | `schema.refined type [ schema.refinements.tcpPort ]`, `checkRefinements` | Narrow an option's type with named predicates such as `positive`, `nonEmpty` and `tcpPort` |
-| Reference | `declarationOf "<kind>"`, `fieldRef`, `isFieldRef` | An option whose value is another instance, given by name or by value |
+| Reference | `declarationOf "<kind>"`, `mkFieldDeclaration`, `isFieldDeclaration` | An option whose value is another instance, given by name or by value |
 | Document | `renderDocs` | Render a kind's options as documentation |
 | Mint identities | `identity.hashIdentity kind labels valueOf` | A stable `kind:digest` string for any labelled value |
 | Compare kinds | `kindEq` | Whether two kind values are the same declaration |
