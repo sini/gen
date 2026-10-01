@@ -354,8 +354,10 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # host evaluator (reports/den-hoag-470xp-arm-f-build-v0.md §5).
 # RATCHETED 0.557 / 0.533 → 0.555 / 0.504 by the gen-scope eval cleanup (den-hoag-lk2ks: the nta
 # channel's incidental cost removed by construction; gen-scope `9a4db95`). Relock 44.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.555
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.504
+# RATCHETED 0.555 / 0.504 → 0.551 / 0.503 by the gen-merge `_module.args` collector change
+# (den-hoag-tl4nx: the same-name refusal, collected pay-per-use). Relock 47.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.551
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.503
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK

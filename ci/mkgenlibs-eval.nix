@@ -101,10 +101,52 @@ let
       cause = "a deliberate throwing tombstone for a renamed type constructor (gen-schema lib/ref.nix, `── THE RETIRED NAME ──`). The type's values are declarations and `ref` names the use side, inverting Neron et al. 2015, so the constructor is `declarationOf` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (TERM ruling 2026-09-25, refused-by-name alias)";
     }
+    {
+      member = "schema";
+      binding = "fieldRef";
+      cause = "a deliberate throwing tombstone for a renamed value constructor (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `mkFieldDeclaration` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "schema";
+      binding = "isFieldRef";
+      cause = "a deliberate throwing tombstone for a renamed predicate (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `isFieldDeclaration` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "schema";
+      binding = "fieldRefsIn";
+      cause = "a deliberate throwing tombstone for a renamed scan (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationsIn` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "schema";
+      binding = "fieldRefMarker";
+      cause = "a deliberate throwing tombstone for a renamed marker key (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationMarker` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "settings";
+      binding = "ref";
+      cause = "a deliberate throwing tombstone for a renamed value constructor (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `mkDeclaration` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "settings";
+      binding = "isRef";
+      cause = "a deliberate throwing tombstone for a renamed predicate (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `isFieldDeclaration` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
+    {
+      member = "settings";
+      binding = "refsIn";
+      cause = "a deliberate throwing tombstone for a renamed scan (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationsIn` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+    }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 2;
+  retirementWidth = 9;
 
   ruledRetirement =
     let
@@ -434,7 +476,17 @@ let
     # gen-schema f99df45 → f7ecf39 (den-hoag-2zjg1): the surface gained ONE name,
     # `declarationOf`; `ref` became a registered tombstone (retirementEntries above), so it is still
     # a published name and nothing was removed.
-    schema = "cf7c7e72e8c194661233bf5f755ba40b972149301765930fcf2c39903f5786f0";
+    #
+    # gen-schema 749cfdd → 620bf64 (den-hoag-2zjg1, the TERM ruling reaching the value constructor):
+    # the surface gained the declaration-named `mkFieldDeclaration`, `isFieldDeclaration`,
+    # `fieldDeclarationsIn` and `fieldDeclarationMarker`, and the four names they replace, `fieldRef`,
+    # `isFieldRef`, `fieldRefsIn` and `fieldRefMarker`, became registered tombstones
+    # (retirementEntries above): still published names, so nothing was removed.
+    #
+    # gen-schema 620bf64 → 4c30e07 (den-hoag-8x97u, relock 47): the surface gained ONE name,
+    # `entryReservation`, the reservation a kind entry's import closure is checked against. Nothing
+    # was removed and no other member's names moved.
+    schema = "d6259d6dc90d1dd8d683b9c2658b064a4e44a4a065f401e38cb375290593ace9";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
     #
@@ -450,7 +502,10 @@ let
     # the retired parameter-attribute accessor. Nothing was added and no other member moved.
     scope = "480d3feece75c5d182c2d3962b5694bbe42cda1636e3656e24e971703f1bd9d3";
     select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
-    settings = "4c1d7b6a85da8dc75591b591767da073b3baf25884f24c163a231eaccbfdef66";
+    # gen-settings 3449bfa → e7cafdd (den-hoag-2zjg1): the surface gained `mkDeclaration`,
+    # `isFieldDeclaration` and `fieldDeclarationsIn`; `ref`, `isRef` and `refsIn` became registered
+    # tombstones (retirementEntries above), so nothing was removed.
+    settings = "0ad19eb12ce7cc7851c97fb00a9b2a756cf95d2806a556c1892414852da383b8";
     # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
     # surface gained ONE name, `identityGuard`, the step-indexed guard that bounds type nesting for
     # identity. Nothing was removed and no other member moved.

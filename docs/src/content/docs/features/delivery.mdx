@@ -82,7 +82,7 @@ values: the node's modules and its bindings. Here `node` is injected into each m
 
 | Feature | Functions and options | Purpose |
 |---|---|---|
-| Project | `delivery.project { values; cnf; selectNodes; }` | Collect each node's modules per class from its aspects |
+| Project | `delivery.project { values; cnf; selectNodes; deliveryClasses ? {}; }` | Collect each node's modules per class from its aspects, keyed under the delivery class `deliveryClasses` names for a node's authored class (identity when absent) |
 | Realise | `delivery.realize { projected; terminals; bindings?; refinements?; layerOrder?; extraModules?; }` | Call one terminal per class per node, and return `{ <class>.<node> = result; }` |
 | Terminals | `bind.crossing.mkHostedTerminal`, `bind.crossing.mkOutputsTerminal` | Ready-made terminals for NixOS-style systems and for flake outputs |
 | Move content | `view.compositions.movement`, `carrier`, `scopeGraph`, `viewRelation` | Carry values along chosen edge labels, nearest source first |
