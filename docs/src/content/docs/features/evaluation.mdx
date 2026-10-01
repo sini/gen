@@ -111,7 +111,7 @@ Grown nodes are evaluated like declared ones. `nodesOfType` lists them with the 
 
 `assemble` builds one node set from many layered contributions and hands it to the evaluator. It
 does not evaluate anything itself. `substratePreconditions` lists the properties an assembly depends
-on. An assembly over libraries that lack one of them fails with an error naming the property,
+on. An assembly over libraries that lack one of them fails with an error naming the property and its stable `record` key,
 instead of producing a wrong node set.
 
 gen-assemble, gen-inspect and gen-memo never evaluate configuration: they prepare an evaluator's
