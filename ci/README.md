@@ -88,7 +88,9 @@ no layer, so they are unrankable: they are named and counted, and they do not ta
 fixtures); `perf-bench.sh` drives it through `nix-instantiate --eval` + `NIX_SHOW_STATS`, 2 stacks
 × 3 reps per cell. Workloads are den shapes: `scalar` (wide flat option sets — the shape that
 catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule) instance
-registries), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
+registries), `threadedRegistry` (the same registry over nixpkgs `attrsWith` with a non-default
+`placeholder`, a container outside the six gen-merge re-homes, so the pure stack folds through
+gen-merge's threaded rebuild channel; its arming plant must fire on the pure arm only), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
 of the digest — the ADR-0016 excluded axis), `aspects` (gen-aspects tree with flatten),
 `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
