@@ -23,13 +23,15 @@ let
 
   access = builtins.concatMap (web: map (db: {
     head = "reach:${web}:${db}";
+    label = "reach";
     pos = [ "webserver:${web}" "database:${db}" ];
     neg = [ "maintenance:${db}" ];
     relata = [ web db ];
   }) (builtins.filter (db: hosts.${db}.env == hosts.${web}.env) (ofRole "database"))) (ofRole "webserver");
 
+  declarations = facts ++ access;
   model = gen.program.model {
-    program = gen.program.program { declarations = facts ++ access; frozen = names; };
+    program = gen.program.program { inherit declarations; frozen = names; };
     interpretation = [ ];
     prior = null;
     complete = true;
@@ -38,14 +40,14 @@ in
 {
   web1ToDb1 = (model.resolve "reach:web-1:db-1").included;
   web2ToDb2 = (model.resolve "reach:web-2:db-2").included;
-  allowed = builtins.filter (a: builtins.substring 0 6 a == "reach:") model.trueAtoms;
+  allowed = (gen.program.ruleEdges { inherit declarations model; }).reached;
   outcome = model.adjudication.outcome;
 }
 ```
 
 ```console
 $ nix eval --impure --json --file platform-acl.nix
-{ "allowed": ["reach:web-1:db-1"], "outcome": "admitted", "web1ToDb1": true, "web2ToDb2": false }
+{ "allowed": [{"from":"web-1","label":"reach","to":"db-1"}], "outcome": "admitted", "web1ToDb1": true, "web2ToDb2": false }
 ```
 
 A **rule** has a head atom, positive conditions (`pos`) and negative conditions (`neg`). The head
@@ -56,9 +58,10 @@ fact. An **atom** is one fact, such as `reach:web-1:db-1`. Its name is yours: ge
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Write a program | `program.program { declarations; frozen; }` | Collect rules `{ head; pos?; neg?; relata; }` into one program |
+| Write a program | `program.program { declarations; frozen; }` | Collect rules `{ head; label?; pos?; neg?; relata; }` into one program |
 | Solve it | `program.model { program; interpretation; prior; complete; }` | Compute every atom's verdict |
 | Read a verdict | `.resolve atom`, `.trueAtoms`, `.falseAtoms`, `.undefinedAtoms`, `.withheldAtoms` | Ask about one atom, or list atoms by verdict |
+| Turn results into edges | `program.ruleEdges { declarations; model; }` | The edge of every labelled rule, and the ones whose head the model includes |
 | Run passes | `prior = <previous model>` | Solve again after new rules arrive, with a check that no earlier rule was dropped |
 | Check stability | `.adjudication`, `adjudicate`, `stableModelBudget` | Decide whether the solution is a stable model, within a search budget |
 | Author rule bodies | `emit`, `forEach`, `body`, `rule`, `declaration` | Build rule bodies from data without evaluating them at registration |
@@ -121,14 +124,14 @@ settled before this program runs. A relatum missing from `frozen` fails with an 
 
 ### From atoms to edges
 
-A true atom can become an edge in the graph. Today this is the caller's step:
+A rule with a `label` denotes the edge `{ from = relata[0]; to = relata[1]; label; }`.
+`ruleEdges { declarations; model; }` returns two edge lists: `candidates`, the edge of every labelled
+rule, and `reached`, the candidates whose head the model includes. That is how `allowed` above is
+built. `reached` fails with an error on an undefined head rather than dropping the edge:
 
 ```nix
-map (atom:
-  let parts = builtins.match "reach:(.*):(.*)" atom;
-  in { from = builtins.elemAt parts 0; to = builtins.elemAt parts 1; label = "reaches"; })
-  allowed
-# [ { from = "web-1"; to = "db-1"; label = "reaches"; } ]
+(gen.program.ruleEdges { inherit declarations model; }).reached
+# [ { from = "web-1"; label = "reach"; to = "db-1"; } ]
 ```
 
 [Inspection](/features/inspection/) shows these derived edges beside the declared ones, and answers

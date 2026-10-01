@@ -27,23 +27,25 @@ let
   fact = label: src: dst: { head = "${label}:${src}:${dst}"; relata = [ src dst ]; };
   reach = web: db: env: {
     head = "reaches:${web}:${db}";
+    label = "reaches";
     pos = [ "runsIn:${web}:${env}" "runsIn:${db}:${env}" ];
     neg = [ "maintenance:${db}:${env}" ];
     relata = [ web db ];
   };
+  declarations = [
+    (fact "runsIn" "web-1" "prod") (fact "runsIn" "db-1" "prod")
+    (fact "runsIn" "web-2" "dev")  (fact "runsIn" "db-2" "dev")
+    (fact "maintenance" "db-2" "dev")
+    (reach "web-1" "db-1" "prod")
+    (reach "web-2" "db-2" "dev")
+  ];
   program = gen.program.program {
     frozen = builtins.attrNames register.host ++ builtins.attrNames register.env;
-    declarations = [
-      (fact "runsIn" "web-1" "prod") (fact "runsIn" "db-1" "prod")
-      (fact "runsIn" "web-2" "dev")  (fact "runsIn" "db-2" "dev")
-      (fact "maintenance" "db-2" "dev")
-      (reach "web-1" "db-1" "prod")
-      (reach "web-2" "db-2" "dev")
-    ];
+    inherit declarations;
   };
   model = gen.program.model { inherit program; interpretation = [ ]; prior = null; complete = true; };
 in
-gen.inspect.mkInspector { inherit register relations program model; }
+gen.inspect.mkInspector { inherit register relations declarations model; }
 ```
 
 ```console
@@ -78,7 +80,7 @@ The rule fired because both positive conditions are true and the negative one is
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Load a graph | `inspect.mkInspector { register; relations; program; model; }` | One set of facts from nodes, declared edges and solved rules |
+| Load a graph | `inspect.mkInspector { register; relations; declarations; model; }` | One set of facts from nodes, declared edges and solved rules |
 | Read the facts | `.facts` | Nodes, edges with their origin, tables per kind, and a gen-graph value |
 | Query with SQL | `.query "SELECT …"` | Filter, join, sort and limit over `edge`, `reaches` and one table per kind |
 | Query with selectors | `.select selector` | The same filters as data; the result is again a set of facts |
