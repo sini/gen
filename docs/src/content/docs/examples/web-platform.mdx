@@ -63,6 +63,7 @@ let
   rules = builtins.concatMap (w:
     map (d: {
       head = "reaches:${w}:${d}";
+      label = "reaches";
       pos = [ "role:webserver:${w}" "role:database:${d}" "sameEnv:${w}:${d}" ];
       neg = [ "quarantined:${d}" ];
       relata = [ w d ];
@@ -70,20 +71,16 @@ let
   ) (withRole "webserver");
 
   # (3) solve
+  declarations = facts ++ rules;
   model = program.model {
     prior = null;
-    program = program.program { frozen = names; declarations = facts ++ rules; };
+    program = program.program { frozen = names; inherit declarations; };
     interpretation = [ ];
     complete = true;
   };
 
-  # (4) turn each true `reaches` atom into an edge
-  acl = builtins.filter (e: e != null) (map (atom:
-    let parts = builtins.split ":" atom; in
-    if builtins.elemAt parts 0 == "reaches"
-    then { from = builtins.elemAt parts 2; to = builtins.elemAt parts 4; }
-    else null
-  ) model.trueAtoms);
+  # (4) the edge of every labelled rule whose head the model includes
+  acl = (program.ruleEdges { inherit declarations model; }).reached;
 
   # (5) query the result as a graph
   g = {
@@ -107,7 +104,9 @@ in
 2. One rule per webserver and database pair. `pos` lists the atoms that must be true and
    `neg` the atoms that must be false.
 3. `model` solves the program. Every atom is true, false or undefined.
-4. The caller maps each true `reaches` atom to an edge.
+4. A rule with a `label` denotes an edge from its first relatum to its second. `ruleEdges`
+   returns those whose head the model includes, and fails with an error on an undefined head
+   rather than dropping it.
 5. The edges form an ordinary accessor graph, so every gen-graph query works on them.
 
 It evaluates to:
@@ -115,9 +114,9 @@ It evaluates to:
 ```nix
 {
   acl = [
-    { from = "web-dev-east";  to = "db-dev-east"; }
-    { from = "web-prod-east"; to = "db-prod-east"; }
-    { from = "web-prod-west"; to = "db-prod-east"; }
+    { from = "web-dev-east";  label = "reaches"; to = "db-dev-east"; }
+    { from = "web-prod-east"; label = "reaches"; to = "db-prod-east"; }
+    { from = "web-prod-west"; label = "reaches"; to = "db-prod-east"; }
   ];
   reachableFromWebProdWest = [ "db-prod-east" ];
   whoReachesDbProdEast = [ "web-prod-east" "web-prod-west" ];
