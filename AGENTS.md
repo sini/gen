@@ -45,6 +45,7 @@ The hub owns nothing; every concern belongs to a member library. Quoted text is 
 | `inspect`            | `gen-inspect` — "gen-inspect — the library that interrogates a materialized gen graph: which nodes exist and of what kind, which edges are declared, which a rule program produced and why, and what reaches what"                           |
 | `memo`               | `gen-memo` — "gen-memo — the incremental plane: a decision layer over the evaluator that never evaluates, only decides reuse"                                                                                                                |
 | `program`            | `gen-program` — "gen-program — the consumer that turns a framework's declarations into a logic program, drives gen-scope's well-founded engine over it, and carries the third value out under its own name"                                  |
+| `rules`              | `gen-rules` — "gen-rules — the one closure door: the loader lowering that turns a closure into a first-order door node or door rule, the door that applies it, and the rule-pattern catalogue"                                               |
 | `view`               | `gen-view` — "gen-view: the substrate's derived-view constructor — the (L, E, \<, k) carrier with van Antwerpen's relation sort published as a raw calculus, and the named compositions over it"                                             |
 
 **Repos that WERE roster members and have left.** Each is off the roster, is no longer a hub flake
@@ -79,7 +80,7 @@ nix eval --impure --json --expr 'builtins.filter (n: builtins.substring 0 4 n ==
 <!-- gen-inputs:begin -->
 
 ```json
-["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-inspect","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
+["gen-algebra","gen-aspects","gen-assemble","gen-bind","gen-class","gen-delivery","gen-dispatch","gen-graph","gen-identity","gen-inspect","gen-link","gen-memo","gen-merge","gen-prelude","gen-product","gen-program","gen-rules","gen-schema","gen-scope","gen-select","gen-settings","gen-types","gen-view"]
 ```
 
 <!-- gen-inputs:end -->
@@ -147,7 +148,7 @@ Current assignment (derive it from `strata`, never from this heading):
 
 ```
 aspects  aspects class link
-framework  assemble delivery inspect program settings
+framework  assemble delivery inspect program rules settings
 modules  merge types
 substrate  algebra bind dispatch graph identity memo prelude product schema scope select view
 ```
@@ -262,7 +263,7 @@ Current output (verbatim):
 <!-- gen-drift:begin -->
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","rules","schema","scope","select","settings","strata","types","view"]}
 ```
 
 <!-- gen-drift:end -->

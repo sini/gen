@@ -55,6 +55,7 @@
   prelude,
   product,
   program,
+  rules,
   schema,
   scope,
   select,
@@ -87,6 +88,12 @@ let
     # gen-scope, the sole evaluator (ADR-0006), and this library reads a model that evaluator already
     # produced. Entry landed when content existed, per the ruled roster timing.
     inherit inspect;
+    # gen-rules is the ONE CLOSURE CROSSING in gen: the loader lowering (`defunctionalize`) that
+    # turns a closure written to a framework surface into a first-order door node or door rule, the
+    # door (`mkApply`) that applies a registered closure and checks its output, and the rule-pattern
+    # catalogue. It publishes its `.lib` UNAPPLIED and takes its substrate injected, so the hub wires
+    # it through `./hubSubstrate.nix`, beside gen-inspect.
+    inherit rules;
     inherit bind;
     inherit schema;
     inherit aspects;
@@ -266,6 +273,10 @@ let
       # on the bucket's own words. It defines no substrate vocabulary in its own terms, which is the
       # bucket's second clause, and ADR-0035 conformance is asserted by its own CI.
       inspect = "framework";
+      # ★ The bucket turns on what the surface DOES: gen-rules is the door a framework's loader and
+      # its consumers plug into, "above the stack rather than a layer of it". Its edges point down
+      # (algebra, identity, merge, aspects) or within the stratum (program).
+      rules = "framework";
       # ★ OWNER-RULED. The bucket turns on what the surface DOES, and this one is a thing
       # frameworks plug into: it realizes delivery targets by invoking a caller-supplied terminal,
       # which is "above the stack rather than a layer of it" on the bucket's own words. Putting the

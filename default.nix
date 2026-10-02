@@ -106,6 +106,7 @@ in
   prelude ? inputs.gen-prelude or (dep [ "gen-prelude" ]),
   product ? inputs.gen-product or (dep [ "gen-product" ]),
   program ? inputs.gen-program or (dep [ "gen-program" ]),
+  rules ? inputs.gen-rules or (dep [ "gen-rules" ]),
   schema ? inputs.gen-schema or (dep [ "gen-schema" ]),
   scope ? inputs.gen-scope or (dep [ "gen-scope" ]),
   select ? inputs.gen-select or (dep [ "gen-select" ]),
@@ -142,6 +143,7 @@ let
       prelude
       product
       program
+      rules
       schema
       scope
       select

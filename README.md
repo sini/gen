@@ -90,6 +90,7 @@ terms.
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [gen-assemble](https://github.com/sini/gen-assemble) | The shared framework toolkit: the contribution protocol and its union point, the id convention, and the evaluator-demanded structural boilerplate that every assembling framework would otherwise write itself                                                                                                                                                                                                          |
 | [gen-program](https://github.com/sini/gen-program)   | The policy library: turns policy declarations into a logic program and drives gen-scope's solver — well-founded semantics with `undefined` a named third value (Van Gelder, Ross & Schlipf 1991), stable-model coherence (Gelfond & Lifschitz 1988) adjudicated under a stated budget and carried as a required field on every result, and prior-pass verdicts entering as an interpretation, never as re-encoded rules |
+| [gen-rules](https://github.com/sini/gen-rules)       | The one closure crossing: a framework's loader lowers each closure to a first-order door node or door rule and registers it; the door applies a registered closure against exactly what its pattern reads and checks the output against the codomain declared at registration. Also the rule-pattern catalogue (conditional edges and abnormalities)                                                                    |
 | [gen-delivery](https://github.com/sini/gen-delivery) | The delivery-class realization surface: the projection that discovers which aspect keys are declared delivery classes and the fold that hands each class's collected content to its target-owned terminal                                                                                                                                                                                                               |
 
 ## Using it
@@ -160,7 +161,7 @@ it fails — is [TRUST.md](TRUST.md).
 `ci/tests/purity.nix` (gen-types carries it as `ci/tests/types-purity.nix`), run by
 `nix develop ./ci --command ci purity` (guarded; the bare
 `nix develop ./ci -c nix-unit --flake ./ci#tests.purity` is unguarded, blind to an untracked cell).
-All 22 roster libraries carry it, including
+All 23 roster libraries carry it, including
 gen-prelude — it declares no flake inputs at all, so nothing transitive can enter its lock, and its own
 scanner still checks the source directly.
 
@@ -174,12 +175,12 @@ ecosystem needs `lib.*` alone it pulls the pinned `github:nix-community/nixpkgs.
 nixpkgs — policy stated in `ci/flake.nix` and visible in every `ci/` lock file.
 
 **One `.lib` export per library.** Structurally enforced: `mkGenLibs` reads `genInputs.gen-<name>.lib`
-for 20 of the 22 roster members — gen-class and gen-assemble are the exceptions (both
+for 21 of the 23 roster members — gen-class and gen-assemble are the exceptions (both
 hub-injected via `import "${genInputs.gen-<name>}/lib" { … }` rather than a direct `.lib` read), and
 their flakes export `.lib` too — so a library that renames, wraps or drops that output fails hub
-evaluation at its first consumer. All 22 library flakes declare it today.
+evaluation at its first consumer. All 23 library flakes declare it today.
 
-**Every library gates on its own CI.** All 22 library repos build their `ci/flake.nix` on
+**Every library gates on its own CI.** All 23 library repos build their `ci/flake.nix` on
 `gen-harness.lib.mkCi`, which `import-tree`s the whole `ci/tests/` directory — a new test file becomes
 a gate the moment it lands, with no registration step. `nix develop ./ci --command ci` from any repo
 root runs the suite guarded: it refuses on any untracked file under a declared read root, and the
@@ -206,7 +207,7 @@ fast-but-wrong change cannot pass — over 12 of the 14 matrix rows; the 2 `aspe
 for the reason above and keep linearity and absolute counters only. Wired as its own CI job, alongside
 `fleet-consistency`, which re-derives every cited fleet number from committed baselines.
 
-**Every library states what it does not own.** All 23 repositories (the hub included) carry
+**Every library states what it does not own.** All 24 repositories (the hub included) carry
 an `AGENTS.md` capability sheet whose "Not this library's job" table names the owning sibling for each
 adjacent concern and quotes that sibling's own `flake.nix` description verbatim, most rows backed by a
 grep that localizes the seam. This is a convention with a uniform artifact, not a CI gate.
@@ -278,10 +279,10 @@ evaluations of the same source:
 gen.lib.substrate   algebra bind dispatch graph identity memo prelude product schema scope select view
 gen.lib.modules     merge types
 gen.lib.aspects     aspects class link
-gen.lib.framework   assemble delivery program settings
+gen.lib.framework   assemble delivery inspect program rules settings
 ```
 
-`framework` (gen-assemble, gen-delivery, gen-program, gen-settings) sits above the stack rather than in
+`framework` (gen-assemble, gen-delivery, gen-program, gen-rules, gen-settings) sits above the stack rather than in
 it — a configuration framework assembles with it, and no substrate vocabulary is defined in its terms —
 but it still publishes `gen.lib.framework`, a roster selection and never a
 re-export, so a bucket path and the flat name are one value and one build. `retiring` is the one value

@@ -56,6 +56,7 @@ let
     "prelude"
     "product"
     "program"
+    "rules"
     "schema"
     "scope"
     "select"
@@ -403,7 +404,9 @@ let
     # gen-algebra d017bc30b2 → 5a8d8d5362 (den-hoag-b7u1v): the surface LOST one name, `search`,
     # the retired Search-monad namespace (gen-scope is the sole evaluator, ADR-0008 §1). Nothing
     # was added.
-    algebra = "574bd0dc735f14d4df6386d1928d9c9cc6cc3380445f4b5ce803e7c7b56e69d3";
+    # gen-algebra 6534ab3 → 18238b1 (relock 51, den-hoag-lwbb1 unit 1): the surface gained ONE name,
+    # `term`, the first-order term algebra extracted from gen-bind's BodyTerm. Nothing was removed.
+    algebra = "ca8c60d33e4f02248875423160ac186a65b8972e8354e029df8dc17c0649bf85";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
     # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
@@ -415,7 +418,10 @@ let
     # gen-aspects 357249b → 7d6a009 (relock 49, den-hoag-0cmbt U4): the surface gained TWO names,
     # `instancesFor`, the instance relation over a scope's suppliers, and `includeSitesOfEntry`, the
     # one include-site classifier it lifts. Nothing was removed.
-    aspects = "4b3a67b3907f96a441c9b3aec36346bb1b4a993a3473936c78572426e5ad9db6";
+    # gen-aspects 0acfc5c → 1062acb (relock 51, den-hoag-lwbb1 unit 2): the surface LOST one name,
+    # `toArgData`, retired with the custom guard forms now that a guard is a first-order term.
+    # Nothing was added.
+    aspects = "1d4ddacd622369b998782d2ebec387ac94b49bf0db8eef0b459e025c88d5a64c";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
@@ -469,7 +475,14 @@ let
     prelude = "70b37e53523bb7178d3d0e45b23c22c8e81ce1d4bb7a8c10a314f0796b57c15b";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
-    program = "bc197b0b34e0825734e19ed605e3f17228712406c0418d3573b4815365f438db";
+    # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,
+    # `groundInstances`, which resolves a terms-only policy body at a context, and
+    # `codomainBreaches`, the per-firing codomain check `fireEscape` already ran. Nothing was removed.
+    program = "e4cf1540eb0d2be27eb306eb487cf395fbe2f4a42b47fb38501aa11547a48704";
+    # gen-rules, the roster's 23rd member and the 5th at `framework`: the one closure crossing. Its
+    # surface is 5 names — the loader lowering and its registration table, the door, and the two
+    # catalogue patterns.
+    rules = "22cc1c5698627db93de8e1a4f6f52c0549333636c794b695316ab2e86c41ce05";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
     # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
     # other member moved.

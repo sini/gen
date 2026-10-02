@@ -24,5 +24,25 @@ members: {
       program
       ;
   };
-  program = { inherit (members) prelude scope; };
+  program = {
+    inherit (members)
+      prelude
+      scope
+      algebra
+      identity
+      ;
+  };
+  # `rules → program → { prelude, scope }`: gen-rules takes gen-program APPLIED, so the fold stays
+  # acyclic while nothing gen-program reaches names gen-rules back.
+  rules = {
+    inherit (members)
+      algebra
+      identity
+      aspects
+      merge
+      program
+      prelude
+      scope
+      ;
+  };
 }

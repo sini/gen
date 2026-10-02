@@ -34,6 +34,7 @@ by feature, so this table tells you which pages cover each library.
 | gen-class | Sharing one computed core across nodes of the same shape | [Incremental Rebuild](/features/incremental/) |
 | gen-assemble | One node set assembled from many contributions | [Evaluation](/features/evaluation/) |
 | gen-inspect | Queries, explanations and diagrams over a built graph | [Inspection](/features/inspection/) |
+| gen-rules | The one place a closure is applied: closures lowered to first-order nodes and rules, and the rule patterns | [Rules](/features/rules/) |
 
 ## Taking one library or all of them
 
@@ -46,6 +47,6 @@ genLibs = inputs.gen.lib.mkGenLibs { };   # genLibs.graph, genLibs.merge, …
 Outside a flake, `import <gen checkout> { }` returns the same set.
 
 A library also works on its own. Add `github:sini/gen-<name>` as an input and use
-`inputs.gen-<name>.lib`. Four libraries, gen-assemble, gen-delivery, gen-inspect and gen-program,
+`inputs.gen-<name>.lib`. Five libraries, gen-assemble, gen-delivery, gen-inspect, gen-program and gen-rules,
 publish `.lib` as a function of the libraries they build on, so you call it with those libraries
 first. The hub makes that call for you.

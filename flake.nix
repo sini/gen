@@ -47,6 +47,7 @@
     gen-aspects.inputs.gen-merge.follows = "gen-merge";
     gen-aspects.inputs.gen-prelude.follows = "gen-prelude";
     gen-aspects.inputs.gen-schema.follows = "gen-schema";
+    gen-aspects.inputs.gen-algebra.follows = "gen-algebra";
 
     gen-scope.url = "github:sini/gen-scope";
     gen-scope.inputs.gen-graph.follows = "gen-graph";
@@ -66,6 +67,7 @@
     gen-bind.url = "github:sini/gen-bind";
     gen-bind.inputs.gen-graph.follows = "gen-graph";
     gen-bind.inputs.gen-prelude.follows = "gen-prelude";
+    gen-bind.inputs.gen-algebra.follows = "gen-algebra";
 
     gen-dispatch.url = "github:sini/gen-dispatch";
     gen-dispatch.inputs.gen-prelude.follows = "gen-prelude";
@@ -114,6 +116,15 @@
     gen-program.url = "github:sini/gen-program";
     gen-program.inputs.gen-prelude.follows = "gen-prelude";
     gen-program.inputs.gen-scope.follows = "gen-scope";
+    gen-program.inputs.gen-algebra.follows = "gen-algebra";
+    gen-program.inputs.gen-identity.follows = "gen-identity";
+
+    gen-rules.url = "github:sini/gen-rules";
+    gen-rules.inputs.gen-algebra.follows = "gen-algebra";
+    gen-rules.inputs.gen-identity.follows = "gen-identity";
+    gen-rules.inputs.gen-merge.follows = "gen-merge";
+    gen-rules.inputs.gen-program.follows = "gen-program";
+    gen-rules.inputs.gen-aspects.follows = "gen-aspects";
 
     gen-delivery.url = "github:sini/gen-delivery";
     gen-delivery.inputs.gen-algebra.follows = "gen-algebra";
