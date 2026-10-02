@@ -412,7 +412,10 @@ let
     # gen-aspects e466063 → 7ac3fd1 (relock 48, den-hoag-0cmbt U3): the surface gained ONE name,
     # `instanceOf`, which mints an aspect instance from its aspect and the sources of the keys it
     # receives. Nothing was removed and no other member moved.
-    aspects = "f8c64c499c4a8fbf5c980fcc9e96177eed7198674fa780b301f4626f73c400d3";
+    # gen-aspects 357249b → 7d6a009 (relock 49, den-hoag-0cmbt U4): the surface gained TWO names,
+    # `instancesFor`, the instance relation over a scope's suppliers, and `includeSitesOfEntry`, the
+    # one include-site classifier it lifts. Nothing was removed.
+    aspects = "4b3a67b3907f96a441c9b3aec36346bb1b4a993a3473936c78572426e5ad9db6";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
@@ -449,7 +452,10 @@ let
     # names, `priorityBand` and `bandedLeaves`, each contributor's leaves sorted into force, set,
     # default or unset. ydro3's `types.witnessRecord` is inside `types`, not a top-level name, so it
     # moves no digest here. Nothing was removed.
-    merge = "c6be063754ff3fc763c435b08276df3e14d10c263203ef5df285cf4bb8177ca7";
+    # gen-merge c2405e0 → dd18d6b (relock 49, den-hoag-5kic): the surface gained ONE name,
+    # `deriveType`, a type derived from a completed one and re-completed rather than overridden; it
+    # is also `types.deriveType`. Nothing was removed.
+    merge = "785b14f78a6460742aa4571c107a85103acaa6eea841a0c30b4e4a2bb8259664";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.

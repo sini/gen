@@ -358,8 +358,10 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # (den-hoag-tl4nx: the same-name refusal, collected pay-per-use). Relock 47.
 # RATCHETED 0.551 / 0.503 → 0.549 / 0.502 by the relock 48 set (gen-merge lnleu, d4gnx, a0c4z,
 # o3oz5, f8mgj arm Q; gen-select l0y U3). Relock 48.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.549
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.502
+# RATCHETED 0.549 / 0.502 → 0.541 / 0.500 by the gen-merge tree-as-a-type option type
+# (den-hoag-foreign-mount-parity-knhyg, built at the crossing site). Relock 49.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.541
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.500
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
