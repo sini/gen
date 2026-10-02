@@ -1021,8 +1021,9 @@ fi
 
 # ── threadedRegistry arming, every run: does the row reach the threaded path? ───────────────────
 # The planted element's `substSubModules` throws a token generated here and never written down
-# whenever it is handed anything but nixpkgs' module list. Only gen-merge's threaded rebuild channel
-# hands it anything else, so `pure-plant` must die naming the token and `ref-plant` must evaluate. A
+# whenever it is handed gen-merge's thread marker (a one-item module list whose `_file` is
+# gen-merge's sentinel) and forwards every real module list. Only gen-merge's threaded rebuild
+# channel hands it the marker, so `pure-plant` must die naming the token and `ref-plant` must evaluate. A
 # pure arm that evaluates means the row folds some other way and its bounds price nothing of the
 # channel; a ref arm that dies means the plant does not isolate it.
 tra_token=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')

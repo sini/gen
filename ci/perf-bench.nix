@@ -329,10 +329,12 @@ let
   # its own `substSubModules` and its merge runs three times per option against nixpkgs' once (the
   # owner-ruled arm (T)'s condition (1): a row that EXERCISES the threaded path). The reference stack
   # is nixpkgs' own. Its arming control is the planted stacks: the element's `substSubModules`
-  # throws the run's token when handed anything but a module list. nixpkgs' protocol hands it a list
-  # (its own `fixupOptionType` calls it on both stacks), and only gen-merge's threaded channel hands
-  # it something else, so it must fire on `pure-plant` and not on `ref-plant` (perf-bench.sh, never a
-  # gated arm).
+  # throws the run's token when handed gen-merge's thread marker and forwards every other module list.
+  # nixpkgs' protocol hands it a real list (its own `fixupOptionType` calls it on both stacks), and
+  # only gen-merge's threaded channel hands it the marker: a one-item module list whose `_file` is
+  # gen-merge's sentinel (den-hoag-threadedforeign-substsubmodules-abort-srpix; before it, a
+  # non-list, still caught), so it must fire on `pure-plant` and not on `ref-plant`
+  # (perf-bench.sh, never a gated arm).
   threadedRegistry = mkRegistry (
     e:
     lib.types.attrsWith {
@@ -342,10 +344,13 @@ let
           // {
             substSubModules =
               m:
-              if builtins.isList m then
-                e.substSubModules m
+              if
+                !builtins.isList m
+                || builtins.length m == 1 && (builtins.head m)._file or null == "<gen-merge thread marker>"
+              then
+                throw "perf-bench threadedRegistry arming: ${token}"
               else
-                throw "perf-bench threadedRegistry arming: ${token}";
+                e.substSubModules m;
           }
         else
           e;
