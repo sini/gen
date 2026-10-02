@@ -373,17 +373,23 @@ let
   # set but found a function", their `.lib` IS the function the hub applies) and on `class` it
   # AGREES ON HASH WHILE READING A DIFFERENT OBJECT — the flake `.lib` leaves `merge = null`, the hub
   # re-imports with the tier-2 kernel injected, and the two name sets merely happen to agree today.
-  # The form below reuses `lib/mkGenLibs.nix` itself rather than restating its wiring, so it is total
-  # over all 21 and cannot drift from the wiring it tests:
+  # The form below mirrors the root `flake.nix` `outputs` (the members, `lib/hubSubstrate.nix`'s
+  # applied fold, then `import ./.`), so it is total over every member. The ci flake has no input
+  # named `gen`, and `lib/mkGenLibs.nix` takes resolved member values, not `genInputs`, so neither
+  # can stand in for the root flake here. `plain` is the root flake's list of plain re-exports:
   #
   #   nix eval --impure --raw --expr '
   #     let
-  #       hub  = (builtins.getFlake "git+file://<clone>/gen?dir=ci").inputs.gen;
-  #       cand = builtins.getFlake "git+file://<clone>/gen-<member>?rev=<newRev>";
-  #       roster = import "${hub}/lib/mkGenLibs.nix" {
-  #         genInputs = hub.inputs // { gen-<member> = cand; };
-  #       } { };
+  #       hub = builtins.getFlake "git+file://<clone>/gen";
+  #       gi = hub.inputs // { gen-<member> = builtins.getFlake "git+file://<clone>/gen-<member>?rev=<newRev>"; };
+  #       plain = [ <the plain member keys, as in flake.nix `members`> ];
+  #       members = builtins.listToAttrs (map (k: { name = k; value = gi."gen-${k}".lib; }) plain);
+  #       applied = builtins.mapAttrs (k: args: gi."gen-${k}".lib args)
+  #         (import "${hub}/lib/hubSubstrate.nix" (members // applied));
+  #       roster = import "${hub}" (members // applied);
   #     in builtins.hashString "sha256" (builtins.toJSON (builtins.attrNames roster.<key>))'
+  #
+  # Arm it first: with `gi = hub.inputs` it must reproduce every pinned line below.
   #
   # Compare the result against `expectedSurface.<key>` below. Equal ⇒ free rider, no regeneration
   # owed. Differ ⇒ the bump carries the regenerated line in the SAME commit as the pin move — the
@@ -403,7 +409,10 @@ let
     # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
     # gen-aspects' own guard-leaf predicate, which delivery reuses. `includeSitesOf` and `nodeIdOf`
     # are `graphFacts` fields, not top-level names. Nothing was removed.
-    aspects = "9b5c03095cadca119740a733f2b625e105cfd04991a18aa54b35f499a487c0e7";
+    # gen-aspects e466063 → 7ac3fd1 (relock 48, den-hoag-0cmbt U3): the surface gained ONE name,
+    # `instanceOf`, which mints an aspect instance from its aspect and the sources of the keys it
+    # receives. Nothing was removed and no other member moved.
+    aspects = "f8c64c499c4a8fbf5c980fcc9e96177eed7198674fa780b301f4626f73c400d3";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
@@ -500,8 +509,13 @@ let
     #
     # gen-scope c25d0e6db2 → b4418fa822 (den-hoag-4kh.53.54): the surface lost ONE name, `paramAttr`,
     # the retired parameter-attribute accessor. Nothing was added and no other member moved.
-    scope = "480d3feece75c5d182c2d3962b5694bbe42cda1636e3656e24e971703f1bd9d3";
-    select = "4facb22f69e61b329635dd742728988aec7b2d8566c3559ddce6763fb6440ff6";
+    #
+    # gen-scope 70c286a → 5afbb0f (relock 48, den-hoag-0cmbt U5): the surface gained ONE name,
+    # `argumentBinding`. Nothing was removed.
+    scope = "765efd5f8b09addb716faa781cf3d2eaa33a81f2077a6522deeef2800b68d380";
+    # gen-select 8ab4b1d → 37eccfc (relock 48, den-hoag-l0y U3): the surface gained ONE name, `subkind`,
+    # the selector matching a kind or any subkind of it. Nothing was removed.
+    select = "5df8bc671b37fec1a92a3c159fab3a2575411430300a146cd90f3667e760dbeb";
     # gen-settings 3449bfa → e7cafdd (den-hoag-2zjg1): the surface gained `mkDeclaration`,
     # `isFieldDeclaration` and `fieldDeclarationsIn`; `ref`, `isRef` and `refsIn` became registered
     # tombstones (retirementEntries above), so nothing was removed.

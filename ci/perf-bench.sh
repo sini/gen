@@ -356,8 +356,10 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # channel's incidental cost removed by construction; gen-scope `9a4db95`). Relock 44.
 # RATCHETED 0.555 / 0.504 → 0.551 / 0.503 by the gen-merge `_module.args` collector change
 # (den-hoag-tl4nx: the same-name refusal, collected pay-per-use). Relock 47.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.551
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.503
+# RATCHETED 0.551 / 0.503 → 0.549 / 0.502 by the relock 48 set (gen-merge lnleu, d4gnx, a0c4z,
+# o3oz5, f8mgj arm Q; gen-select l0y U3). Relock 48.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.549
+ROW_ALLOC_MAX[deepSubmodule,1600]=0.502
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
