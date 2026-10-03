@@ -472,7 +472,10 @@ let
     #
     # gen-prelude 6487a87 → f7247d1 (den-hoag-7gp66 P2 v1.2): the surface gained ONE name,
     # `checkGuarded`, the misplaced-option guard `door`'s `optionsStep` applies. Nothing was removed.
-    prelude = "70b37e53523bb7178d3d0e45b23c22c8e81ce1d4bb7a8c10a314f0796b57c15b";
+    # gen-prelude b2962cb → 0bed837 (relock 53, den-hoag-fyx6m): the surface gained ONE name,
+    # `isStringLike`, vendored from nixpkgs `lib.isStringLike` for gen-types' `path` and `pathLike`.
+    # Nothing was removed.
+    prelude = "d6145271c1d4a1f13db33a7ee2549662d6818a7fa5176a2deeeb0b1c308b96da";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
     # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,
