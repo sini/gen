@@ -1202,6 +1202,21 @@
             name = "gen";
             inherit (ciSelfInput) scanner;
           };
+
+          # ── THE GUARDED `ci` COMMAND: the SAME read-roots guard the libraries run, in PUBLICATION
+          # mode over the whole repository (den-hoag-g2glu, owner-ruled 2026-09-30). This flake's
+          # checks probe and enumerate the repository root (`publication-coverage`, the workflow
+          # and `ci/tests-error.nix` probes in `ci-plane-coverage`), each over a git-filtered source,
+          # so an untracked file there is invisible and the verdict is not about the tree that would
+          # be published. The domain is the repository's own `.gitignore` and never the host's.
+          # `sourceInfo.outPath` and NOT `outPath`, for the `?dir=ci` reason given above the sheet check.
+          readRootsGuard = inputs.gen-harness.lib.readRootsGuard {
+            inherit pkgs;
+            name = "gen";
+            sourceRoot = self.sourceInfo.outPath;
+            roots = [ ];
+            publicationRoots = [ self.sourceInfo.outPath ];
+          };
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -1525,6 +1540,16 @@
             ];
 
             commands = [
+              {
+                name = "ci";
+                help = "The hub's gate behind the read-roots guard [ci [nix flake check args]]";
+                # `cd "$FLAKE_ROOT"` because the guard resolves the tree it checks from the CWD.
+                # `|| exit` is explicit; numtide-devshell already runs commands under `set -e`.
+                command = ''
+                  cd "$FLAKE_ROOT" && "${readRootsGuard}/bin/gen-ci-read-roots" || exit $?
+                  nix flake check "$FLAKE_ROOT/ci" "$@"
+                '';
+              }
               {
                 name = "fmt";
                 help = "Format all files";
