@@ -133,6 +133,7 @@ flowchart TD
   gen_settings --> gen_prelude
   gen_settings --> gen_schema
   gen_settings --> gen_types
+  gen_types --> gen_algebra
   gen_types --> gen_identity
   gen_types --> gen_prelude
   gen_view --> gen_graph

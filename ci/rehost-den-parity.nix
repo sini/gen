@@ -45,6 +45,7 @@ let
   genTypes = import "${gen-types}/lib" {
     inherit prelude;
     identity = genIdentity;
+    algebra = import "${gen-algebra}/lib";
   };
   genMerge = import "${gen-merge}/lib" {
     inherit prelude;

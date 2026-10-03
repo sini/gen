@@ -406,7 +406,10 @@ let
     # was added.
     # gen-algebra 6534ab3 → 18238b1 (relock 51, den-hoag-lwbb1 unit 1): the surface gained ONE name,
     # `term`, the first-order term algebra extracted from gen-bind's BodyTerm. Nothing was removed.
-    algebra = "ca8c60d33e4f02248875423160ac186a65b8972e8354e029df8dc17c0649bf85";
+    # gen-algebra 18238b1 → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained ONE name,
+    # `hasDeclaredSubject`, the reader of a registered construction's declared comparison subject.
+    # Nothing was removed.
+    algebra = "332c5ee7a52cbf17801a9ed884fbcb2cf46ef04b055934c1ffdb7a5e121f2097";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
     # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
@@ -558,7 +561,10 @@ let
     # gen-types f6115ec → 3f8b7ca (den-hoag-ydro3 arm (c)): the surface gained ONE name,
     # `witnessRecord`, the one record `witnessedCheck` publishes twice, for a producer that publishes
     # it itself. Nothing was removed.
-    types = "5facf6e368a8f0af30fe4109737c81d63f430e006cbf420f0dcb034b387c9e32";
+    # gen-types d1930bf → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained TWO names, `mkIdentity`,
+    # the per-component identity half a producer outside gen-types builds through, and
+    # `comparisonSubject`, the compared regime's subject. Nothing was removed.
+    types = "5bb1f39be3f709dbba22a7915d2b5234ab43b41ee3c460b847a41fa33f8bb0f9";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.

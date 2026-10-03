@@ -28,6 +28,7 @@
     gen-types.url = "github:sini/gen-types";
     gen-types.inputs.gen-identity.follows = "gen-identity";
     gen-types.inputs.gen-prelude.follows = "gen-prelude";
+    gen-types.inputs.gen-algebra.follows = "gen-algebra";
 
     gen-merge.url = "github:sini/gen-merge";
     gen-merge.inputs.gen-memo.follows = "gen-memo";
