@@ -82,7 +82,7 @@ This maps to the paper as follows:
 | Inspectable before forcing | gen can examine aspect metadata, includes, identity and which class keys carry content without running the class's module evaluation |
 | Evaluated on demand | The `deferredModule` is forced only when the consuming NixOS, Darwin or Home Manager evaluation imports it |
 | Memoization | Nix memoizes the forced value; once evaluated, the result is shared by every consumer |
-| Defunctionalization (S3.1) | Guard functions (`{ host, ... }: { ... }`) are wrapped as a tagged functor record (`__isWrappedFn`, `__functionArgs`, `__functor`) whose formals can be read without calling it. The closure stays inside `__functor`, so this is defunctionalization by analogy (Reynolds 1972) |
+| Defunctionalization (S3.1) | A guard is first-order data, a condition term and a body term, read by one interpreter (Reynolds 1972). A context closure (`{ host, ... }: { ... }`) is not wrapped: gen-aspects refuses it by name, and it crosses the gen-rules door, which lowers it to a door node |
 
 The paper's fusion optimization (S3.3, eliminating indirection nodes between stream cells and streams) has an analogue: class options are declared directly on the aspect submodule, so no intermediate container sits between an aspect and its class content.
 

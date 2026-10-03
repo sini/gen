@@ -63,17 +63,11 @@ Reynolds' defunctionalization and CPS transformation became foundational techniq
 
 ### gen-aspects: guard defunctionalization
 
-A guard decides whether an aspect's content applies in a given context. gen-aspects offers guards in two forms.
+A guard decides whether an aspect's content applies in a given context.
 
 **Defunctionalized guards** (`lib/guard.nix`) apply Reynolds' transformation directly, in the form Danvy & Nielsen 2001 formalize. `guard pred body` pairs a condition with a body, and both are terms of gen-algebra's one first-order term algebra (`lib/guard-term.nix` is gen-aspects' instance of it). The condition is built from a closed vocabulary of constructors (`pred.class`, `pred.tagEq`, `pred.eq`, `pred.has`, `pred.all`, `pred.any`, `pred.always`, `pred.not`), each emitting a core term. A custom condition is a Nix function that builds a term from these at declaration, never a new interpreted form. A body is a term or first-order data, lifted to its term and checked against the configuration's declared names where the guard meets its `cnf`. One interpreter, gen-algebra's resolver, reads every condition through the read environment gen-aspects supplies: the role of Reynolds' `apply`. Because the condition and the body are data, a guard's identity is the mint over the two and never has to hash a closure.
 
-**Raw closures** such as `{ host, ... }: { nixos = ...; }` remain available when a guard must compute from context. gen-aspects wraps each one as a functor record:
-
-- **Tag**: `__isWrappedFn = true` marks the value as a wrapped closure.
-- **Interface**: `__functionArgs` records the formal parameters from `builtins.functionArgs`, so the closure's interface can be read without calling it.
-- **Dispatch**: `__functor` calls the original function when scope context supplies the arguments.
-
-The closure stays inside `__functor`, so this form is defunctionalization by analogy: it makes the interface inspectable, and the body stays opaque.
+**Context closures** such as `{ host, ... }: { nixos = ...; }` are not a second guard form. gen-aspects refuses one by name at an aspect position: a closure crosses the gen-rules door, which lowers it to a door node, so the one closure crossing sits at that door. A context-dependent aspect is written as a guard, `guard (pred.has "host") { … }`, whose body reads the context through read terms.
 
 `canTake` (`lib/can-take.nix`) reads a function's formals to decide whether the available context satisfies its required parameters. This inspects first-order data instead of trying the call.
 

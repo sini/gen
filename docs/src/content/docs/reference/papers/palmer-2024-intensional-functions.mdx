@@ -65,7 +65,7 @@ The identity is minted lazily in `__mint`, a digest over the registry coordinate
 ### gen-aspects: guards as first-order data
 
 - **Guard defunctionalization (S5.1)** -- `lib/guard.nix` gives guards a closed predicate vocabulary with one global `applyGuard`. The predicate is first-order data, so an aspect's identity never has to hash a closure.
-- **Wrapped guard functions** -- a raw function such as `{ host, ... }: { nixos = ...; }` is wrapped as a functor record tagged `__isWrappedFn` with its `__functionArgs`, so gen can read what it asks for without calling it. `canTake` reads those formals to decide whether a function can be applied in a given context.
+- **Context closures refused** -- a raw function such as `{ host, ... }: { nixos = ...; }` is told apart from a module function by `canTake`, which reads its formals without calling it, and is refused by name: it crosses the gen-rules door, which lowers it to a door node.
 - **Diamond dedup (S5.3, Lemma 5.12)** -- an aspect's identity is its path key (`lib/identity.nix`). When one aspect is included through several paths, equal identities deduplicate its contributions.
 
 ### gen-dispatch: rule identity
