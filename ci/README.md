@@ -519,7 +519,7 @@ few modules. The `wide` options make the declaration fold's accumulator grow by 
 that copies it per module (a binary `foldl'` over `mergeOptionDecls`, a `//` accumulation) pays bytes
 quadratic in the product: reverting that fold alone reads 10.4× alloc per ×4 step against the 5.5×
 bound, where one declared key per module read 4.3× and passed. Gated on parity and linearity only: its
-claim is order, not a constant against nixpkgs (pure/ref reads about 0.89 thunks and 0.88 alloc at
+claim is order, not a constant against nixpkgs (pure/ref reads about 0.94 thunks and 0.94 alloc at
 n=1600).
 
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
