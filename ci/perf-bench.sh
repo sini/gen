@@ -223,6 +223,8 @@ MATRIX=(
   "wideFreeform 8000 rb,big"
   "deepSubmodule 400 small"
   "deepSubmodule 1600 r,big"
+  "moduleFanIn 400 small"
+  "moduleFanIn 1600 big"
 )
 
 REPS=3
@@ -899,7 +901,7 @@ for row in "${MATRIX[@]}"; do
   fi
 done
 
-for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule; do
+for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule moduleFanIn; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1183,7 +1185,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule; do
+  for w in scalar registry threadedRegistry schemaHosts aspects wideFreeform deepSubmodule moduleFanIn; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done

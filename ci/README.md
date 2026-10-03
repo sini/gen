@@ -95,7 +95,8 @@ of the digest — the ADR-0016 excluded axis), `aspects` (gen-aspects tree with 
 `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
 keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
-`startup` (fixed cost, report-only).
+`moduleFanIn` (n modules each declaring, defining and freeform-adding one key at one level — the
+module-count axis), `startup` (fixed cost, report-only).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
 pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
@@ -509,6 +510,13 @@ in git history.
 per-level fixpoint re-entry dominates an instance's cost, shallow enough to keep the eval-stack
 recursion bounded so the bench runs under a plain `nix run` (no raised stack limit); the recursion
 stays linear in the instance count.
+
+**`moduleFanIn`** — n modules, each declaring one option, defining it under `mkIf`, adding one key to
+a shared `attrsOf` and one undeclared key; one more module redeclares every option, declares the bag and
+sets `freeformType`. It is the only row whose level holds n MODULES, so it is the one that sees a per-key
+lookup answered by a scan of the module list (O(n²); den-hoag-hk4ed): every other row's levels hold a
+few modules. Gated on parity and linearity only: its claim is order, not a constant against nixpkgs
+(pure/ref reads about 1.98 thunks and 1.60 alloc at n=1600).
 
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the
