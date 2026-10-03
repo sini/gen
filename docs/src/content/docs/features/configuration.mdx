@@ -101,7 +101,8 @@ priority merge in reverse module order, as in nixpkgs: that is why `allowUsers` 
 | `warmDecision`, `freeformConfig`, `freeformProv` | internal records an incremental re-run reads (see [Incremental Rebuild](/features/incremental/)) |
 
 A definition for an option that does not exist fails with
-``gen-merge: option `ssh.prot' does not exist (no freeformType to absorb it)``. With
+``The option `ssh.prot' does not exist. Definition values:`` and one
+``- In `/modules/web-1.nix': 1`` line naming the defining file, as nixpkgs does. With
 `check = false` the evaluation continues, and `undeclared` lists
 `{ file = "/modules/web-1.nix"; path = [ "ssh" "prot" ]; }`.
 
