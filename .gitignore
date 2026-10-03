@@ -5,3 +5,4 @@ result
 .pre-commit-config.yaml
 ci/__pycache__/
 result-*
+.claude/
