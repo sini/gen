@@ -564,7 +564,9 @@ let
     # gen-types d1930bf → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained TWO names, `mkIdentity`,
     # the per-component identity half a producer outside gen-types builds through, and
     # `comparisonSubject`, the compared regime's subject. Nothing was removed.
-    types = "5bb1f39be3f709dbba22a7915d2b5234ab43b41ee3c460b847a41fa33f8bb0f9";
+    # gen-types 6orb8-u1 → 6orb8-u1b (den-hoag-6orb8 U1b): the surface gained ONE name, `stampOk`,
+    # the completion stamp's reader a rebuilding boundary consults. Nothing was removed.
+    types = "3c410671814a37fa1678658e91113a74af40bdeaa328d1daf8ea2dc2419f8977";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
