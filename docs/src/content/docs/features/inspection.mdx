@@ -146,7 +146,7 @@ gen fails early and names what it expected. Each message below comes from the cu
 | `gen-graph.dependents: 'edges' is not an option of this door; the options are closed (accepted: 'maxIter')` | The graph was passed where the options set goes | Call `dependents { } graph node`; see [Graphs and Queries](/features/graphs/) |
 | `gen-graph.ancestorsOf: required field 'parent' is missing` | The accessor record lacks a field this query reads | Add the field, here `parent = id: …` |
 | ``gen-merge: a definition for option `ssh.port' is not of the expected type: expected type 'int' but value "22" is of type 'string'`` | A definition has the wrong type | Fix the value, or the option's `type` |
-| ``gen-merge: option `ssh.prot' does not exist (no freeformType to absorb it)`` | A definition has no matching option, often a typo | Correct the path, or declare the option |
+| ``The option `ssh.prot' does not exist. Definition values:`` followed by ``- In `/modules/web-1.nix': 1`` | A definition has no matching option, often a typo | Correct the path, or declare the option |
 | `gen-schema: ref field 'home' on kind 'admin': reference 'web-3' not found in instance registry (available: db-1, web-1)` | A reference names an instance the registry does not have | Use one of the listed names, or add the instance |
 | `gen-aspects.includes (aspect 'webserver', include position 0): reference 'sshd' names no entry of the registry` | An `includes` entry names no aspect | Correct the name; the position is the index in `includes` |
 | `gen-program: the membership 'primary:db-1' is UNDEFINED — …` | `included` was read on an atom whose rules contradict each other | Read `flag` and handle `"U"`; see [Rules](/features/rules/) |
