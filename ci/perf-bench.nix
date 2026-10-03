@@ -582,22 +582,47 @@ let
   # option and declares the bag and the freeform. Every per-key lookup a level answers (definitions
   # by key, declaring sites by loc, the declaration fold, the freeform coalescing, the container's
   # definitions by key) sees n modules, so a lookup answered by a scan of the module list is
-  # O(n²) here and nowhere else in the matrix (den-hoag-hk4ed).
+  # O(n²) here and nowhere else in the matrix (den-hoag-hk4ed). Each declaring module also
+  # declares `wide` options nobody defines: the declaration fold's accumulator grows by `wide + 1`
+  # keys per module, so a fold that copies it per module (a `//` over n modules) pays bytes
+  # quadratic in n × wide, which outgrows the 5.5× linearity bound on alloc on this evaluator
+  # (10.4× at wide = 16, 4.3× at wide = 0). Each module also adds `free` undeclared keys per module to the root
+  # freeform, so the freeform coalescing's per-module regrouping (a filter of every unmatched entry
+  # per module) stays above the bound against the wider linear base.
   moduleFanIn =
     P:
     let
+      wide = 16;
+      free = 4;
       eval = P.eval {
         modules =
           map (i: {
-            options."o${toString i}" = P.mkOption {
-              type = P.types.str;
-              default = "d${toString i}";
-            };
+            options = {
+              "o${toString i}" = P.mkOption {
+                type = P.types.str;
+                default = "d${toString i}";
+              };
+            }
+            // builtins.listToAttrs (
+              builtins.genList (j: {
+                name = "p${toString i}x${toString j}";
+                value = P.mkOption {
+                  type = P.types.str;
+                  default = "w";
+                };
+              }) wide
+            );
             config = {
               "o${toString i}" = P.mkIf (!third i) "v${toString i}";
               bag."k${toString i}" = "b${toString i}";
               "u${toString i}" = "f${toString i}";
-            };
+            }
+            // builtins.listToAttrs (
+              builtins.genList (j: {
+                name = "u${toString i}x${toString j}";
+                value = "f";
+              }) free
+            );
           }) idx
           ++ [
             {
