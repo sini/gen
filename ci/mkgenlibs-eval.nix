@@ -480,7 +480,8 @@ let
     # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
     # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,
     # `groundInstances`, which resolves a terms-only policy body at a context, and
-    # `codomainBreaches`, the per-firing codomain check `fireEscape` already ran. Nothing was removed.
+    # `codomainBreaches`, the per-firing codomain check the gen-rules door applies. Nothing was
+    # removed.
     program = "e4cf1540eb0d2be27eb306eb487cf395fbe2f4a42b47fb38501aa11547a48704";
     # gen-rules, the roster's 23rd member and the 5th at `framework`: the one closure crossing. Its
     # surface is 5 names — the loader lowering and its registration table, the door, and the two
