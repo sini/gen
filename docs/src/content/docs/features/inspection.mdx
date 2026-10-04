@@ -39,10 +39,7 @@ let
     (reach "web-1" "db-1" "prod")
     (reach "web-2" "db-2" "dev")
   ];
-  program = gen.program.program {
-    frozen = builtins.attrNames register.host ++ builtins.attrNames register.env;
-    inherit declarations;
-  };
+  program = gen.program.program (builtins.attrNames register.host ++ builtins.attrNames register.env) declarations;
   model = gen.program.model { inherit program; interpretation = [ ]; prior = null; complete = true; };
 in
 gen.inspect.mkInspector { inherit register relations declarations model; }

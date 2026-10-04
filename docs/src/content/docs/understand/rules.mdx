@@ -43,10 +43,7 @@ let
     ++ [ { head = "down:db-prod-west"; relata = [ "db-prod-west" ]; } ];
 
   acl = gen.program.model {
-    program = gen.program.program {
-      declarations = facts ++ reachRules;
-      frozen = builtins.attrNames hosts;
-    };
+    program = gen.program.program (builtins.attrNames hosts) (facts ++ reachRules);
     interpretation = [ ];
     prior = null;
     complete = true;

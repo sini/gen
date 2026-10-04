@@ -31,7 +31,7 @@ let
 
   declarations = facts ++ access;
   model = gen.program.model {
-    program = gen.program.program { inherit declarations; frozen = names; };
+    program = gen.program.program names declarations;
     interpretation = [ ];
     prior = null;
     complete = true;
@@ -40,7 +40,7 @@ in
 {
   web1ToDb1 = (model.resolve "reach:web-1:db-1").included;
   web2ToDb2 = (model.resolve "reach:web-2:db-2").included;
-  allowed = (gen.program.ruleEdges { inherit declarations model; }).reached;
+  allowed = (gen.program.ruleEdges model declarations).reached;
   outcome = model.adjudication.outcome;
 }
 ```
@@ -58,10 +58,10 @@ fact. An **atom** is one fact, such as `reach:web-1:db-1`. Its name is yours: ge
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Write a program | `program.program { declarations; frozen; }` | Collect rules `{ head; label?; pos?; neg?; relata; }` into one program |
+| Write a program | `program.program frozen declarations` | Collect rules `{ head; label?; pos?; neg?; relata; }` into one program |
 | Solve it | `program.model { program; interpretation; prior; complete; }` | Compute every atom's verdict |
 | Read a verdict | `.resolve atom`, `.trueAtoms`, `.falseAtoms`, `.undefinedAtoms`, `.withheldAtoms` | Ask about one atom, or list atoms by verdict |
-| Turn results into edges | `program.ruleEdges { declarations; model; }` | The edge of every labelled rule, and the ones whose head the model includes |
+| Turn results into edges | `program.ruleEdges model declarations` | The edge of every labelled rule, and the ones whose head the model includes |
 | Run passes | `prior = <previous model>` | Solve again after new rules arrive, with a check that no earlier rule was dropped |
 | Check stability | `.adjudication`, `adjudicate`, `stableModelBudget` | Decide whether the solution is a stable model, within a search budget |
 | Author rule bodies | `emit`, `forEach`, `body`, `rule`, `declaration` | Build rule bodies from data without evaluating them at registration |
@@ -77,13 +77,10 @@ The engine computes the well-founded model of the program. Each atom is true, fa
 fact settles it:
 
 ```nix
-gen.program.program {
-  frozen = [ "db-1" ];
-  declarations = [
-    { head = "primary:db-1"; neg = [ "replica:db-1" ]; relata = [ "db-1" ]; }
-    { head = "replica:db-1"; neg = [ "primary:db-1" ]; relata = [ "db-1" ]; }
-  ];
-}
+gen.program.program [ "db-1" ] [
+  { head = "primary:db-1"; neg = [ "replica:db-1" ]; relata = [ "db-1" ]; }
+  { head = "replica:db-1"; neg = [ "primary:db-1" ]; relata = [ "db-1" ]; }
+]
 # model.undefinedAtoms == [ "primary:db-1" "replica:db-1" ]
 # (model.resolve "primary:db-1").flag == "U"
 ```
@@ -125,12 +122,12 @@ settled before this program runs. A relatum missing from `frozen` fails with an 
 ### From atoms to edges
 
 A rule with a `label` denotes the edge `{ from = relata[0]; to = relata[1]; label; }`.
-`ruleEdges { declarations; model; }` returns two edge lists: `candidates`, the edge of every labelled
+`ruleEdges model declarations` returns two edge lists: `candidates`, the edge of every labelled
 rule, and `reached`, the candidates whose head the model includes. That is how `allowed` above is
 built. `reached` fails with an error on an undefined head rather than dropping the edge:
 
 ```nix
-(gen.program.ruleEdges { inherit declarations model; }).reached
+(gen.program.ruleEdges model declarations).reached
 # [ { from = "web-1"; label = "reach"; to = "db-1"; } ]
 ```
 

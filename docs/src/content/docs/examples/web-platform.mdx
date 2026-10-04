@@ -74,13 +74,13 @@ let
   declarations = facts ++ rules;
   model = program.model {
     prior = null;
-    program = program.program { frozen = names; inherit declarations; };
+    program = program.program names declarations;
     interpretation = [ ];
     complete = true;
   };
 
   # (4) the edge of every labelled rule whose head the model includes
-  acl = (program.ruleEdges { inherit declarations model; }).reached;
+  acl = (program.ruleEdges model declarations).reached;
 
   # (5) query the result as a graph
   g = {
