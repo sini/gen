@@ -697,22 +697,26 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # row then has no result. No linearity gate: the complete relation has n² edges, so the walk is
 # quadratic in n by the fixture, and only a same-n ratio can see a regression.
 #
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (kindMatch's convention). ANCHOR — the measured ratio at the
-# landing: hub `perf-bench` app, Nix 2.34.8, gen-scope `cd653a2`, frozen gen-graph `0db4e737`. Raw
-# thunks resolve / query-orig: n=4 2,364 / 1,237 · 5 2,532 / 1,433 · 6 2,722 / 1,669 · 7 2,934 / 1,945 ·
-# 100 118,812 / 202,453 · 1000 11,070,912 / 20,016,853. The small sizes read above 1 because the
-# lift and the WFL's construction are a constant the frozen `query` does not pay; from n = 100 the
-# walk is the cheaper. witnesses: 3,451 / 8,441 / 36,181 / 217,231 at n = 4..7 (6 → 7: ×6.004).
+# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (kindMatch's convention). ANCHOR — the measured ratio at
+# gen-scope `32e39c0` (gayc-u2e, the revision this hub pins): hub `perf-bench` app, Nix 2.34.8, frozen
+# gen-graph `0db4e737`. Raw thunks resolve / query-orig: n=4 2,368 / 1,237 · 5 2,537 / 1,433 · 6 2,728
+# / 1,669 · 7 2,941 / 1,945 · 100 118,912 / 202,453 · 1000 11,071,912 / 20,016,853. The small sizes
+# read above 1 because the lift and the WFL's construction are a constant the frozen `query` does not
+# pay; from n = 100 the walk is the cheaper. witnesses: 3,467 / 8,506 / 36,507 / 219,188 at n = 4..7
+# (6 → 7: ×6.004). RE-ANCHORED (den-hoag-gayc U2d): the row landed anchored at gen-scope `cd653a2`
+# (U2b), and gen-scope `32e39c0` (U2e, the converse) costs `resolve` one thunk per node more
+# (n=4..7 +4..+7, n=100 +100, n=1000 +1,000), which crossed the n = 4..7 bounds by +0.003..+0.004;
+# the same hub with gen-scope at `cd653a2` passes every gate, the same run.
 # WHAT IT CANNOT SEE: anything that makes `resolve` CHEAPER (one-sided), and the `visible` and
 # `witnesses` modes' own cost (only `reachable` is gated). Re-derive with `nix run ./ci#perf-bench`.
 RESOLUTION_SIZES=(4 5 6 7 100 1000)
 RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
 RESOLUTION_WITNESSES_GROWTH_MIN=3.0
 declare -A RESOLUTION_THUNKS_MAX
-RESOLUTION_THUNKS_MAX[4]=1.911
-RESOLUTION_THUNKS_MAX[5]=1.767
-RESOLUTION_THUNKS_MAX[6]=1.631
-RESOLUTION_THUNKS_MAX[7]=1.508
+RESOLUTION_THUNKS_MAX[4]=1.914
+RESOLUTION_THUNKS_MAX[5]=1.770
+RESOLUTION_THUNKS_MAX[6]=1.635
+RESOLUTION_THUNKS_MAX[7]=1.512
 RESOLUTION_THUNKS_MAX[100]=0.587
 RESOLUTION_THUNKS_MAX[1000]=0.553
 
