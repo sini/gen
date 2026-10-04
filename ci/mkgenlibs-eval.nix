@@ -174,10 +174,34 @@ let
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the reverse-import gather, now the converse is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
     }
+    {
+      member = "graph";
+      binding = "query";
+      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): the labeled walk is gen-scope `resolve` over an evaluated scope (modes `all` / `paths` / `visible` are `reachable` / `witnesses` / `visible`), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "graph";
+      binding = "regex";
+      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): a label expression is gen-scope `wellFormed`, built from a string or the published `wfl` constructors; the derivative engine is unpublished, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "graph";
+      binding = "labeledFrom";
+      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): a graph to resolve over is lifted into a gen-scope evaluated scope, and a labeled record kept for `forgetLabels` / `labeledTranspose` / `cyclicEdgesWhere` is written as data, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "graph";
+      binding = "boundedBy";
+      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): boundary marks are read inside gen-scope `resolve` (each node declares `marks`, `bound` narrows, `withheld` names the mark), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 14;
+  retirementWidth = 18;
 
   ruledRetirement =
     let
@@ -468,7 +492,13 @@ let
     # gen-graph 4649d8390b → 04993c2228 (den-hoag-gayc U1a): the surface gained ONE name, `key`, the
     # key formers with the refusal prefix a parameter, which gen-scope's calculus binds. Nothing was
     # removed.
-    graph = "b55b373788a1dd20a903d0d80e0ac6b866aab3148aa0605923d02b7433b39ffe";
+    #
+    # gen-graph ce977b5576 → ab81c86405 (den-hoag-gayc U3, gen-graph leaves the resolution
+    # calculus): the surface lost SEVEN names, `queryArrivals`, `queryFold`, `ranksOf`, `rankOf`,
+    # `rankWordOf`, `wordLess` and `pathLess`, which had no caller; `query`, `regex`, `labeledFrom`
+    # and `boundedBy` became registered tombstones (retirementEntries above), so they are still
+    # published names. Nothing was added.
+    graph = "5d5ead1bc3b5cb92c788d0468fc90e0bf95908ba4922d39b893d21ce9dcd2041";
     identity = "ae39363fd50eb2100013362d3d43563146bf24fe8539675c8e8a944d62eaa201";
     # gen-inspect, the roster's 22nd member and the 4th at `framework`: the library that
     # interrogates a materialized graph. Its surface is 13 names — the IR construction and its

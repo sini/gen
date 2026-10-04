@@ -108,7 +108,7 @@ dependencies, so there is nothing to wire:
       genGraph = gen-graph.lib;
     in
     {
-      # … use genGraph.query / genGraph.phaseOrder / … directly
+      # … use genGraph.condensation / genGraph.phaseOrder / … directly
     };
 }
 ```
