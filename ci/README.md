@@ -91,7 +91,10 @@ catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule
 registries), `threadedRegistry` (the same registry over nixpkgs `attrsWith` with a non-default
 `placeholder`, a container outside the six gen-merge re-homes, so the pure stack folds through
 gen-merge's threaded rebuild channel; its arming plant must fire on the pure arm only), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
-of the digest — the ADR-0016 excluded axis), `aspects` (gen-aspects tree with flatten),
+of the digest — the ADR-0016 excluded axis), `inheritHosts` (the same shape with a host kind inheriting
+two parents by name, on both gen-schema entry arms: the desugared parents ride every instance's module
+list, so an `inherits` change is priced per instance; pure-only, since the frozen reference predates
+`inherits`), `aspects` (gen-aspects tree with flatten),
 `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
 keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
