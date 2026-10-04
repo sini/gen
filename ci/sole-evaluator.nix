@@ -258,8 +258,13 @@ let
       cause = "a FROZEN PRIOR REVISION of roster member `graph`, held as the perf-bench resolution row's denominator so the gated ratio reads the live gen-scope `resolve` against a fixed `query`. Scanning it would read one library twice, the second time at a revision no consumer gets";
       carrier = "the gen-graph-orig declaration in ci/flake.nix";
     }
+    {
+      resolved = "gen-prelude-orig";
+      cause = "a FROZEN PRIOR REVISION of roster member `prelude`, the one gen-graph-orig's own lock pins, supplied to gen-graph-orig alone so the perf-bench resolution row's denominator is frozen in full. Scanning it would read one library twice, the second time at a revision no consumer gets";
+      carrier = "the gen-prelude-orig declaration in ci/flake.nix";
+    }
   ];
-  registerWidth = 4;
+  registerWidth = 5;
   mkRegister = mkRuledSet {
     label = "out-of-domain register";
     keyField = "resolved";
