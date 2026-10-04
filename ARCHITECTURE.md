@@ -80,7 +80,6 @@ flowchart TD
   gen_assemble --> gen_prelude
   gen_assemble --> gen_scope
   gen_bind --> gen_algebra
-  gen_bind --> gen_graph
   gen_bind --> gen_prelude
   gen_class --> gen_merge
   gen_class --> gen_prelude
