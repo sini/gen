@@ -155,7 +155,7 @@ let
   #     not open INSIDE a tree it does scan.
   #
   # ★ THE THREE WIDTHS ARE PINNED TO DIFFERENT AUTHORITIES. The exception set's is pinned to a RULING
-  # (opened empty; 8 as of the 2026-09-08 graph ruling, den-hoag-1n3tw) and the exclusion's to a
+  # (opened empty; 8 as of the 2026-09-08 graph ruling, den-hoag-1n3tw; 5 after the gate den-hoag-be0bt re-key) and the exclusion's to a
   # RULING. THE REGISTER'S IS PINNED TO A MEASUREMENT — it
   # is 3 because 3 is what the lock resolves outside the roster today, and `domain-total` exists
   # precisely so that number can move when the lock moves. A register entry appearing or leaving is a
@@ -203,13 +203,25 @@ let
   # `genericClosure` calls over an ALREADY-MATERIALIZED id/edge graph (ancestors/descendants/query
   # traversals), not Nix-expression evaluation to a semantic fixpoint — ADR-0008 §3 separately
   # licenses graph-native analysis queries over the graph the engine already exposes. The set is
-  # keyed by SITE (`classOf` admits exactly the `file:line` an entry names; `site` is a required
-  # field), so all 8 entries carry `tree = "graph"` and a NEW construct appearing anywhere else in
-  # gen-graph is refused, not swept in by the same ruling. A site is a line number, so a gen-graph
-  # edit that moves a ruled construct makes it read refused until a ruling re-names it.
+  # keyed by ENCLOSING BINDING (`classOf` admits a site only when `bindingOfSite` names the
+  # `<file>/<binding>` an entry carries; `site` is a required field), so all entries carry
+  # `tree = "graph"` and a NEW construct appearing in any other binding of gen-graph is refused,
+  # not swept in by the same ruling. A binding survives a gen-graph edit that moves its lines; an
+  # entry that matches NO live site reds the `ruled-sites-live` key by name, so a retired binding
+  # cannot keep a ruling alive silently. The binding is the top-level `name =` (the file's least
+  # indented binding line) that precedes the call.
+  #
+  # ★ WIDTH 8 → 5 (gate den-hoag-be0bt, gen-graph 7db46c8). The 2026-09-08 entries were line-keyed
+  # at gen-graph efa3b01; four of those sites moved and three died. Succession, by binding and code:
+  #   lib/global.nix:161     dependentsFrontier             → global.nix `dependentsFrontier`
+  #   lib/traverse.nix:47    reachableFrom                  → traverse.nix `reachableFromAs` (:88)
+  #   lib/traverse.nix:88    canReach                       → traverse.nix `canReachAs` (:165)
+  #   lib/traverse.nix:100   selfReachable                  → traverse.nix `selfReachable` (:200)
+  #   lib/traverse.nix:267   closureVia                     → traverse.nix `closureVia` (:438)
+  #   lib/query.nix:274 :359 :466   DROPPED — `query.nix` was retired by gayc U3 (one calculus).
   exceptionEntries =
     let
-      graphCause = "ADR-0008 §3 graph-native analysis query over a materialized graph; owner-ruled 2026-09-08 (den-hoag-1n3tw)";
+      graphCause = "ADR-0008 §3 graph-native analysis query over a materialized graph; owner-ruled 2026-09-08 (den-hoag-1n3tw); counted per engine, not per call site (den-hoag-0pk67)";
       graphCarrier = "den-hoag-1n3tw";
       graphSite = site: {
         tree = "graph";
@@ -219,16 +231,13 @@ let
       };
     in
     map graphSite [
-      "lib/global.nix:161"
-      "lib/query.nix:274"
-      "lib/query.nix:359"
-      "lib/query.nix:466"
-      "lib/traverse.nix:47"
-      "lib/traverse.nix:88"
-      "lib/traverse.nix:100"
-      "lib/traverse.nix:267"
+      "lib/global.nix/dependentsFrontier"
+      "lib/traverse.nix/reachableFromAs"
+      "lib/traverse.nix/canReachAs"
+      "lib/traverse.nix/selfReachable"
+      "lib/traverse.nix/closureVia"
     ];
-  exceptionWidth = 8;
+  exceptionWidth = 5;
   mkExceptionSet = mkRuledSet {
     label = "exception set";
     keyField = "tree";
@@ -873,7 +882,34 @@ let
     {
       inherit name raw kept;
       code = builtins.concatStringsSep "\n" kept;
+      # Lazy: only a file with a hit that reaches `bindingOfSite` ever pays for it.
+      bindings = topBindings kept;
     };
+
+  # The top-level bindings of a stripped file: every `name =` line at the file's LEAST indent among
+  # binding lines. A call's enclosing binding is the last of these at or above its line, so the key
+  # survives any edit that moves lines without renaming the binding.
+  # ponytail: indent heuristic, not a parse; a file whose top level is not its least-indented
+  # `name =` run would need a real parser.
+  topBindings =
+    kept:
+    let
+      parsed = lib.concatLists (
+        lib.imap1 (
+          line: l:
+          let
+            m = builtins.match "( *)([A-Za-z_][A-Za-z0-9_'.-]*) *=([^=].*)?" l;
+          in
+          lib.optional (m != null) {
+            inherit line;
+            indent = builtins.stringLength (builtins.elemAt m 0);
+            name = builtins.elemAt m 1;
+          }
+        ) kept
+      );
+      least = lib.foldl' (a: b: if b.indent < a then b.indent else a) 1000000 parsed;
+    in
+    builtins.filter (b: b.indent == least) parsed;
 
   # THE SOURCE READER, the parameter every seeded world below substitutes for.
   trueFiles = t: map (n: prep n (builtins.readFile (t.src + "/${n}"))) (namesIn t);
@@ -957,9 +993,38 @@ let
   # THE EXCEPTION IS KEYED BY SITE: a ruled entry admits exactly the `file:line` it names, so a
   # construct appearing anywhere else in an excepted tree is refused rather than swept in by the
   # tree's membership.
-  isRuledSite = k: s: builtins.any (x: x.tree == k && x.site == s) ruledException;
-  unruledSites = world: k: builtins.filter (s: !(isRuledSite k s)) world.${k}.sites;
-  ruledSitesIn = world: k: builtins.filter (isRuledSite k) world.${k}.sites;
+  # `<file>/<binding>` of a `file:line` site, read from the file the world holds under that name;
+  # `<top>` for a hit above every top-level binding.
+  bindingOfSite =
+    world: k: s:
+    let
+      m = builtins.match "(.*):([0-9]+)" s;
+      file = builtins.elemAt m 0;
+      line = lib.toInt (builtins.elemAt m 1);
+      f = lib.findFirst (x: x.name == file) null world.${k}.files;
+      above = builtins.filter (b: b.line <= line) f.bindings;
+    in
+    "${file}/${if above == [ ] then "<top>" else (lib.last above).name}";
+  isRuledSite =
+    world: k: s:
+    let
+      b = bindingOfSite world k s;
+    in
+    builtins.any (x: x.tree == k && x.site == b) ruledException;
+  unruledSites = world: k: builtins.filter (s: !(isRuledSite world k s)) world.${k}.sites;
+  ruledSitesIn = world: k: builtins.filter (isRuledSite world k) world.${k}.sites;
+
+  # A ruled entry that no live site of its tree sits in is DEAD (its binding was renamed or its
+  # file retired) and reads as a message, one per entry, never as silence.
+  deadRuledOf =
+    world: entries:
+    map (x: "ruled exception ${x.site} matches no live site") (
+      builtins.filter (
+        x:
+        !(world ? ${x.tree})
+        || !(builtins.any (s: bindingOfSite world x.tree s == x.site) world.${x.tree}.sites)
+      ) entries
+    );
 
   classOf =
     world: ev: k:
@@ -1305,6 +1370,7 @@ let
   liveRefusedKeys = inClass "refused" liveWorld evaluatorKey scannedKeys;
   liveExceptedKeys = inClass "excepted" liveWorld evaluatorKey scannedKeys;
   liveRuledKeys = builtins.filter (k: ruledSitesIn liveWorld k != [ ]) scannedKeys;
+  liveDeadRuled = deadRuledOf liveWorld ruledException;
   liveUnreadable = inClass "unreadable" liveWorld evaluatorKey scannedKeys;
   liveTally = tally liveWorld evaluatorKey scannedKeys;
   accounted = accountedIn liveWorld evaluatorKey scannedKeys;
@@ -1365,13 +1431,30 @@ let
     };
     seededEntrySets = entrySetArms;
     seededSiteKeyed = {
-      plantedSite = "lib/traverse.nix:2";
+      plantedBinding = siteKeyedBinding;
       plantedClass = classOf siteKeyedSeed evaluatorKey "graph";
-      plantedUnruled = builtins.filter (x: !(builtins.elem x (unruledSites liveWorld "graph"))) (
-        unruledSites siteKeyedSeed "graph"
+      plantedUnruled = map (bindingOfSite siteKeyedSeed "graph") (
+        builtins.filter (x: !(builtins.elem x (unruledSites liveWorld "graph"))) (
+          unruledSites siteKeyedSeed "graph"
+        )
       );
-      liveRuledSite = isRuledSite "graph" "lib/traverse.nix:88";
-      liveRuledAdmitted = builtins.elem "lib/traverse.nix:88" (ruledSitesIn liveWorld "graph");
+      liveRuledBindings = map (bindingOfSite liveWorld "graph") (ruledSitesIn liveWorld "graph");
+      plantedRuledBindings = map (bindingOfSite siteKeyedSeed "graph") (
+        ruledSitesIn siteKeyedSeed "graph"
+      );
+      # A blank line above every ruled binding moves each line number and no binding.
+      shiftMoved = ruledSitesIn shiftSeed "graph" != ruledSitesIn liveWorld "graph";
+      shiftedRuledBindings = map (bindingOfSite shiftSeed "graph") (ruledSitesIn shiftSeed "graph");
+      shiftedUnruled = builtins.length (unruledSites shiftSeed "graph");
+      liveUnruled = builtins.length (unruledSites liveWorld "graph");
+    };
+    seededRuledLive = {
+      live = liveDeadRuled;
+      planted = deadRuledOf liveWorld [
+        deadEntry
+        liveEntry
+      ];
+      expected = [ "ruled exception ${deadEntry.site} matches no live site" ];
     };
     seededIdentBoundary = {
       sites = hitsIn criterion identBoundaryPlant;
@@ -1422,13 +1505,36 @@ let
   # gen-graph's own ruled file `lib/traverse.nix` at a line no entry names (line 2): it must read
   # `refused`, where the tree-keyed set admitted it. The live control, same run: the ruled site
   # `lib/traverse.nix:88` is still admitted in the live world.
-  siteKeyedPlant = prep "lib/traverse.nix" "{ }:\nbuiltins.genericClosure { }\n";
-  siteKeyedSeed = {
-    graph = {
-      files = liveWorld.graph.files ++ [ siteKeyedPlant ];
-      sites = liveWorld.graph.sites ++ hitsIn criterion siteKeyedPlant;
-      hitFiles = [ ];
+  siteKeyedBinding = "lib/traverse.nix/armPlant";
+  traverseFile = lib.findFirst (f: f.name == "lib/traverse.nix") null liveWorld.graph.files;
+  traverseText = lib.concatStringsSep "\n" traverseFile.raw;
+  # The graph tree with `lib/traverse.nix` replaced by `text`, its sites re-scanned.
+  withTraverse =
+    text:
+    let
+      files = (builtins.filter (f: f.name != "lib/traverse.nix") liveWorld.graph.files) ++ [
+        (prep "lib/traverse.nix" text)
+      ];
+    in
+    {
+      graph = {
+        inherit files;
+        sites = lib.concatMap (hitsIn criterion) files;
+        hitFiles = [ ];
+      };
     };
+  siteKeyedSeed = withTraverse "${traverseText}\n  armPlant = builtins.genericClosure { };\n";
+  shiftSeed = withTraverse "\n${traverseText}";
+  # Independent of the live ruled set: one entry no site sits in, and one entry naming the binding of a
+  # live site (the control — it must NOT be reported).
+  liveEntry = deadEntry // {
+    site = bindingOfSite liveWorld "graph" (lib.head liveWorld.graph.sites);
+  };
+  deadEntry = {
+    tree = "graph";
+    site = "lib/query.nix/armGone";
+    cause = "arming";
+    carrier = "arming";
   };
   # Line 1 is a data identifier containing a token (no hit), 2 the token beside it (hit), 3 an
   # engine entry point whose name extends the token (hit).
@@ -1514,10 +1620,18 @@ let
     # longer non-construct identifier is not a hit.
     site-keyed-exception =
       arming.seededSiteKeyed.plantedClass == "refused"
-      && arming.seededSiteKeyed.plantedUnruled == [ arming.seededSiteKeyed.plantedSite ]
-      && arming.seededSiteKeyed.liveRuledSite
-      && arming.seededSiteKeyed.liveRuledAdmitted
+      && arming.seededSiteKeyed.plantedUnruled == [ arming.seededSiteKeyed.plantedBinding ]
+      && arming.seededSiteKeyed.liveRuledBindings != [ ]
+      && arming.seededSiteKeyed.plantedRuledBindings == arming.seededSiteKeyed.liveRuledBindings
+      && arming.seededSiteKeyed.shiftMoved
+      && arming.seededSiteKeyed.shiftedRuledBindings == arming.seededSiteKeyed.liveRuledBindings
+      && arming.seededSiteKeyed.shiftedUnruled == arming.seededSiteKeyed.liveUnruled
       && arming.seededIdentBoundary.sites == arming.seededIdentBoundary.expected;
+
+    # O12 — A RULED ENTRY MATCHES A LIVE SITE. Reads: no entry of the exception set is dead. Armed: a
+    # planted entry naming a binding no site sits in is reported by name, and the live set is clean.
+    ruled-sites-live =
+      liveDeadRuled == [ ] && arming.seededRuledLive.planted == arming.seededRuledLive.expected;
 
     # O9 — A NAME BEING BOUND IS NOT AN EVALUATION. An `inherit` clause's names must stop matching
     # in all three of its surface forms, and a DEFINITION, an `inherit ( … )` source expression and
@@ -1564,7 +1678,8 @@ let
       && strip-sound
       && binding-position-sound
       && comment-state-sound
-      && site-keyed-exception;
+      && site-keyed-exception
+      && (arming.seededRuledLive.planted == arming.seededRuledLive.expected);
   };
 in
 {
@@ -1603,6 +1718,7 @@ in
 
     exceptionWidthRuled = exceptionWidth;
     exceptionSet = ruledException;
+    deadRuledEntries = liveDeadRuled;
     registerWidthRuled = registerWidth;
     outOfDomainRegister = ruledRegister;
     exclusionWidthRuled = exclusionWidth;
