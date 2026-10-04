@@ -1324,7 +1324,10 @@ let
   #   resolve    : the LIVE gen-scope `resolve`, mode `reachable` (the walk law, a closure over
   #                ⟨node, derivative state⟩), over the same relation LIFTED to an evaluated scope
   #                (`edges-peer`, and `marks = _: _: [ ]`, gen-authored and stated). Its projection
-  #                must equal query-orig's byte for byte: the answer's nodes, in walk order.
+  #                must equal query-orig's byte for byte: the answer's nodes, SORTED. Both sides
+  #                sort, so the gate checks the reachable SET (owner ruling 15, 2026-10-04,
+  #                den-hoag-4or0a U0): query-orig answers in codepoint order and resolve in
+  #                first-reach order, and gen-scope's own order cell pins the latter.
   #   witnesses  : the same lift under mode `witnesses` (the acyclic-path law, NR-Cons), which
   #                enumerates every simple path — factorial in n on this fixture. THE LIVE CONTROL:
   #                perf-bench.sh runs it at n ≤ 7 only (it never returns at n = 100, gate P2) and
@@ -1350,13 +1353,15 @@ let
           } lifted "h0").answers;
     in
     if stack == "query-orig" then
-      genGraphOrig.query { mode = "all"; } {
-        graph = genGraphOrig.labeledFrom { peer = _: keys; } keys;
-        from = "h0";
-        follow = genGraphOrig.regex.parse "peer*";
-      }
+      builtins.sort builtins.lessThan (
+        genGraphOrig.query { mode = "all"; } {
+          graph = genGraphOrig.labeledFrom { peer = _: keys; } keys;
+          from = "h0";
+          follow = genGraphOrig.regex.parse "peer*";
+        }
+      )
     else if stack == "resolve" then
-      walk "reachable"
+      builtins.sort builtins.lessThan (walk "reachable")
     else if stack == "witnesses" then
       walk "witnesses"
     else
