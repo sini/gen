@@ -253,8 +253,13 @@ let
       cause = "a FROZEN PRIOR REVISION of roster member `select`, held as the perf-bench kindMatch row's denominator so the gated ratio reads the live gen-select against a fixed baseline. Scanning it would read one library twice, the second time at a revision no consumer gets";
       carrier = "the gen-select-orig declaration in ci/flake.nix";
     }
+    {
+      resolved = "gen-graph-orig";
+      cause = "a FROZEN PRIOR REVISION of roster member `graph`, held as the perf-bench resolution row's denominator so the gated ratio reads the live gen-scope `resolve` against a fixed `query`. Scanning it would read one library twice, the second time at a revision no consumer gets";
+      carrier = "the gen-graph-orig declaration in ci/flake.nix";
+    }
   ];
-  registerWidth = 3;
+  registerWidth = 4;
   mkRegister = mkRuledSet {
     label = "out-of-domain register";
     keyField = "resolved";

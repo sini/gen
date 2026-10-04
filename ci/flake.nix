@@ -82,6 +82,15 @@
       url = "github:sini/gen-select/9285b5b8264a779894dd79e00fa0fe7683a9ffaf";
       flake = false;
     };
+    # ── REFERENCE side for perf-bench `resolution`: FROZEN gen-graph (den-hoag-gayc U2b) ──
+    # The row's denominator. `0db4e737` is the last gen-graph before resolution moved into gen-scope's
+    # one calculus (design §5.8), so the ratio reads the live `resolve` against a `query` no relock
+    # moves. A PERMANENT pin like the two above: do NOT sweep it forward. `flake = false` because the
+    # bench imports `/lib` with the environment's own `prelude`, so its lock closure is never read.
+    gen-graph-orig = {
+      url = "github:sini/gen-graph/0db4e73708f356024121336fcad1230ba0aed8d4";
+      flake = false;
+    };
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
     # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
     nixpkgs-lib.url = "github:nix-community/nixpkgs.lib/db3f255737b94216eb71cce308e2912cf6bc2d7c";
@@ -1036,6 +1045,7 @@
               "gen-graph" = "${genInputs.gen-graph}";
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
               "gen-select-orig" = "${inputs.gen-select-orig}";
+              "gen-graph-orig" = "${inputs.gen-graph-orig}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';
@@ -1047,7 +1057,7 @@
           # is recoverable from a store path and `genInputs.gen-X` does not carry its own URL, so
           # both are read out of the lock that pinned them — resolved BY PATH from the root, never by
           # node label, because a lock carries duplicate-named nodes (`gen-merge_4`). The `axis`
-          # field is what lets the app refuse `--at` on the three REFERENCE keys by name: a ratio's
+          # field is what lets the app refuse `--at` on the four REFERENCE keys by name: a ratio's
           # denominator is its control, and if both arms float a moved ratio is unattributable.
           ciLock = builtins.fromJSON (builtins.readFile ./flake.lock);
           perfMemberKeys = [
@@ -1067,6 +1077,7 @@
           perfRefKeys = [
             "gen-schema-orig"
             "gen-select-orig"
+            "gen-graph-orig"
             "nixpkgs-lib"
           ];
           # A MEMBER is read from the ROOT lock, the pin set `gen` resolves through; a REFERENCE key
