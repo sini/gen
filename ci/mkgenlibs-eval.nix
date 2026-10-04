@@ -195,7 +195,7 @@ let
     {
       member = "graph";
       binding = "boundedBy";
-      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): boundary marks are read inside gen-scope `resolve` (each node declares `marks`, `bound` narrows, `withheld` names the mark), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): boundary marks are read inside gen-scope `resolve` (each node declares `marks`, `bound` narrows, `withheld` names the mark, at the scopes `resolve` reached: a gen-graph `withheld` answered graph-total, including an edge withheld at a node the walk never visited, and gen-scope's does not), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
     }
   ];

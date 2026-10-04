@@ -30,21 +30,23 @@ let
   follow = label: id:
     map (e: e.to) (builtins.filter (e: e.label == label && e.from == id) edges);
 
-  fleet = gen.graph.labeledFrom {
-    user = follow "user";
-    feature = follow "feature";
-    includes = follow "includes";
-  } nodes;
-
-  inherit (gen.graph) regex;
+  # An evaluated scope: each label `l` is read from the attribute `edges-l`.
+  scope = gen.scope;
+  fleet = scope.eval { parseParent = _: null; } {
+    children = _: _: { };
+    imports = _: _: [ ];
+    marks = _: _: [ ];
+    edges-user = _: follow "user";
+    edges-feature = _: follow "feature";
+    edges-includes = _: follow "includes";
+  } (scope.buildRoots { parentGraph = scope.overlays (map scope.vertex nodes); decls = { }; });
 in
 {
   # Which features does web-1 get, counting what each feature includes?
-  web1Features = gen.graph.query { } {
-    graph = fleet;
-    from = "web-1";
-    follow = regex.seq [ (regex.lit "feature") (regex.star (regex.lit "includes")) ];
-  };
+  web1Features = map (a: a.node) (scope.resolve {
+    wf = scope.wellFormed { alphabet = [ "user" "feature" "includes" ]; expression = "feature includes*"; };
+    dataFilter = n: n.id;
+  } fleet "web-1").answers;
 
   # Which hosts have the dba account?
   dbaHosts = gen.graph.dependents { } {
@@ -61,9 +63,9 @@ in
 ## How a question is asked
 
 The first query reads as a sentence: start at `web-1`, follow one `feature` edge, then follow any
-number of `includes` edges. The `follow` argument is a regular expression over edge labels.
-`regex.lit` matches one label, `regex.seq` matches labels in order, and `regex.star` matches zero or
-more repeats. The answer is every node at the end of a matching path.
+number of `includes` edges. The `wellFormed` expression is a regular expression over edge labels:
+a label matches itself, labels written in order match in order, and `*` matches zero or more
+repeats. `resolve` answers every node at the end of a matching path.
 
 The second query walks edges backwards. `dependents` returns every node that can reach `dba`,
 which in the `user` relation means every host that has the account.
