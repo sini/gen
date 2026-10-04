@@ -687,17 +687,19 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # own lock pins (`gen-prelude-orig`, `c471c9a`), never the live one, so a prelude change can move only
 # the numerator.
 #
-# GATES. (1) BYTE, every n: resolve's projection (the answer's nodes, in walk order) equals
-# query-orig's. (2) RATIO, THUNKS ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and
-# gated by nothing: at n = 4..7 a cell allocates 75–211 KB, so allocation's ~2.5 KB run-to-run jitter
-# is over 1% and crosses a printed step. (3) ARMING, every run: the `witnesses` arm (mode `witnesses`,
-# the acyclic-path law, which enumerates every simple path and is factorial in n here) at n = 4..7
-# only — it never returns at n = 100 (gate P2) — must step 6 → 7 by at least
-# RESOLUTION_WITNESSES_GROWTH_MIN and by more than resolve's own 6 → 7 step. A polynomial of degree d
-# steps 6 → 7 by (7/6)^d, so ×3 needs d ≥ 7.1: the floor separates enumeration from every walk this
-# row could regress to. A control that does not read super-linear is a broken instrument, and the
-# row then has no result. No linearity gate: the complete relation has n² edges, so the walk is
-# quadratic in n by the fixture, and only a same-n ratio can see a regression.
+# GATES. (1) BYTE, every n: resolve's projection (the answer's nodes, sorted) equals query-orig's
+# (sorted): a SET-parity gate (owner ruling 15, 2026-10-04, den-hoag-4or0a U0), since resolve
+# answers in first-reach order and gen-scope's own order cell pins that order. (2) RATIO, THUNKS
+# ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and gated by nothing: at n = 4..7
+# a cell allocates 75–211 KB, so allocation's ~2.5 KB run-to-run jitter is over 1% and crosses a
+# printed step. (3) ARMING, every run: the `witnesses` arm (mode `witnesses`, the acyclic-path law,
+# which enumerates every simple path and is factorial in n here) at n = 4..7 only — it never returns
+# at n = 100 (gate P2) — must step 6 → 7 by at least RESOLUTION_WITNESSES_GROWTH_MIN and by more
+# than resolve's own 6 → 7 step. A polynomial of degree d steps 6 → 7 by (7/6)^d, so ×3 needs d ≥
+# 7.1: the floor separates enumeration from every walk this row could regress to. A control that
+# does not read super-linear is a broken instrument, and the row then has no result. No linearity
+# gate: the complete relation has n² edges, so the walk is quadratic in n by the fixture, and only a
+# same-n ratio can see a regression.
 #
 # BOUND = ANCHOR + MARGIN, MARGIN 0.000 (kindMatch's convention). ANCHOR — the measured ratio at
 # gen-scope `32e39c0` (gayc-u2e, the revision this hub pins): hub `perf-bench` app, Nix 2.34.8, frozen
@@ -1193,7 +1195,7 @@ for n in "${RESOLUTION_SIZES[@]}"; do
     RS_BG[$n]="ok"
   else
     RS_BG[$n]="MISMATCH"
-    FAILURES+=("resolution byte gate: n=$n expected(query-orig)=${den:-<none>} actual(resolve)=${num:-<none>} — resolve reached a different node set, or the same set in a different order")
+    FAILURES+=("resolution byte gate: n=$n expected(query-orig)=${den:-<none>} actual(resolve)=${num:-<none>} — resolve reached a different node set (both sides are sorted, so order is not compared)")
   fi
   RS_TR[$n]=$(ratio "${THUNKS[resolution,$n,resolve]}" "${THUNKS[resolution,$n,query-orig]}")
   RS_AR[$n]=$(ratio "${ALLOC[resolution,$n,resolve]}" "${ALLOC[resolution,$n,query-orig]}")
