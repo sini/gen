@@ -202,12 +202,11 @@ let
   # ★ POPULATED 2026-09-08 (owner-ruled, den-hoag-1n3tw): gen-graph's 8 `genericClosure` sites are
   # `genericClosure` calls over an ALREADY-MATERIALIZED id/edge graph (ancestors/descendants/query
   # traversals), not Nix-expression evaluation to a semantic fixpoint — ADR-0008 §3 separately
-  # licenses graph-native analysis queries over the graph the engine already exposes. The set's
-  # own key is TREE, not site (that is the shape this constructor supports — see the "THE RULED
-  # ENTRY SETS" note above), so all 8 entries carry `tree = "graph"`; each still names its exact
-  # site so a NEW construct appearing anywhere else in gen-graph is not silently swept in by the
-  # same ruling — a reader auditing this list against a future refusal compares by `site`, not by
-  # tree membership alone.
+  # licenses graph-native analysis queries over the graph the engine already exposes. The set is
+  # keyed by SITE (`classOf` admits exactly the `file:line` an entry names; `site` is a required
+  # field), so all 8 entries carry `tree = "graph"` and a NEW construct appearing anywhere else in
+  # gen-graph is refused, not swept in by the same ruling. A site is a line number, so a gen-graph
+  # edit that moves a ruled construct makes it read refused until a ruling re-names it.
   exceptionEntries =
     let
       graphCause = "ADR-0008 §3 graph-native analysis query over a materialized graph; owner-ruled 2026-09-08 (den-hoag-1n3tw)";
@@ -234,6 +233,7 @@ let
     label = "exception set";
     keyField = "tree";
     width = exceptionWidth;
+    extraRequired = [ "site" ];
   };
   ruledException = mkExceptionSet exceptionEntries;
 
@@ -892,6 +892,26 @@ let
   #
   # The whole-file test gates the per-line one: the file-level pass is one linear comparison per
   # token per file, and only a file that hits pays for line positions.
+  # A criterion token is a substring family (`evalModuleTreeUnchecked`, `evalModuleTreeWith` are
+  # the engine's own entry points and stay matched), but a WHOLE identifier that merely contains a
+  # token and is not a construct is blanked first, at identifier boundaries: `evalModuleTreeOptions`
+  # is gen-merge's list of option-set DATA, not an evaluation. Nix identifiers continue with
+  # letters, digits, `_`, `'` and `-`. The infix test stays as the cheap prefilter.
+  notConstruct = [ "evalModuleTreeOptions" ];
+  blankIdent =
+    id: line:
+    lib.concatStrings (
+      map (p: if builtins.isList p then " " else p) (
+        builtins.split "(^|[^A-Za-z0-9_'-])${id}($|[^A-Za-z0-9_'-])" line
+      )
+    );
+  hasToken =
+    tok: line:
+    hasInfix tok line
+    && hasInfix tok (
+      builtins.foldl' (l: id: if hasInfix id l then blankIdent id l else l) line notConstruct
+    );
+
   hitsIn =
     crit: f:
     if !(builtins.any (tok: hasInfix tok f.code) crit) then
@@ -899,7 +919,7 @@ let
     else
       lib.concatLists (
         lib.imap1 (
-          i: kept: lib.optional (builtins.any (tok: hasInfix tok kept) crit) "${f.name}:${toString i}"
+          i: kept: lib.optional (builtins.any (tok: hasToken tok kept) crit) "${f.name}:${toString i}"
         ) f.kept
       );
 
@@ -934,6 +954,13 @@ let
       ) scanned
     );
 
+  # THE EXCEPTION IS KEYED BY SITE: a ruled entry admits exactly the `file:line` it names, so a
+  # construct appearing anywhere else in an excepted tree is refused rather than swept in by the
+  # tree's membership.
+  isRuledSite = k: s: builtins.any (x: x.tree == k && x.site == s) ruledException;
+  unruledSites = world: k: builtins.filter (s: !(isRuledSite k s)) world.${k}.sites;
+  ruledSitesIn = world: k: builtins.filter (isRuledSite k) world.${k}.sites;
+
   classOf =
     world: ev: k:
     if world.${k}.files == [ ] then
@@ -941,7 +968,7 @@ let
     else if k == ev then
       "evaluator"
     else if world.${k}.sites != [ ] then
-      (if builtins.any (x: x.tree == k) ruledException then "excepted" else "refused")
+      (if unruledSites world k == [ ] then "excepted" else "refused")
     else
       "clean";
 
@@ -976,13 +1003,15 @@ let
 
   # `tree(n)` — the shape a census reads in, so a refusal set is legible on one line. The sites
   # themselves are printed beside it, keyed by tree.
-  census = world: keys: map (k: "${k}(${toString (builtins.length world.${k}.sites)})") keys;
+  censusOf =
+    pick: world: keys:
+    map (k: "${k}(${toString (builtins.length (pick world k))})") keys;
   siteMap =
-    world: keys:
+    pick: world: keys:
     builtins.listToAttrs (
       map (k: {
         name = k;
-        value = world.${k}.sites;
+        value = pick world k;
       }) keys
     );
 
@@ -1119,7 +1148,12 @@ let
       fieldArmsClaimed = true;
       uncausedAccepted = accepts mkExceptionSet (withoutField exceptionEntries "cause");
       uncarriedAccepted = accepts mkExceptionSet (withoutField exceptionEntries "carrier");
-      widenedAccepted = accepts mkExceptionSet (widenedWith exceptionEntries { tree = "select"; });
+      widenedAccepted = accepts mkExceptionSet (
+        widenedWith exceptionEntries {
+          tree = "select";
+          site = "lib/none.nix:1";
+        }
+      );
     };
     register = {
       ruledSetAccepted = accepts mkRegister registerEntries;
@@ -1270,6 +1304,7 @@ let
   # ── THE VERDICTS ──
   liveRefusedKeys = inClass "refused" liveWorld evaluatorKey scannedKeys;
   liveExceptedKeys = inClass "excepted" liveWorld evaluatorKey scannedKeys;
+  liveRuledKeys = builtins.filter (k: ruledSitesIn liveWorld k != [ ]) scannedKeys;
   liveUnreadable = inClass "unreadable" liveWorld evaluatorKey scannedKeys;
   liveTally = tally liveWorld evaluatorKey scannedKeys;
   accounted = accountedIn liveWorld evaluatorKey scannedKeys;
@@ -1329,6 +1364,22 @@ let
       refused = inClass "refused" deadWorld evaluatorKey scannedKeys;
     };
     seededEntrySets = entrySetArms;
+    seededSiteKeyed = {
+      plantedSite = "lib/traverse.nix:2";
+      plantedClass = classOf siteKeyedSeed evaluatorKey "graph";
+      plantedUnruled = builtins.filter (x: !(builtins.elem x (unruledSites liveWorld "graph"))) (
+        unruledSites siteKeyedSeed "graph"
+      );
+      liveRuledSite = isRuledSite "graph" "lib/traverse.nix:88";
+      liveRuledAdmitted = builtins.elem "lib/traverse.nix:88" (ruledSitesIn liveWorld "graph");
+    };
+    seededIdentBoundary = {
+      sites = hitsIn criterion identBoundaryPlant;
+      expected = [
+        "identBoundary.nix:2"
+        "identBoundary.nix:3"
+      ];
+    };
     seededDomain = {
       registerShort = unaccountedIn scanned seedRegisterShort resolved;
       lockWidened = unaccountedIn scanned ruledRegister seedResolvedWidened;
@@ -1366,6 +1417,22 @@ let
       ];
     };
   };
+
+  # THE EXCEPTION IS SITE-KEYED, armed on a RULED tree. The plant is a `genericClosure` appended to
+  # gen-graph's own ruled file `lib/traverse.nix` at a line no entry names (line 2): it must read
+  # `refused`, where the tree-keyed set admitted it. The live control, same run: the ruled site
+  # `lib/traverse.nix:88` is still admitted in the live world.
+  siteKeyedPlant = prep "lib/traverse.nix" "{ }:\nbuiltins.genericClosure { }\n";
+  siteKeyedSeed = {
+    graph = {
+      files = liveWorld.graph.files ++ [ siteKeyedPlant ];
+      sites = liveWorld.graph.sites ++ hitsIn criterion siteKeyedPlant;
+      hitFiles = [ ];
+    };
+  };
+  # Line 1 is a data identifier containing a token (no hit), 2 the token beside it (hit), 3 an
+  # engine entry point whose name extends the token (hit).
+  identBoundaryPlant = prep "identBoundary.nix" "evalModuleTreeOptions = [ ];\nevalModuleTreeOptions evalModuleTree\nevalModuleTreeUnchecked args\n";
 
   # Every key MUST be true. The check builder is handed `builtins.attrNames` of this rather than a
   # hand-kept list beside it: a second register would let an arm be added here and left out of the
@@ -1443,6 +1510,15 @@ let
     # interpolations would be quieter, not safer.
     strip-sound = arming.seededStripSoundness.sites == arming.seededStripSoundness.expected;
 
+    # O11 — AN EXCEPTION ADMITS ITS SITE AND NOTHING ELSE IN THE TREE, and a criterion token inside a
+    # longer non-construct identifier is not a hit.
+    site-keyed-exception =
+      arming.seededSiteKeyed.plantedClass == "refused"
+      && arming.seededSiteKeyed.plantedUnruled == [ arming.seededSiteKeyed.plantedSite ]
+      && arming.seededSiteKeyed.liveRuledSite
+      && arming.seededSiteKeyed.liveRuledAdmitted
+      && arming.seededIdentBoundary.sites == arming.seededIdentBoundary.expected;
+
     # O9 — A NAME BEING BOUND IS NOT AN EVALUATION. An `inherit` clause's names must stop matching
     # in all three of its surface forms, and a DEFINITION, an `inherit ( … )` source expression and
     # a plain CALL must each still match. Either half failing is red: the first half going green for
@@ -1487,7 +1563,8 @@ let
       )
       && strip-sound
       && binding-position-sound
-      && comment-state-sound;
+      && comment-state-sound
+      && site-keyed-exception;
   };
 in
 {
@@ -1511,10 +1588,10 @@ in
     resolvedCount = builtins.length resolved;
     tally = liveTally;
 
-    refused = census liveWorld liveRefusedKeys;
-    refusedSites = siteMap liveWorld liveRefusedKeys;
-    excepted = census liveWorld liveExceptedKeys;
-    exceptedSites = siteMap liveWorld liveExceptedKeys;
+    refused = censusOf unruledSites liveWorld liveRefusedKeys;
+    refusedSites = siteMap unruledSites liveWorld liveRefusedKeys;
+    excepted = censusOf ruledSitesIn liveWorld liveRuledKeys;
+    exceptedSites = siteMap ruledSitesIn liveWorld liveRuledKeys;
     unreadable = liveUnreadable;
     evaluatorSiteCount = builtins.length evaluatorSites;
     inherit evaluatorSites;
