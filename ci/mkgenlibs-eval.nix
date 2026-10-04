@@ -611,7 +611,11 @@ let
     # riders here — their hashes are unchanged, so no line for them was touched.
     # gen-view 5d0835a → 47106a8 (den-hoag-zakjg U2/U3): the surface gained TWO names,
     # `headPositions` and `joinedTrace`. Nothing was removed.
-    view = "581839da0a986d0f29941711b045ce4b165ec3868cd3b78fe51812da34b05e52";
+    # gen-view 83796dc → gayc-u2a (den-hoag-gayc U2a, D14): the surface lost TWO names,
+    # `labelWellFormedness` and `labelOrder`. E and < are the resolution calculus's own parameters
+    # and gen-scope builds them (`wellFormed`, `labelOrder`); they are removed, not re-exported.
+    # Nothing was added.
+    view = "ea9490675935a131800e05e0de5af68aa317a9fa45597a2fddb22bb9057fed72";
   };
 
   # EXPORTED below, and that export is the only route that regenerates what this arm compares. It is
