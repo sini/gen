@@ -57,7 +57,7 @@
 # their revisions, and each one's LEAK set — into the report, so the artefact records the population
 # it measured instead of leaving the reader to infer it from a lock file.
 #
-# The three REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
+# The four REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
 # float, a moved ratio is unattributable — you cannot tell whether gen got worse or nixpkgs got
 # better — and the ci/README.md rejection of an absolute pure-counter ratchet rests on `ref` being
 # byte-identical across arms.
@@ -674,6 +674,44 @@ COORDMATCH_ALLOC_MAX[sealed,400]=1.002
 COORDMATCH_THUNKS_MAX[sealed,1600]=1.001
 COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 
+# ── resolution (the one resolution calculus at scale; den-hoag-gayc U2b, design §5.8) ──
+# The hub's own peer shape — a COMPLETE peer relation with self-edges over n hosts, walked `peer*`
+# from `h0` — through the LIVE gen-scope `resolve` (mode `reachable`, the walk law) over the relation
+# lifted to an evaluated scope, against gen-graph FROZEN at `0db4e737` (`gen-graph-orig`, ci/flake.nix),
+# whose `query { mode = "all"; }` over a `labeledFrom` record is the DENOMINATOR at a revision no
+# relock moves.
+#
+# GATES. (1) BYTE, every n: resolve's projection (the answer's nodes, in walk order) equals
+# query-orig's. (2) RATIO, THUNKS ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and
+# gated by nothing: at n = 4..7 a cell allocates 75–211 KB, so allocation's ~2.5 KB run-to-run jitter
+# is over 1% and crosses a printed step. (3) ARMING, every run: the `witnesses` arm (mode `witnesses`,
+# the acyclic-path law, which enumerates every simple path and is factorial in n here) at n = 4..7
+# only — it never returns at n = 100 (gate P2) — must step 6 → 7 by at least
+# RESOLUTION_WITNESSES_GROWTH_MIN and by more than resolve's own 6 → 7 step. A polynomial of degree d
+# steps 6 → 7 by (7/6)^d, so ×3 needs d ≥ 7.1: the floor separates enumeration from every walk this
+# row could regress to. A control that does not read super-linear is a broken instrument, and the
+# row then has no result. No linearity gate: the complete relation has n² edges, so the walk is
+# quadratic in n by the fixture, and only a same-n ratio can see a regression.
+#
+# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (kindMatch's convention). ANCHOR — the measured ratio at the
+# landing: hub `perf-bench` app, Nix 2.34.8, gen-scope `cd653a2`, frozen gen-graph `0db4e737`. Raw
+# thunks resolve / query-orig: n=4 2,364 / 1,237 · 5 2,532 / 1,433 · 6 2,722 / 1,669 · 7 2,934 / 1,945 ·
+# 100 118,812 / 202,453 · 1000 11,070,912 / 20,016,853. The small sizes read above 1 because the
+# lift and the WFL's construction are a constant the frozen `query` does not pay; from n = 100 the
+# walk is the cheaper. witnesses: 3,451 / 8,441 / 36,181 / 217,231 at n = 4..7 (6 → 7: ×6.004).
+# WHAT IT CANNOT SEE: anything that makes `resolve` CHEAPER (one-sided), and the `visible` and
+# `witnesses` modes' own cost (only `reachable` is gated). Re-derive with `nix run ./ci#perf-bench`.
+RESOLUTION_SIZES=(4 5 6 7 100 1000)
+RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
+RESOLUTION_WITNESSES_GROWTH_MIN=3.0
+declare -A RESOLUTION_THUNKS_MAX
+RESOLUTION_THUNKS_MAX[4]=1.911
+RESOLUTION_THUNKS_MAX[5]=1.767
+RESOLUTION_THUNKS_MAX[6]=1.631
+RESOLUTION_THUNKS_MAX[7]=1.508
+RESOLUTION_THUNKS_MAX[100]=0.587
+RESOLUTION_THUNKS_MAX[1000]=0.553
+
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
 CELL_ERRF=""
@@ -682,6 +720,9 @@ declare -A LIN_SMALL LIN_BIG LIN_TG LIN_AG
 declare -A CS_TR CS_AR CS_CR CS_BG
 declare -A EM_TR EM_AR EM_CR EM_BG EM_LIN
 declare -A CM_TR CM_AR CM_CR CM_BG CM_LIN
+declare -A RS_TR RS_AR RS_CR RS_BG
+RS_WIT_STEP=""
+RS_RES_STEP=""
 CS_LIN_FULL=""
 CS_LIN_FIXED=""
 declare -A OW_TR OW_AR OW_CR OW_BG
@@ -1120,6 +1161,33 @@ for fx in migrated sealed; do
   done
 done
 
+# ── resolution — the one resolution calculus at scale (den-hoag-gayc U2b; the gate derivation is beside the constants) ──
+for n in "${RESOLUTION_SIZES[@]}"; do
+  run_row resolution "$n" query-orig resolve
+  den="${DIG[resolution,$n,query-orig]}"
+  num="${DIG[resolution,$n,resolve]}"
+  if [[ -n "$den" && "$den" == "$num" ]]; then
+    RS_BG[$n]="ok"
+  else
+    RS_BG[$n]="MISMATCH"
+    FAILURES+=("resolution byte gate: n=$n expected(query-orig)=${den:-<none>} actual(resolve)=${num:-<none>} — resolve reached a different node set, or the same set in a different order")
+  fi
+  RS_TR[$n]=$(ratio "${THUNKS[resolution,$n,resolve]}" "${THUNKS[resolution,$n,query-orig]}")
+  RS_AR[$n]=$(ratio "${ALLOC[resolution,$n,resolve]}" "${ALLOC[resolution,$n,query-orig]}")
+  RS_CR[$n]=$(ratio "${CPU[resolution,$n,resolve]}" "${CPU[resolution,$n,query-orig]}")
+  lte "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}" \
+    || FAILURES+=("resolution ratio: n=$n resolve/query-orig thunks expected≤${RESOLUTION_THUNKS_MAX[$n]} actual=${RS_TR[$n]} delta=$(delta "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}") — the live walk costs more: per edge or per ⟨node, state⟩ if the n=1000 excess dominates, a constant (the lift, the WFL's construction) if only n=4..7 move")
+done
+# ARMING, every run: the witnesses control at n ≤ 7 must read super-linear (P2 pins it there).
+for n in "${RESOLUTION_WITNESSES_SIZES[@]}"; do
+  sample_cell resolution "$n" witnesses 1
+done
+RS_WIT_STEP=$(ratio "${THUNKS[resolution,7,witnesses]}" "${THUNKS[resolution,6,witnesses]}")
+RS_RES_STEP=$(ratio "${THUNKS[resolution,7,resolve]}" "${THUNKS[resolution,6,resolve]}")
+if lte "$RS_WIT_STEP" "$RESOLUTION_WITNESSES_GROWTH_MIN" || lte "$RS_WIT_STEP" "$RS_RES_STEP"; then
+  FAILURES+=("resolution arming: the witnesses control stepped 6 → 7 by ${RS_WIT_STEP}× (resolve ${RS_RES_STEP}×), not above $RESOLUTION_WITNESSES_GROWTH_MIN and above resolve — the control is not super-linear, so the instrument is broken and this row has no result")
+fi
+
 # ── report (pure printing from the computed values above) ──────────────────────
 emit_report() {
   echo
@@ -1149,7 +1217,7 @@ emit_report() {
     printf '| %s | %s | %s | %s | %s |\n' "$ck" "${BASE_AXIS[$ck]}" "$csrc" "$crev" "${PF_LEAK[$ck]:-—}"
   done
   echo
-  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The three reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
+  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The four reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
     "$PF_ARMING" "$PF_UNAPPLIED"
   echo
   echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
@@ -1270,6 +1338,20 @@ emit_report() {
   echo
   printf 'thunk linearity (%s → %s, ×4 step): coord-ref %s×, coord %s×, coord-ref-sealed %s×, coord-sealed %s× (gate ≤ %s)\n' \
     "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "${CM_LIN[coord-ref]}" "${CM_LIN[coord]}" "${CM_LIN[coord-ref-sealed]}" "${CM_LIN[coord-sealed]}" "$GROWTH_MAX"
+  echo
+  echo "### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, per-size thunk bounds at anchor + 0.000; alloc reported, gated by nothing)"
+  echo
+  echo "| n | query-orig thunks | resolve thunks | thunks r/q (≤) | alloc r/q | cpu r/q | byte gate |"
+  echo "|---|---:|---:|---:|---:|---:|---|"
+  for n in "${RESOLUTION_SIZES[@]}"; do
+    printf '| %s | %s | %s | %s (%s) | %s | %s | %s |\n' \
+      "$n" "${THUNKS[resolution,$n,query-orig]}" "${THUNKS[resolution,$n,resolve]}" \
+      "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}" "${RS_AR[$n]}" "${RS_CR[$n]}" "${RS_BG[$n]}"
+  done
+  echo
+  printf 'arming (witnesses control, n=4..7 thunks): %s / %s / %s / %s; 6 → 7 step %s× (resolve %s×) — must exceed %s and resolve\n' \
+    "${THUNKS[resolution,4,witnesses]}" "${THUNKS[resolution,5,witnesses]}" "${THUNKS[resolution,6,witnesses]}" "${THUNKS[resolution,7,witnesses]}" \
+    "$RS_WIT_STEP" "$RS_RES_STEP" "$RESOLUTION_WITNESSES_GROWTH_MIN"
   echo
   if [[ ${#FAILURES[@]} -eq 0 ]]; then
     echo "ALL GATES PASSED (parity + ratio + linearity)"
