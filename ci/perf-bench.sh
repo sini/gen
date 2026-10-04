@@ -707,22 +707,22 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # (U2b), and gen-scope `32e39c0` (U2e, the converse) costs `resolve` one thunk per node more
 # (n=4..7 +4..+7, n=100 +100, n=1000 +1,000), which crossed the n = 4..7 bounds by +0.003..+0.004;
 # the same hub with gen-scope at `cd653a2` passes every gate, the same run. RE-ANCHORED AGAIN at
-# gen-scope `8a5586f` (den-hoag-di165: every node-id table keyed by the id's text through
-# `key.attrKey`, so a store-path-context id resolves). That is di165's price, a correctness fix's
-# linear cost: about +45 thunks fixed plus about 2 per node. resolve thunks at `32e39c0` → `8a5586f`:
-# n=4 2,368 → 2,415 · 5 2,537 → 2,586 · 6 2,728 → 2,779 · 7 2,941 → 2,994 · 100 118,912 → 119,151 ·
-# 1000 11,071,912 → 11,073,951; witnesses 3,514 / 8,555 / 36,558 / 219,241.
-# WHAT IT CANNOT SEE: anything that makes `resolve` CHEAPER (one-sided), and the `visible` and
-# `witnesses` modes' own cost (only `reachable` is gated). Re-derive with `nix run ./ci#perf-bench`.
+# gen-scope `35b106b` (den-hoag-di165: every node-id table keyed by the id's text through
+# `key.attrKey`, once per id, so a store-path-context id resolves). That is di165's price, a
+# correctness fix's linear cost: about +6 thunks fixed plus about 1 per node (attrKey's context check
+# per node-id read). resolve thunks at `32e39c0` → `35b106b`: n=4 2,368 → 2,378 · 5 2,537 → 2,548 ·
+# 6 2,728 → 2,740 · 7 2,941 → 2,954 · 100 118,912 → 119,018 · 1000 11,071,912 → 11,072,918;
+# witnesses 3,477 / 8,517 / 36,519 / 219,201. (di165's first build `8a5586f` cost +47..+53 / +239 /
+# +2,039; the bounds are held at `35b106b`, so a return to that cost reds.)
 RESOLUTION_SIZES=(4 5 6 7 100 1000)
 RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
 RESOLUTION_WITNESSES_GROWTH_MIN=3.0
 declare -A RESOLUTION_THUNKS_MAX
-RESOLUTION_THUNKS_MAX[4]=1.952
-RESOLUTION_THUNKS_MAX[5]=1.805
-RESOLUTION_THUNKS_MAX[6]=1.665
-RESOLUTION_THUNKS_MAX[7]=1.539
-RESOLUTION_THUNKS_MAX[100]=0.589
+RESOLUTION_THUNKS_MAX[4]=1.922
+RESOLUTION_THUNKS_MAX[5]=1.778
+RESOLUTION_THUNKS_MAX[6]=1.642
+RESOLUTION_THUNKS_MAX[7]=1.519
+RESOLUTION_THUNKS_MAX[100]=0.588
 RESOLUTION_THUNKS_MAX[1000]=0.553
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
