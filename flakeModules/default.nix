@@ -110,12 +110,12 @@ let
   # module binds its dependencies at CONSUMER eval time off the hub roster — the same shape as
   # `flakeModules/genLibs.nix`. Since the unit-5 re-point those dependencies are the successors:
   # gen-bind's crossing adapter set (`bind`) and gen-delivery's fold (`delivery`); no surface below
-  # reads gen-flake. `graph` joined them at the extent peer-read completion (below): the default
-  # `nixos` terminal's `peerGraph` is built from it, not reconstructed.
+  # reads gen-flake. `scope` joined them at the one-calculus migration (den-hoag-gayc U2b, below): it
+  # is the resolution engine the default `nixos` terminal's carriage injects (O10 (A)).
   roster = inputs.gen.lib.mkGenLibs { inherit lib; };
   genBind = roster.bind;
   genDelivery = roster.delivery;
-  genGraph = roster.graph;
+  genScope = roster.scope;
 
   inherit (lib) mkOption types;
   cfg = config.gen;
@@ -245,23 +245,23 @@ let
   # governs). `locateConfig` rides the record for the crossing's `close`, not for the fold — this
   # bridge does not consume it.
   #
-  # `peerGraph` and `marksOf` complete the Adapter carriage gen-bind's extent peer-read widened to
-  # require. This wiring adopts ARM A semantics — every unmarked node sees the whole class — which
-  # is what gen-bind shipped and what its O-1–O-6 suite tests: `peerGraph`'s node set is `extent`'s
-  # own key set (the class's member keys, already in scope, forced lazily — forcing one node's
-  # artifact never forces a peer's), every node is each other's `peer`, and `marksOf` is the
-  # explicit-empty default `_: [ ]` (no marks concept exists at this hub). ARM B (aspect-membership-
-  # derived peer sets) is a future narrowing, not decided here.
+  # `peersOf`, `marksOf` and `engine` complete the Adapter carriage gen-bind's extent peer-read
+  # requires. This wiring adopts ARM A semantics — every unmarked node sees the whole class — which
+  # is what gen-bind shipped and what its O-1–O-6 suite tests: gen-bind lifts `extent`'s own key set
+  # (the class's member keys, already in scope, forced lazily — forcing one node's artifact never
+  # forces a peer's) and resolves one `peer` step through `engine`, every node is each other's
+  # `peer`, and `marksOf` is the STATED empty policy `_: [ ]` (no marks concept exists at this hub),
+  # so gen-bind's `opaque` default never applies here. ARM B (aspect-membership-derived peer sets)
+  # is a future narrowing, not decided here.
   terminalOf =
     record: args:
     let
       peerKeys = builtins.attrNames args.extent;
       a = record.adapter {
         inherit (args) extent extraModules;
-        peerGraph = genGraph.labeledFrom {
-          peer = _id: peerKeys;
-        } peerKeys;
+        peersOf = _: peerKeys;
         marksOf = _: [ ];
+        engine = genScope;
         readerId = args.name;
       };
     in

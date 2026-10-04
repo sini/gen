@@ -154,6 +154,18 @@ stacks `attrs-ref-sealed` / `entity-sealed`, types `addr` by nixpkgs `lib.types.
 carry a sealed component and the one matching node reaches `sel.entity`'s sealed arm (the node's kind
 key, then `kindEq`); a cost confined to that arm is invisible on the migrated fixture.
 
+`resolution` meters the one resolution calculus (den-hoag-gayc U2b, design §5.8) on the hub's own
+peer shape: a complete peer relation with self-edges over n hosts, walked `peer*` from `h0`, at
+n ∈ {4, 5, 6, 7, 100, 1000}. Its numerator is `resolve` (the live gen-scope `resolve`, mode
+`reachable`, over the relation lifted to an evaluated scope); its denominator is `query-orig`, gen-graph
+FROZEN at `0db4e737` (`gen-graph-orig` in `ci/flake.nix`, the last revision before resolution moved
+into gen-scope), whose `query { mode = "all"; }` must reach the same nodes in the same order (the byte
+gate). Thunks are gated per n at anchor + 0.000; allocation is reported only, because the n ≤ 7 cells
+allocate under 211 KB and the run-to-run jitter crosses a printed step. A third stack, `witnesses`,
+enumerates every simple path (NR-Cons) and is factorial in n: it runs at n ≤ 7 only, as the row's
+arming control on every run, and must step 6 → 7 by at least ×3 and by more than `resolve` does, or
+the instrument is broken and the row has no result.
+
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
 Three gate families (thresholds at the top of `perf-bench.sh`):
