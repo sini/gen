@@ -61,6 +61,7 @@ let
     "gen-schema-orig" = "/lib";
     "gen-select-orig" = "/lib"; # kindMatch's frozen denominator (ci/flake.nix)
     "gen-graph-orig" = "/lib"; # resolution's frozen denominator (ci/flake.nix)
+    "gen-prelude-orig" = "/lib";
     "nixpkgs-lib" = "/lib";
   };
   envName = {
@@ -79,6 +80,7 @@ let
     "gen-schema-orig" = "schemaOrig";
     "gen-select-orig" = "selectOrig";
     "gen-graph-orig" = "graphOrig";
+    "gen-prelude-orig" = "preludeOrig";
     "nixpkgs-lib" = "lib";
   };
   memberKeys = builtins.attrNames entryPath;
@@ -109,7 +111,9 @@ let
     map (k: {
       name = envName.${k};
       value =
-        if isApplied k then
+        if k == "gen-graph-orig" then
+          entryOf k { prelude = env.preludeOrig; }
+        else if isApplied k then
           # SUPPLIED ∪ PINNED in one builtin: every declared formal the environment can name, and
           # nothing else. A formal the environment cannot name is either UNSAT (required — refused
           # by the pre-flight) or a LEAK (defaulted — declared in the combination block, and it

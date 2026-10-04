@@ -683,7 +683,9 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # from `h0` — through the LIVE gen-scope `resolve` (mode `reachable`, the walk law) over the relation
 # lifted to an evaluated scope, against gen-graph FROZEN at `0db4e737` (`gen-graph-orig`, ci/flake.nix),
 # whose `query { mode = "all"; }` over a `labeledFrom` record is the DENOMINATOR at a revision no
-# relock moves.
+# relock moves. The denominator is frozen IN FULL: gen-graph-orig is applied with the gen-prelude its
+# own lock pins (`gen-prelude-orig`, `c471c9a`), never the live one, so a prelude change can move only
+# the numerator.
 #
 # GATES. (1) BYTE, every n: resolve's projection (the answer's nodes, in walk order) equals
 # query-orig's. (2) RATIO, THUNKS ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and
@@ -714,6 +716,14 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # 6 2,728 → 2,740 · 7 2,941 → 2,954 · 100 118,912 → 119,018 · 1000 11,071,912 → 11,072,918;
 # witnesses 3,477 / 8,517 / 36,519 / 219,201. (di165's first build `8a5586f` cost +47..+53 / +239 /
 # +2,039; the bounds are held at `35b106b`, so a return to that cost reds.)
+# THE DENOMINATOR FROZEN IN FULL (relock 60): until then `gen-graph-orig` ran on the LIVE gen-prelude,
+# so the "frozen" query floated with every relock, and gen-prelude `ae1ce68` (door `next`, which
+# refuses an unwired record step) could no longer evaluate it at all. Under `gen-prelude-orig`
+# `c471c9a`, with gen-scope `35b106b` and gen-prelude `ae1ce68`, raw thunks resolve / query-orig:
+# n=4 2,396 / 1,263 · 5 2,566 / 1,459 · 6 2,758 / 1,695 · 7 2,972 / 1,971 · 100 119,036 / 202,479 ·
+# 1000 11,072,936 / 20,016,879; witnesses 3,495 / 8,535 / 36,537 / 219,219 (6 → 7: ×6.000). The new
+# prelude's price on `resolve` is +18 thunks, constant in n. The bounds above stand: the ratios read
+# 1.897 / 1.759 / 1.627 / 1.508 / 0.588 / 0.553, under every bound.
 RESOLUTION_SIZES=(4 5 6 7 100 1000)
 RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
 RESOLUTION_WITNESSES_GROWTH_MIN=3.0

@@ -91,6 +91,10 @@
       url = "github:sini/gen-graph/0db4e73708f356024121336fcad1230ba0aed8d4";
       flake = false;
     };
+    gen-prelude-orig = {
+      url = "github:sini/gen-prelude/c471c9a12ef5495be5c50911ff45e3efa16cc67f";
+      flake = false;
+    };
     # nixpkgs LIB ONLY — the reference `lib.evalModules` engine. Ecosystem policy: pull the pinned
     # nixpkgs.lib (auto-generated per nixpkgs release), NOT full nixpkgs, where only `lib.*` is needed.
     nixpkgs-lib.url = "github:nix-community/nixpkgs.lib/db3f255737b94216eb71cce308e2912cf6bc2d7c";
@@ -1046,6 +1050,7 @@
               "gen-schema-orig" = "${inputs.gen-schema-orig}";
               "gen-select-orig" = "${inputs.gen-select-orig}";
               "gen-graph-orig" = "${inputs.gen-graph-orig}";
+              "gen-prelude-orig" = "${inputs.gen-prelude-orig}";
               "nixpkgs-lib" = "${inputs.nixpkgs-lib}";
             }
           '';
@@ -1078,6 +1083,7 @@
             "gen-schema-orig"
             "gen-select-orig"
             "gen-graph-orig"
+            "gen-prelude-orig"
             "nixpkgs-lib"
           ];
           # A MEMBER is read from the ROOT lock, the pin set `gen` resolves through; a REFERENCE key
