@@ -118,7 +118,9 @@ everything they include, breadth-first, each aspect once. Content written inline
 position is delivered too. A reached parametric aspect (a guard) is delivered through its
 instances: pass gen-aspects' `instancesFor` relation as `instances`, and each node receives the
 instances the relation lists for it, never another node's. `project` reads the relation and never
-mints an instance. Where the relation lists no instance of a reached guard, `project` reads the
+mints an instance. Beside its walk, `project` runs a receiver-rooted query over the same graph
+through gen-scope's `resolve`; if the relation lists an instance at a node that the node's includes
+never reach, or the two otherwise disagree, the node refuses by name. Where the relation lists no instance of a reached guard, `project` reads the
 relation's `declined` lists: a guard whose condition was decided false there delivers nothing, as an
 include that never existed. Any other empty reach refuses by name, rather than guess: the relation
 never walked the guard there (it was handed other members or another tree), or the guard's condition

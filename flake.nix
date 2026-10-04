@@ -130,6 +130,7 @@
     gen-delivery.inputs.gen-algebra.follows = "gen-algebra";
     gen-delivery.inputs.gen-aspects.follows = "gen-aspects";
     gen-delivery.inputs.gen-prelude.follows = "gen-prelude";
+    gen-delivery.inputs.gen-scope.follows = "gen-scope";
 
     # The import-tree FORK (nixpkgs-lib-free; `(addPath dir).files` yields a bare path list the
     # engine imports natively). It is a TOOL input, not a roster member: the tree-loading line is

@@ -86,6 +86,7 @@ flowchart TD
   gen_delivery --> gen_algebra
   gen_delivery --> gen_aspects
   gen_delivery --> gen_prelude
+  gen_delivery --> gen_scope
   gen_dispatch --> gen_prelude
   gen_graph --> gen_prelude
   gen_inspect --> gen_graph

@@ -7,7 +7,14 @@
 # the standalone root.
 members: {
   assemble = { inherit (members) prelude scope algebra; };
-  delivery = { inherit (members) algebra aspects prelude; };
+  delivery = {
+    inherit (members)
+      algebra
+      aspects
+      prelude
+      scope
+      ;
+  };
   # ★★ THE FOLD IS WELL-FOUNDED ONLY WHILE THE UNAPPLIED MEMBERS' DEPENDENCIES ARE ACYCLIC. The
   # order is `inspect → program → {prelude, scope}`, and `program` is applied once and shared by
   # gen-inspect and the roster. A key here naming an unapplied member that (transitively) names
