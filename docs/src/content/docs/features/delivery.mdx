@@ -228,13 +228,14 @@ A movement view carries values along edges with a declared precedence. Here `web
 let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   view = gen.view;
+  scope = gen.scope;
   labels = view.edgeLabels { letters = [ "within" ]; };
   carrier = view.carrier {
     inherit labels;
     relations = view.relations { names = [ "firewall" ]; };
     relatumLabels = view.relatumLabels { names = [ ]; };
-    labelWellFormedness = view.labelWellFormedness { alphabet = labels; expression = "within*"; };
-    labelOrder = view.labelOrder { alphabet = labels; layers = [ [ "within" ] ]; endOfPath = -1; };
+    labelWellFormedness = scope.wellFormed { alphabet = labels.letters; expression = "within*"; };
+    labelOrder = scope.labelOrder { alphabet = labels.letters; layers = [ [ "within" ] ]; endOfPath = -1; };
     dataOrder = view.dataOrder { channel = "firewall"; keyOf = _: "firewall"; };
   };
   firewall = view.compositions.movement {
@@ -253,8 +254,8 @@ let
     ];
   };
   moved = view.viewRelation {
-    definition = firewall; marks = _: [ ]; inherit graph;
-    orderMark = view.labelOrder { alphabet = labels; layers = [ labels.letters ]; endOfPath = 0; };
+    engine = scope; definition = firewall; marks = _: [ ]; inherit graph;
+    orderMark = scope.labelOrder { alphabet = labels.letters; layers = [ labels.letters ]; endOfPath = 0; };
   };
 in
 { inherit (moved) value; shadowedFrom = map (s: s.scope) moved.shadowed; }
@@ -267,8 +268,9 @@ $ nix eval --impure --json --file nearest-firewall.nix
 
 `us-east` is one edge away and `prod` is two, so `us-east` wins. Each `shadowed` entry records the
 losing value, its scope, its distance and the full path, so a reader can see why it lost.
-`labelWellFormedness` decides which paths are admitted at all (here `within*`), and `labelOrder`
-decides which admitted path wins. This is name resolution over a scope graph, as in
+The carrier's `labelWellFormedness` decides which paths are admitted at all (here `within*`), and
+its `labelOrder` decides which admitted path wins; both are built by `scope`, the resolution
+calculus `viewRelation` lifts the graph into and walks it with (`engine`). This is name resolution over a scope graph, as in
 [Scopes as Types](/reference/papers/van-antwerpen-2018-scopes-as-types/).
 
 ### The flake module
