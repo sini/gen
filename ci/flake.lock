@@ -190,6 +190,23 @@
         "type": "github"
       }
     },
+    "gen-graph-orig": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790623339,
+        "narHash": "sha256-u/IwomIY79SuydNpC899HAiICUby8xaCHPmhrmqSjsc=",
+        "owner": "sini",
+        "repo": "gen-graph",
+        "rev": "0db4e73708f356024121336fcad1230ba0aed8d4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-graph",
+        "rev": "0db4e73708f356024121336fcad1230ba0aed8d4",
+        "type": "github"
+      }
+    },
     "gen-harness": {
       "inputs": {
         "devshell": [
@@ -752,6 +769,7 @@
         "devshell": "devshell",
         "flake-parts": "flake-parts",
         "flake-root": "flake-root",
+        "gen-graph-orig": "gen-graph-orig",
         "gen-harness": "gen-harness",
         "gen-schema-orig": "gen-schema-orig",
         "gen-select-orig": "gen-select-orig",
