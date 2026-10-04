@@ -144,10 +144,40 @@ let
       cause = "a deliberate throwing tombstone for a renamed scan (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationsIn` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
     }
+    {
+      member = "scope";
+      binding = "query";
+      cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the D<I<P selection is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "scope";
+      binding = "queryAll";
+      cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the every-witness gather is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "scope";
+      binding = "ambiguous";
+      cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the ambiguity test, redefined over distinct origins is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "scope";
+      binding = "visibleFrom";
+      cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the visible-declaration read is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
+    {
+      member = "scope";
+      binding = "queryReverse";
+      cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the reverse-import gather, now the converse is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
+      carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+    }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 9;
+  retirementWidth = 14;
 
   ruledRetirement =
     let
@@ -434,7 +464,11 @@ let
     # lock-currency relock): the surface gained ONE name, `lowlink`, a third SCC-partition arm
     # (Tarjan's DFS iterated over a persistent trie) published beside `fbNode` and `fbWork`.
     # Nothing was removed and no other member moved.
-    graph = "9946fde84fe482a80a4237de91d842b9f874f37070a354201c8d1b14e9d6de2b";
+    #
+    # gen-graph 4649d8390b → 04993c2228 (den-hoag-gayc U1a): the surface gained ONE name, `key`, the
+    # key formers with the refusal prefix a parameter, which gen-scope's calculus binds. Nothing was
+    # removed.
+    graph = "b55b373788a1dd20a903d0d80e0ac6b866aab3148aa0605923d02b7433b39ffe";
     identity = "ae39363fd50eb2100013362d3d43563146bf24fe8539675c8e8a944d62eaa201";
     # gen-inspect, the roster's 22nd member and the 4th at `framework`: the library that
     # interrogates a materialized graph. Its surface is 13 names — the IR construction and its
@@ -538,7 +572,12 @@ let
     #
     # gen-scope 70c286a → 5afbb0f (relock 48, den-hoag-0cmbt U5): the surface gained ONE name,
     # `argumentBinding`. Nothing was removed.
-    scope = "765efd5f8b09addb716faa781cf3d2eaa33a81f2077a6522deeef2800b68d380";
+    #
+    # gen-scope 7ab60ef → 995461f (den-hoag-gayc, the one resolution calculus): the surface gained
+    # `wellFormed`, `labelOrder`, `neron` and `wfl`; `resolve` names the calculus where it named the
+    # D<I<P selector; `query`, `queryAll`, `ambiguous`, `visibleFrom` and `queryReverse` are
+    # tombstones (`retirementEntries`).
+    scope = "a5393968311a63822c332337c0fc5221c37d5c13430cc71942483f93576cc9eb";
     # gen-select 8ab4b1d → 37eccfc (relock 48, den-hoag-l0y U3): the surface gained ONE name, `subkind`,
     # the selector matching a kind or any subkind of it. Nothing was removed.
     select = "5df8bc671b37fec1a92a3c159fab3a2575411430300a146cd90f3667e760dbeb";
