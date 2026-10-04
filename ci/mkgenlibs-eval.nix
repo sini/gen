@@ -739,9 +739,11 @@ let
   # its `__functionArgs` where `builtins.functionArgs` reads nothing. That is the owner's C′ ruling
   # (2026-09-27, "accept C'"), which also decided den-hoag-2xg6e as (β): the contract doors
   # reshape like every other door and publish their contract as data. ★ WHAT IT DOES NOT SEE,
-  # stated rather than left to be discovered: fields of a record a function RETURNS, curried
-  # formals (a chained door's steps after the first), sets inside lists, `_type` sets, `name`
-  # strings, error text, option descriptions and docs prose, and the hub flakeModule's option names.
+  # stated rather than left to be discovered: fields of a record a function RETURNS, the steps
+  # behind a POSITIONAL first step (`memo.runScc`, den-hoag-ak8va OQ-1, until den-hoag-n7ax),
+  # a record's field-level contracts (a field that is itself checked by a door), sets inside lists,
+  # `_type` sets, `name` strings, error text, option descriptions and docs prose, and the hub
+  # flakeModule's option names. A chained door's later steps ARE read, from `__contract.next`.
   # A clean read here is a claim about the population above and nothing wider.
   #
   # TWO PREDICATES over each name, both lifted to functions of their inputs (the `driftOf`
@@ -803,8 +805,11 @@ let
     builtins.filter (w: builtins.elem w vocabularyWords) (tokensOf name)
     ++ builtins.filter (w: builtins.length (builtins.split w (lower name)) > 1) vocabularySubstrings;
 
-  vocabularyWalk =
-    member: depth: p: v:
+  vocabularyWalk = walkWith wordsIn;
+  # `walkWith wordsOf` is the walk over any name predicate: `wordsIn` for the vocabulary, and the
+  # every-name predicate for the reach arm below, so the reach arm runs THIS walk.
+  walkWith =
+    wordsOf: member: depth: p: v:
     let
       t = builtins.tryEval (builtins.typeOf v);
       kind = if t.success then t.value else "throws";
@@ -814,7 +819,7 @@ let
         map (word: {
           inherit member word;
           at = at';
-        }) (wordsIn name);
+        }) (wordsOf name);
       own = if p == [ ] then [ ] else hits at (builtins.elemAt p (builtins.length p - 1));
       formals = builtins.concatMap (f: hits "${at}:${f}" f) (
         builtins.attrNames (
@@ -826,15 +831,34 @@ let
             { }
         )
       );
+      # A chained door's later steps (den-hoag-ak8va; OQ16 "nest", owner 2026-09-28): `door`
+      # publishes each next step's contract as `__contract.next`, so the walk reads step k's fields
+      # at the locus `<at>:next:…:<field>` with no application of any step.
+      # A positional node (`{ positional; next; }`, a plain-lambda step between two record steps)
+      # contributes its operand's name, and counts as a step in the locus.
+      nextFormals =
+        pre: c:
+        if builtins.isAttrs c && c ? next && builtins.isAttrs c.next then
+          (
+            if c.next ? positional then
+              hits "${at}:${pre}next:${c.next.positional}" c.next.positional
+            else
+              builtins.concatMap (f: hits "${at}:${pre}next:${f}" f) (c.next.required ++ c.next.optional)
+          )
+          ++ nextFormals "${pre}next:" c.next
+        else
+          [ ];
+      later =
+        if kind == "set" && v ? __functor && v ? __contract then nextFormals "" v.__contract else [ ];
       plain = kind == "set" && !(v ? _type) && !(v ? type && v ? check) && !(v ? __functor);
       names = builtins.tryEval (builtins.attrNames v);
       kids =
         if plain && depth < vocabularyDepth && names.success then
-          builtins.concatMap (n: vocabularyWalk member (depth + 1) (p ++ [ n ]) v.${n}) names.value
+          builtins.concatMap (n: walkWith wordsOf member (depth + 1) (p ++ [ n ]) v.${n}) names.value
         else
           [ ];
     in
-    own ++ formals ++ kids;
+    own ++ formals ++ later ++ kids;
 
   # One offender per (member, locus, word): a name the two predicates both catch is listed once.
   offendersOf =
@@ -890,6 +914,12 @@ let
     };
   };
   vocabularyOffenders = offendersOf vocabularySurface;
+  # Every formal locus the walk reads on one member; `transitiveClosure:maxIter` (step 1) is the
+  # live control that the reach arm's walk is not dead.
+  vocabularyGraphLoci = map (o: o.at) (walkWith (_: [ "*" ]) "graph" 0 [ ] genLibs.graph);
+  vocabularyNextLoci = builtins.filter (
+    at: builtins.length (builtins.split ":next:" at) > 1
+  ) vocabularyGraphLoci;
   vocabularyUnregistered = map showOffender (unregisteredOf vocabularyRegister vocabularyOffenders);
   vocabularyStale = map showEntry (staleOf vocabularyRegister vocabularyOffenders);
 
@@ -901,8 +931,23 @@ let
     genLibs.prelude.door {
       inherit name required;
     } (a: a);
+  chainOf =
+    name: field:
+    let
+      recordSpec = {
+        inherit name;
+        required = [ field ];
+        open = true;
+      };
+    in
+    genLibs.prelude.door {
+      inherit name;
+      optional = [ "depth" ];
+      next = recordSpec;
+    } (o: genLibs.prelude.door recordSpec (r: r));
   armVocab = {
     alpha = {
+      c = chainOf "alpha.c" "hostName";
       mkHostThing = x: x;
       g = { userName }: userName;
       d = doorOf "alpha.d" [ "hostName" ];
@@ -913,6 +958,7 @@ let
   };
   armVocabClean = {
     alpha = {
+      c = chainOf "alpha.c" "nodeName";
       mkNodeThing = x: x;
       g = { nodeName }: nodeName;
       d = doorOf "alpha.d" [ "nodeName" ];
@@ -964,6 +1010,8 @@ in
     # the token split cannot see.
     arming-vocabulary-names-planted =
       vocabularyArming.planted == [
+        "alpha.c:next:hostName [host]"
+        "alpha.c:next:hostName [hostname]"
         "alpha.d:hostName [host]"
         "alpha.d:hostName [hostname]"
         "alpha.fromNixOS [nixos]"
@@ -974,6 +1022,9 @@ in
       ];
     arming-vocabulary-silent-on-clean = vocabularyArming.clean == [ ];
     arming-vocabulary-names-stale = vocabularyArming.stale == [ "alpha.gone [host]" ];
+    # REACH, on the LIVE surface: the walk reads a real chained door's step-2 fields. Red while any
+    # landing leaves `transitiveClosure` publishing its first step only.
+    vocabulary-reaches-next = builtins.elem "transitiveClosure:next:edges" vocabularyNextLoci;
   };
   gateKeys = actualKeys ++ [
     "roster-ok"
@@ -997,6 +1048,7 @@ in
     "arming-vocabulary-names-planted"
     "arming-vocabulary-silent-on-clean"
     "arming-vocabulary-names-stale"
+    "vocabulary-reaches-next"
   ];
   # Raw, for `nix eval ./ci#lib.mkGenLibsEval --json | jq`.
   keyCount = builtins.length actualKeys;
@@ -1029,6 +1081,8 @@ in
     vocabularyUnregistered
     vocabularyStale
     vocabularyArming
+    vocabularyGraphLoci
+    vocabularyNextLoci
     ;
   vocabularyRegister = map (e: "${showEntry e}: ${e.clause}") vocabularyRegister;
   bucketCounts = builtins.listToAttrs (
