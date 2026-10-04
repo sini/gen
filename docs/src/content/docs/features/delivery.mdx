@@ -118,9 +118,12 @@ everything they include, breadth-first, each aspect once. Content written inline
 position is delivered too. A reached parametric aspect (a guard) is delivered through its
 instances: pass gen-aspects' `instancesFor` relation as `instances`, and each node receives the
 instances the relation lists for it, never another node's. `project` reads the relation and never
-mints an instance. Where the relation lists no instance of a reached guard, the node refuses by
-name: the relation does not yet say whether the guard's condition was false there or the guard was
-never handed to it, so for now that reach is refused rather than guessed. Here a web server and a database host share an `ssh` aspect, the web server also carries
+mints an instance. Where the relation lists no instance of a reached guard, `project` reads the
+relation's `declined` lists: a guard whose condition was decided false there delivers nothing, as an
+include that never existed. Any other empty reach refuses by name, rather than guess: the relation
+never walked the guard there (it was handed other members or another tree), or the guard's condition
+read a coordinate the node does not supply under the open world. Declare the coordinate set
+(`entityKinds`) to make such an absence false. Here a web server and a database host share an `ssh` aspect, the web server also carries
 a firewall rule, and the terminals count modules:
 
 ```nix title="platform-delivery.nix"
