@@ -478,7 +478,10 @@ let
     # gen-aspects 0acfc5c → 1062acb (relock 51, den-hoag-lwbb1 unit 2): the surface LOST one name,
     # `toArgData`, retired with the custom guard forms now that a guard is a first-order term.
     # Nothing was added.
-    aspects = "1d4ddacd622369b998782d2ebec387ac94b49bf0db8eef0b459e025c88d5a64c";
+    # gen-aspects 9043da6 → 52e73a9 (relock 61, den-hoag-gywcg): the surface gained ONE name,
+    # `parsePath`, the inverse of the one injective path rendering `pathKey` (a rendered key back to its
+    # segment list). Nothing was removed.
+    aspects = "9cbc93c7c7c67a7aa45020b750a6ff2d1e032d87a6123b888691a066a40dfba5";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
