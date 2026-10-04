@@ -129,14 +129,17 @@
         ],
         "gen-prelude": [
           "gen-prelude"
+        ],
+        "gen-scope": [
+          "gen-scope"
         ]
       },
       "locked": {
-        "lastModified": 1791138077,
-        "narHash": "sha256-03upPe2mDJx/xPYYzDaGpP4mQz9L59wg38uYmq5+LDo=",
+        "lastModified": 1791155859,
+        "narHash": "sha256-rHV2MfEv6ilOapLNt2YYVPVGBRSbNRFttmrir/PtgOo=",
         "owner": "sini",
         "repo": "gen-delivery",
-        "rev": "c6e1a81921e21d8dafcf117e452f25a1936d143a",
+        "rev": "acff34ba47876b03bc29a971dc86283956b9f68b",
         "type": "github"
       },
       "original": {
