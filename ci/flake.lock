@@ -247,6 +247,23 @@
         "type": "github"
       }
     },
+    "gen-prelude-orig": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790623305,
+        "narHash": "sha256-2VMxiIjs7sX6CTLy7bSen3LBNZHRFfWREZrKnGKmefk=",
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "rev": "c471c9a12ef5495be5c50911ff45e3efa16cc67f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-prelude",
+        "rev": "c471c9a12ef5495be5c50911ff45e3efa16cc67f",
+        "type": "github"
+      }
+    },
     "gen-schema-orig": {
       "inputs": {
         "gen-algebra": "gen-algebra",
@@ -771,6 +788,7 @@
         "flake-root": "flake-root",
         "gen-graph-orig": "gen-graph-orig",
         "gen-harness": "gen-harness",
+        "gen-prelude-orig": "gen-prelude-orig",
         "gen-schema-orig": "gen-schema-orig",
         "gen-select-orig": "gen-select-orig",
         "git-hooks-nix": "git-hooks-nix_3",
