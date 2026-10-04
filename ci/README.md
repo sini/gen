@@ -159,7 +159,8 @@ peer shape: a complete peer relation with self-edges over n hosts, walked `peer*
 n ∈ {4, 5, 6, 7, 100, 1000}. Its numerator is `resolve` (the live gen-scope `resolve`, mode
 `reachable`, over the relation lifted to an evaluated scope); its denominator is `query-orig`, gen-graph
 FROZEN at `0db4e737` (`gen-graph-orig` in `ci/flake.nix`, the last revision before resolution moved
-into gen-scope), whose `query { mode = "all"; }` must reach the same nodes in the same order (the byte
+into gen-scope), applied with the gen-prelude its own lock pins (`gen-prelude-orig`), so the denominator
+is frozen in full; its `query { mode = "all"; }` must reach the same nodes in the same order (the byte
 gate). Thunks are gated per n at anchor + 0.000; allocation is reported only, because the n ≤ 7 cells
 allocate under 211 KB and the run-to-run jitter crosses a printed step. A third stack, `witnesses`,
 enumerates every simple path (NR-Cons) and is factorial in n: it runs at n ≤ 7 only, as the row's

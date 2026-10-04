@@ -1062,7 +1062,7 @@
           # is recoverable from a store path and `genInputs.gen-X` does not carry its own URL, so
           # both are read out of the lock that pinned them — resolved BY PATH from the root, never by
           # node label, because a lock carries duplicate-named nodes (`gen-merge_4`). The `axis`
-          # field is what lets the app refuse `--at` on the four REFERENCE keys by name: a ratio's
+          # field is what lets the app refuse `--at` on the five REFERENCE keys by name: a ratio's
           # denominator is its control, and if both arms float a moved ratio is unattributable.
           ciLock = builtins.fromJSON (builtins.readFile ./flake.lock);
           perfMemberKeys = [

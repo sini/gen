@@ -57,7 +57,7 @@
 # their revisions, and each one's LEAK set — into the report, so the artefact records the population
 # it measured instead of leaving the reader to infer it from a lock file.
 #
-# The four REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
+# The five REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
 # float, a moved ratio is unattributable — you cannot tell whether gen got worse or nixpkgs got
 # better — and the ci/README.md rejection of an absolute pure-counter ratchet rests on `ref` being
 # byte-identical across arms.
@@ -1240,7 +1240,7 @@ emit_report() {
     printf '| %s | %s | %s | %s | %s |\n' "$ck" "${BASE_AXIS[$ck]}" "$csrc" "$crev" "${PF_LEAK[$ck]:-—}"
   done
   echo
-  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The four reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
+  printf '> The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member'\''s OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: %s. Entries that are not functions, so they declare no formals to read: %s. The five reference keys do not take --at, because a ratio'\''s denominator is its control.\n' \
     "$PF_ARMING" "$PF_UNAPPLIED"
   echo
   echo "| workload | n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |"
