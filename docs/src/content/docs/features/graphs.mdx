@@ -11,6 +11,7 @@ machines. One `connects` edge says the web server talks to the database.
 let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   graph = gen.graph;
+  scope = gen.scope;
 
   links = [
     { from = "prod";    to = "us-east"; label = "contains"; }
@@ -23,7 +24,15 @@ let
   nodes = [ "prod" "us-east" "us-west" "web-1" "db-1" ];
 
   contains = { edges = targets "contains"; inherit nodes; };
-  labelled = graph.labeledFrom { contains = targets "contains"; connects = targets "connects"; } nodes;
+
+  # An evaluated scope: each label `l` is read from the attribute `edges-l`.
+  fleet = scope.eval { parseParent = _: null; } {
+    children = _: _: { };
+    imports = _: _: [ ];
+    marks = _: _: [ ];
+    edges-contains = _: targets "contains";
+    edges-connects = _: targets "connects";
+  } (scope.buildRoots { parentGraph = scope.overlays (map scope.vertex nodes); decls = { }; });
 in
 {
   machines = graph.leaves contains;
@@ -33,14 +42,10 @@ in
   cycles = graph.cycles contains;
 
   # Follow any number of `contains` edges, then exactly one `connects` edge.
-  reachedDbs = graph.query { } {
-    graph = labelled;
-    from = "prod";
-    follow = graph.regex.seq [
-      (graph.regex.star (graph.regex.lit "contains"))
-      (graph.regex.lit "connects")
-    ];
-  };
+  reachedDbs = map (a: a.node) (scope.resolve {
+    wf = scope.wellFormed { alphabet = [ "contains" "connects" ]; expression = "contains* connects"; };
+    dataFilter = n: n.id;
+  } fleet "prod").answers;
 }
 ```
 
@@ -71,7 +76,7 @@ gen-specific structure first.
 | Order | `topoOrder`, `topoOrderKahn`, `phaseOrder` | A dependency order, or the cycles that prevent one |
 | Cycles | `cycles`, `cyclePaths`, `condensation`, `lowlink` | Strongly connected components and the acyclic graph between them |
 | Closure | `transitiveClosure`, `transitiveReduction` | Every implied edge, or the fewest edges with the same reachability |
-| Labelled queries | `labeledFrom`, `query`, `regex.lit`, `regex.seq`, `regex.star`, `queryFold`, `queryArrivals` | Nodes at the end of paths whose edge labels match a regular expression |
+| Labelled queries | gen-scope's `resolve`, `wellFormed`, `wfl` | Nodes at the end of paths whose edge labels match a regular expression |
 | Edge algebra | `unionEdges`, `intersectEdges`, `differenceEdges`, `transpose`, `compose`, `materialize` | Combine and reverse edge relations |
 | Selectors | `matches`, `attrs`, `and`, `not`, `any`, `has`, `kind`, `within`, `child`, `descendant` | Composable node predicates, written as data |
 | Products | `cartesian`, `tensor`, `strong`, `lexicographic`, `productN`, `restrict`, `slice`, `fiber` | A graph over pairs of nodes, for example hosts × users |
@@ -94,7 +99,7 @@ A missing field fails with an error naming the function and the field, for examp
 
 ### Options come first
 
-`dependents`, `ancestorsOf`, `topoOrder`, `query` and `pathsBetween` take an options set before the
+`dependents`, `ancestorsOf`, `topoOrder` and `pathsBetween` take an options set before the
 graph. Pass `{ }` for the defaults. Calling one without it fails with
 `'edges' is not an option of this door; the options are closed`, because the graph was read as the
 options set.
@@ -106,10 +111,11 @@ returns `{ ok = false; cycles = [ [ "a" "b" ] ]; }`, so the caller decides how t
 
 ### Labelled path queries
 
-`labeledFrom` builds a labelled graph from one edge function per label. `query` walks it from a start
-node and returns every node where a path ends whose label sequence matches `follow`. The expression
-language has `lit`, `seq` and `star`. The walk runs over pairs of (node, expression state), so it
-terminates on cyclic graphs.
+Labelled paths are resolved by gen-scope's one calculus over an evaluated scope, where each label `l`
+is read from the attribute `edges-l`. `resolve` walks from a start node and returns every node where a
+path ends whose label sequence matches the `wellFormed` expression, written as a string or built with
+`wfl.lit`, `wfl.seq`, `wfl.alt`, `wfl.star`, `wfl.opt`, `wfl.plus` and `wfl.any`. The walk runs over pairs
+of (node, expression state), so it terminates on cyclic graphs.
 
 ### Selectors
 
@@ -158,5 +164,5 @@ where transposing a graph flips the arguments of `connect` and leaves `overlay` 
 
 ---
 
-**Provided by** gen-graph (queries, ordering, labelled paths), gen-select (selectors) and gen-product
+**Provided by** gen-graph (queries, ordering), gen-scope (labelled paths), gen-select (selectors) and gen-product
 (products).

@@ -63,8 +63,6 @@ Datafun's contribution is tracking monotonicity with types (abstract; contributi
 
 **Transitive closure (S3.4).** `transitiveClosure` iterates relational composition to a fixed point, the shape of Datafun's `trans E = fix X is E | (X . X)`. `compose` is relational composition `(.)` (S3.3) and `unionEdges` is the join `|`.
 
-**Folds over query answers.** `queryFold` folds a caller-supplied commutative, idempotent monoid over a query's answer set in canonical order. Under those laws the order is unobservable, which is why Datafun restricts fixed points to join-semilattices.
-
 ### gen-memo
 
 `restabilize` re-solves a cyclic stratum after a change by iterating each strongly connected component from bottom. For a lattice with a genuine join (union, powerset, or any finite-height bounded semilattice) Lemma 4 gives convergence at the least fixed point, detected when an iteration returns its input. gen-memo does not check that the step is monotone or that the lattice has finite height. Both are obligations on the caller, and a violation shows up as non-termination.
