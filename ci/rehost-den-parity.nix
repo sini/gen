@@ -137,31 +137,31 @@ let
     P:
     let
       eval = P.eval { } [
-          { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
-          (
-            { config, ... }:
-            {
-              config.schema.conf = { };
-              config.schema.fleet = { };
-              config.schema.host = {
-                options.addr = P.mkOption { type = P.types.str; };
-                imports = [ config.schema.conf ];
+        { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
+        (
+          { config, ... }:
+          {
+            config.schema.conf = { };
+            config.schema.fleet = { };
+            config.schema.host = {
+              options.addr = P.mkOption { type = P.types.str; };
+              imports = [ config.schema.conf ];
+            };
+            config.schema.user = {
+              parent = "host";
+              options.uid = P.mkOption {
+                type = P.types.int;
+                default = 1000;
               };
-              config.schema.user = {
-                parent = "host";
-                options.uid = P.mkOption {
-                  type = P.types.int;
-                  default = 1000;
-                };
-                imports = [ config.schema.conf ];
-              };
-              config.schema.home = {
-                parent = "host";
-                imports = [ config.schema.conf ];
-              };
-            }
-          )
-        ];
+              imports = [ config.schema.conf ];
+            };
+            config.schema.home = {
+              parent = "host";
+              imports = [ config.schema.conf ];
+            };
+          }
+        )
+      ];
       s = eval.config.schema;
     in
     {
@@ -194,19 +194,19 @@ let
     P: addr2:
     let
       hostSchema = P.eval { } [
-          {
-            options.schema = P.schema.mkSchemaOption denSchemaArgs;
-            config.schema.host.options.addr = P.mkOption { type = P.types.str; };
-          }
-        ];
+        {
+          options.schema = P.schema.mkSchemaOption denSchemaArgs;
+          config.schema.host.options.addr = P.mkOption { type = P.types.str; };
+        }
+      ];
       frozenHost = hostSchema.config.schema.host;
       eval = P.eval { } [
-          {
-            options.hosts = P.schema.mkInstanceRegistry frozenHost { };
-            config.hosts.blade.addr = "10.0.0.1";
-            config.hosts.uplink.addr = addr2;
-          }
-        ];
+        {
+          options.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          config.hosts.blade.addr = "10.0.0.1";
+          config.hosts.uplink.addr = addr2;
+        }
+      ];
     in
     lib.mapAttrs (_: h: { inherit (h) addr id_hash; }) eval.config.hosts;
 
@@ -219,18 +219,18 @@ let
     P:
     let
       hostSchema = P.eval { } [
-          {
-            options.den.schema = P.schema.mkSchemaOption denSchemaArgs;
-            config.den.schema.host.options.addr = P.mkOption { type = P.types.str; };
-          }
-        ];
+        {
+          options.den.schema = P.schema.mkSchemaOption denSchemaArgs;
+          config.den.schema.host.options.addr = P.mkOption { type = P.types.str; };
+        }
+      ];
       frozenHost = hostSchema.config.den.schema.host;
       eval = P.eval { } [
-          {
-            options.den.hosts = P.schema.mkInstanceRegistry frozenHost { };
-            config.den.hosts.blade.addr = "10.0.0.1";
-          }
-        ];
+        {
+          options.den.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          config.den.hosts.blade.addr = "10.0.0.1";
+        }
+      ];
     in
     {
       kindNames = hostSchema.config.den.schema._kindNames;

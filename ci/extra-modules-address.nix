@@ -34,14 +34,14 @@ let
   schema = genAspects.mkAspectSchema cnf;
 
   eval = genMerge.evalModuleTree { } [
-      { options.schema = schema.schemaOption; }
-      (schema.mkAspectModule { })
-      {
-        config.aspects.web.nixos.networking.hostName = "set";
-        config.aspects.web.peer.marker = "peer";
-        config.aspects.side.peer.marker = "peer";
-      }
-    ];
+    { options.schema = schema.schemaOption; }
+    (schema.mkAspectModule { })
+    {
+      config.aspects.web.nixos.networking.hostName = "set";
+      config.aspects.web.peer.marker = "peer";
+      config.aspects.side.peer.marker = "peer";
+    }
+  ];
 
   #   alpha, beta  nixos AND peer content
   #   gamma        peer content only — nixos does not realize there

@@ -17,7 +17,7 @@ jobs:
   # key sets and every non-identity field). `id_hash` is the ADR-0016 excluded axis — no forward
   # golden pin can carry the new encoding, so it is held by a teeth arm on the PURE engine instead.
   evaluators:
-    uses: sini/gen-harness/.github/workflows/evaluators.yml@8d98fe4704dce9aab3e9940215f029ba473fa77a
+    uses: sini/gen-harness/.github/workflows/evaluators.yml@333547c9d31ac4c0327e5903a8ce4030276a9b2d
     with:
       # `.` is the ROOT flake, the bare `nix flake check` every member repository runs. Its `roster`
       # output is what carries the check — forcing the roster to names depth reds on an unhealthy

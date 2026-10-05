@@ -226,13 +226,13 @@ let
   startup =
     P:
     (P.eval { } [
-        {
-          options.x = P.mkOption {
-            type = P.types.str;
-            default = "y";
-          };
-        }
-      ]).config.x;
+      {
+        options.x = P.mkOption {
+          type = P.types.str;
+          default = "y";
+        };
+      }
+    ]).config.x;
 
   # scalar — n flat typed options; layer 1 = mkDefault (all), layer 2 = mkIf (every 3rd discharges
   # away). Exercises decl merge, property discharge, priority, leaf verify. The wide-sibling shape
@@ -241,28 +241,28 @@ let
     P:
     let
       eval = P.eval { } [
-          {
-            options.s = toAttrs (i: {
-              name = "o${toString i}";
-              value = P.mkOption {
-                type = P.types.str;
-                default = "d${toString i}";
-              };
-            });
-          }
-          {
-            config.s = toAttrs (i: {
-              name = "o${toString i}";
-              value = P.mkDefault "a${toString i}";
-            });
-          }
-          {
-            config.s = toAttrs (i: {
-              name = "o${toString i}";
-              value = P.mkIf (!third i) "b${toString i}";
-            });
-          }
-        ];
+        {
+          options.s = toAttrs (i: {
+            name = "o${toString i}";
+            value = P.mkOption {
+              type = P.types.str;
+              default = "d${toString i}";
+            };
+          });
+        }
+        {
+          config.s = toAttrs (i: {
+            name = "o${toString i}";
+            value = P.mkDefault "a${toString i}";
+          });
+        }
+        {
+          config.s = toAttrs (i: {
+            name = "o${toString i}";
+            value = P.mkIf (!third i) "b${toString i}";
+          });
+        }
+      ];
     in
     eval.config.s;
 
@@ -289,38 +289,38 @@ let
         };
       };
       eval = P.eval { } [
-          {
-            options.hosts = P.mkOption {
-              type =
-                if builtins.isFunction attrsOfName then
-                  attrsOfName (P.types.submodule sub)
-                else
-                  P.types.${attrsOfName} (P.types.submodule sub);
-              default = { };
+        {
+          options.hosts = P.mkOption {
+            type =
+              if builtins.isFunction attrsOfName then
+                attrsOfName (P.types.submodule sub)
+              else
+                P.types.${attrsOfName} (P.types.submodule sub);
+            default = { };
+          };
+        }
+        {
+          config.hosts = toAttrs (i: {
+            name = "h${toString i}";
+            value = {
+              addr = "10.0.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
+              tags = [
+                "t${toString i}"
+                "zone-${toString (i / 100)}"
+              ];
             };
-          }
-          {
-            config.hosts = toAttrs (i: {
-              name = "h${toString i}";
-              value = {
-                addr = "10.0.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
-                tags = [
-                  "t${toString i}"
-                  "zone-${toString (i / 100)}"
-                ];
-              };
-            });
-          }
-          {
-            config.hosts = toAttrsIf even (i: {
-              name = "h${toString i}";
-              value = {
-                role = P.mkForce "db";
-                port = 8000 + i;
-              };
-            });
-          }
-        ];
+          });
+        }
+        {
+          config.hosts = toAttrsIf even (i: {
+            name = "h${toString i}";
+            value = {
+              role = P.mkForce "db";
+              port = 8000 + i;
+            };
+          });
+        }
+      ];
     in
     eval.config.hosts;
 
@@ -380,32 +380,32 @@ let
     P:
     let
       hostSchema = P.eval { } [
-          {
-            options.schema = P.schema.mkSchemaOption { };
-            config.schema.host = {
-              options.addr = P.mkOption { type = P.types.str; };
-              options.role = P.mkOption { type = P.types.str; };
-              options.system = P.mkOption {
-                type = P.types.str;
-                default = "x86_64-linux";
-              };
+        {
+          options.schema = P.schema.mkSchemaOption { };
+          config.schema.host = {
+            options.addr = P.mkOption { type = P.types.str; };
+            options.role = P.mkOption { type = P.types.str; };
+            options.system = P.mkOption {
+              type = P.types.str;
+              default = "x86_64-linux";
             };
-          }
-        ];
+          };
+        }
+      ];
       frozenHost = hostSchema.config.schema.host;
       eval = P.eval { } [
-          {
-            options.hosts = P.schema.mkInstanceRegistry frozenHost { };
-            config.hosts = toAttrs (i: {
-              name = "host${toString i}";
-              value = {
-                addr = "10.1.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
-                role = if even i then "web" else "db";
-              }
-              // (if third i then { system = "aarch64-linux"; } else { });
-            });
-          }
-        ];
+        {
+          options.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          config.hosts = toAttrs (i: {
+            name = "host${toString i}";
+            value = {
+              addr = "10.1.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
+              role = if even i then "web" else "db";
+            }
+            // (if third i then { system = "aarch64-linux"; } else { });
+          });
+        }
+      ];
     in
     # ── THE EXCLUDED AXIS: `id_hash` IS FORCED BUT NOT DIGESTED (ADR-0016) ──
     # This cell's digest is compared against the PERMANENT frozen `gen-schema-orig` pin, which
@@ -449,21 +449,21 @@ let
       treeOf =
         schemaOption:
         (P.eval { } [
-            {
-              options.schema = schemaOption;
-              config.schema = {
-                site.options.site = str;
-                role.options.role = str;
-                host = {
-                  inherits = [
-                    "site"
-                    "role"
-                  ];
-                  options.addr = str;
-                };
+          {
+            options.schema = schemaOption;
+            config.schema = {
+              site.options.site = str;
+              role.options.role = str;
+              host = {
+                inherits = [
+                  "site"
+                  "role"
+                ];
+                options.addr = str;
               };
-            }
-          ]).config.schema;
+            };
+          }
+        ]).config.schema;
       # a caller `mkType` that composes its defs, as gen-aspects' does
       mkType =
         {
@@ -478,18 +478,18 @@ let
       registryOf =
         host:
         (P.eval { } [
-            {
-              options.hosts = P.schema.mkInstanceRegistry host { };
-              config.hosts = toAttrs (i: {
-                name = "host${toString i}";
-                value = {
-                  addr = "10.1.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
-                  site = "s${toString (i / 100)}";
-                  role = if even i then "web" else "db";
-                };
-              });
-            }
-          ]).config.hosts;
+          {
+            options.hosts = P.schema.mkInstanceRegistry host { };
+            config.hosts = toAttrs (i: {
+              name = "host${toString i}";
+              value = {
+                addr = "10.1.${toString (i / 256)}.${toString (i - ((i / 256) * 256))}";
+                site = "s${toString (i / 100)}";
+                role = if even i then "web" else "db";
+              };
+            });
+          }
+        ]).config.hosts;
       project = builtins.mapAttrs (
         _: h: {
           inherit (h) addr site role;
@@ -515,21 +515,21 @@ let
       };
       fourth = i: builtins.bitAnd i 3 == 0;
       eval = P.eval { } [
-          { options.schema = schema.schemaOption; }
-          (schema.mkAspectModule { })
-          {
-            config.aspects = toAttrs (i: {
-              name = "asp${toString i}";
-              value = {
-                description = "aspect ${toString i}";
-                nixos = {
-                  services."svc${toString i}".enable = true;
-                };
-              }
-              // (if fourth i then { child.description = "child of ${toString i}"; } else { });
-            });
-          }
-        ];
+        { options.schema = schema.schemaOption; }
+        (schema.mkAspectModule { })
+        {
+          config.aspects = toAttrs (i: {
+            name = "asp${toString i}";
+            value = {
+              description = "aspect ${toString i}";
+              nixos = {
+                services."svc${toString i}".enable = true;
+              };
+            }
+            // (if fourth i then { child.description = "child of ${toString i}"; } else { });
+          });
+        }
+      ];
       flat = P.aspects.flatten eval.config.aspects;
     in
     builtins.mapAttrs (_: a: {
@@ -548,41 +548,41 @@ let
     P:
     let
       eval = P.eval { } [
-          {
-            freeformType = P.types.lazyAttrsOf P.types.str;
-            options.title = P.mkOption {
-              type = P.types.str;
-              default = "t";
-            };
-            options.count = P.mkOption {
-              type = P.types.int;
-              default = 0;
-            };
-          }
-          {
-            config =
-              (toAttrs (i: {
-                name = "k${toString i}";
-                value = P.mkDefault "d${toString i}";
-              }))
-              // {
-                title = "wide";
-                count = n;
-              };
-          }
-          {
-            config = toAttrsIf even (i: {
+        {
+          freeformType = P.types.lazyAttrsOf P.types.str;
+          options.title = P.mkOption {
+            type = P.types.str;
+            default = "t";
+          };
+          options.count = P.mkOption {
+            type = P.types.int;
+            default = 0;
+          };
+        }
+        {
+          config =
+            (toAttrs (i: {
               name = "k${toString i}";
-              value = P.mkForce "f${toString i}";
-            });
-          }
-          {
-            config = toAttrs (i: {
-              name = "k${toString i}";
-              value = P.mkIf (!third i) "b${toString i}";
-            });
-          }
-        ];
+              value = P.mkDefault "d${toString i}";
+            }))
+            // {
+              title = "wide";
+              count = n;
+            };
+        }
+        {
+          config = toAttrsIf even (i: {
+            name = "k${toString i}";
+            value = P.mkForce "f${toString i}";
+          });
+        }
+        {
+          config = toAttrs (i: {
+            name = "k${toString i}";
+            value = P.mkIf (!third i) "b${toString i}";
+          });
+        }
+      ];
     in
     eval.config;
 
@@ -620,19 +620,19 @@ let
       # a value that fills a chain to `depth` (only the leaf differs per instance).
       mkVal = d: leaf: if d == 0 then { inherit leaf; } else { next = mkVal (d - 1) leaf; };
       eval = P.eval { } [
-          {
-            options.chains = P.mkOption {
-              type = P.types.attrsOf (P.types.submodule (mkChain depth));
-              default = { };
-            };
-          }
-          {
-            config.chains = toAttrs (i: {
-              name = "c${toString i}";
-              value = mkVal depth "leaf${toString i}";
-            });
-          }
-        ];
+        {
+          options.chains = P.mkOption {
+            type = P.types.attrsOf (P.types.submodule (mkChain depth));
+            default = { };
+          };
+        }
+        {
+          config.chains = toAttrs (i: {
+            name = "c${toString i}";
+            value = mkVal depth "leaf${toString i}";
+          });
+        }
+      ];
     in
     eval.config.chains;
 
@@ -653,50 +653,52 @@ let
     let
       wide = 16;
       free = 4;
-      eval = P.eval { } (map (i: {
-            options = {
-              "o${toString i}" = P.mkOption {
+      eval = P.eval { } (
+        map (i: {
+          options = {
+            "o${toString i}" = P.mkOption {
+              type = P.types.str;
+              default = "d${toString i}";
+            };
+          }
+          // builtins.listToAttrs (
+            builtins.genList (j: {
+              name = "p${toString i}x${toString j}";
+              value = P.mkOption {
                 type = P.types.str;
-                default = "d${toString i}";
+                default = "w";
               };
-            }
-            // builtins.listToAttrs (
-              builtins.genList (j: {
-                name = "p${toString i}x${toString j}";
-                value = P.mkOption {
-                  type = P.types.str;
-                  default = "w";
+            }) wide
+          );
+          config = {
+            "o${toString i}" = P.mkIf (!third i) "v${toString i}";
+            bag."k${toString i}" = "b${toString i}";
+            "u${toString i}" = "f${toString i}";
+          }
+          // builtins.listToAttrs (
+            builtins.genList (j: {
+              name = "u${toString i}x${toString j}";
+              value = "f";
+            }) free
+          );
+        }) idx
+        ++ [
+          {
+            freeformType = P.types.attrsOf P.types.str;
+            options =
+              toAttrs (i: {
+                name = "o${toString i}";
+                value = P.mkOption { type = P.types.str; };
+              })
+              // {
+                bag = P.mkOption {
+                  type = P.types.attrsOf P.types.str;
+                  default = { };
                 };
-              }) wide
-            );
-            config = {
-              "o${toString i}" = P.mkIf (!third i) "v${toString i}";
-              bag."k${toString i}" = "b${toString i}";
-              "u${toString i}" = "f${toString i}";
-            }
-            // builtins.listToAttrs (
-              builtins.genList (j: {
-                name = "u${toString i}x${toString j}";
-                value = "f";
-              }) free
-            );
-          }) idx
-          ++ [
-            {
-              freeformType = P.types.attrsOf P.types.str;
-              options =
-                toAttrs (i: {
-                  name = "o${toString i}";
-                  value = P.mkOption { type = P.types.str; };
-                })
-                // {
-                  bag = P.mkOption {
-                    type = P.types.attrsOf P.types.str;
-                    default = { };
-                  };
-                };
-            }
-          ]);
+              };
+          }
+        ]
+      );
     in
     eval.config;
 
@@ -711,10 +713,12 @@ let
   sameLocFanIn =
     P:
     let
-      eval = P.eval { } (map (_: {
-            options.p = P.mkOption { type = P.types.str; };
-          }) idx
-          ++ [ { config.p = "v"; } ]);
+      eval = P.eval { } (
+        map (_: {
+          options.p = P.mkOption { type = P.types.str; };
+        }) idx
+        ++ [ { config.p = "v"; } ]
+      );
     in
     eval.config;
 
@@ -832,10 +836,13 @@ let
 
       memberFull =
         i:
-        (genMerge.evalModuleTree { } (coreRegistryModules ++ [
+        (genMerge.evalModuleTree { } (
+          coreRegistryModules
+          ++ [
             nodeIdDecl
             (axisModule i)
-          ])).config;
+          ]
+        )).config;
       memberFixed =
         i:
         (genClass.applyCoreFixed {
@@ -975,11 +982,14 @@ let
       prev = genMerge.evalModuleTree { specialArgs = specialArgs; } base;
 
       coldMember =
-        k:
-        (genMerge.evalModuleTree { specialArgs = specialArgs; } (base ++ [ (editOf k) ])).config;
+        k: (genMerge.evalModuleTree { specialArgs = specialArgs; } (base ++ [ (editOf k) ])).config;
       warmMember =
         k:
-        (genMerge.evalModuleTree { specialArgs = specialArgs; warmFrom = prev; editedModules = [ (editOf k) ]; } (base ++ [ (editOf k) ])).config;
+        (genMerge.evalModuleTree {
+          specialArgs = specialArgs;
+          warmFrom = prev;
+          editedModules = [ (editOf k) ];
+        } (base ++ [ (editOf k) ])).config;
 
       projOf = if stack == "warm" then warmMember else coldMember;
     in
@@ -1052,23 +1062,23 @@ let
       nodes = names "a" ++ names "b";
       isA = id: builtins.substring 0 1 id == "a";
       ev = M.evalModuleTree { } [
-          {
-            options.hostsA = S.mkInstanceRegistry kA { };
-            options.hostsB = S.mkInstanceRegistry kB { };
-            config.hostsA = builtins.listToAttrs (
-              map (x: {
-                name = x;
-                value.addr = "10.0.0.1";
-              }) (names "a")
-            );
-            config.hostsB = builtins.listToAttrs (
-              map (x: {
-                name = x;
-                value.addr = "10.0.0.2";
-              }) (names "b")
-            );
-          }
-        ];
+        {
+          options.hostsA = S.mkInstanceRegistry kA { };
+          options.hostsB = S.mkInstanceRegistry kB { };
+          config.hostsA = builtins.listToAttrs (
+            map (x: {
+              name = x;
+              value.addr = "10.0.0.1";
+            }) (names "a")
+          );
+          config.hostsB = builtins.listToAttrs (
+            map (x: {
+              name = x;
+              value.addr = "10.0.0.2";
+            }) (names "b")
+          );
+        }
+      ];
       ctx = sel.adapters.registry.mkContext {
         inherit nodes;
         data = id: if isA id then ev.config.hostsA.${id} else ev.config.hostsB.${id};
@@ -1120,7 +1130,11 @@ let
       sel = if isRef then genSelectOrig else genSelect;
       S = if isRef then genSchemaOld else genSchemaNew;
       O = if isRef then lib else genMerge;
-      eval = if isRef then (o: modules: lib.evalModules (o // { inherit modules; })) else genMerge.evalModuleTree;
+      eval =
+        if isRef then
+          (o: modules: lib.evalModules (o // { inherit modules; }))
+        else
+          genMerge.evalModuleTree;
       declA = {
         addr = O.mkOption { type = if sealedE then lib.types.str else O.types.str; };
       };
@@ -1133,11 +1147,11 @@ let
       mkHost =
         d:
         (eval { } [
-            {
-              options.schema = S.mkSchemaOption { };
-              config.schema.host.options = d;
-            }
-          ]).config.schema.host;
+          {
+            options.schema = S.mkSchemaOption { };
+            config.schema.host.options = d;
+          }
+        ]).config.schema.host;
       kA = mkHost declA;
       kB = mkHost declB;
       half = builtins.genList (i: "h${toString i}") (n / 2);
@@ -1153,22 +1167,22 @@ let
           }) xs
         );
       ev = eval { } [
-          {
-            options.hostsA = S.mkInstanceRegistry kA { };
-            options.hostsB = S.mkInstanceRegistry kB { };
-            config.hostsA = regOf half;
-            config.hostsB = regOf half;
-          }
-        ];
+        {
+          options.hostsA = S.mkInstanceRegistry kA { };
+          options.hostsB = S.mkInstanceRegistry kB { };
+          config.hostsA = regOf half;
+          config.hostsB = regOf half;
+        }
+      ];
       planted = stack == "entity-plant";
       evOne =
         id:
         (eval { } [
-            {
-              options.h = S.mkInstanceRegistry (mkHost (if isA id then declA else declB)) { };
-              config.h.${inst id}.addr = "10.0.0.1";
-            }
-          ]).config.h.${inst id};
+          {
+            options.h = S.mkInstanceRegistry (mkHost (if isA id then declA else declB)) { };
+            config.h.${inst id}.addr = "10.0.0.1";
+          }
+        ]).config.h.${inst id};
       ctx = sel.adapters.registry.mkContext {
         inherit nodes;
         data =
@@ -1227,26 +1241,26 @@ let
       P = sel.adapters.product;
       kH =
         (genMerge.evalModuleTree { } [
-            {
-              options.schema = genSchemaNew.mkSchemaOption { };
-              config.schema.host.options.addr = genMerge.mkOption {
-                type = if sealedC then lib.types.str else genMerge.types.str;
-              };
-            }
-          ]).config.schema.host;
+          {
+            options.schema = genSchemaNew.mkSchemaOption { };
+            config.schema.host.options.addr = genMerge.mkOption {
+              type = if sealedC then lib.types.str else genMerge.types.str;
+            };
+          }
+        ]).config.schema.host;
       names = builtins.genList (i: "h${toString i}") n;
       hosts =
         (genMerge.evalModuleTree { } [
-            {
-              options.hosts = genSchemaNew.mkInstanceRegistry kH { };
-              config.hosts = builtins.listToAttrs (
-                map (x: {
-                  name = x;
-                  value.addr = x;
-                }) names
-              );
-            }
-          ]).config.hosts;
+          {
+            options.hosts = genSchemaNew.mkInstanceRegistry kH { };
+            config.hosts = builtins.listToAttrs (
+              map (x: {
+                name = x;
+                value.addr = x;
+              }) names
+            );
+          }
+        ]).config.hosts;
       ctx = P.mkContext (
         {
           cellIds = names;

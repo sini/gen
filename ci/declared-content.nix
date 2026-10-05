@@ -68,15 +68,15 @@ let
   # TWO member hosts, both in `web`, so "realizes no host" and "realizes EVERY member host" are both
   # claims over a non-empty domain.
   eval = genMerge.evalModuleTree { } [
-      { options.schema = schema.schemaOption; }
-      (schema.mkAspectModule { })
-      {
-        config.aspects.web.nixos.networking.hostName = "set";
-        # Non-empty `imports`: class-shaped AND content-bearing, so only the declared category
-        # can exclude it.
-        config.aspects.web.chan.imports = [ { } ];
-      }
-    ];
+    { options.schema = schema.schemaOption; }
+    (schema.mkAspectModule { })
+    {
+      config.aspects.web.nixos.networking.hostName = "set";
+      # Non-empty `imports`: class-shaped AND content-bearing, so only the declared category
+      # can exclude it.
+      config.aspects.web.chan.imports = [ { } ];
+    }
+  ];
 
   values = {
     inherit (eval.config) aspects;
