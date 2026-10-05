@@ -100,7 +100,8 @@ priority merge in reverse module order, as in nixpkgs: that is why `allowUsers` 
 
 A definition for an option that does not exist fails with
 ``The option `ssh.prot' does not exist. Definition values:`` and one
-``- In `/modules/web-1.nix': 1`` line naming the defining file, as nixpkgs does. With
+``- In `/modules/web-1.nix': 1`` line naming the defining file, then nixpkgs' suggestion over the
+sibling option names, ``Did you mean `ssh.port'?``, as nixpkgs does. With
 `check = false` the evaluation continues, and `undeclared` lists
 `{ file = "/modules/web-1.nix"; path = [ "ssh" "prot" ]; }`.
 

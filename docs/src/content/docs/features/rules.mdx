@@ -58,7 +58,7 @@ fact. An **atom** is one fact, such as `reach:web-1:db-1`. Its name is yours: ge
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Write a program | `program.program frozen declarations` | Collect rules `{ head; label?; pos?; neg?; relata; }` into one program |
+| Write a program | `program.program frozen declarations` | Collect rules `{ head; label?; promote?; pos?; neg?; relata; }` into one program |
 | Solve it | `program.model { program; interpretation; prior; complete; }` | Compute every atom's verdict |
 | Read a verdict | `.resolve atom`, `.trueAtoms`, `.falseAtoms`, `.undefinedAtoms`, `.withheldAtoms` | Ask about one atom, or list atoms by verdict |
 | Turn results into edges | `program.ruleEdges model declarations` | The edge of every labelled rule, and the ones whose head the model includes |
@@ -122,7 +122,7 @@ settled before this program runs. A relatum missing from `frozen` fails with an 
 ### From atoms to edges
 
 A rule with a `label` denotes the edge `{ from = relata[0]; to = relata[1]; label; }`.
-`ruleEdges model declarations` returns two edge lists: `candidates`, the edge of every labelled
+`ruleEdges model declarations` returns two edge lists (and two promotion lists, below): `candidates`, the edge of every labelled
 rule, and `reached`, the candidates whose head the model includes. That is how `allowed` above is
 built. `reached` fails with an error on an undefined head rather than dropping the edge:
 
@@ -130,6 +130,13 @@ built. `reached` fails with an error on an undefined head rather than dropping t
 (gen.program.ruleEdges model declarations).reached
 # [ { from = "web-1"; label = "reach"; to = "db-1"; } ]
 ```
+
+A rule may carry `promote`, a relation kind, instead of `label`. Its head, when included, then
+denotes a node rather than an edge, and its `relata` are a labelled tuple: an attrset from label to
+identifier. `ruleEdges` returns two more lists for these, `promotions` (one record per promoted head)
+and `promoted` (the records whose head the model includes). A record is not yet a node: hand
+`promoted` to gen-scope's `mintStrata` to mint it. A rule carrying both `label` and `promote` fails
+with an error.
 
 [Inspection](/features/inspection/) shows these derived edges beside the declared ones, and answers
 why each exists.
