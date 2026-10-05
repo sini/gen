@@ -215,6 +215,8 @@ MATRIX=(
   "lazyRegistry 2000 r"
   "threadedRegistry 500 small"
   "threadedRegistry 2000 r,big"
+  "wrappedRegistry 500 small"
+  "wrappedRegistry 2000 r,big"
   "schemaHosts 400 small"
   "schemaHosts 1600 r,big"
   "inheritHosts 400 small,noref"
@@ -297,6 +299,16 @@ ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
 # needs no licence (ci/README.md). Arming: the planted stacks below, never a gated arm.
 ROW_THUNKS_MAX[threadedRegistry,2000]=0.772
 ROW_ALLOC_MAX[threadedRegistry,2000]=0.675
+# wrappedRegistry n=2000 — the registry shape under nixpkgs `coercedTo` (a container that adds no step)
+# over the stack's own `attrsOf`, which gen-merge keys at the option's root as the root is (keyWalk's
+# step-free arm, den-hoag-t1j4z). ANCHORS 0.652 / 0.580 at Nix 2.34.8, gen-merge d01779a (branch
+# t1j4z-b1, the landing that opens the arm) under this hub's other pins. MARGIN 0.000, the
+# threadedRegistry precedent: the row is new, and a bound below the default COUNTER_RATIO_MAX is a
+# tightening, which needs no licence (ci/README.md). Arming: a gen-merge without the arm cannot
+# evaluate the row at all (class (a) under `coercedTo`), and a fresh token planted as the arm's body
+# reds the bench naming it (landing-time seed; no per-run plant).
+ROW_THUNKS_MAX[wrappedRegistry,2000]=0.652
+ROW_ALLOC_MAX[wrappedRegistry,2000]=0.580
 # schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
 # The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
 # stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
@@ -967,7 +979,7 @@ for row in "${MATRIX[@]}"; do
   fi
 done
 
-for w in scalar registry threadedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1278,7 +1290,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done

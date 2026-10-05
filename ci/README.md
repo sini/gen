@@ -90,7 +90,10 @@ fixtures); `perf-bench.sh` drives it through `nix-instantiate --eval` + `NIX_SHO
 catches super-linear key handling), `registry`/`lazyRegistry` (attrsOf(submodule) instance
 registries), `threadedRegistry` (the same registry over nixpkgs `attrsWith` with a non-default
 `placeholder`, a container outside the six gen-merge re-homes, so the pure stack folds through
-gen-merge's threaded rebuild channel; its arming plant must fire on the pure arm only), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
+gen-merge's threaded rebuild channel; its arming plant must fire on the pure arm only),
+`wrappedRegistry` (the same registry under nixpkgs `coercedTo` over the stack's own `attrsOf`, a
+container that adds no step, so the pure stack keys it at the option's root as the root is; a
+gen-merge without that arm cannot evaluate the row), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
 of the digest — the ADR-0016 excluded axis), `inheritHosts` (the same shape with a host kind inheriting
 two parents by name, on both gen-schema entry arms: the desugared parents ride every instance's module
 list, so an `inherits` change is priced per instance; pure-only, since the frozen reference predates
