@@ -301,8 +301,8 @@ ROW_THUNKS_MAX[threadedRegistry,2000]=0.772
 ROW_ALLOC_MAX[threadedRegistry,2000]=0.675
 # wrappedRegistry n=2000 — the registry shape under nixpkgs `coercedTo` (a container that adds no step)
 # over the stack's own `attrsOf`, which gen-merge keys at the option's root as the root is (keyWalk's
-# step-free arm, den-hoag-t1j4z). ANCHORS 0.652 / 0.580 at Nix 2.34.8, gen-merge 76ae01b (branch
-# t1j4z-b1, the landing that opens the arm) under this hub's other pins. MARGIN 0.000, the
+# step-free arm, den-hoag-t1j4z). ANCHORS 0.652 / 0.580 at Nix 2.34.8, gen-merge b15c282 (main,
+# carrying t1j4z-b1's arm and t1j4z's agreeing-definitions serve) under this hub's other pins. MARGIN 0.000, the
 # threadedRegistry precedent: the row is new, and a bound below the default COUNTER_RATIO_MAX is a
 # tightening, which needs no licence (ci/README.md). Arming: a gen-merge without the arm cannot
 # evaluate the row at all (class (a) under `coercedTo`), and a fresh token planted as the arm's body

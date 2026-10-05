@@ -134,7 +134,11 @@ let
   genClass = env.class;
   genSelect = env.select;
   genSelectOrig = env.selectOrig;
-  genSchemaOld = env.schemaOrig;
+  # The frozen gen-schema predates its registry door's options-first order (den-hoag-7gp66 P2 L4), so
+  # it adapts to the gen door's shape, as refP's `eval` adapts nixpkgs' `evalModules`.
+  genSchemaOld = env.schemaOrig // {
+    mkInstanceRegistry = o: kind: env.schemaOrig.mkInstanceRegistry kind o;
+  };
   genScope = env.scope;
   genGraphOrig = env.graphOrig;
 
