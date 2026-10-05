@@ -1234,6 +1234,16 @@
             roots = [ ];
             publicationRoots = [ self.sourceInfo.outPath ];
           };
+
+          # ── THE COMMIT HOOK: the SAME construction every mkCi consumer installs, hook AND slot
+          # writer, through the published `lib.stagedCommitHook`. It runs the format-only config
+          # below in an export of the staged tree, never pre-commit's stashing shim, so a commit in
+          # a checkout another writer shares leaves their unstaged edits on disk
+          # (den-hoag-commit-hook-stash-shared-checkout-ddjy2).
+          stagedHook = inputs.gen-harness.lib.stagedCommitHook {
+            inherit pkgs;
+            inherit (config.pre-commit.settings) package configFile;
+          };
         in
         {
           # Pre-commit gate for the hub itself. Unlike the lib repos (which consume
@@ -1248,6 +1258,8 @@
           # the gates themselves are pure functions of `pkgs` and apply here unchanged.
           pre-commit = {
             check.enable = false;
+            # Config generated, nothing installed: the slot is `stagedHook`'s.
+            settings.install.enable = false;
             settings.hooks.treefmt = {
               enable = true;
               package = self'.formatter;
@@ -1547,7 +1559,7 @@
           };
 
           devshells.default = {
-            devshell.startup.git-hooks.text = config.pre-commit.installationScript;
+            devshell.startup.git-hooks.text = "${stagedHook.install} 1>&2";
 
             env = [
               {
