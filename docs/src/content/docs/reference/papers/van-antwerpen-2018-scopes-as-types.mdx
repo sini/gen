@@ -55,7 +55,7 @@ The resolution algorithm (S4.2) implements an ordered depth-first search control
 
 ### gen-scope
 
-- **Custom edge labels via `edgeGraphs`/`followEdge`**: `buildNodes` accepts `edgeGraphs = { label = graph; }` which stores custom-labeled edges in `decls.__edges.<label>`. The `followEdge label self id` combinator (S2.1 generalized edges) retrieves targets for a given label. `collectByLabel label extract self id` aggregates values along custom edges. This directly implements the paper's generalization from fixed P/I edges to arbitrary label sets L.
+- **Custom edge labels via `edgeGraphs`/`followEdge`**: `buildRoots` accepts `edgeGraphs = [ { label; graph; } … ]`, an ordered list, and stores custom-labeled edges in `decls.__edges.<label>`; an evaluation exposes them as an `edges-<label>` attribute. The `followEdge label self id` combinator (S2.1 generalized edges) retrieves the targets for a given label as the one-letter resolution `wf = label`, so a boundary mark at the node withholds them. `collectByLabel label extract self id` aggregates values along custom edges. This directly implements the paper's generalization from fixed P/I edges to arbitrary label sets L.
 
 - **Structural subtyping via `subtypeOf`**: `subtypeOf { eq? } self idA idB` implements the \<:-Rec pattern from S2.3 Fig. 4 as a field check: every declaration of scope A must also be declared in scope B, and `eq` decides whether each pair is compatible (by default, any pair is).
 

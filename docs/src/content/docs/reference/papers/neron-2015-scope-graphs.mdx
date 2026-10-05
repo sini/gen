@@ -67,7 +67,7 @@ gen-scope implements the complete Neron resolution framework as a demand-driven 
 
 - **queryAll**: Implements reachability without visibility filtering (rule R without rule V), corresponding to Neron's reachable declarations relation for ambiguity detection.
 
-- **collectionAttr**: Extends Neron's framework with traversal-based aggregation. Traverse modes `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"neron"` and `"label:<name>"`, or a traversal function, generalize path-following beyond Neron's P and I edges.
+- **collectionAttr**: Extends Neron's framework with traversal-based aggregation. Traverse modes `"imports"`, `"children"`, `"siblings"`, `"ancestors"`, `"neron"` and `"label:<name>"`, or a traversal function, generalize path-following beyond Neron's P and I edges. `"imports"` and `"label:<name>"` are one-letter resolutions (`wf = l`), so boundary marks withhold them as they do the walks; `"children"` and `"siblings"` read the containment tree.
 
 - **Algebraic graph construction**: All four Mokhov (2017) primitives (`empty`, `vertex`, `overlay`, `connect`) plus derived constructors (`star`, `path`, `clique`, `tree`, `forest`) are used to build the scope graphs that Neron's calculus operates over.
 
