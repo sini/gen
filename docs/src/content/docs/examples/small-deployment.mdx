@@ -87,9 +87,7 @@ let
   aspectSchema = genAspects.mkAspectSchema (import ../aspect-cnf.nix);
 
   # Two kinds.
-  schema = genSchema.evalSchema {
-    inherit (aspectSchema) schemaOption;
-    modules = [ {
+  schema = genSchema.evalSchema { schemaOption = aspectSchema.schemaOption; } [ {
       config.schema.host = {
         options.aspects = mkOption { type = types.listOf types.str; default = [ ]; };
       };
@@ -98,7 +96,6 @@ let
         options.admin = mkOption { type = types.bool; default = false; };
       };
     } ];
-  };
 
   # The users that list a host.
   usersOn = host:
@@ -110,8 +107,8 @@ in
   imports = [ (aspectSchema.mkAspectModule { }) ];
 
   # Two registries.
-  options.hosts = genSchema.mkInstanceRegistry schema.host { };
-  options.users = genSchema.mkInstanceRegistry schema.user { };
+  options.hosts = genSchema.mkInstanceRegistry { } schema.host;
+  options.users = genSchema.mkInstanceRegistry { } schema.user;
 
   config = {
     hosts.web.aspects = [ "webserver" ];

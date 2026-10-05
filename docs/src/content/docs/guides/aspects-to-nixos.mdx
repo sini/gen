@@ -95,9 +95,7 @@ The finished project has five files:
      inherit (genMerge) mkOption types;
      aspectSchema = genAspects.mkAspectSchema (import ../aspect-cnf.nix);
 
-     schema = genSchema.evalSchema {
-       inherit (aspectSchema) schemaOption;
-       modules = [ {
+     schema = genSchema.evalSchema { schemaOption = aspectSchema.schemaOption; } [ {
          config.schema.host = {
            options.aspects = mkOption { type = types.listOf types.str; default = [ ]; };   # (2)
          };
@@ -106,7 +104,6 @@ The finished project has five files:
            options.admin = mkOption { type = types.bool; default = false; };
          };
        } ];
-     };
    ```
 
    1. The hub passes these gen libraries to every module in the tree.
@@ -119,8 +116,8 @@ The finished project has five files:
    {
      imports = [ (aspectSchema.mkAspectModule { }) ];                  # (1)
 
-     options.hosts = genSchema.mkInstanceRegistry schema.host { };     # (2)
-     options.users = genSchema.mkInstanceRegistry schema.user { };
+     options.hosts = genSchema.mkInstanceRegistry { } schema.host;     # (2)
+     options.users = genSchema.mkInstanceRegistry { } schema.user;
 
      config = {
        hosts.web.aspects = [ "webserver" ];                            # (3)

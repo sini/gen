@@ -11,8 +11,7 @@ let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   inherit (gen.merge) evalModuleTree mkOption types;
 
-  kinds = gen.schema.evalSchema {
-    modules = [{
+  kinds = gen.schema.evalSchema { } [{
       config.schema.host = {
         options.system = mkOption { type = types.str; default = "x86_64-linux"; };
         options.address = mkOption { type = types.str; };
@@ -26,11 +25,10 @@ let
         options.sudo = mkOption { type = types.bool; default = true; };
       };
     }];
-  };
 
   result = evalModuleTree { } [ ({ config, ... }: {
-      options.hosts = gen.schema.mkInstanceRegistry kinds.host { };
-      options.admins = gen.schema.mkInstanceRegistry kinds.admin { refs.home = config.hosts; };
+      options.hosts = gen.schema.mkInstanceRegistry { } kinds.host;
+      options.admins = gen.schema.mkInstanceRegistry { refs.home = config.hosts; } kinds.admin;
 
       config.hosts.web-1 = { address = "10.0.0.2"; };
       config.hosts.db-1 = { address = "10.0.0.1"; system = "aarch64-linux"; };
@@ -69,10 +67,10 @@ defaults (`web-1.system`, `deploy.sudo`) and an `id_hash`.
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Declare kinds | `schema.evalSchema { modules; }` | Build a set of kinds from modules under `config.schema.<kind>` |
+| Declare kinds | `schema.evalSchema { specialArgs?; } modules` | Build a set of kinds from modules under `config.schema.<kind>` |
 | Inherit | `inherits = [ "<kind>" ];` | Give a kind every option of another kind |
 | Mix in | `mkMixin`, `applyMixin`, `composeMixins` | Add a reusable group of options to several kinds |
-| Hold instances | `mkInstanceRegistry kind { refs?; extraModules?; }` | An option holding a kind's instances, with defaults and `id_hash` |
+| Hold instances | `mkInstanceRegistry { refs?; extraModules?; } kind` | An option holding a kind's instances, with defaults and `id_hash` |
 | Validate | `validateInstances` | Check every instance against its kind's validators |
 | Refine an option | `schema.refined type [ schema.refinements.tcpPort ]`, `checkRefinements` | Narrow an option's type with named predicates such as `positive`, `nonEmpty` and `tcpPort` |
 | Reference | `declarationOf "<kind>"`, `mkFieldDeclaration`, `isFieldDeclaration` | An option whose value is another instance, given by name or by value |
@@ -155,7 +153,7 @@ library to every module as `genSchema`. Kinds declared this way can use nixpkgs'
     flake-parts.lib.mkFlake { inherit inputs; } ({ config, lib, genSchema, ... }: {
       imports = [ inputs.gen-schema.flakeModules.default ];
 
-      options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
+      options.hosts = genSchema.mkInstanceRegistry { } config.schema.host;
 
       config = {
         systems = [ ];

@@ -59,7 +59,7 @@ composition of all the modules gives. Only the work differs: `ssh.port` was reus
 | Stop early | `earlyCutoff` | Stop propagating where a recomputed value equals the old one |
 | Explain | `why`, `whyFor`, `whyNot`, `whyNotFor` | Why a node was or was not recomputed |
 | Cycles | `runScc` | Recompute a group of mutually dependent nodes together |
-| Share a core | `class.mkClasses { nodes; keyOf; }`, `mkCore`, `applyCoreMerge`, `applyCoreExtend`, `gateCore` | Compute shared configuration once for a class of similar nodes |
+| Share a core | `class.mkClasses keyOf nodes`, `mkCore`, `applyCoreMerge`, `applyCoreExtend`, `gateCore` | Compute shared configuration once for a class of similar nodes |
 
 ## Details
 
@@ -103,9 +103,10 @@ Hosts that play the same role often compute the same configuration. `mkClasses` 
 key:
 
 ```nix
-gen.class.mkClasses {
-  nodes = { web-1.role = "webserver"; web-2.role = "webserver"; db-1.role = "database"; };
-  keyOf = _name: node: node.role;
+gen.class.mkClasses (_name: node: node.role) {
+  web-1.role = "webserver";
+  web-2.role = "webserver";
+  db-1.role = "database";
 }
 # [ { key = "database";  members = [ "db-1" ];           archetype = "db-1";  … }
 #   { key = "webserver"; members = [ "web-1" "web-2" ]; archetype = "web-1"; … } ]

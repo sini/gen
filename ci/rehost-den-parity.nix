@@ -202,7 +202,7 @@ let
       frozenHost = hostSchema.config.schema.host;
       eval = P.eval { } [
         {
-          options.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          options.hosts = P.schema.mkInstanceRegistry { } frozenHost;
           config.hosts.blade.addr = "10.0.0.1";
           config.hosts.uplink.addr = addr2;
         }
@@ -227,7 +227,7 @@ let
       frozenHost = hostSchema.config.den.schema.host;
       eval = P.eval { } [
         {
-          options.den.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          options.den.hosts = P.schema.mkInstanceRegistry { } frozenHost;
           config.den.hosts.blade.addr = "10.0.0.1";
         }
       ];

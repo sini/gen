@@ -27,7 +27,7 @@
   # exports `evalSchema`, then rewrite this as the ordinary `frozen = genSchema.evalSchema {
   # modules = [ { config.schema.pkg = <the kind body below>; } ]; }` let-bind per
   # specs/2026-09-15-gen-schema-inheritance-relocation-spec.md §2.6, mirroring `ci/inject-payload.nix`.
-  options.packages = genSchema.mkInstanceRegistry config.schema.pkg { };
+  options.packages = genSchema.mkInstanceRegistry { } config.schema.pkg;
 
   config.schema.pkg = {
     # "shellScript" -> writeShellScriptBin, "text" -> writeText (resolved at the terminal).

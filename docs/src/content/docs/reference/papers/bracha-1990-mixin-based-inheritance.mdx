@@ -73,7 +73,7 @@ The most direct implementation. gen-algebra's record algebra realises Bracha's c
 
 gen-schema lifts Bracha's algebra to kind definitions.
 
-- **`mkMixin { define; requires ? [ ]; provides ? [ ]; }`** creates a first-class mixin with an explicit interface. `requires` lists the labels the mixin expects on its parent, as a partial mixin references undefined fields. `provides` lists the labels it contributes. `define` receives the parent record and returns new fields, which is Bracha's parametric delta.
+- **`mkMixin { requires ? [ ]; provides ? [ ]; } define`** creates a first-class mixin with an explicit interface: the options come first, as one closed set, and `define` last. `requires` lists the labels the mixin expects on its parent, as a partial mixin references undefined fields. `provides` lists the labels it contributes. `define` receives the parent record and returns new fields, which is Bracha's parametric delta.
 
 - **`composeMixins [ m1 m2 m3 ]`** composes a chain with `record.compose`. It tracks `requires` and `provides` across the chain, so an earlier mixin's `provides` satisfies a later mixin's `requires`. Bracha's Modula-3 sketch leaves this compatibility to static typing.
 

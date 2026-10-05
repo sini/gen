@@ -15,8 +15,7 @@ let
   gen = inputs.gen.lib.mkGenLibs { };
   m = gen.merge;
 
-  schema = gen.schema.evalSchema {
-    modules = [
+  schema = gen.schema.evalSchema { } [
       {
         config.schema.host = {
           options.system = m.mkOption { type = m.types.str; default = "x86_64-linux"; };
@@ -24,11 +23,10 @@ let
         };
       }
     ];
-  };
 
   fleet = m.evalModuleTree { } [
       {
-        options.hosts = gen.schema.mkInstanceRegistry schema.host { };
+        options.hosts = gen.schema.mkInstanceRegistry { } schema.host;
         config.hosts.web-1.role = "webserver";
         config.hosts.db-1.role = "database";
       }

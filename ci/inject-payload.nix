@@ -44,13 +44,11 @@ let
           default = [ ];
         };
       };
-      frozen = genSchema.evalSchema {
-        modules = [ { config.schema.host = hostKind; } ];
-      };
+      frozen = genSchema.evalSchema { } [ { config.schema.host = hostKind; } ];
     in
     {
       options.schema = genSchema.mkSchemaOption { };
-      options.hosts = genSchema.mkInstanceRegistry frozen.host { };
+      options.hosts = genSchema.mkInstanceRegistry { } frozen.host;
       config.schema.host = hostKind;
       config.hosts.igloo = {
         addr = "10.0.1.1";

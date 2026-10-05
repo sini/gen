@@ -404,7 +404,7 @@ let
       frozenHost = hostSchema.config.schema.host;
       eval = P.eval { } [
         {
-          options.hosts = P.schema.mkInstanceRegistry frozenHost { };
+          options.hosts = P.schema.mkInstanceRegistry { } frozenHost;
           config.hosts = toAttrs (i: {
             name = "host${toString i}";
             value = {
@@ -488,7 +488,7 @@ let
         host:
         (P.eval { } [
           {
-            options.hosts = P.schema.mkInstanceRegistry host { };
+            options.hosts = P.schema.mkInstanceRegistry { } host;
             config.hosts = toAttrs (i: {
               name = "host${toString i}";
               value = {
@@ -826,10 +826,7 @@ let
       # pure-fixed forces this (via `core`); pure-full never references it (laziness ⇒ no double-pay).
       coreValues = (genMerge.evalModuleTree { } coreRegistryModules).config.hosts;
       core = genClass.mkCoreRecord {
-        class = genClass.mkClass {
-          key = "hostclass";
-          members = map (i: "node-${toString i}") memberIdx;
-        };
+        class = genClass.mkClass { } "hostclass" (map (i: "node-${toString i}") memberIdx);
         projection = "hosts";
         # attrNames is already lexically sorted (Nix guarantee) ⇒ satisfies mkCoreRecord's
         # sorted-sharedKeys contract without a redundant O(n log n) re-sort.
@@ -855,13 +852,10 @@ let
         )).config;
       memberFixed =
         i:
-        (genClass.applyCoreFixed {
-          inherit core;
-          modules = [
-            nodeIdDecl
-            (axisModule i)
-          ];
-        }).config;
+        (genClass.applyCoreFixed { } core [
+          nodeIdDecl
+          (axisModule i)
+        ]).config;
 
       projOf = if stack == "pure-fixed" then memberFixed else memberFull;
     in
@@ -1065,7 +1059,7 @@ let
           default = [ ];
         };
       };
-      mkHost = d: (S.evalSchema { modules = [ { config.schema.host.options = d; } ]; }).host;
+      mkHost = d: (S.evalSchema { } [ { config.schema.host.options = d; } ]).host;
       kA = mkHost declA;
       kB = mkHost declB;
       names = p: builtins.genList (i: "${p}${toString i}") (n / 2);
@@ -1073,8 +1067,8 @@ let
       isA = id: builtins.substring 0 1 id == "a";
       ev = M.evalModuleTree { } [
         {
-          options.hostsA = S.mkInstanceRegistry kA { };
-          options.hostsB = S.mkInstanceRegistry kB { };
+          options.hostsA = S.mkInstanceRegistry { } kA;
+          options.hostsB = S.mkInstanceRegistry { } kB;
           config.hostsA = builtins.listToAttrs (
             map (x: {
               name = x;
@@ -1178,8 +1172,8 @@ let
         );
       ev = eval { } [
         {
-          options.hostsA = S.mkInstanceRegistry kA { };
-          options.hostsB = S.mkInstanceRegistry kB { };
+          options.hostsA = S.mkInstanceRegistry { } kA;
+          options.hostsB = S.mkInstanceRegistry { } kB;
           config.hostsA = regOf half;
           config.hostsB = regOf half;
         }
@@ -1189,7 +1183,7 @@ let
         id:
         (eval { } [
           {
-            options.h = S.mkInstanceRegistry (mkHost (if isA id then declA else declB)) { };
+            options.h = S.mkInstanceRegistry { } (mkHost (if isA id then declA else declB));
             config.h.${inst id}.addr = "10.0.0.1";
           }
         ]).config.h.${inst id};
@@ -1262,7 +1256,7 @@ let
       hosts =
         (genMerge.evalModuleTree { } [
           {
-            options.hosts = genSchemaNew.mkInstanceRegistry kH { };
+            options.hosts = genSchemaNew.mkInstanceRegistry { } kH;
             config.hosts = builtins.listToAttrs (
               map (x: {
                 name = x;

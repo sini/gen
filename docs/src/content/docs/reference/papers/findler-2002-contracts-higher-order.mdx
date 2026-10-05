@@ -79,7 +79,7 @@ gen-schema applies Findler's predicate contracts to typed registries.
 
 **Blame records.** `blame` builds a record `{ __blame = true; field; message; }` that names the field and the violation. The `field` component plays the part of the variable names in Findler's obligation expressions (`e^{c,p,n}`, where `p` identifies the responsible definition). It is producer-side attribution and does not implement higher-order blame.
 
-**Validators (S2.1-2.2).** A validator from `mkValidator name pred message` is a named flat contract evaluated against every instance of a kind. `validateInstances` collects all failures into an Either (`{ right = instances; }` or `{ left = [ failure ]; }`) instead of throwing on the first. Collecting every error goes beyond Findler's fail-fast semantics and suits configuration validation, where users want all errors at once.
+**Validators (S2.1-2.2).** A validator from `mkValidator { name; pred; message; }` is a named flat contract evaluated against every instance of a kind. `validateInstances` collects all failures into an Either (`{ right = instances; }` or `{ left = [ failure ]; }`) instead of throwing on the first. Collecting every error goes beyond Findler's fail-fast semantics and suits configuration validation, where users want all errors at once.
 
 ### Contracts at the evaluation boundary
 
