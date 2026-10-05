@@ -327,6 +327,15 @@ let
   registry = mkRegistry "attrsOf";
   lazyRegistry = mkRegistry "lazyAttrsOf";
 
+  # wrappedRegistry — the registry shape under a nixpkgs wrapper that adds no step (`coercedTo`) over the
+  # STACK's own `attrsOf`. The pure stack keys that gen `attrsOf` at the option's root as the root is keyed
+  # (gen-merge `keyWalk`'s step-free arm, den-hoag-t1j4z), where it once refused class (a); so the row
+  # cannot evaluate on a gen-merge without that arm. A nixpkgs `attrsOf` here would not reach the arm:
+  # the wrapper's threaded split captures the gen submodules beneath it directly. The coercion never
+  # runs: no definition is a string.
+  wrappedRegistry =
+    P: mkRegistry (e: lib.types.coercedTo lib.types.str (_: { }) (P.types.attrsOf e)) P;
+
   # threadedRegistry — the registry shape over a nixpkgs container OUTSIDE the six gen-merge
   # re-homes (`attrsWith` with a non-default `placeholder`), on both stacks. The pure stack folds its
   # gen `submodule` element through gen-merge's threaded rebuild channel: the container is rebuilt by
@@ -729,6 +738,7 @@ let
       registry
       lazyRegistry
       threadedRegistry
+      wrappedRegistry
       schemaHosts
       inheritHosts
       aspects
