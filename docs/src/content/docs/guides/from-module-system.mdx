@@ -16,7 +16,7 @@ value.
 
 | nixpkgs module system | gen |
 |---|---|
-| `lib.evalModules { modules; specialArgs; }` | `genMerge.evalModuleTree { modules; specialArgs; }` |
+| `lib.evalModules { modules; specialArgs; }` | `genMerge.evalModuleTree { specialArgs; } modules` (options first, the module list last) |
 | `lib.mkOption`, `lib.types.*` | `genMerge.mkOption`, `genMerge.types.*` |
 | `mkIf`, `mkMerge`, `mkDefault`, `mkForce`, `mkOverride`, `mkBefore`, `mkAfter`, `mkOrder` | the same names on `genMerge` |
 | `imports = [ … ]` | `imports = [ … ]` inside one module tree. Across classes and hosts, an aspect's `includes`. |
@@ -35,9 +35,7 @@ This tree uses options, `imports`, `mkIf`, `mkDefault` and a special argument:
 let
   m = genMerge;            # inputs.gen-merge.lib, or (inputs.gen.lib.mkGenLibs { }).merge
   t = m.types;
-  result = m.evalModuleTree {
-    specialArgs = { site = "us-east"; };                                  # (1)
-    modules = [
+  result = m.evalModuleTree { specialArgs = { site = "us-east"; }; } [  # (1)
       {
         options.services.ssh.enable = m.mkOption { type = t.bool; default = false; };
         options.services.ssh.port = m.mkOption { type = t.int; default = 22; };
@@ -53,7 +51,6 @@ let
       { services.ssh.port = m.mkDefault 2222; }
       ({ site, ... }: { motd = "welcome to ${site}"; })
     ];
-  };
 in
 result.config
 ```
@@ -79,10 +76,10 @@ Written with `lib.evalModules` and `lib.mkOption`, the same tree gives the same 
 Each option in the result carries its provenance:
 
 ```nix
-m.evalModuleTree { modules = [
+m.evalModuleTree { } [
   { options.services.ssh.port = m.mkOption { type = t.int; default = 22; }; }
   { _file = "/etc/gen/ssh.nix"; services.ssh.port = m.mkDefault 2222; }
-]; }
+]
 # .provenance.services.ssh.port
 # ⇒ { winners = [ { file = "/etc/gen/ssh.nix"; } ]; priority = 1000; defs = [ … ]; … }
 ```
@@ -129,17 +126,14 @@ option types use the same merge interface as gen-merge's, so a module written fo
 be evaluated by gen-merge while you port it:
 
 ```nix
-genMerge.evalModuleTree {
-  specialArgs = { inherit (inputs.nixpkgs) lib; };
-  modules = [
+genMerge.evalModuleTree { specialArgs = { inherit (inputs.nixpkgs) lib; }; } [
     ({ lib, ... }: {
       options.services.ssh.port = lib.mkOption { type = lib.types.port; default = 22; };
       options.services.ssh.banner = lib.mkOption { type = lib.types.lines; default = ""; };
     })
     ({ lib, ... }: { services.ssh.port = lib.mkDefault 2222; })
     { services.ssh.banner = "authorised use only"; }
-  ];
-}
+  ]
 # .config ⇒ { services.ssh = { banner = "authorised use only"; port = 2222; }; }
 ```
 

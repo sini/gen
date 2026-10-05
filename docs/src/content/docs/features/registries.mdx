@@ -28,8 +28,7 @@ let
     }];
   };
 
-  result = evalModuleTree {
-    modules = [ ({ config, ... }: {
+  result = evalModuleTree { } [ ({ config, ... }: {
       options.hosts = gen.schema.mkInstanceRegistry kinds.host { };
       options.admins = gen.schema.mkInstanceRegistry kinds.admin { refs.home = config.hosts; };
 
@@ -37,7 +36,6 @@ let
       config.hosts.db-1 = { address = "10.0.0.1"; system = "aarch64-linux"; };
       config.admins.deploy = { home = "web-1"; shell = "zsh"; };
     }) ];
-  };
   inherit (result.config) hosts admins;
 in
 {

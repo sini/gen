@@ -13,8 +13,7 @@ let
   gen = inputs.gen.lib.mkGenLibs { };
   m = gen.merge;
 
-  server = m.evalModuleTree {
-    modules = [
+  server = m.evalModuleTree { } [
       {
         _file = "ssh.nix";
         options.ssh.port = m.mkOption { type = m.types.int; default = 22; };
@@ -31,7 +30,6 @@ let
         config.ssh.allowUsers = [ "dba" ];
       }
     ];
-  };
 in
 {
   inherit (server) config;

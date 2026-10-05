@@ -77,7 +77,9 @@ let
   };
   refP = {
     inherit (lib) mkOption types;
-    eval = lib.evalModules;
+    # Both arms take the gen door's shape, options first and the module list last (den-hoag-7gp66
+    # P2); nixpkgs' one-record `evalModules` is the side that adapts.
+    eval = o: modules: lib.evalModules (o // { inherit modules; });
     schema = genSchemaOld;
   };
 
@@ -134,8 +136,7 @@ let
   driveSchema =
     P:
     let
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           { options.schema = P.schema.mkSchemaOption denSchemaArgs; }
           (
             { config, ... }:
@@ -161,7 +162,6 @@ let
             }
           )
         ];
-      };
       s = eval.config.schema;
     in
     {
@@ -193,24 +193,20 @@ let
   driveInstances =
     P: addr2:
     let
-      hostSchema = P.eval {
-        modules = [
+      hostSchema = P.eval { } [
           {
             options.schema = P.schema.mkSchemaOption denSchemaArgs;
             config.schema.host.options.addr = P.mkOption { type = P.types.str; };
           }
         ];
-      };
       frozenHost = hostSchema.config.schema.host;
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.hosts = P.schema.mkInstanceRegistry frozenHost { };
             config.hosts.blade.addr = "10.0.0.1";
             config.hosts.uplink.addr = addr2;
           }
         ];
-      };
     in
     lib.mapAttrs (_: h: { inherit (h) addr id_hash; }) eval.config.hosts;
 
@@ -222,23 +218,19 @@ let
   driveNested =
     P:
     let
-      hostSchema = P.eval {
-        modules = [
+      hostSchema = P.eval { } [
           {
             options.den.schema = P.schema.mkSchemaOption denSchemaArgs;
             config.den.schema.host.options.addr = P.mkOption { type = P.types.str; };
           }
         ];
-      };
       frozenHost = hostSchema.config.den.schema.host;
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.den.hosts = P.schema.mkInstanceRegistry frozenHost { };
             config.den.hosts.blade.addr = "10.0.0.1";
           }
         ];
-      };
     in
     {
       kindNames = hostSchema.config.den.schema._kindNames;

@@ -16,8 +16,7 @@ let
     keySemantics.terranix.category = "class";
   };
 
-  result = evalModuleTree {
-    modules = [
+  result = evalModuleTree { } [
       ((gen.aspects.mkAspectSchema cnf).mkAspectModule { })
       { options.hosts = mkOption { type = types.attrsOf types.raw; default = { }; }; }
       {
@@ -33,7 +32,6 @@ let
         hosts.web-1.aspects = [ "webserver" ];
       }
     ];
-  };
 
   facts = gen.aspects.graphFacts cnf result.config.aspects;
 in

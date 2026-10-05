@@ -26,15 +26,13 @@ let
     ];
   };
 
-  fleet = m.evalModuleTree {
-    modules = [
+  fleet = m.evalModuleTree { } [
       {
         options.hosts = gen.schema.mkInstanceRegistry schema.host { };
         config.hosts.web-1.role = "webserver";
         config.hosts.db-1.role = "database";
       }
     ];
-  };
 in
 {
   web = fleet.config.hosts.web-1.id_hash;

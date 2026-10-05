@@ -21,12 +21,10 @@ let
     bindings.host = { name = "web-1"; };
   } monitoring;
 
-  web1 = m.evalModuleTree {
-    modules = [
+  web1 = m.evalModuleTree { } [
       { options.monitoring.target = m.mkOption { type = m.types.str; }; }
       forWeb1.module
     ];
-  };
 in
 web1.config.monitoring.target
 ```
@@ -106,12 +104,10 @@ let
 
   # Evaluate one module with the value bound. The freeform type accepts any shape.
   render = module:
-    (m.evalModuleTree {
-      modules = [
+    (m.evalModuleTree { } [
         { freeformType = m.types.lazyAttrsOf m.types.anything; }
         (gen.bind.wrap { bindings = { inherit service; }; } module).module
-      ];
-    }).config;
+      ]).config;
 in
 {
   nixos = render forNixos;

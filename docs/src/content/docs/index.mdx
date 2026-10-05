@@ -243,8 +243,7 @@ let
   cnf.keySemantics.nixos.category = "class";
   aspectSchema = gen.aspects.mkAspectSchema cnf;
 
-  declared = m.evalModuleTree {
-    modules = [
+  declared = m.evalModuleTree { } [
       (aspectSchema.mkAspectModule { })
       { options.hosts = m.mkOption { type = t.attrsOf t.raw; }; }
       {
@@ -274,7 +273,6 @@ let
         };
       }
     ];
-  };
 
   # The include edges, as graph data. `project` follows them itself.
   facts = gen.aspects.graphFacts cnf declared.config.aspects;
@@ -290,11 +288,9 @@ let
     inherit projected;
     terminals.nixos =
       { modules, bindings, ... }:
-      (m.evalModuleTree {
-        modules = [
+      (m.evalModuleTree { } ([
           { freeformType = t.lazyAttrsOf t.anything; }
-        ] ++ map (mod: (gen.bind.wrap { bindings.host = bindings.node; } mod).module) modules;
-      }).config;
+        ] ++ map (mod: (gen.bind.wrap { bindings.host = bindings.node; } mod).module) modules)).config;
   };
 in
 {

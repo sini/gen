@@ -98,10 +98,10 @@ let
         engine.evalModuleTree (
           engineArgs
           // {
-            inherit modules specialArgs;
+            inherit specialArgs;
           }
           // warmKnobs
-        )
+        ) modules
       );
 
       projection = {

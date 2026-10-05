@@ -18,8 +18,7 @@ let
     kubernetes.category = "class";
   };
 
-  declared = evalModuleTree {
-    modules = [
+  declared = evalModuleTree { } [
       ((gen.aspects.mkAspectSchema cnf).mkAspectModule { })
       { options.services = mkOption { type = types.attrsOf types.raw; default = { }; }; }
       {
@@ -35,7 +34,6 @@ let
         services.api = { name = "api"; port = 8080; aspects = [ "api" ]; };
       }
     ];
-  };
 
   projected = gen.delivery.project {
     values = declared.config;
@@ -45,10 +43,8 @@ let
 
   # A data terminal: merge the class's modules into plain configuration, giving each module `node`.
   toData = { modules, bindings, ... }:
-    (evalModuleTree {
-      modules = [ { freeformType = types.lazyAttrsOf types.anything; } ]
-        ++ map (module: (gen.bind.wrap { bindings.node = bindings.node; } module).module) modules;
-    }).config;
+    (evalModuleTree { } ([ { freeformType = types.lazyAttrsOf types.anything; } ]
+        ++ map (module: (gen.bind.wrap { bindings.node = bindings.node; } module).module) modules)).config;
 in
 gen.delivery.realize {
   inherit projected;
@@ -138,8 +134,7 @@ let
     keySemantics.terranix.category = "class";
   };
 
-  result = evalModuleTree {
-    modules = [
+  result = evalModuleTree { } [
       ((gen.aspects.mkAspectSchema cnf).mkAspectModule { })
       { options.hosts = mkOption { type = types.attrsOf types.raw; default = { }; }; }
       {
@@ -154,7 +149,6 @@ let
         hosts.db-1.aspects = [ "database" ];
       }
     ];
-  };
 
   projected = gen.delivery.project {
     values = result.config;

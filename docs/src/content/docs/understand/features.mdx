@@ -18,8 +18,7 @@ let
   cnf.keySemantics.nixos.category = "class";
   aspectSchema = gen.aspects.mkAspectSchema cnf;
 
-  fleet = m.evalModuleTree {
-    modules = [
+  fleet = m.evalModuleTree { } [
       (aspectSchema.mkAspectModule { })
       { options.hosts = m.mkOption { type = m.types.attrsOf m.types.raw; default = { }; }; }
       {
@@ -32,7 +31,6 @@ let
         hosts.db-1.aspects = [ "ssh" "monitoring" ];
       }
     ];
-  };
 
   facts = gen.aspects.graphFacts cnf fleet.config.aspects;
   includes = id: facts.includesOf.${id} or [ ];

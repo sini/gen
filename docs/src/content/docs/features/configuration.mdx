@@ -11,8 +11,7 @@ let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
   inherit (gen.merge) evalModuleTree mkOption mkDefault types;
 
-  result = evalModuleTree {
-    modules = [
+  result = evalModuleTree { } [
       {
         _file = "/modules/ssh.nix";
         options.ssh.port = mkOption { type = types.int; default = 22; };
@@ -21,7 +20,6 @@ let
       { _file = "/modules/hardening.nix"; ssh.port = mkDefault 2222; ssh.allowUsers = [ "deploy" ]; }
       { _file = "/modules/web-1.nix"; ssh.port = 22022; ssh.allowUsers = [ "dba" ]; }
     ];
-  };
 in
 {
   config = result.config;
@@ -53,7 +51,7 @@ The module language is the one NixOS uses: `options`, `config`, `mkDefault`, `mk
 | Feature | Functions and options | Purpose |
 |---|---|---|
 | Check a value | `types.int`, `str`, `bool`, `listOf`, `attrsOf`, `struct`, `union`, `enum`, `refined`, `typedef`, each with `.verify` | Test a value against a type and get a readable error string, or `null` when it passes |
-| Merge modules | `merge.evalModuleTree { modules; specialArgs?; check?; }` | Evaluate a module tree to `config`, `options` and `provenance` |
+| Merge modules | `merge.evalModuleTree { specialArgs?; check?; } modules` | Evaluate a module tree to `config`, `options` and `provenance` |
 | Declare options | `mkOption`, `merge.types.*`, `submodule` | Typed options, nested submodules and freeform attribute sets |
 | Override | `mkDefault`, `mkForce`, `mkOverride`, `mkIf`, `mkMerge` | Priorities and conditional definitions, with the NixOS semantics |
 | Order lists | `mkBefore`, `mkAfter`, `mkOrder` | Place a definition's elements before or after the others |
@@ -126,7 +124,7 @@ let
   ];
 in
 {
-  gen = (gen.merge.evalModuleTree { inherit modules; }).config;
+  gen = (gen.merge.evalModuleTree { } modules).config;
   nixpkgs = (lib.evalModules { inherit modules; }).config;
 }
 ```
@@ -157,12 +155,10 @@ let
   wrapped = bind.wrap { bindings = { host = { name = "web-1"; }; }; }
     ({ host, config, ... }: { networking.hostName = host.name; });
 
-  result = merge.evalModuleTree {
-    modules = [
+  result = merge.evalModuleTree { } [
       { options.networking.hostName = merge.mkOption { type = merge.types.str; }; }
       wrapped.module
     ];
-  };
 in
 {
   hostName = result.config.networking.hostName;

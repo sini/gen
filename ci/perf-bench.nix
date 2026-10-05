@@ -204,7 +204,9 @@ let
       mkIf
       types
       ;
-    eval = lib.evalModules;
+    # Both arms take the gen door's shape, options first and the module list last (den-hoag-7gp66
+    # P2); nixpkgs' one-record `evalModules` is the side that adapts.
+    eval = o: modules: lib.evalModules (o // { inherit modules; });
     schema = genSchemaOld;
   };
 
@@ -223,16 +225,14 @@ let
   # startup — fixed cost of one trivial option through the engine (report-only, no gates).
   startup =
     P:
-    (P.eval {
-      modules = [
+    (P.eval { } [
         {
           options.x = P.mkOption {
             type = P.types.str;
             default = "y";
           };
         }
-      ];
-    }).config.x;
+      ]).config.x;
 
   # scalar — n flat typed options; layer 1 = mkDefault (all), layer 2 = mkIf (every 3rd discharges
   # away). Exercises decl merge, property discharge, priority, leaf verify. The wide-sibling shape
@@ -240,8 +240,7 @@ let
   scalar =
     P:
     let
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.s = toAttrs (i: {
               name = "o${toString i}";
@@ -264,7 +263,6 @@ let
             });
           }
         ];
-      };
     in
     eval.config.s;
 
@@ -290,8 +288,7 @@ let
           };
         };
       };
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.hosts = P.mkOption {
               type =
@@ -324,7 +321,6 @@ let
             });
           }
         ];
-      };
     in
     eval.config.hosts;
 
@@ -383,8 +379,7 @@ let
   schemaHosts =
     P:
     let
-      hostSchema = P.eval {
-        modules = [
+      hostSchema = P.eval { } [
           {
             options.schema = P.schema.mkSchemaOption { };
             config.schema.host = {
@@ -397,10 +392,8 @@ let
             };
           }
         ];
-      };
       frozenHost = hostSchema.config.schema.host;
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.hosts = P.schema.mkInstanceRegistry frozenHost { };
             config.hosts = toAttrs (i: {
@@ -413,7 +406,6 @@ let
             });
           }
         ];
-      };
     in
     # ── THE EXCLUDED AXIS: `id_hash` IS FORCED BUT NOT DIGESTED (ADR-0016) ──
     # This cell's digest is compared against the PERMANENT frozen `gen-schema-orig` pin, which
@@ -456,8 +448,7 @@ let
       str = P.mkOption { type = P.types.str; };
       treeOf =
         schemaOption:
-        (P.eval {
-          modules = [
+        (P.eval { } [
             {
               options.schema = schemaOption;
               config.schema = {
@@ -472,8 +463,7 @@ let
                 };
               };
             }
-          ];
-        }).config.schema;
+          ]).config.schema;
       # a caller `mkType` that composes its defs, as gen-aspects' does
       mkType =
         {
@@ -487,8 +477,7 @@ let
         };
       registryOf =
         host:
-        (P.eval {
-          modules = [
+        (P.eval { } [
             {
               options.hosts = P.schema.mkInstanceRegistry host { };
               config.hosts = toAttrs (i: {
@@ -500,8 +489,7 @@ let
                 };
               });
             }
-          ];
-        }).config.hosts;
+          ]).config.hosts;
       project = builtins.mapAttrs (
         _: h: {
           inherit (h) addr site role;
@@ -526,8 +514,7 @@ let
         };
       };
       fourth = i: builtins.bitAnd i 3 == 0;
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           { options.schema = schema.schemaOption; }
           (schema.mkAspectModule { })
           {
@@ -543,7 +530,6 @@ let
             });
           }
         ];
-      };
       flat = P.aspects.flatten eval.config.aspects;
     in
     builtins.mapAttrs (_: a: {
@@ -561,8 +547,7 @@ let
   wideFreeform =
     P:
     let
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             freeformType = P.types.lazyAttrsOf P.types.str;
             options.title = P.mkOption {
@@ -598,7 +583,6 @@ let
             });
           }
         ];
-      };
     in
     eval.config;
 
@@ -635,8 +619,7 @@ let
           };
       # a value that fills a chain to `depth` (only the leaf differs per instance).
       mkVal = d: leaf: if d == 0 then { inherit leaf; } else { next = mkVal (d - 1) leaf; };
-      eval = P.eval {
-        modules = [
+      eval = P.eval { } [
           {
             options.chains = P.mkOption {
               type = P.types.attrsOf (P.types.submodule (mkChain depth));
@@ -650,7 +633,6 @@ let
             });
           }
         ];
-      };
     in
     eval.config.chains;
 
@@ -671,9 +653,7 @@ let
     let
       wide = 16;
       free = 4;
-      eval = P.eval {
-        modules =
-          map (i: {
+      eval = P.eval { } (map (i: {
             options = {
               "o${toString i}" = P.mkOption {
                 type = P.types.str;
@@ -716,8 +696,7 @@ let
                   };
                 };
             }
-          ];
-      };
+          ]);
     in
     eval.config;
 
@@ -732,13 +711,10 @@ let
   sameLocFanIn =
     P:
     let
-      eval = P.eval {
-        modules =
-          map (_: {
+      eval = P.eval { } (map (_: {
             options.p = P.mkOption { type = P.types.str; };
           }) idx
-          ++ [ { config.p = "v"; } ];
-      };
+          ++ [ { config.p = "v"; } ]);
     in
     eval.config;
 
@@ -834,7 +810,7 @@ let
 
       # THE expensive merge, computed ONCE — the fully-realized registry the class shares. Only
       # pure-fixed forces this (via `core`); pure-full never references it (laziness ⇒ no double-pay).
-      coreValues = (genMerge.evalModuleTree { modules = coreRegistryModules; }).config.hosts;
+      coreValues = (genMerge.evalModuleTree { } coreRegistryModules).config.hosts;
       core = genClass.mkCoreRecord {
         class = genClass.mkClass {
           key = "hostclass";
@@ -856,12 +832,10 @@ let
 
       memberFull =
         i:
-        (genMerge.evalModuleTree {
-          modules = coreRegistryModules ++ [
+        (genMerge.evalModuleTree { } (coreRegistryModules ++ [
             nodeIdDecl
             (axisModule i)
-          ];
-        }).config;
+          ])).config;
       memberFixed =
         i:
         (genClass.applyCoreFixed {
@@ -998,25 +972,14 @@ let
 
       # the base eval, computed ONCE — the memo the warm class reuses (`warmFrom`). Only the warm stack
       # references it; cold never does (laziness ⇒ no double-pay), exactly as classShare's `coreValues`.
-      prev = genMerge.evalModuleTree {
-        modules = base;
-        inherit specialArgs;
-      };
+      prev = genMerge.evalModuleTree { specialArgs = specialArgs; } base;
 
       coldMember =
         k:
-        (genMerge.evalModuleTree {
-          modules = base ++ [ (editOf k) ];
-          inherit specialArgs;
-        }).config;
+        (genMerge.evalModuleTree { specialArgs = specialArgs; } (base ++ [ (editOf k) ])).config;
       warmMember =
         k:
-        (genMerge.evalModuleTree {
-          modules = base ++ [ (editOf k) ];
-          inherit specialArgs;
-          warmFrom = prev;
-          editedModules = [ (editOf k) ];
-        }).config;
+        (genMerge.evalModuleTree { specialArgs = specialArgs; warmFrom = prev; editedModules = [ (editOf k) ]; } (base ++ [ (editOf k) ])).config;
 
       projOf = if stack == "warm" then warmMember else coldMember;
     in
@@ -1088,8 +1051,7 @@ let
       names = p: builtins.genList (i: "${p}${toString i}") (n / 2);
       nodes = names "a" ++ names "b";
       isA = id: builtins.substring 0 1 id == "a";
-      ev = M.evalModuleTree {
-        modules = [
+      ev = M.evalModuleTree { } [
           {
             options.hostsA = S.mkInstanceRegistry kA { };
             options.hostsB = S.mkInstanceRegistry kB { };
@@ -1107,7 +1069,6 @@ let
             );
           }
         ];
-      };
       ctx = sel.adapters.registry.mkContext {
         inherit nodes;
         data = id: if isA id then ev.config.hostsA.${id} else ev.config.hostsB.${id};
@@ -1159,7 +1120,7 @@ let
       sel = if isRef then genSelectOrig else genSelect;
       S = if isRef then genSchemaOld else genSchemaNew;
       O = if isRef then lib else genMerge;
-      eval = if isRef then lib.evalModules else genMerge.evalModuleTree;
+      eval = if isRef then (o: modules: lib.evalModules (o // { inherit modules; })) else genMerge.evalModuleTree;
       declA = {
         addr = O.mkOption { type = if sealedE then lib.types.str else O.types.str; };
       };
@@ -1171,14 +1132,12 @@ let
       };
       mkHost =
         d:
-        (eval {
-          modules = [
+        (eval { } [
             {
               options.schema = S.mkSchemaOption { };
               config.schema.host.options = d;
             }
-          ];
-        }).config.schema.host;
+          ]).config.schema.host;
       kA = mkHost declA;
       kB = mkHost declB;
       half = builtins.genList (i: "h${toString i}") (n / 2);
@@ -1193,8 +1152,7 @@ let
             value.addr = "10.0.0.1";
           }) xs
         );
-      ev = eval {
-        modules = [
+      ev = eval { } [
           {
             options.hostsA = S.mkInstanceRegistry kA { };
             options.hostsB = S.mkInstanceRegistry kB { };
@@ -1202,18 +1160,15 @@ let
             config.hostsB = regOf half;
           }
         ];
-      };
       planted = stack == "entity-plant";
       evOne =
         id:
-        (eval {
-          modules = [
+        (eval { } [
             {
               options.h = S.mkInstanceRegistry (mkHost (if isA id then declA else declB)) { };
               config.h.${inst id}.addr = "10.0.0.1";
             }
-          ];
-        }).config.h.${inst id};
+          ]).config.h.${inst id};
       ctx = sel.adapters.registry.mkContext {
         inherit nodes;
         data =
@@ -1271,20 +1226,17 @@ let
       sel = if isRef then genSelectOrig else genSelect;
       P = sel.adapters.product;
       kH =
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } [
             {
               options.schema = genSchemaNew.mkSchemaOption { };
               config.schema.host.options.addr = genMerge.mkOption {
                 type = if sealedC then lib.types.str else genMerge.types.str;
               };
             }
-          ];
-        }).config.schema.host;
+          ]).config.schema.host;
       names = builtins.genList (i: "h${toString i}") n;
       hosts =
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } [
             {
               options.hosts = genSchemaNew.mkInstanceRegistry kH { };
               config.hosts = builtins.listToAttrs (
@@ -1294,8 +1246,7 @@ let
                 }) names
               );
             }
-          ];
-        }).config.hosts;
+          ]).config.hosts;
       ctx = P.mkContext (
         {
           cellIds = names;
