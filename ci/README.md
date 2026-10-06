@@ -655,7 +655,13 @@ fresh run; the workload is never deleted to make it pass.
 
 Counters are deterministic per evaluator identity — `nrThunks` always, `gc.totalBytes` because every
 cell runs with the collector off and every source sits at a `<hash>-source` store path of one length
-(`perf-bench.sh` header, with the measurements) — so CI host speed does not matter. Every cost gate
+(`perf-bench.sh` header, with the measurements) — so CI host speed does not matter. Across hosts,
+`gc.totalBytes` also needs the host's nix-path kept out: the evaluator stores it on the heap at
+startup, and the CI runner's Determinate `extra-nix-path` entry against a workstation's
+`nixpkgs=flake:nixpkgs` moved 4 alloc gates by up to 4,096 B with every thunk equal. Every evaluation
+runs with `--option nix-path ''` (`NIX_PIN`), which overrides nix.conf and `NIX_PATH` alike, and the
+identity block refuses by name (exit 4, `HOST NIX-PATH REACHES THE EVALUATOR`) a run in which
+`builtins.nixPath` is not `[]`. Pinned, CI and a workstation read the same byte on every cell. Every cost gate
 is EXACT and TWO-SIDED, so every run ends in one of four states, each with its own exit code:
 
 - **0** — every cost reading EQUALS its bound.

@@ -61,8 +61,9 @@
 # with the collector off (GC_DONT_GC, sample_cell) and every source is a `<hash>-source` store path
 # of one length (the `--at path:` arm adds the directory to the store): measured, a collecting cell
 # moved by up to 9,648 B across six runs of one tree (deepSubmodule ref n=1600), and an overlay
-# path's length moved coordMatch coord n=400 by 576 B; with both removed, every rep and every
-# environment read the same byte.
+# path's length moved coordMatch coord n=400 by 576 B; with both removed, every rep on one host read
+# the same byte. Across hosts it also needs the host's nix-path pinned empty (NIX_PIN): unpinned, the
+# CI runner and this workstation differed on 4 alloc gates.
 
 # ── the combination under test ────────────────────────────────────────────────
 # `--at <member>=<source>` overlays ONE member of the pure-side source set onto the baseline. The
@@ -129,6 +130,16 @@ fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# Every evaluation reads the INSTRUMENT's nix-path, never the host's. The evaluator stores the host's
+# nix-path (nix.conf `nix-path`/`extra-nix-path`, and NIX_PATH) on the GC heap at startup, and its
+# length moves later allocations across heap-block boundaries: measured, the CI runner's 78-character
+# Determinate flakehub entry against this workstation's `nixpkgs=flake:nixpkgs` moved 4 alloc gates by
+# up to 4,096 B with every thunk equal, and with this pin 0 of 282 rep-lines differed across the two
+# hosts (den-hoag-r8y89 alloc host scout). The option overrides both channels; NIX_PATH= alone does
+# not, since nix.conf's `extra-nix-path` still applies. The identity block refuses a run in which
+# builtins.nixPath is not empty, so a lost pin fails by name rather than as a 4 KiB drift.
+NIX_PIN=(--option nix-path '')
 
 # ── resolve the overlay, WHOLE-CLASS, before anything is collected (exit 4) ────
 # Every entry is validated and fetched here and EVERY failure is named in one message: a partial
@@ -344,7 +355,7 @@ declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
 # RESTORED to the original 0.90 (xzchx arm A, gen-merge 63ae058's path-free declaration walk):
 # 0.883 at gen-merge d37deb6. A tightening; the thunk bound is no longer interim.
 ROW_THUNKS_MAX[scalar,8000]=691066/844626
-ROW_ALLOC_MAX[scalar,8000]=42573120/56484848
+ROW_ALLOC_MAX[scalar,8000]=42573120/56480752
 # registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
 ROW_THUNKS_MAX[registry,2000]=1418543/2179179
 ROW_ALLOC_MAX[registry,2000]=73299264/126644096
@@ -450,7 +461,7 @@ ROW_ALLOC_MAX[deepSubmodule,1600]=325449760/653164176
 # alone, and `pure` on gen-prelude, -types, -merge, -scope, -identity and -graph, so the row is
 # INDEPENDENT. Anchored at its landing; the mount's measured price over nixpkgs is the reading.
 ROW_THUNKS_MAX[foreignMount,2000]=1717897/1673781
-ROW_ALLOC_MAX[foreignMount,2000]=98764240/97486576
+ROW_ALLOC_MAX[foreignMount,2000]=98764272/97486576
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
 # bound is WIDEFREEFORM_RATIO_MAX below, which carries that row's own claim.
@@ -713,7 +724,7 @@ ENTITYMATCH_ALLOC_MAX[migrated,400]=31319392/33627840
 # migrated, n=1600 — 1.307 / 1.116 → 1.321 / 1.128.
 # migrated, n=1600 — 1.321 → 1.329.
 ENTITYMATCH_THUNKS_MAX[migrated,1600]=2186444/2277211
-ENTITYMATCH_ALLOC_MAX[migrated,1600]=122482304/133250800
+ENTITYMATCH_ALLOC_MAX[migrated,1600]=122478208/133250800
 # sealed, n=400    — anchors 1.317 / 1.129 (756,521 / 574,390 thunks; 37,976,080 / 33,622,624 B).
 # sealed, n=400    — 1.317 / 1.129 → 1.331 / 1.142.
 # sealed, n=400    — 1.331 → 1.339.
@@ -928,7 +939,7 @@ sample_cell() {
   # GC_DONT_GC: the collector off makes `gc.totalBytes` one byte count per tree (header); the
   # evaluator then warns on stderr that it could not collect before reporting, which is expected.
   status=0
-  out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
+  out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict "${NIX_PIN[@]}" \
     "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
   CELL_ERRF=$errf
@@ -1034,7 +1045,7 @@ gate() {
 # an error consumed as an empty value is this bench's own die_cell doctrine one layer up.
 PREFLIGHT=""
 pf_status=0
-PREFLIGHT=$(nix-instantiate --eval --strict --json "$PERF_WORKLOADS" \
+PREFLIGHT=$(nix-instantiate --eval --strict --json "${NIX_PIN[@]}" "$PERF_WORKLOADS" \
   --arg srcs "import $SRCS" --argstr stack pure --argstr workload preflight --arg n 1 \
   2>"$tmp/preflight.err") || pf_status=$?
 if [[ $pf_status -ne 0 ]]; then
@@ -1088,6 +1099,17 @@ if [[ $id_st -ne 0 || -z "$EVAL_ID" || ${#ALLOC_IDS[@]} -ne 1 ]]; then
   exit 4
 fi
 ALLOC_ID=${ALLOC_IDS[0]}
+# The host's nix-path is part of the alloc identity (NIX_PIN, above). Read it the way every cell is
+# evaluated; anything but an empty list means the pin was lost and the host reaches the readings.
+np_st=0
+NIX_PATH_SEEN=$(nix-instantiate --eval --strict --json "${NIX_PIN[@]}" --expr builtins.nixPath 2>"$tmp/np.err") || np_st=$?
+if [[ $np_st -ne 0 || "$NIX_PATH_SEEN" != "[]" ]]; then
+  {
+    echo "perf-bench: HOST NIX-PATH REACHES THE EVALUATOR — builtins.nixPath read '${NIX_PATH_SEEN}' (nix exit $np_st), not []; its length moves every alloc reading, so the --option nix-path '' pin (NIX_PIN) is lost; NO cells collected"
+    cat "$tmp/np.err"
+  } >&2
+  exit 4
+fi
 REF_ID=$(jq -er '[to_entries[] | select(.value.axis == "reference") | "\(.key)=\(.value.rev)"] | sort | join(" ")' "$PERF_COMBINATION")
 # The members this run MEASURES: an overlay replaces its key's revision unless it resolved to the
 # baseline's own source; a `path:` overlay has no revision, so it never matches the anchor.
@@ -1277,7 +1299,7 @@ tra_token=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
 [[ ${#tra_token} -eq 24 ]] || { echo "perf-bench: could not generate the threadedRegistry arming token" >&2; exit 4; }
 for s in pure-plant ref-plant; do
   status=0
-  nix-instantiate --eval --strict "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
+  nix-instantiate --eval --strict "${NIX_PIN[@]}" "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload threadedRegistry --arg n 4 --argstr token "$tra_token" \
     >"$tmp/tra-$s.out" 2>"$tmp/tra-$s.err" || status=$?
   hits=$(grep -c -- "$tra_token" "$tmp/tra-$s.err") || hits=0
