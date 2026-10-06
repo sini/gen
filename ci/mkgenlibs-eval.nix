@@ -554,9 +554,11 @@ let
     # removed.
     program = "e4cf1540eb0d2be27eb306eb487cf395fbe2f4a42b47fb38501aa11547a48704";
     # gen-rules, the roster's 23rd member and the 5th at `framework`: the one closure crossing. Its
-    # surface is 5 names — the loader lowering and its registration table, the door, and the two
-    # catalogue patterns.
-    rules = "22cc1c5698627db93de8e1a4f6f52c0549333636c794b695316ab2e86c41ce05";
+    # surface was 5 names — the loader lowering and its registration table, the door, and the two
+    # catalogue patterns. gen-rules d473539 → relock 64 (den-hoag-lwbb1 S1 (a), den-hoag-1wdng): the
+    # surface gained TWO names, `lambdasMount`, the registration table mounted inside the aspect
+    # submodule, and `registrations`, the tables a load-time closure's site names. Nothing was removed.
+    rules = "2a9bce7a102ab1196f5d58fd19b5ca837ded06096240bae431cf80d35e675fb0";
     # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
     # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
     # other member moved.

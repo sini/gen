@@ -380,7 +380,9 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # (den-hoag-foreign-mount-parity-knhyg, built at the crossing site). Relock 49.
 # RATCHETED 0.541 / 0.500 → 0.539 / 0.498 by the gen-merge relock 51 set (den-hoag-fpxsd construction
 # L, den-hoag-threadedforeign-parity-residue-0hew4). Relock 51.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.539
+# RATCHETED 0.539 → 0.538 (thunks) by the gen-merge declaration address handed where it is read
+# (den-hoag-8hlo3 U1, `nests.declAt`). Relock 64.
+ROW_THUNKS_MAX[deepSubmodule,1600]=0.538
 ROW_ALLOC_MAX[deepSubmodule,1600]=0.498
 declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
