@@ -133,13 +133,18 @@ trap 'rm -rf "$tmp"' EXIT
 
 # Every evaluation reads the INSTRUMENT's nix-path, never the host's. The evaluator stores the host's
 # nix-path (nix.conf `nix-path`/`extra-nix-path`, and NIX_PATH) on the GC heap at startup, and its
-# length moves later allocations across heap-block boundaries: measured, the CI runner's 78-character
+# value, and the channel it arrives by, move later allocations across heap-block boundaries (the same
+# string as NIX_PATH reproduced CI's bytes on 1 of 3 cells, as nix.conf `extra-nix-path` on 3 of 3):
+# measured, the CI runner's 78-character
 # Determinate flakehub entry against this workstation's `nixpkgs=flake:nixpkgs` moved 4 alloc gates by
 # up to 4,096 B with every thunk equal, and with this pin 0 of 282 rep-lines differed across the two
 # hosts (den-hoag-r8y89 alloc host scout). The option overrides both channels; NIX_PATH= alone does
 # not, since nix.conf's `extra-nix-path` still applies. The identity block refuses a run in which
-# builtins.nixPath is not empty, so a lost pin fails by name rather than as a 4 KiB drift.
+# builtins.nixPath is not empty, so a lost NIX_PIN definition fails by name rather than as a 4 KiB
+# drift. Every evaluation goes through nixi, so the pin has one definition and one use; an evaluation
+# that calls nix-instantiate directly is NOT caught by the guard and reds as an unnamed alloc drift.
 NIX_PIN=(--option nix-path '')
+nixi() { nix-instantiate "${NIX_PIN[@]}" "$@"; }
 
 # ── resolve the overlay, WHOLE-CLASS, before anything is collected (exit 4) ────
 # Every entry is validated and fetched here and EVERY failure is named in one message: a partial
@@ -939,7 +944,7 @@ sample_cell() {
   # GC_DONT_GC: the collector off makes `gc.totalBytes` one byte count per tree (header); the
   # evaluator then warns on stderr that it could not collect before reporting, which is expected.
   status=0
-  out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict "${NIX_PIN[@]}" \
+  out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nixi --eval --strict \
     "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
   CELL_ERRF=$errf
@@ -1045,7 +1050,7 @@ gate() {
 # an error consumed as an empty value is this bench's own die_cell doctrine one layer up.
 PREFLIGHT=""
 pf_status=0
-PREFLIGHT=$(nix-instantiate --eval --strict --json "${NIX_PIN[@]}" "$PERF_WORKLOADS" \
+PREFLIGHT=$(nixi --eval --strict --json "$PERF_WORKLOADS" \
   --arg srcs "import $SRCS" --argstr stack pure --argstr workload preflight --arg n 1 \
   2>"$tmp/preflight.err") || pf_status=$?
 if [[ $pf_status -ne 0 ]]; then
@@ -1102,10 +1107,10 @@ ALLOC_ID=${ALLOC_IDS[0]}
 # The host's nix-path is part of the alloc identity (NIX_PIN, above). Read it the way every cell is
 # evaluated; anything but an empty list means the pin was lost and the host reaches the readings.
 np_st=0
-NIX_PATH_SEEN=$(nix-instantiate --eval --strict --json "${NIX_PIN[@]}" --expr builtins.nixPath 2>"$tmp/np.err") || np_st=$?
+NIX_PATH_SEEN=$(nixi --eval --strict --json --expr builtins.nixPath 2>"$tmp/np.err") || np_st=$?
 if [[ $np_st -ne 0 || "$NIX_PATH_SEEN" != "[]" ]]; then
   {
-    echo "perf-bench: HOST NIX-PATH REACHES THE EVALUATOR — builtins.nixPath read '${NIX_PATH_SEEN}' (nix exit $np_st), not []; its length moves every alloc reading, so the --option nix-path '' pin (NIX_PIN) is lost; NO cells collected"
+    echo "perf-bench: HOST NIX-PATH REACHES THE EVALUATOR — builtins.nixPath read '${NIX_PATH_SEEN}' (nix exit $np_st), not []; its value moves alloc readings, so the --option nix-path '' pin (NIX_PIN) is lost; NO cells collected"
     cat "$tmp/np.err"
   } >&2
   exit 4
@@ -1299,7 +1304,7 @@ tra_token=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
 [[ ${#tra_token} -eq 24 ]] || { echo "perf-bench: could not generate the threadedRegistry arming token" >&2; exit 4; }
 for s in pure-plant ref-plant; do
   status=0
-  nix-instantiate --eval --strict "${NIX_PIN[@]}" "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
+  nixi --eval --strict "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload threadedRegistry --arg n 4 --argstr token "$tra_token" \
     >"$tmp/tra-$s.out" 2>"$tmp/tra-$s.err" || status=$?
   hits=$(grep -c -- "$tra_token" "$tmp/tra-$s.err") || hits=0
