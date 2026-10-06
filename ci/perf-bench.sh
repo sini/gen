@@ -39,7 +39,8 @@
 #               evaluator-attributed bytes. Above the bound is a regression; below it is `ratchet:`,
 #               refused until the bound is lowered in the same change (den-hoag-r8y89: the bench
 #               catches regressions and never obstructs optimizations)
-#   load      — the per-process constant, through `gate` likewise: each member's own load (one `load`
+#   load      — the per-process constant, through `gate` likewise: each member's load, the load its own
+#               top-level values force, calls into its predecessors' functions included (one `load`
 #               cell per member), each gated arm's small-size counter while its marginal holds, and
 #               the startup cell. A load rise is a regression; a fall ratchets
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×);
@@ -428,15 +429,15 @@ MARG_MAX[resolution,100-1000,t]=10952100/19814400
 LOAD_MAX[resolution,resolve]=2367
 LOADM[resolution,resolve]=168
 LOAD_MAX[startup,t]=2952
-LOAD_MAX[startup,a]=175062
+LOAD_MAX[startup,a]=175114
 LOAD_MAX[member,gen-prelude,t]=140
 LOAD_MAX[member,gen-prelude,a]=14646
 LOAD_MAX[member,gen-algebra,t]=78
 LOAD_MAX[member,gen-algebra,a]=6467
 LOAD_MAX[member,gen-identity,t]=13
-LOAD_MAX[member,gen-identity,a]=814
+LOAD_MAX[member,gen-identity,a]=810
 LOAD_MAX[member,gen-graph,t]=1753
-LOAD_MAX[member,gen-graph,a]=87889
+LOAD_MAX[member,gen-graph,a]=87879
 LOAD_MAX[member,gen-types,t]=485
 LOAD_MAX[member,gen-types,a]=28946
 LOAD_MAX[member,gen-scope,t]=1754
@@ -707,6 +708,10 @@ sample_cell() {
   local w=$1 n=$2 s=$3 rep=$4
   local statf="$tmp/$w-$n-$s-$rep.json" errf="$tmp/$w-$n-$s-$rep.err"
   local out="" status cpu thunks alloc dig
+  # A load cell receives the census's order as an argument: deriving it inside the cell would run the
+  # census there and pre-pay every member's `import`, which is part of that member's own load.
+  local -a order_arg=()
+  [[ $w == load ]] && order_arg=(--arg order "$LOAD_ORDER_NIX")
   CELL="workload=$w n=$n stack=$s rep=$rep"
   # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
   # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
@@ -715,7 +720,7 @@ sample_cell() {
   status=0
   out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nixi --eval --strict \
     "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
-    --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
+    --argstr stack "$s" --argstr workload "$w" --arg n "$n" "${order_arg[@]}" 2>"$errf") || status=$?
   CELL_ERRF=$errf
   CELL_OUT=$out
   # A LIVE cell's capture is never printed: a warning or trace on the healthy path would move the
@@ -846,9 +851,10 @@ if [[ -z "$PF_RESIDUE" ]]; then
 fi
 PF_ARMING=$(printf '%s' "$PREFLIGHT" | jq -r '"striking \"\(.arming.strike)\" from the environment fires on \(.arming.fires) of \(.arming.of) applied entries"')
 PF_UNAPPLIED=$(printf '%s' "$PREFLIGHT" | jq -r '.unappliedEntries | join(", ")')
-# The load cells' order, read from the corpus so the two cannot drift: perf-bench.nix `loadOrder`.
+# The load cells' order, read from the corpus so the two cannot drift: perf-bench.nix `loadOrder`, derived from `loadMembers`.
 LOAD_ORDER=()
 while IFS= read -r lk; do LOAD_ORDER+=("$lk"); done < <(printf '%s' "$PREFLIGHT" | jq -er '.loadOrder[] | strings')
+LOAD_ORDER_NIX="[ $(printf '"%s" ' "${LOAD_ORDER[@]}")]"
 if [[ ${#LOAD_ORDER[@]} -eq 0 ]]; then
   echo "perf-bench: PRE-FLIGHT CENSUS UNREADABLE — it carries no .loadOrder, so no member's load can be measured; UNMEASURED, not empty" >&2
   exit 5
@@ -935,10 +941,10 @@ done
 # load ungated, and the census is what says so.
 for ck in "${COMB_KEYS[@]}"; do
   [[ "${BASE_AXIS[$ck]}" == reference ]] && continue
-  [[ " ${LOAD_ORDER[*]} " == *" $ck "* ]] || FAILURES+=("unmeasured: load: member $ck has no load cell (perf-bench.nix loadOrder)")
+  [[ " ${LOAD_ORDER[*]} " == *" $ck "* ]] || FAILURES+=("unmeasured: load: member $ck has no load cell (perf-bench.nix loadMembers)")
 done
 for k in "${LOAD_ORDER[@]}"; do
-  [[ "${BASE_AXIS[$k]:-}" == member ]] || FAILURES+=("load: loadOrder names $k, which is not a member of the combination")
+  [[ "${BASE_AXIS[$k]:-}" == member ]] || FAILURES+=("load: loadMembers names $k, which is not a member of the combination")
 done
 for row in "${MATRIX[@]}"; do
   read -r w n tags <<<"$row"
@@ -1399,8 +1405,10 @@ emit_report() {
 # bytes (ATT, sample_cell): exact, and free of the collector's 4,096 B block steps, which transfer 1:1
 # into a difference of totalBytes (owner ruling OQ7, arm β + U0: the unattributed remainder, strings
 # among it, is not gated). The constant is the LOAD, and it is gated three ways:
-#   member  — each member's own file-level load: its `load` cell minus its predecessor's in perf-bench.nix
-#             `loadOrder`, thunks and ATT, absolute. Exact, n-independent and blind to the shape of any
+#   member  — each member's file-level load, the load its own top-level values force (calls into its
+#             predecessors' functions included, so a change to a predecessor's function body reads on its
+#             callers' rows): its `load` cell minus its predecessor's in perf-bench.nix
+#             `loadOrder` (derived there from the census's supplied formals), thunks and ATT, absolute. Exact, n-independent and blind to the shape of any
 #             workload cost, so a landing cannot hide a binding behind a change to a row's curvature
 #             (gate F1, arm (A)).
 #   row     — each gated arm's small-size thunk counter X_s, judged when the arm's own thunk marginal reads

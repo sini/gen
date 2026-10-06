@@ -105,7 +105,7 @@ keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpk
 foreign-mount path, against nixpkgs `evalModules` over the same modules — den-hoag-gijly OQ2; before
 it no row reached the mount), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
-fold's length), `startup` (fixed cost, report-only).
+fold's length), `startup` (fixed cost; gated as the `startup,t|a` load rows).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
 pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
@@ -203,7 +203,9 @@ Four gate families (bounds at the top of `perf-bench.sh`):
   set of every member up to it, each attribute to weak head normal form, and a member's load is its
   cell minus its predecessor's, thunks and attributed bytes: n-independent and exact, so a binding
   added to any member reds that member's row whatever the landing does to a row's curvature (one
-  unused binding planted per member reds exactly that member's row); **row** — each gated arm's
+  unused binding planted at a member's top level reds exactly that member's row; a row reads the load its
+  own top-level values FORCE, including calls into its predecessors' functions, so a change to a
+  predecessor's function body reads on its callers' rows); **row** — each gated arm's
   small-size thunk counter, judged while the arm's own thunk marginal equals its anchored `LOADM`
   (then the counter's change is the constant's change, exactly), or on its three-size intercept
   against `LOADI` when the marginal moved and the arm is affine; otherwise `confounded`, printed and
