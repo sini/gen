@@ -64,9 +64,14 @@ let
     identity = genIdentity;
     graph = import "${gen-graph}/lib" { inherit prelude; };
   };
-  genSchemaOld = import "${gen-schema-orig}/lib" {
+  # The frozen gen-schema predates its registry door's options-first order (den-hoag-7gp66 P2 L4), so
+  # it adapts to the gen door's shape, as refP's `eval` adapts nixpkgs' `evalModules`.
+  genSchemaOrig = import "${gen-schema-orig}/lib" {
     inherit lib;
     algebra = genAlgebra;
+  };
+  genSchemaOld = genSchemaOrig // {
+    mkInstanceRegistry = o: kind: genSchemaOrig.mkInstanceRegistry kind o;
   };
 
   pureP = {
