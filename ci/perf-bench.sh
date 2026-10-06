@@ -31,12 +31,17 @@
 #
 # Gates (rationale + baselines: ci/README.md) — every gate reads a DETERMINISTIC evaluator counter:
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
-#   cost      — every cost row, through `gate`: EXACT and TWO-SIDED against its recorded bound. A
-#               row whose denominator is INDEPENDENT of gen (nixpkgs `ref`, or a rev-pinned frozen
-#               original) gates its ratio, NUM/DEN at full precision; a row whose only control is
-#               gen itself gates the guarded arm's OWN count. Above the bound is a regression; below
-#               it is `ratchet:`, refused until the bound is lowered in the same change
-#               (den-hoag-r8y89: the bench catches regressions and never obstructs optimizations)
+#   cost      — every cost row, through `gate`: EXACT and TWO-SIDED against its recorded bound.
+#               A row gates its MARGINAL, counter(big) − counter(small), so a per-process constant
+#               cancels: a row whose denominator is INDEPENDENT of gen (nixpkgs `ref`, or a rev-pinned
+#               frozen original) gates the ratio of marginals, NUM/DEN at full precision; a row whose
+#               only control is gen itself gates the guarded arm's OWN marginal. Alloc is the
+#               evaluator-attributed bytes. Above the bound is a regression; below it is `ratchet:`,
+#               refused until the bound is lowered in the same change (den-hoag-r8y89: the bench
+#               catches regressions and never obstructs optimizations)
+#   load      — the per-process constant, through `gate` likewise: each member's own load (one `load`
+#               cell per member), each gated arm's small-size counter while its marginal holds, and
+#               the startup cell. A load rise is a regression; a fall ratchets
 #   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×);
 #               a complexity-class threshold, not a cost, so it does not ratchet
 #
@@ -252,8 +257,8 @@ if [[ ${#COMB_KEYS[@]} -eq 0 ]]; then
   exit 4
 fi
 
-# "workload n tags" — tags: r = ratio-gated size (default win-gate), rb = wideFreeform ratio size
-# (alloc on its own derived bound; thunks band ≤ WIDEFREEFORM_RATIO_MAX), small/big = linearity pair (big = 4×small)
+# "workload n tags" — tags: r = a ratio row's big size (its marginal runs from the row's `small`), rb =
+# wideFreeform's (its thunk marginal is a parity band), small/big = the marginal and linearity pair (big = 4×small)
 # noref = PURE-ONLY row: no reference cell is measured, so it carries no parity/ratio verdict and is
 # reported apart from the pure/ref table. A pure/ref gate is only meaningful where a frozen reference
 # can track its subject; the aspect grammar moves by design ruling, so no frozen aspect stack can (see
@@ -264,6 +269,7 @@ MATRIX=(
   "scalar 8000 r,big"
   "registry 500 small"
   "registry 2000 r,big"
+  "lazyRegistry 500 small"
   "lazyRegistry 2000 r"
   "threadedRegistry 500 small"
   "threadedRegistry 2000 r,big"
@@ -308,169 +314,146 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.8'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=de93454e5a6466bdd724ce15c666647358f9622a gen-aspects=e1ad87c83e3c249d7b1ab2c70b8b10105e0cce04 gen-class=fed0139ca309405adf7fe82da71d27d0abe1fb3a gen-graph=6f7300d3f69f844f713e98c26443a72119eeff2c gen-identity=19338f554a0030645b1eba88dfa89a470e5f8f30 gen-memo=fe1b501b6f4bc35590d5ec708ba4c3b9dc54858d gen-merge=b15c2825912aa3893833c398d8e1bd93f862dd14 gen-prelude=7f0513dd21c06e92ffe5131ea85d6b32b1b77a90 gen-schema=cd67d648b7664b1ee22e2453e5e9c0ccf922ce7f gen-scope=3a50a9c64dc3210db6776417f2242b81c4715016 gen-select=ff3229ca56ad5b6762f87634cab8bba1942c3f61 gen-types=37258c458f451c1f19d6380b8d5ba0e86eb73e59'
+ANCHOR_MEMBERS='gen-algebra=8dbf9bc6e77477913d16ec87e06b4c7d91beb793 gen-aspects=2ff4feb134ac2c0deae08b56333bfb909d22d531 gen-class=991641c54637f7be26a66974fc4de5c16e2587be gen-graph=23674e750c76a31596be263980112e3b9b0d2877 gen-identity=4350968f0a4bce3ae54bda89a04aae78dcbaa350 gen-memo=ddf8d26270a7459870574211ee171ac8630515c9 gen-merge=a5480430ed243eca983bfc0761d548a77cab794b gen-prelude=da7dcf4e7969c1dd4cab129eb94432c80d32e9aa gen-schema=61b683284f3e5dc58cb53dc9872a1a75d3caeee8 gen-scope=73effcefc1d7c9af4e39a2351f92b2e49a4f0625 gen-select=01768544e6df584725d407d1c9d7621a64725b12 gen-types=c8865e67accbc8abafe25e23937a7a72abd8621f'
 
-# ── per-row ratio bounds — DERIVED, not chosen ────────────────────────────────
-# ★ THE FORM SINCE den-hoag-r8y89 (owner sitting den-hoag-rwuqw, ruling 10 arm A; P1 (i), P5 (i)):
-# every bound in this file is the EXACT reading at the anchor identity above, written as an integer
-# count or, on a ratio row, as NUM/DEN — the two raw counters, so the ratio is compared at full
-# precision and the bound carries its own provenance. MARGIN is 0 by construction and there is no
-# per-row tolerance: the bound EQUALS the reading on a green run, a reading above it is a regression
-# (raising it needs an owner reading on the five items in ci/README.md), and a reading below it is
-# `ratchet:` until the bound is lowered to it in the same change. The ANCHOR/MARGIN derivations that
-# follow are the record of how each row's former decimal bound was reached; the decimals are gone.
-# ADR-0032 ruling 5: the number is derived at implementation from the measured cost curve,
-# recorded with its derivation, and re-derived when the engine changes. The licensing rule is
-# ci/README.md §"Updating thresholds / workloads"; the derivation record is its 2026-09-21
-# baseline block. Regenerate every figure below with `nix run ./ci#perf-bench`.
-#
-# ANCHOR — the measured pure/ref ratio at 2026-09-21, Nix 2.34.8, gen-merge `7516886` (the rev
-# this hub pins; its lib/modules.nix is byte-identical to gen-merge main `275953b`, one relock
-# commit ahead, which moves lock files only). Read at the precision the gate compares at:
-# ratio() prints %.3f before lte(), so a bound of 1.210 admits a printed 1.210 and refuses 1.211.
-#
-# MARGIN — half the ratio-delta of the SMALLER of the two constructions the one-engine
-# consolidation (gen-merge `564ad1c`) introduced, measured on THAT row and THAT counter,
-# truncated down to three places. The two are ① `declarationGuard` (ADR-0033's refusal-by-name)
-# and ② `driveKnot` (ADR-0006's one evaluator); each was re-measured per row at this pin by
-# neutralising it in a throwaway tree. This is NOT a noise allowance: the gated counters have
-# ZERO spread here (byte-identical across reps and across arms), so a margin buys exactly one
-# thing — how much unattributed drift the project absorbs before it hears about it.
-#
-# WHAT EVERY BOUND BELOW STILL CATCHES, as one claim: a regression costing half of the cheaper
-# of the two constructions this engine change is calibrated on, on that row and counter. Half
-# rather than all of it is what keeps the gate's own red state testable — a cost seeded strictly
-# between the margin and ②'s delta must red, and that is the acceptance cell this bound shipped
-# with.
-#
-# Four of the twelve come out at margin 0.000, because ② is ~free on that row (`driveKnot` costs
-# 147 thunks on scalar n=8000 — 0.0002 of ratio). A 0.000 margin is admissible on a deterministic
-# counter and it is the tightest honest reading: the row holds AT its anchor and any move of 0.001
-# is reported.
-#
-# THIS RE-BASELINE LOOSENS EXACTLY THREE OF THE TWELVE — scalar thunks, schemaHosts thunks,
-# schemaHosts alloc — and each of the three is the attributed move (ci/README.md's 2026-09-21
-# block carries all five licensing items). The other NINE tighten, most of them sharply: the old
-# shared 0.90 was absorbing a silent +57% pure-side regression on deepSubmodule and +16% on
-# registry/lazyRegistry with no gate firing at all.
-declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
-# scalar n=8000 — anchors 0.912 / 0.756; ① 0.037994 / 0.054458, ② 0.000174 / 0.000083 (~free).
-# RATCHETED to the figures gen-merge d84ba687 lands (0.902 / 0.754, down from the pre-channel
-# figure 0.912 / 0.756), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
-# RESTORED to the original 0.90 (xzchx arm A, gen-merge 63ae058's path-free declaration walk):
-# 0.883 at gen-merge d37deb6. A tightening; the thunk bound is no longer interim.
-ROW_THUNKS_MAX[scalar,8000]=691066/844626
-ROW_ALLOC_MAX[scalar,8000]=42573120/56480752
-# registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
-ROW_THUNKS_MAX[registry,2000]=1418543/2179179
-ROW_ALLOC_MAX[registry,2000]=73299264/126644096
-# lazyRegistry n=2000 — anchors 0.777 / 0.632; ① 0.108440 / 0.101548, ② 0.064373 / 0.046891.
-ROW_THUNKS_MAX[lazyRegistry,2000]=1402542/2177174
-ROW_ALLOC_MAX[lazyRegistry,2000]=72657728/126453088
-# threadedRegistry n=2000 — the registry shape over nixpkgs `attrsWith { placeholder = "host"; }`,
-# a container outside the six, so the pure stack folds through gen-merge's threaded rebuild channel
-# (its merge runs three times per option, nixpkgs' once). ANCHORS 0.772 / 0.675 at Nix 2.34.8, gen-merge
-# 202cbd5 (branch f8mgj, the landing that opens the channel). MARGIN 0.000, the tightest honest
-# reading on a deterministic counter (as entityMatch's): the row is new, so no consolidation delta
-# was ever measured on it, and a bound below the then-default COUNTER_RATIO_MAX (0.90, retired) is a tightening, which
-# needs no licence (ci/README.md). Arming: the planted stacks below, never a gated arm.
-ROW_THUNKS_MAX[threadedRegistry,2000]=1619102/2179181
-ROW_ALLOC_MAX[threadedRegistry,2000]=83947328/126644096
-# wrappedRegistry n=2000 — the registry shape under nixpkgs `coercedTo` (a container that adds no step)
-# over the stack's own `attrsOf`, which gen-merge keys at the option's root as the root is (keyWalk's
-# step-free arm, den-hoag-t1j4z). ANCHORS 0.652 / 0.580 at Nix 2.34.8, gen-merge b15c282 (main,
-# carrying t1j4z-b1's arm and t1j4z's agreeing-definitions serve) under this hub's other pins. MARGIN 0.000, the
-# threadedRegistry precedent: the row is new, and a bound below the then-default COUNTER_RATIO_MAX (0.90, retired) is a
-# tightening, which needs no licence (ci/README.md). Arming: a gen-merge without the arm cannot
-# evaluate the row at all (class (a) under `coercedTo`), and a fresh token planted as the arm's body
-# reds the bench naming it (landing-time seed; no per-run plant).
-ROW_THUNKS_MAX[wrappedRegistry,2000]=1420336/2179234
-ROW_ALLOC_MAX[wrappedRegistry,2000]=73401968/126648128
-# schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
-# The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
-# stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
-# the project's PUBLIC claim moved with it was decided on 2026-09-21 — it did: BENCHMARKS.md's
-# composition-plane claim is amended to this band and cites this bound back here.
-# RATCHETED to the figures read at the gen-merge d84ba687 pin (1.207 / 1.018, down from the
-# 1.210 / 1.023 band), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
-# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000: 1.132 / 0.969 at the
-# pre-relock pins, 1.146 / 0.982 at the relock that carries it. gen-identity names the kind and label
-# in every mint refusal, and its price is PER MINT, never per value node: +4 thunks per encoder
-# instance, labels + 1 instances per mint, so +12 thunks and +7 calls for a two-label mint. Measured
-# on this row, one member swapped at a time: gen-identity alone +38,563 thunks / +2,037,984 B on the
-# pure arm (0.981); gen-merge `aea02d1` +2 thunks / +24,112 B (0.00014, below a printed step), which
-# is what takes the alloc anchor to 0.982. A +1-thunk-per-mint plant in gen-identity reads 1.146 /
-# 0.982 here and does NOT red this row (measured at this re-anchor); entityMatch is the per-mint guard
-# (below). A tightening of the xzchx INTERIM 1.207 / 1.018, in the direction its return clause asks.
-# RE-ANCHORED 1.146 / 0.982 → 1.157 / 0.991, margin 0.000 (den-hoag-bfc0k + den-hoag-5xio7 relock),
-# under owner sitting item R8's default (a correctness fix's stated price; defaulted, reversible).
-# Bisect by root-lock arm on hub cb6953a, host and Determinate agreeing: gen-merge e332998/0943b2a
-# (5xio7 alone, + export) does not red this row; + gen-schema fa26749 (`constructionRelation`, the
-# per-construction merge relation every schema entry type now states) reads 1.155 / 0.990; the full
-# landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86) reads 1.157 / 0.991 locally
-# (Nix 2.34.8 and Determinate 3.22.5) and 1.157 / 0.992 on the CI runner's Determinate (hub CI run
-# 36228440647 on fcb8a69); the alloc bound is the larger measured figure, still margin 0.000.
-# RE-ANCHORED thunks 1.157 → 1.163, margin 0.000 (den-hoag-ez1yq relock 32, R8 default; alloc unmoved,
-# 0.991): bisect by root-lock arm on the relock-32 candidate (host evaluator): gen-scope a650104 (kinds minted by a staged
-# fold) reads 1.158, + gen-scope 67b690c (the quotient accessor) 1.163; gen-graph e10c49d does not
-# red this row.
-# RESTORED to the original 0.90 on both counters (xzchx arm 4, gen-schema ffdf8ec: `_identity` is one
-# `lazyAttrsOf (listOf str)` leaf closed to `keys` by its `apply`, not a submodule evaluating a nested
-# module per instance with its own declaration guard and knot). Read 0.890 / 0.786 on the host evaluator
-# (Nix 2.34.8) at hub b48c1d0 with that gen-schema; the thunk ratio is 0.890 under nix, Determinate and
-# Lix alike. The bound is the restored promise, as scalar's was at ab05306, not ANCHOR + MARGIN; the
-# ratchet to a derived anchor reads its alloc figure off CI's Determinate log, because the local
-# Determinate binary's allocation diverges from CI's. A tightening; the bounds are no longer interim.
-ROW_THUNKS_MAX[schemaHosts,1600]=2430537/2864692
-ROW_ALLOC_MAX[schemaHosts,1600]=137815536/168214464
-# deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
-# RE-DERIVED for the Unit 2 engine (den-hoag-n6dh7; owner ruling 2026-09-28, ADR-0032 ruling 5 "re-
-# derived when the engine changes"), 0.618 / 0.495 → 0.643 / 0.595, margin 0.000, RATCHETED.
-# The old anchor and margin measured ② `driveKnot`, one `scope.eval` per nested tree; Unit 2 retires
-# it (every nested tree is an `nta` child of ONE `scope.eval`, ADR-0006 / ADR-0008 §1), so ② is no
-# longer paid on this row and the rule gives margin 0.000, as on the rows where ② is ~free. ANCHOR:
-# read on hub ec614fa at gen-merge 0c49041 (Unit 2 with arm (B): a child reads its definitions off
-# its host's position record; L5c; den-hoag-9d80v, +0.001 alloc; den-hoag-1n12c), gen-scope ba726ef,
-# gen-schema 33e4dda, gen-aspects afd8972, host evaluator. The five
-# licensing items for this loosening: reports/den-hoag-n6dh7-reader-api-spike-v0.md (isolation by
-# per-arm curves; the named construction, the `nta` node at 214.8 thunks / 14,640 B per tree over a
-# plain knot; measured irreducibility, no lever reaches 0.618 / 0.495) and
-# reports/den-hoag-n6dh7-u2-armb-build-v0.md (both suites of each member at the anchor revs).
-# RATCHET: this row only ever tightens. A reading BELOW the bound refuses as `ratchet:` until the
-# bound is lowered to it in the same change; a reading above it refuses as every row does, and
-# raising it needs a fresh owner reading on top of the five licensing items.
-# RATCHETED 0.643 / 0.595 → 0.583 / 0.536 by the gen-merge nesting-side rebuild (den-hoag-i4c0n: the
-# walk reads the fold's own `typeDefs`, one discharge per nesting option; no freeform group without
-# a declared freeform type, decided by key; gen-merge `0010eb7` + `fa73591`). Re-read at relock 40's
-# hub, every member at its tip (gen-merge `f47c48a`, with gen-scope's L2 grammar), host evaluator.
-# RATCHETED 0.583 / 0.536 → 0.557 / 0.533 by the gen-merge module graph (den-hoag-470xp arm F: a
-# plain module list is its own closure, and the merge path collects by breadth-first levels with no
-# minted id; gen-merge `7398fd3`). Read on hub 98c056c with `--at gen-merge=path:` at that tree,
-# host evaluator (reports/den-hoag-470xp-arm-f-build-v0.md §5).
-# RATCHETED 0.557 / 0.533 → 0.555 / 0.504 by the gen-scope eval cleanup (den-hoag-lk2ks: the nta
-# channel's incidental cost removed by construction; gen-scope `9a4db95`). Relock 44.
-# RATCHETED 0.555 / 0.504 → 0.551 / 0.503 by the gen-merge `_module.args` collector change
-# (den-hoag-tl4nx: the same-name refusal, collected pay-per-use). Relock 47.
-# RATCHETED 0.551 / 0.503 → 0.549 / 0.502 by the relock 48 set (gen-merge lnleu, d4gnx, a0c4z,
-# o3oz5, f8mgj arm Q; gen-select l0y U3). Relock 48.
-# RATCHETED 0.549 / 0.502 → 0.541 / 0.500 by the gen-merge tree-as-a-type option type
-# (den-hoag-foreign-mount-parity-knhyg, built at the crossing site). Relock 49.
-# RATCHETED 0.541 / 0.500 → 0.539 / 0.498 by the gen-merge relock 51 set (den-hoag-fpxsd construction
-# L, den-hoag-threadedforeign-parity-residue-0hew4). Relock 51.
-ROW_THUNKS_MAX[deepSubmodule,1600]=6226213/11557492
-ROW_ALLOC_MAX[deepSubmodule,1600]=325449760/653164176
-# foreignMount n=2000 — n option roots on ONE stock nixpkgs `submodule`, each mounted by gen-merge's
-# foreign-mount path (den-hoag-gijly OQ2, arm (a) + this row; before it no row reached the mount, and
-# an abort planted at its head left the bench green). The denominator is nixpkgs `evalModules` over
-# the same modules: the reach census (every source key poisoned in turn) kills `ref` on nixpkgs-lib
-# alone, and `pure` on gen-prelude, -types, -merge, -scope, -identity and -graph, so the row is
-# INDEPENDENT. Anchored at its landing; the mount's measured price over nixpkgs is the reading.
-ROW_THUNKS_MAX[foreignMount,2000]=1717897/1673781
-ROW_ALLOC_MAX[foreignMount,2000]=98764272/97486576
-# wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
-# per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
-# bound is WIDEFREEFORM_RATIO_MAX below, which carries that row's own claim.
-ROW_ALLOC_MAX[wideFreeform,8000]=40703680/52381456
+# ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
+# Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
+# NUM/DEN: the two raw marginals, compared by cross-multiplication. There is no margin and no per-row
+# tolerance (owner sitting den-hoag-rwuqw, ruling 10 arm A; P1 (i), P5 (i)): the bound EQUALS the
+# reading on a green run, a reading above it is a regression (raising it needs an owner reading on the
+# five items in ci/README.md), and a reading below it is `ratchet:` until the bound is lowered to it
+# in the same change. Four tables, keyed by row (the marginal and load section, below the report):
+#   MARG_MAX  each cost row's marginal: counter(big) − counter(small), thunks and attributed bytes;
+#             a ratio row reads pure over ref, NUM/DEN. wideFreeform's thunk marginal is a parity band
+#             with nixpkgs (`…,t,band`), since freeform absorption rides the same per-key type merges
+#             nixpkgs.lib performs; its alloc marginal is a win-gate like every other row's.
+#   LOAD_MAX  the load: each member's own load (`member,<key>,t|a`), each gated arm's small-size thunk
+#             counter, and the startup cell's thunks and attributed bytes.
+#   LOADM     each gated arm's own thunk marginal at the anchor: its X_s is judged only while it holds.
+#   LOADI     each gated arm's three-size thunk intercept at the anchor, or `-` where it is not affine.
+# The block is written by ci/perf-bench-bounds.py from a run's own printed lines, never by hand. The
+# per-size ratio bounds these rows gated until den-hoag-r8y89's marginal form, with every anchor, margin,
+# ratchet and re-anchor recorded beside them, are at hub `94e07ff` (`git show 94e07ff:ci/perf-bench.sh`).
+declare -A MARG_MAX LOAD_MAX LOADM LOADI
+# BEGIN BOUNDS
+MARG_MAX[scalar,t]=516000/632000
+MARG_MAX[scalar,a]=29422000/39182000
+LOAD_MAX[scalar]=175073
+LOADM[scalar]=516000
+LOADI[scalar]=18438000/6000
+MARG_MAX[registry,t]=1061250/1632750
+MARG_MAX[registry,a]=52496000/87727000
+LOAD_MAX[registry]=357323
+LOADM[registry]=1061250
+LOADI[registry]=5359500/1500
+MARG_MAX[lazyRegistry,t]=1049250/1631250
+MARG_MAX[lazyRegistry,a]=52040000/87595000
+LOAD_MAX[lazyRegistry]=353322
+LOADM[lazyRegistry]=1049250
+LOADI[lazyRegistry]=5358000/1500
+MARG_MAX[threadedRegistry,t]=1210500/1632750
+MARG_MAX[threadedRegistry,a]=60338000/87727000
+LOAD_MAX[threadedRegistry]=408642
+LOADM[threadedRegistry]=1210500
+LOADI[threadedRegistry]=7713000/1500
+MARG_MAX[wrappedRegistry,t]=1061250/1632750
+MARG_MAX[wrappedRegistry,a]=52508000/87727000
+LOAD_MAX[wrappedRegistry]=359150
+LOADM[wrappedRegistry]=1061250
+LOADI[wrappedRegistry]=8100000/1500
+MARG_MAX[schemaHosts,t]=1816000/2145200
+MARG_MAX[schemaHosts,a]=93507600/115548200
+LOAD_MAX[schemaHosts]=614601
+LOADM[schemaHosts]=1816000
+LOADI[schemaHosts]=11121200/1200
+MARG_MAX[wideFreeform,t,band]=459000/512000
+MARG_MAX[wideFreeform,a]=27134000/35030000
+LOAD_MAX[wideFreeform]=156439
+LOADM[wideFreeform]=459000
+LOADI[wideFreeform]=20634000/6000
+MARG_MAX[deepSubmodule,t]=4657200/8666400
+MARG_MAX[deepSubmodule,a]=236193600/453759000
+LOAD_MAX[deepSubmodule]=1556300
+LOADM[deepSubmodule]=4657200
+LOADI[deepSubmodule]=4680000/1200
+MARG_MAX[foreignMount,t]=1285500/1254000
+MARG_MAX[foreignMount,a]=68527000/67327000
+LOAD_MAX[foreignMount]=432406
+LOADM[foreignMount]=1285500
+LOADI[foreignMount]=5859000/1500
+MARG_MAX[classShare,fixed,t]=851400
+LOAD_MAX[classShare,fixed]=290659
+LOADM[classShare,fixed]=851400
+LOADI[classShare,fixed]=8230800/1200
+MARG_MAX[overrideWarm,warm,t]=1137000
+MARG_MAX[overrideWarm,warm,a]=56991600
+LOAD_MAX[overrideWarm,warm]=391446
+LOADM[overrideWarm,warm]=1137000
+LOADI[overrideWarm,warm]=14935200/1200
+MARG_MAX[kindMatch,migrated,kind,t]=1192800
+MARG_MAX[entityMatch,migrated,entity,t]=1629000/1702800
+MARG_MAX[coordMatch,migrated,coord,t]=2373600
+MARG_MAX[kindMatch,migrated,kind,a]=65222400
+MARG_MAX[entityMatch,migrated,entity,a]=83978400/91557600
+MARG_MAX[coordMatch,migrated,coord,a]=120620400
+LOAD_MAX[kindMatch,migrated,kind]=411757
+LOADM[kindMatch,migrated,kind]=1192800
+LOADI[kindMatch,migrated,kind]=16988400/1200
+LOAD_MAX[entityMatch,migrated,entity]=557741
+LOADM[entityMatch,migrated,entity]=1629000
+LOADI[entityMatch,migrated,entity]=17689200/1200
+LOAD_MAX[coordMatch,migrated,coord]=800828
+LOADM[coordMatch,migrated,coord]=2373600
+LOADI[coordMatch,migrated,coord]=11553600/1200
+MARG_MAX[kindMatch,sealed,kind,t]=1192800
+MARG_MAX[entityMatch,sealed,entity,t]=1642200/1702800
+MARG_MAX[coordMatch,sealed,coord,t]=2386800
+MARG_MAX[kindMatch,sealed,kind,a]=65222400
+MARG_MAX[entityMatch,sealed,entity,a]=84900000/91557600
+MARG_MAX[coordMatch,sealed,coord,a]=121542000
+LOAD_MAX[kindMatch,sealed,kind]=412412
+LOADM[kindMatch,sealed,kind]=1192800
+LOADI[kindMatch,sealed,kind]=17774400/1200
+LOAD_MAX[entityMatch,sealed,entity]=563074
+LOADM[entityMatch,sealed,entity]=1642200
+LOADI[entityMatch,sealed,entity]=18808800/1200
+LOAD_MAX[coordMatch,sealed,coord]=807488
+LOADM[coordMatch,sealed,coord]=2386800
+LOADI[coordMatch,sealed,coord]=14265600/1200
+MARG_MAX[resolution,4-5,t]=168/196
+MARG_MAX[resolution,5-6,t]=190/236
+MARG_MAX[resolution,6-7,t]=212/276
+MARG_MAX[resolution,7-100,t]=115878/200508
+MARG_MAX[resolution,100-1000,t]=10952100/19814400
+LOAD_MAX[resolution,resolve]=2367
+LOADM[resolution,resolve]=168
+LOAD_MAX[startup,t]=2952
+LOAD_MAX[startup,a]=175062
+LOAD_MAX[member,gen-prelude,t]=140
+LOAD_MAX[member,gen-prelude,a]=14646
+LOAD_MAX[member,gen-algebra,t]=78
+LOAD_MAX[member,gen-algebra,a]=6467
+LOAD_MAX[member,gen-identity,t]=13
+LOAD_MAX[member,gen-identity,a]=814
+LOAD_MAX[member,gen-graph,t]=1753
+LOAD_MAX[member,gen-graph,a]=87889
+LOAD_MAX[member,gen-types,t]=485
+LOAD_MAX[member,gen-types,a]=28946
+LOAD_MAX[member,gen-scope,t]=1754
+LOAD_MAX[member,gen-scope,a]=108025
+LOAD_MAX[member,gen-memo,t]=412
+LOAD_MAX[member,gen-memo,a]=24242
+LOAD_MAX[member,gen-merge,t]=909
+LOAD_MAX[member,gen-merge,a]=52173
+LOAD_MAX[member,gen-schema,t]=533
+LOAD_MAX[member,gen-schema,a]=31812
+LOAD_MAX[member,gen-aspects,t]=292
+LOAD_MAX[member,gen-aspects,a]=18699
+LOAD_MAX[member,gen-select,t]=51
+LOAD_MAX[member,gen-select,a]=4755
+LOAD_MAX[member,gen-class,t]=210
+LOAD_MAX[member,gen-class,a]=10097
+# END BOUNDS
 
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
@@ -479,49 +462,23 @@ ROW_ALLOC_MAX[wideFreeform,8000]=40703680/52381456
 # 0.30 = measured + ~75% relative headroom, and enforces ≥3.33× — comfortably past the A1 fixed-input
 # reference (2.48×, ratio 0.403; the 1.89×→2.48× spine-tax band, spec §2.5) so an erosion BELOW the A1
 # band fires the gate ("any reduction" is not a pass). Sizes mirror schemaHosts/aspects (400→1600, ×4).
-# RE-BASED (den-hoag-r8y89): both arms are gen, so a shared-plane improvement moved the denominator
-# and a fixed/full ratio could refuse an optimization; no nixpkgs operation corresponds to fixed-input
-# class sharing (spec OQ1), so the row gates the guarded arm's OWN cost: `pure-fixed` thunks, exact.
-# Erosion of the reuse raises that cost and reds; the 0.30 ratio (≥ 3.33×, the A1 band) is printed,
-# gated by nothing. The domain, stated: a change that lowers the shared plane AND erodes the reuse
-# by less moves the fixed arm DOWN, so it passes as a ratchet and the erosion is absorbed into the
+# GATED (den-hoag-r8y89): both arms are gen and no nixpkgs operation corresponds to fixed-input class
+# sharing (spec OQ1), so the row gates the guarded arm's OWN cost: the `pure-fixed` thunk marginal and
+# its load. Erosion of the reuse raises the marginal and reds; the 0.30 ratio (≥ 3.33×, the A1 band) is
+# printed, gated by nothing. The domain, stated: a change that lowers the shared plane AND erodes the
+# reuse by less moves the fixed arm DOWN, so it passes as a ratchet and the erosion is absorbed into the
 # lowered bound; only the printed ratio shows it.
 CLASSSHARE_SMALL=400
 CLASSSHARE_BIG=1600
-declare -A CLASSSHARE_FIXED_THUNKS_MAX
-CLASSSHARE_FIXED_THUNKS_MAX[400]=290629
-CLASSSHARE_FIXED_THUNKS_MAX[1600]=1142029
 
 # ── wideFreeform — THUNK band (only alloc keeps the default win-gate) ──
 # Freeform absorption is THUNK-parity with nixpkgs, not a pure win on that counter: unknown sibling keys
 # route through the root freeformType, so absorption rides the SAME per-key type merges nixpkgs.lib
 # performs (the pure engine's thunk win is on DECLARED option paths — see scalar/registry/aspects). So
-# the THUNK ratio rides a band while ALLOC stays a win-gate — two claims, two bounds.
-# Deterministic anchor (2026-09-21, Nix 2.34.8, gen-merge 7516886) at n=8000: thunks 1.096, alloc 0.806
-# (the 2026-07-05 fdbf140 reading was 1.099 / 0.821). The thunk ceiling is the anchor itself: under the
-# per-row derivation above, this row's margin is 0.000 because BOTH constructions of the one-engine
-# consolidation are ~free on it (① 0.000154, ② 0.000090 of ratio) — freeform absorption rides the
-# per-key type merges, not the declaration spine. The former 1.3 was measured + ~18% headroom and was
-# absorbing a silent +19% pure-side regression on this row; a band at the anchor keeps the parity claim
-# and reports the next move instead of swallowing it. The real teeth are LINEARITY (the O(n^2)
-# freeform blowup this workload was built to catch — pre-fix n=8000 thunks were 468×ref, gated at
-# GROWTH_MAX over a 4x step) + the thunk band + the deterministic counters. This cell also used to carry
-# a cpu band of its own; it was the thinnest-margin cpu gate in the matrix (0.914 measured against a 0.95
-# ceiling — 3.9% headroom on an instrument whose noise floor is a ~2.2× raw frequency-regime step) and it is
-# retired with the rest, along with the 0.776–0.888 spread that set it: that spread was produced by the
-# blocked A-then-B protocol this script no longer runs, and a figure a blocked protocol produced on this
-# host is not evidence about the subject. The same reasoning, with these figures, is written out in
-# ci/README.md's wideFreeform section; regenerate via `nix run ./ci#perf-bench`.
-# RE-ANCHORED 1.096 → 1.097 (owner ruling on den-hoag-7gp66 G8, arm (a), 2026-09-28): the P2 door
-# price of gen-scope's L2 argument grammar, a CONSTANT +182 pure thunks per evaluation at gen-scope's
-# entry (750,941 → 751,123 at n=8000, the same +182 at n=2000; ref 684,857), linearity and alloc
-# unchanged. WHAT THE LOOSENED BAND PAYS FOR (owner-confirmed 2026-09-30, den-hoag-kvj78 arm (a)): the
-# door cost is ONE-TIME construction PER gen-scope LIBRARY INSTANCE — 207 thunks built once per process
-# (at the scout's pinned pair), 0 per crossing (101 crossings measured, 356.0 thunks each with and without
-# the doors; identical on nix, Determinate and Lix). The lean door construction took 55 of it back; no
-# internal-only path reaches 1.096, and publishing unchecked cores to reach it was rejected. A landing that
-# brings wideFreeform back under 1.096 re-tightens this band.
-WIDEFREEFORM_RATIO_MAX=615425/684873
+# the thunk marginal ratio is a band, `MARG_MAX[wideFreeform,t,band]`, while the alloc marginal stays a
+# win-gate: two claims, two bounds. The real teeth are LINEARITY (the O(n^2) freeform blowup this
+# workload was built to catch — pre-fix n=8000 thunks were 468×ref, gated at GROWTH_MAX over a 4x step)
+# and the deterministic counters. The cpu band this row once carried is retired with the rest (header).
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -534,16 +491,11 @@ WIDEFREEFORM_RATIO_MAX=615425/684873
 # thunks AND alloc are gated (both are deterministic per Nix version and both genuinely reduce here — the
 # whole warm stack allocates less, unlike classShare where the digest serialization dominates alloc).
 # Sizes mirror classShare/schemaHosts/aspects (400 → 1600, ×4).
-# RE-BASED (den-hoag-r8y89), classShare's reason: `warm` thunks AND alloc, exact, against the arm's
-# own recorded cost; the warm/cold ratios are printed, gated by nothing. The same domain statement
-# holds: a shared-plane gain larger than a simultaneous reuse erosion reads as a ratchet.
+# GATED (den-hoag-r8y89), classShare's reason: the `warm` thunk and alloc marginals and its load; the
+# warm/cold ratios are printed, gated by nothing. The same domain statement holds: a shared-plane gain
+# larger than a simultaneous reuse erosion reads as a ratchet.
 OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
-declare -A OVERRIDEWARM_WARM_THUNKS_MAX OVERRIDEWARM_WARM_ALLOC_MAX
-OVERRIDEWARM_WARM_THUNKS_MAX[400]=391368
-OVERRIDEWARM_WARM_ALLOC_MAX[400]=20616848
-OVERRIDEWARM_WARM_THUNKS_MAX[1600]=1528368
-OVERRIDEWARM_WARM_ALLOC_MAX[1600]=80391888
 
 # ── kindMatch (kind identity at scale; den-hoag-l0y) — the owner's landing gate on ruling (a) ──
 # Ruling (a) keys every kind by its MINTED identity, and the owner's condition on it was that the hub
@@ -566,80 +518,15 @@ OVERRIDEWARM_WARM_ALLOC_MAX[1600]=80391888
 #
 # THREE GATES per fixture. (1) BYTE: kind's projection equals attrs-ref's — the n/2 A instances. A
 # name key that conflates the two same-name kinds returns all n, so this gate also reds the
-# conflation itself. (2) RATIO, thunks AND alloc (classShare's pair: a per-node primop recompute over
-# a cached preimage costs ~1 thunk but allocates), kind/attrs-ref ≤ the bound, at both sizes.
-# (3) LINEARITY on every stack.
-#
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000. ANCHOR — the measured ratio at the landing: hub `perf-bench`
-# app, Nix 2.34.8, gen-select `2cd8c5d` (lib/ identical to `28a0968`), frozen gen-select `9285b5b`,
-# gen-schema `a90bc54`. MARGIN — zero, because the thunk counters are deterministic and the owner
-# ruled any regression a defect. ratio() prints %.3f, so the headroom under each bound is the distance
-# from the exact anchor to the next printed step: thunks 63 / 211 (migrated, n=400 / 1600) and
-# 159 / 1,373 (sealed); alloc 21,799 / 63,415 B and 20,482 / 13,244 B. Allocation carries a ~2.5 KB
-# run-to-run jitter and moves a few KB between environments, which is inside every alloc headroom.
-#
-# STOCK, stated: the anchor is NOT the pre-landing cost. Stock gen-select `9285b5b` as the numerator
-# costs 398,207 / 1,573,607 thunks on the migrated fixture, and its projection fails the byte gate
-# (a name key selects all n). The landed construction is +11,155 / +28,555 over it: +14.5 thunks
-# per node plus ≈5.4k constant (the two mints). About 8.5 per node of that is C-1's
-# `sealedCollisionEq` on the matching half; the rest is the per-node kind-key projection and its
-# admission read (den-hoag-l0y build and landing-gate reports). The bound holds that price; it
-# does not claim the price is zero.
-#
-# WHAT IT CATCHES, derived from the headroom: any per-node cost the live gen-select adds to a
-# `sel.kind` match above ~0.16 thunk/node on the migrated fixture (~0.4 on the sealed one at n=400),
-# including cost in the matcher every selector shares, because the frozen denominator does not pay
-# it; and any rise of more than ~30 thunks in either kind's mint price, since the two mints
-# are in the numerator (so a gen-schema change to `markOf`'s cost moves this row, as it should). The
-# arming control below re-proves the per-node recompute on every run. WHAT IT CANNOT SEE: cost in the
-# instance data plane (gen-merge, gen-schema), which both stacks still pay through the live members
-# and which the ratio therefore dilutes, not cancels — the pure/ref rows gate that plane; a cost in the
-# live gen-select below the headroom; and anything that makes the kind path CHEAPER (the ratio gates
-# are one-sided). Re-derive with `nix run ./ci#perf-bench`.
+# conflation itself. (2) COST, thunks AND alloc (a per-node primop recompute over a cached preimage
+# costs ~1 thunk but allocates): the `kind` arm's own marginals and its load. The denominator runs the
+# frozen matcher over the LIVE data plane (gen-merge, -schema, -scope, … — the reach census), so it is
+# gen-vs-gen and no nixpkgs operation corresponds to kind-identity selection (spec OQ1): the
+# kind/attrs-ref ratios are printed and gated by nothing, and what the frozen denominator buys is the
+# byte gate. (3) LINEARITY on every stack. ARMING, every run: `kind-plant`'s thunk marginal must exceed
+# MARG_MAX[kindMatch,migrated,kind,t].
 KINDMATCH_SMALL=400
 KINDMATCH_BIG=1600
-# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000: the two kinds' mints cost
-# +275 thunks, a CONSTANT at both sizes, which moves the two n=400 thunk ratios one printed step
-# (0.972 → 0.973, 0.966 → 0.967; kind 408,851 / 409,422 against attrs-ref 420,215 / 423,531 thunks at
-# the relock, headroom 228 / 344). The cost is gen-identity's per-mint price (+12 thunks and +7 calls
-# per two-label mint), not gen-select's: gen-select's lib is unmoved. The other bounds print unchanged.
-# sealed n=1600 alloc RE-ANCHORED 0.969 → 0.970, margin 0.000 (relock26, den-hoag-ez1yq; raw bytes at
-# reports/den-hoag-ez1yq-relock26-v0.md §0.1): it reads 0.970 only when gen-identity `410261b`
-# (+16,368 B on kind-sealed, alone 0.96948) and gen-merge `aea02d1` (+126,512 B kind-sealed /
-# +122,416 B attrs-ref-sealed, alone 0.96939) combine (0.96957) — neither reds this gate alone, and
-# the sum crosses one printed step jointly. Both are correctness landings (xvww's attribution;
-# gen-merge's w1k40/jzatq/2f4gm). Priced and re-anchored under owner sitting item R8's default
-# (den-hoag-xwhq4): a correctness fix's stated, re-anchored price is not an xzchx regression.
-# migrated, n=400  — anchors 0.973 / 0.991.
-# RE-ANCHORED thunks 0.973 → 0.974, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
-# a650104 (kinds minted by a staged fold) alone; neither 67b690c nor gen-graph e10c49d moves it.
-# migrated, n=1600 — anchors 0.962 / 0.976 (1,602,162 / 1,664,803 thunks; 85,042,560 / 87,154,096 B).
-# RE-ANCHORED 0.962 / 0.976 → 0.963 / 0.977, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default):
-# thunks cross one printed step at + gen-schema fa26749 (`constructionRelation`); alloc crosses only
-# with the full landing (gen-merge 50250c1 + gen-schema 4b4244a + gen-aspects 25c6f86), no arm alone.
-# sealed, n=400    — anchors 0.967 / 0.984.
-# RE-ANCHORED thunks 0.967 → 0.968, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
-# 67b690c (the quotient accessor); a650104 and gen-graph e10c49d leave it at 0.967.
-# sealed, n=1600   — anchors 0.957 / 0.970 (1,602,745 / 1,675,319 thunks; 85,050,064 / 87,719,184 B).
-# RE-ANCHORED thunks 0.957 → 0.958, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default): crosses
-# one printed step only with the full landing; no single-member arm reds it.
-# RE-BASED (den-hoag-r8y89): the denominator runs the frozen matcher over the LIVE data plane
-# (gen-merge, -schema, -scope, … — the reach census), so it is gen-vs-gen and a shared-plane
-# improvement moved it. No nixpkgs operation corresponds to kind-identity selection (spec OQ1), so the
-# row gates the guarded arm's OWN cost, `kind` thunks and alloc, exact, per fixture and size; the
-# kind/attrs-ref ratios above are printed and gated by nothing. The KINDMATCH_{THUNKS,ALLOC}_MAX ratio
-# bounds whose derivation is recorded above are retired with them. What the frozen denominator still
-# buys is the byte gate. The arming control re-points: `kind-plant`'s thunks must exceed
-# KINDMATCH_KIND_THUNKS_MAX[migrated,400].
-declare -A KINDMATCH_KIND_THUNKS_MAX KINDMATCH_KIND_ALLOC_MAX
-KINDMATCH_KIND_THUNKS_MAX[migrated,400]=411476
-KINDMATCH_KIND_ALLOC_MAX[migrated,400]=24024384
-KINDMATCH_KIND_THUNKS_MAX[migrated,1600]=1604276
-KINDMATCH_KIND_ALLOC_MAX[migrated,1600]=93375664
-KINDMATCH_KIND_THUNKS_MAX[sealed,400]=412013
-KINDMATCH_KIND_ALLOC_MAX[sealed,400]=24035072
-KINDMATCH_KIND_THUNKS_MAX[sealed,1600]=1604813
-KINDMATCH_KIND_ALLOC_MAX[sealed,1600]=93386352
 
 # ── entityMatch (INSTANCE identity at scale; den-hoag-l0y U2) — the row that FORCES `id_hash` ──
 # gen-schema's instance stamp carries the kind's minted identity beside the key values, so two
@@ -658,8 +545,9 @@ KINDMATCH_KIND_ALLOC_MAX[sealed,1600]=93386352
 #
 # THREE GATES. (1) PROJECTION: entity selects exactly `[ "a:h0" ]` (its digest is pinned below); a
 # stamp keyed by the kind NAME selects both halves, `[ "a:h0" "b:h0" ]`, which is attrs-ref's
-# projection and is pinned as the control. (2) RATIO, thunks AND alloc, entity/attrs-ref ≤ the bound,
-# at both sizes. (3) LINEARITY on every stack.
+# projection and is pinned as the control. (2) COST, thunks AND alloc: the entity/attrs-ref marginal
+# ratio, and the `entity` arm's load. (3) LINEARITY on every stack. ARMING, every run: `entity-plant`'s
+# marginal ratio must exceed MARG_MAX[entityMatch,migrated,entity,t].
 #
 # TWO FIXTURES (den-hoag-l0y (β); kindMatch's precedent). `migrated` (the kinds' sealed maps are
 # empty, so `sel.entity` decides on the stamp alone) and `sealed` (stacks `attrs-ref-sealed` /
@@ -671,75 +559,16 @@ KINDMATCH_KIND_ALLOC_MAX[sealed,1600]=93386352
 # both projections are unchanged. The two denominators are the same frozen stack (the frozen side's
 # `str` is nixpkgs' already), so each fixture's ratio is read against its own paired cell.
 #
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (xzchx: any regression is a defect). ANCHOR — the measured
-# ratio at the landing: Nix 2.34.8, gen-schema `9289268`, gen-select `410f517`, frozen gen-schema
-# `2b7c2d3`, frozen gen-select `9285b5b`. ratio() prints %.3f, so the headroom is the distance from the
-# exact anchor to the next printed step: migrated thunks 390 / 1,972 (n=400 / 1600), alloc 20,702 /
-# 60,871 B; sealed thunks 10 / 629, alloc 23,439 / 131,663 B (at (β); the gen-identity `410261b`
-# re-anchor below restates them).
-# (β)'s own price over `9791baf`: +12 thunks constant on the migrated fixture (the kind key the
-# selector now carries); the sealed arm adds the node's kind key and one `kindEq` on the one match.
-#
 # THE PRICE, stated: the stamp's kind component costs +24.0 thunks per instance (one more
 # ⟨label, value⟩ pair through the canonical encoder) plus the mark once per kind, which the stamp now
 # forces — ≈3.3k thunks on this row's one-option kind, and more on a larger declaration, since every
 # option attribute is a component of the mark. Stock gen-schema `cfec60d` as the numerator reads
 # 731,629 / 2,906,629 thunks and fails the projection gate (both halves).
-#
-# WHAT IT CATCHES: a per-instance cost in the stamp above the headroom (~1 thunk/node), including
-# the identity module built per instance rather than once per kind type (+6 thunks/node, measured
-# red at landing through `--at gen-schema=path:`, exit 6); and the per-instance kind re-derivation,
-# re-proved every run by the arming control below. WHAT IT CANNOT SEE: anything that makes the
-# entity path CHEAPER (one-sided), and a cost below the headroom.
 ENTITYMATCH_SMALL=400
 ENTITYMATCH_BIG=1600
 # sha256 of the JSON projections: `[ "a:h0" ]` (entity) and `[ "a:h0" "b:h0" ]` (attrs-ref).
 ENTITYMATCH_DIGEST_ENTITY=6b6d42a882aa4068cc0009757746a29fd06a3ee757c08a55f179af91c2e88055
 ENTITYMATCH_DIGEST_REF=b4d8cf97c0d1bfa8fe91136ed4d1fe56610ae23dadb1a30ecfd6df7f31a796a1
-declare -A ENTITYMATCH_THUNKS_MAX ENTITYMATCH_ALLOC_MAX
-# RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000. gen-identity names the kind
-# and label in every mint refusal; its price is PER MINT and never per value node: +4 thunks per
-# encoder instance, labels + 1 instances per mint, so +12 thunks and +7 calls for a two-label mint
-# and +16 thunks for the stamp's three-label one. Measured here, one member swapped at a time:
-# gen-identity alone moves entity +6,675 / +25,875 thunks (migrated) and +6,663 / +25,863 (sealed),
-# i.e. +16 per instance plus a constant, and attrs-ref (which runs no library under test) is
-# unmoved. Every other member of the relock together moves entity +2 thunks and +7,056 / +28,208 B
-# (migrated) — gen-merge `aea02d1` — which is below a printed step alone, and takes the migrated
-# alloc anchors from 1.124 / 1.115 (gen-identity alone) to 1.125 / 1.116. Headroom to the next
-# printed step: migrated thunks 31 / 1,144, sealed 237 / 2,090 — so a +1-thunk-per-mint regression
-# in gen-identity (+400 at n=400) reds the migrated fixture.
-# RE-ANCHORED, margin 0.000 (den-hoag-bfc0k + den-hoag-5xio7 relock, owner sitting R8's default:
-# a correctness fix's stated price; defaulted, reversible). Bisect by root-lock arm on hub cb6953a,
-# host and Determinate agreeing:
-#   (i) gen-merge e332998 (5xio7: `callD` applies `extra // declArgs`, `slotsDiffer`) and 0943b2a
-#       (+ the `closuresFirst` export) red the four ALLOC gates by +0.001 each, thunks unmoved. The
-#       5xio7 spec priced the `callD` swap at nil; that is FALSE on this row.
-#   (ii) + gen-schema fa26749 (`constructionRelation`) moves thunks about +0.012 and alloc about
-#       +0.010 more; the full landing (gen-merge 50250c1, gen-schema 4b4244a, gen-aspects 25c6f86)
-#       reads the anchors below.
-# migrated, n=400  — 1.311 / 1.125 → 1.326 / 1.137.
-# RE-ANCHORED (den-hoag-ez1yq relock 32, R8 default), bisect by root-lock arm on the relock-32 candidate (host evaluator):
-#   gen-scope a650104 (kinds minted by a staged fold) +0.001 to +0.002 on every fixture; + gen-scope
-#   67b690c (the quotient accessor) about +0.006 more; gen-graph e10c49d (the key-former door) alone
-#   moves only sealed n=400, 1.331 → 1.332. Alloc unmoved.
-# migrated, n=400  — 1.326 → 1.334.
-ENTITYMATCH_THUNKS_MAX[migrated,400]=557444/574411
-ENTITYMATCH_ALLOC_MAX[migrated,400]=31319392/33627840
-# migrated, n=1600 — anchors 1.307 / 1.116 (2,976,281 / 2,277,190 thunks; 148,649,792 / 133,249,584 B).
-# migrated, n=1600 — 1.307 / 1.116 → 1.321 / 1.128.
-# migrated, n=1600 — 1.321 → 1.329.
-ENTITYMATCH_THUNKS_MAX[migrated,1600]=2186444/2277211
-ENTITYMATCH_ALLOC_MAX[migrated,1600]=122478208/133250800
-# sealed, n=400    — anchors 1.317 / 1.129 (756,521 / 574,390 thunks; 37,976,080 / 33,622,624 B).
-# sealed, n=400    — 1.317 / 1.129 → 1.331 / 1.142.
-# sealed, n=400    — 1.331 → 1.339.
-ENTITYMATCH_THUNKS_MAX[sealed,400]=562659/574411
-ENTITYMATCH_ALLOC_MAX[sealed,400]=31651680/33627840
-# sealed, n=1600   — anchors 1.312 / 1.120 (2,986,721 / 2,277,190 thunks; 149,237,056 / 133,249,584 B).
-# sealed, n=1600   — 1.312 / 1.120 → 1.326 / 1.133.
-# sealed, n=1600   — 1.326 → 1.334.
-ENTITYMATCH_THUNKS_MAX[sealed,1600]=2204859/2277211
-ENTITYMATCH_ALLOC_MAX[sealed,1600]=123732096/133250800
 
 # ── coordMatch (the PRODUCT COORDINATE's identity decision at scale; den-hoag-8hqx0) ──
 # `adapters.product.coord dim kind entry` decides as `sel.entity` does: the stamp, then — at an equal
@@ -756,8 +585,11 @@ ENTITYMATCH_ALLOC_MAX[sealed,1600]=123732096/133250800
 #
 # 64 selectors each run over every cell (perf-bench.nix states why: with one, construction dilutes
 # the matcher below the ratio's printed precision). THREE GATES, entityMatch's. (1) PROJECTION: both
-# stacks select exactly `[ "h0" … "h63" ]`. (2) RATIO, thunks
-# AND alloc, coord/coord-ref ≤ the bound, per fixture and size. (3) LINEARITY on every stack.
+# stacks select exactly `[ "h0" … "h63" ]`. (2) COST, thunks AND alloc: the `coord` arm's own marginals
+# and its load. Both stacks share the live gen-schema instances and plane, so gen-merge c3 (`ownUnmatched
+# = []` when nothing is undeclared) lowered coord and coord-ref alike and a coord/coord-ref ratio rose to
+# 1.001 with the excess a constant +398: the ratios are printed, gated by nothing. (3) LINEARITY on
+# every stack.
 #
 # WHY ALLOC IS GATED (den-hoag-8hqx0 gate PF5). The rejected construction A — the kind projected into
 # every cell's `data` — is THUNK-NEUTRAL (+0.000/cell) and costs bytes only (+16.7 / +9.9 B/cell): a
@@ -766,42 +598,11 @@ ENTITYMATCH_ALLOC_MAX[sealed,1600]=123732096/133250800
 # and `plant-A` (construction A). ALLOC is GC-quantised and depends on the source PATH string (the
 # bank's perf-bench trap), so the anchor is read on a `path:` overlay and must be re-read at the relock
 # that lands gen-select's tip.
-#
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (xzchx). ANCHOR — measured at the landing: Nix 2.34.8, hub
-# ec614fa, gen-select 8hqx0 tip `5348baf` (`--at gen-select=path:`), frozen gen-select `9285b5b`:
-# migrated 815,275 / 814,878 thunks (n=400), 3,236,875 / 3,236,478 (n=1600) — the +397 is the constant
-# (64 kind keys and the context's `coordKinds`); sealed 819,976 / 818,096 and 3,248,776 / 3,246,896 —
-# the +1,880 is the 64 matching cells' `entityEq`. Constant, as the bound demands: +0.000 per cell.
-# The plants, same instrument, same paths' length: plant-kindread reads thunks 1.095 / 1.095 / 1.096 /
-# 1.095 and alloc 1.030-1.031; plant-A reads thunks IDENTICAL to the anchor (thunk-neutral) and alloc
-# 1.010 / 1.010 / 1.012 / 1.010, so only the alloc gate refuses it.
-# HEADROOM AT THE CONSTANT FLOOR (den-hoag-8hqx0 landing gate PF-b): migrated n=400 reds on any growth of
-# the numerator over 10 thunks or 556 B, CONSTANT (n=1600: 1,221 thunks / 58,935 B; sealed n=400: 165 /
-# 23,839 B). So a red here is not by itself a per-cell cost: compare the n=1600 and n=400 excesses over
-# coord-ref — a per-cell cost scales ×4 across the step, a constant does not. The FAILURES text says so.
 COORDMATCH_SMALL=400
 COORDMATCH_BIG=1600
 # sha256 of the JSON projection `[ "h0" … "h63" ]` (each of the 64 selectors selects its own cell),
 # both stacks.
 COORDMATCH_DIGEST=ec30bebff99631b2d8ef98e29a6403135aea466f4b4d1d2ab303d1dffefe77dc
-# RAISED 1.000 → 1.001 (owner-approved, den-hoag-470xp arm F): the residue is one GC heap block, not a
-# cost. ΔThunks coord−ref stays the row's constant 397 at gen-merge `3a8d116`, and the byte excess moves
-# by whole 4 096 B blocks whose sign changes with n (+1 block at n=400, −2 at n=1600), which a per-cell
-# cost could not do (reports/den-hoag-470xp-arm-f-landing-gate-v0.md §4.3).
-# RE-BASED (den-hoag-r8y89), and this row is the measured case: both stacks share the live gen-schema
-# instances and plane, so gen-merge c3 (`ownUnmatched = []` when nothing is undeclared) lowered coord
-# and coord-ref alike and the ratio rose to 1.001 with the excess a constant +398. The row gates the
-# guarded arm's OWN cost, `coord` thunks and alloc, exact; the ratios are printed, gated by nothing,
-# and the COORDMATCH_{THUNKS,ALLOC}_MAX ratio bounds derived above are retired.
-declare -A COORDMATCH_COORD_THUNKS_MAX COORDMATCH_COORD_ALLOC_MAX
-COORDMATCH_COORD_THUNKS_MAX[migrated,400]=800763
-COORDMATCH_COORD_ALLOC_MAX[migrated,400]=43747504
-COORDMATCH_COORD_THUNKS_MAX[migrated,1600]=3174363
-COORDMATCH_COORD_ALLOC_MAX[migrated,1600]=173125712
-COORDMATCH_COORD_THUNKS_MAX[sealed,400]=807425
-COORDMATCH_COORD_ALLOC_MAX[sealed,400]=44134416
-COORDMATCH_COORD_THUNKS_MAX[sealed,1600]=3194225
-COORDMATCH_COORD_ALLOC_MAX[sealed,1600]=174442400
 
 # ── resolution (the one resolution calculus at scale; den-hoag-gayc U2b, design §5.8) ──
 # The hub's own peer shape — a COMPLETE peer relation with self-edges over n hosts, walked `peer*`
@@ -814,11 +615,11 @@ COORDMATCH_COORD_ALLOC_MAX[sealed,1600]=174442400
 #
 # GATES. (1) BYTE, every n: resolve's projection (the answer's nodes, sorted) equals query-orig's
 # (sorted): a SET-parity gate (owner ruling 15, 2026-10-04, den-hoag-4or0a U0), since resolve
-# answers in first-reach order and gen-scope's own order cell pins that order. (2) RATIO, THUNKS
-# ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and gated by nothing: at n = 4..7
-# a cell allocates 75–211 KB, so allocation's ~2.5 KB run-to-run jitter is over 1% and crosses a
-# printed step (that jitter was the collector's: with GC_DONT_GC every cell reads one byte count,
-# but no alloc gate is built on this row yet). (3) ARMING, every run: the `witnesses` arm (mode `witnesses`, the acyclic-path law,
+# answers in first-reach order and gen-scope's own order cell pins that order. (2) COST, THUNKS
+# ONLY: the resolve/query-orig marginal between each pair of consecutive sizes (the walk is super-linear
+# by the fixture, so it has no linear pair), and the resolve arm's load at n=4 (spec OQ8). Alloc is
+# reported and gated by nothing: no alloc gate is built on this row. (3) ARMING, every run: the
+# `witnesses` arm (mode `witnesses`, the acyclic-path law,
 # which enumerates every simple path and is factorial in n here) at n = 4..7 only — it never returns
 # at n = 100 (gate P2) — must step 6 → 7 by at least RESOLUTION_WITNESSES_GROWTH_MIN and by more
 # than resolve's own 6 → 7 step. A polynomial of degree d steps 6 → 7 by (7/6)^d, so ×3 needs d ≥
@@ -827,43 +628,11 @@ COORDMATCH_COORD_ALLOC_MAX[sealed,1600]=174442400
 # gate: the complete relation has n² edges, so the walk is quadratic in n by the fixture, and only a
 # same-n ratio can see a regression.
 #
-# BOUND = ANCHOR + MARGIN, MARGIN 0.000 (kindMatch's convention). ANCHOR — the measured ratio at
-# gen-scope `32e39c0` (gayc-u2e, the revision this hub pins): hub `perf-bench` app, Nix 2.34.8, frozen
-# gen-graph `0db4e737`. Raw thunks resolve / query-orig: n=4 2,368 / 1,237 · 5 2,537 / 1,433 · 6 2,728
-# / 1,669 · 7 2,941 / 1,945 · 100 118,912 / 202,453 · 1000 11,071,912 / 20,016,853. The small sizes
-# read above 1 because the lift and the WFL's construction are a constant the frozen `query` does not
-# pay; from n = 100 the walk is the cheaper. witnesses: 3,467 / 8,506 / 36,507 / 219,188 at n = 4..7
-# (6 → 7: ×6.004). RE-ANCHORED (den-hoag-gayc U2d): the row landed anchored at gen-scope `cd653a2`
-# (U2b), and gen-scope `32e39c0` (U2e, the converse) costs `resolve` one thunk per node more
-# (n=4..7 +4..+7, n=100 +100, n=1000 +1,000), which crossed the n = 4..7 bounds by +0.003..+0.004;
-# the same hub with gen-scope at `cd653a2` passes every gate, the same run. RE-ANCHORED AGAIN at
-# gen-scope `35b106b` (den-hoag-di165: every node-id table keyed by the id's text through
-# `key.attrKey`, once per id, so a store-path-context id resolves). That is di165's price, a
-# correctness fix's linear cost: about +6 thunks fixed plus about 1 per node (attrKey's context check
-# per node-id read). resolve thunks at `32e39c0` → `35b106b`: n=4 2,368 → 2,378 · 5 2,537 → 2,548 ·
-# 6 2,728 → 2,740 · 7 2,941 → 2,954 · 100 118,912 → 119,018 · 1000 11,071,912 → 11,072,918;
-# witnesses 3,477 / 8,517 / 36,519 / 219,201. (di165's first build `8a5586f` cost +47..+53 / +239 /
-# +2,039; the bounds are held at `35b106b`, so a return to that cost reds.)
-# THE DENOMINATOR FROZEN IN FULL (relock 60): until then `gen-graph-orig` ran on the LIVE gen-prelude,
-# so the "frozen" query floated with every relock, and gen-prelude `ae1ce68` (door `next`, which
-# refuses an unwired record step) could no longer evaluate it at all. Under `gen-prelude-orig`
-# `c471c9a`, with gen-scope `35b106b` and gen-prelude `ae1ce68`, raw thunks resolve / query-orig:
-# n=4 2,396 / 1,263 · 5 2,566 / 1,459 · 6 2,758 / 1,695 · 7 2,972 / 1,971 · 100 119,036 / 202,479 ·
-# 1000 11,072,936 / 20,016,879; witnesses 3,495 / 8,535 / 36,537 / 219,219 (6 → 7: ×6.000). The new
-# prelude's price on `resolve` is +18 thunks, constant in n. The bounds above stand: the ratios read
-# 1.897 / 1.759 / 1.627 / 1.508 / 0.588 / 0.553, under every bound.
 RESOLUTION_SIZES=(4 5 6 7 100 1000)
 RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
 RESOLUTION_WITNESSES_GROWTH_MIN=3.0
-declare -A RESOLUTION_THUNKS_MAX
-RESOLUTION_THUNKS_MAX[4]=2365/1267
-RESOLUTION_THUNKS_MAX[5]=2533/1463
-RESOLUTION_THUNKS_MAX[6]=2723/1699
-RESOLUTION_THUNKS_MAX[7]=2935/1975
-RESOLUTION_THUNKS_MAX[100]=118813/202483
-RESOLUTION_THUNKS_MAX[1000]=11070913/20016883
 
-declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
+declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG ATT
 declare -A CR TR AR PAR
 CELL_ERRF=""
 CELL_OUT=""
@@ -961,6 +730,12 @@ sample_cell() {
     || die_cell "no usable .cpuTime in $statf" "$status" "$errf" "$out"
   thunks=$(jq -e '.nrThunks | numbers | select(. > 0)' "$statf") \
     || die_cell "no usable .nrThunks in $statf" "$status" "$errf" "$out"
+  att=0
+  for bf in envs list sets values symbols; do
+    bv=$(jq -e ".$bf.bytes | numbers | select(. > 0)" "$statf") \
+      || die_cell "the attributed-bytes field .$bf.bytes is zero or absent in $statf: the evaluator's accounting is not the anchored one" "$status" "$errf" "$out"
+    att=$((att + bv))
+  done
   alloc=$(jq -e '.gc.totalBytes | numbers | select(. > 0)' "$statf") \
     || die_cell "no usable .gc.totalBytes in $statf" "$status" "$errf" "$out"
   # The digest is the parity oracle's datum, and perf-bench.nix emits it for every cell: its absence
@@ -972,6 +747,7 @@ sample_cell() {
   CPU_SAMPLES["$w,$n,$s"]+="$cpu"$'\n'
   THUNKS["$w,$n,$s"]=$thunks
   ALLOC["$w,$n,$s"]=$alloc
+  ATT["$w,$n,$s"]=$att
   DIG["$w,$n,$s"]=$dig
 }
 
@@ -1070,6 +846,13 @@ if [[ -z "$PF_RESIDUE" ]]; then
 fi
 PF_ARMING=$(printf '%s' "$PREFLIGHT" | jq -r '"striking \"\(.arming.strike)\" from the environment fires on \(.arming.fires) of \(.arming.of) applied entries"')
 PF_UNAPPLIED=$(printf '%s' "$PREFLIGHT" | jq -r '.unappliedEntries | join(", ")')
+# The load cells' order, read from the corpus so the two cannot drift: perf-bench.nix `loadOrder`.
+LOAD_ORDER=()
+while IFS= read -r lk; do LOAD_ORDER+=("$lk"); done < <(printf '%s' "$PREFLIGHT" | jq -er '.loadOrder[] | strings')
+if [[ ${#LOAD_ORDER[@]} -eq 0 ]]; then
+  echo "perf-bench: PRE-FLIGHT CENSUS UNREADABLE — it carries no .loadOrder, so no member's load can be measured; UNMEASURED, not empty" >&2
+  exit 5
+fi
 declare -A PF_LEAK
 while IFS=$'\t' read -r lk lv; do PF_LEAK[$lk]=$lv; done < <(
   printf '%s' "$PREFLIGHT" | jq -r '.leaks[] | "\(.member)\t\(.leak | join(", "))"'
@@ -1142,7 +925,21 @@ for row in "${MATRIX[@]}"; do
   fi
 done
 
+# The load cells: one rep each, since a counter is deterministic and their cpu is reported nowhere.
+for k in none "${LOAD_ORDER[@]}"; do
+  sample_cell load 1 "$k" 1
+done
+
 # ── compute ratios + gate outcomes (no printing; emit_report reads these) ──────
+# Every member has a load cell, and every load cell is a member: a member outside `loadOrder` would
+# load ungated, and the census is what says so.
+for ck in "${COMB_KEYS[@]}"; do
+  [[ "${BASE_AXIS[$ck]}" == reference ]] && continue
+  [[ " ${LOAD_ORDER[*]} " == *" $ck "* ]] || FAILURES+=("unmeasured: load: member $ck has no load cell (perf-bench.nix loadOrder)")
+done
+for k in "${LOAD_ORDER[@]}"; do
+  [[ "${BASE_AXIS[$k]:-}" == member ]] || FAILURES+=("load: loadOrder names $k, which is not a member of the combination")
+done
 for row in "${MATRIX[@]}"; do
   read -r w n tags <<<"$row"
   # noref rows have no reference cell: no ratio is computable and no parity verdict is asserted.
@@ -1158,20 +955,8 @@ for row in "${MATRIX[@]}"; do
     PAR["$w,$n"]="MISMATCH"
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
-  # CR is computed and reported but never gated — see the cpu note in the header. TR/AR are the
-  # printed ratios; the gates read the raw counters as NUM/DEN. A row with no recorded bound is
-  # UNMEASURED (gate), so a new workload's first landing records its reading as its bound.
-  tq="${THUNKS[$w,$n,pure]}/${THUNKS[$w,$n,ref]}"
-  aq="${ALLOC[$w,$n,pure]}/${ALLOC[$w,$n,ref]}"
-  if has_tag "$tags" r; then
-    gate "ratio: $w n=$n pure/ref thunks" "$tq" "${ROW_THUNKS_MAX[$w,$n]:-}" "ROW_THUNKS_MAX[$w,$n]"
-    gate "ratio: $w n=$n pure/ref alloc" "$aq" "${ROW_ALLOC_MAX[$w,$n]:-}" "ROW_ALLOC_MAX[$w,$n]"
-  elif has_tag "$tags" rb; then
-    # wideFreeform: ALLOC is a win-gate, THUNKS ride a parity band — two different CLAIMS, which is
-    # why the band keeps its own named constant and its own failure wording.
-    gate "ratio: $w n=$n pure/ref alloc" "$aq" "${ROW_ALLOC_MAX[$w,$n]:-}" "ROW_ALLOC_MAX[$w,$n]"
-    gate "ratio-band: $w n=$n pure/ref thunks" "$tq" "$WIDEFREEFORM_RATIO_MAX" "WIDEFREEFORM_RATIO_MAX"
-  fi
+  # CR, TR and AR are printed, gated by nothing: the cost gates read the raw counters as marginals
+  # (the marginal and load section, below the report).
 done
 
 for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount moduleFanIn sameLocFanIn; do
@@ -1210,7 +995,6 @@ for n in "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG"; do
   CS_AR[$n]=$(ratio "${ALLOC[classShare,$n,pure-fixed]}" "${ALLOC[classShare,$n,pure-full]}")
   CS_CR[$n]=$(ratio "${CPU[classShare,$n,pure-fixed]}" "${CPU[classShare,$n,pure-full]}")
   # COST gate (re-based, den-hoag-r8y89): the fixed-input arm's OWN thunks; the ratio is printed.
-  gate "classShare: n=$n pure-fixed thunks (the spine reduction eroded, or the shared plane moved)" "${THUNKS[classShare,$n,pure-fixed]}" "${CLASSSHARE_FIXED_THUNKS_MAX[$n]:-}" "CLASSSHARE_FIXED_THUNKS_MAX[$n]"
 done
 # LINEARITY: both stacks stay linear in the core size (a quadratic core-merge blowup would fail here).
 CS_LIN_FULL=$(ratio "${THUNKS[classShare,$CLASSSHARE_BIG,pure-full]}" "${THUNKS[classShare,$CLASSSHARE_SMALL,pure-full]}")
@@ -1239,8 +1023,6 @@ for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
   OW_AR[$n]=$(ratio "${ALLOC[overrideWarm,$n,warm]}" "${ALLOC[overrideWarm,$n,cold]}")
   OW_CR[$n]=$(ratio "${CPU[overrideWarm,$n,warm]}" "${CPU[overrideWarm,$n,cold]}")
   # COST gate (re-based, den-hoag-r8y89): the warm arm's OWN thunks and alloc; the ratios are printed.
-  gate "overrideWarm: n=$n warm thunks (warm reuse eroded, or the shared plane moved)" "${THUNKS[overrideWarm,$n,warm]}" "${OVERRIDEWARM_WARM_THUNKS_MAX[$n]:-}" "OVERRIDEWARM_WARM_THUNKS_MAX[$n]"
-  gate "overrideWarm: n=$n warm alloc (warm reuse eroded, or the shared plane moved)" "${ALLOC[overrideWarm,$n,warm]}" "${OVERRIDEWARM_WARM_ALLOC_MAX[$n]:-}" "OVERRIDEWARM_WARM_ALLOC_MAX[$n]"
 done
 # LINEARITY: both stacks stay linear in the registry size (a quadratic base merge would fail here).
 OW_LIN_COLD=$(ratio "${THUNKS[overrideWarm,$OVERRIDEWARM_BIG,cold]}" "${THUNKS[overrideWarm,$OVERRIDEWARM_SMALL,cold]}")
@@ -1271,8 +1053,6 @@ for fx in migrated sealed; do
     KM_TR[$fx,$n]=$(ratio "${THUNKS[kindMatch,$n,kind$sfx]}" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}")
     KM_AR[$fx,$n]=$(ratio "${ALLOC[kindMatch,$n,kind$sfx]}" "${ALLOC[kindMatch,$n,attrs-ref$sfx]}")
     KM_CR[$fx,$n]=$(ratio "${CPU[kindMatch,$n,kind$sfx]}" "${CPU[kindMatch,$n,attrs-ref$sfx]}")
-    gate "kindMatch ($fx): n=$n kind thunks (the live gen-select per node, a kind's mint price, or the data plane)" "${THUNKS[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_THUNKS_MAX[$fx,$n]:-}" "KINDMATCH_KIND_THUNKS_MAX[$fx,$n]"
-    gate "kindMatch ($fx): n=$n kind alloc (the live gen-select per node, a kind's mint price, or the data plane)" "${ALLOC[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_ALLOC_MAX[$fx,$n]:-}" "KINDMATCH_KIND_ALLOC_MAX[$fx,$n]"
   done
   for s in "attrs-ref$sfx" "kind$sfx"; do
     KM_LIN[$s]=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,$s]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,$s]}")
@@ -1289,9 +1069,6 @@ KM_PLANT_TR=$(ratio "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${THUNKS
 KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[kindMatch,$KINDMATCH_SMALL,attrs-ref]}")
 [[ "${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}" == "${DIG[kindMatch,$KINDMATCH_SMALL,attrs-ref]}" ]] \
   || FAILURES+=("kindMatch arming: the planted per-node recompute selected a different node set (${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}) — the plant no longer isolates cost")
-if [[ $(qcmp "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-}") != gt ]]; then
-  FAILURES+=("kindMatch arming: the planted per-node recompute read kind thunks ${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}, not above KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]=${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-} — the bound cannot see the class this row exists for")
-fi
 
 # ── threadedRegistry arming, every run: does the row reach the threaded path? ───────────────────
 # The planted element's `substSubModules` throws a token generated here and never written down
@@ -1337,8 +1114,6 @@ for fx in migrated sealed; do
     EM_TR[$fx,$n]=$(ratio "${THUNKS[entityMatch,$n,entity$sfx]}" "${THUNKS[entityMatch,$n,attrs-ref$sfx]}")
     EM_AR[$fx,$n]=$(ratio "${ALLOC[entityMatch,$n,entity$sfx]}" "${ALLOC[entityMatch,$n,attrs-ref$sfx]}")
     EM_CR[$fx,$n]=$(ratio "${CPU[entityMatch,$n,entity$sfx]}" "${CPU[entityMatch,$n,attrs-ref$sfx]}")
-    gate "entityMatch ratio ($fx): n=$n entity/attrs-ref thunks (gen-schema's stamp, or gen-identity's per-mint price)" "${THUNKS[entityMatch,$n,entity$sfx]}/${THUNKS[entityMatch,$n,attrs-ref$sfx]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]:-}" "ENTITYMATCH_THUNKS_MAX[$fx,$n]"
-    gate "entityMatch ratio ($fx): n=$n entity/attrs-ref alloc (gen-schema's stamp, or gen-identity's per-mint price)" "${ALLOC[entityMatch,$n,entity$sfx]}/${ALLOC[entityMatch,$n,attrs-ref$sfx]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]:-}" "ENTITYMATCH_ALLOC_MAX[$fx,$n]"
   done
   for s in "attrs-ref$sfx" "entity$sfx"; do
     EM_LIN[$s]=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_BIG,$s]}" "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,$s]}")
@@ -1353,9 +1128,6 @@ EM_PLANT_TR=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${
 EM_PLANT_AR=$(ratio "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,attrs-ref]}")
 [[ "${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" == "$ENTITYMATCH_DIGEST_ENTITY" ]] \
   || FAILURES+=("entityMatch arming: the planted per-instance re-derivation selected a different node set (${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}) — the plant no longer isolates cost")
-if [[ $(qcmp "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}/${THUNKS[entityMatch,$ENTITYMATCH_SMALL,attrs-ref]}" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]:-}") != gt ]]; then
-  FAILURES+=("entityMatch arming: the planted per-instance re-derivation read entity/attrs-ref thunks $EM_PLANT_TR ≤ ${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]} — the bound cannot see the class this row exists for")
-fi
 
 # ── coordMatch — the product coordinate's identity decision at scale (den-hoag-8hqx0; the gate derivation is beside the constants) ──
 for fx in migrated sealed; do
@@ -1374,8 +1146,6 @@ for fx in migrated sealed; do
     CM_TR[$fx,$n]=$(ratio "${THUNKS[coordMatch,$n,coord$sfx]}" "${THUNKS[coordMatch,$n,coord-ref$sfx]}")
     CM_AR[$fx,$n]=$(ratio "${ALLOC[coordMatch,$n,coord$sfx]}" "${ALLOC[coordMatch,$n,coord-ref$sfx]}")
     CM_CR[$fx,$n]=$(ratio "${CPU[coordMatch,$n,coord$sfx]}" "${CPU[coordMatch,$n,coord-ref$sfx]}")
-    gate "coordMatch ($fx): n=$n coord thunks (PER CELL if the n=1600 excess over coord-ref is ~4× the n=400 excess, a CONSTANT if equal, the shared plane if coord-ref moved too)" "${THUNKS[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_THUNKS_MAX[$fx,$n]:-}" "COORDMATCH_COORD_THUNKS_MAX[$fx,$n]"
-    gate "coordMatch ($fx): n=$n coord alloc (PER CELL if the n=1600 excess over coord-ref is ~4× the n=400 excess, a CONSTANT if equal, the shared plane if coord-ref moved too)" "${ALLOC[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_ALLOC_MAX[$fx,$n]:-}" "COORDMATCH_COORD_ALLOC_MAX[$fx,$n]"
   done
   for s in "coord-ref$sfx" "coord$sfx"; do
     CM_LIN[$s]=$(ratio "${THUNKS[coordMatch,$COORDMATCH_BIG,$s]}" "${THUNKS[coordMatch,$COORDMATCH_SMALL,$s]}")
@@ -1398,7 +1168,6 @@ for n in "${RESOLUTION_SIZES[@]}"; do
   RS_TR[$n]=$(ratio "${THUNKS[resolution,$n,resolve]}" "${THUNKS[resolution,$n,query-orig]}")
   RS_AR[$n]=$(ratio "${ALLOC[resolution,$n,resolve]}" "${ALLOC[resolution,$n,query-orig]}")
   RS_CR[$n]=$(ratio "${CPU[resolution,$n,resolve]}" "${CPU[resolution,$n,query-orig]}")
-  gate "resolution ratio: n=$n resolve/query-orig thunks (per edge or per ⟨node, state⟩ if the n=1000 excess dominates, a constant if only n=4..7 move)" "${THUNKS[resolution,$n,resolve]}/${THUNKS[resolution,$n,query-orig]}" "${RESOLUTION_THUNKS_MAX[$n]:-}" "RESOLUTION_THUNKS_MAX[$n]"
 done
 # ARMING, every run: the witnesses control at n ≤ 7 must read super-linear (P2 pins it there).
 for n in "${RESOLUTION_WITNESSES_SIZES[@]}"; do
@@ -1452,7 +1221,7 @@ emit_report() {
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
-  printf '> The ratios are printed to three places; the gates do not read them. Every ratio-gated row compares its two raw counters, NUM/DEN at full precision, EXACTLY and two-sidedly against its recorded bound (perf-bench.sh, beside each constant): above it is a regression, below it is a ratchet: owed in the same change. wideFreeform thunks are a parity band (WIDEFREEFORM_RATIO_MAX) rather than a win-gate, and ratchet like every other cost row. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples, collector off). See ci/README.md.\n' "$REPS"
+  printf '> The ratios are printed to three places; the gates do not read them. Every cost row gates its MARGINAL, the counter at its big size minus the counter at its small size (a ratio row: the pure marginal over the ref marginal, NUM/DEN), EXACTLY and two-sidedly against MARG_MAX: above it is a regression, below it is a ratchet: owed in the same change. Alloc is gated as the evaluator-attributed bytes, not gc.totalBytes. The per-process constant is gated apart, in the load table below. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples, collector off). See ci/README.md.\n' "$REPS"
   echo
   echo "### pure-only workloads (no reference arm; report-only counters, gated on linearity below)"
   echo
@@ -1480,7 +1249,7 @@ emit_report() {
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
   echo
-  echo "### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed; gated: pure-fixed thunks = CLASSSHARE_FIXED_THUNKS_MAX, the ratios printed)"
+  echo "### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed; gated: the pure-fixed thunk marginal and its load; the ratios printed)"
   echo
   echo "| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
@@ -1493,7 +1262,7 @@ emit_report() {
   printf 'thunk linearity (%s → %s, ×4 step): pure-full %s×, pure-fixed %s× (gate ≤ %s)\n' \
     "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" "$CS_LIN_FULL" "$CS_LIN_FIXED" "$GROWTH_MAX"
   echo
-  echo "### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm; gated: warm thunks + alloc = OVERRIDEWARM_WARM_{THUNKS,ALLOC}_MAX, the ratios printed)"
+  echo "### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm; gated: the warm thunk and alloc marginals and its load; the ratios printed)"
   echo
   echo "| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
@@ -1506,26 +1275,26 @@ emit_report() {
   printf 'thunk linearity (%s → %s, ×4 step): cold %s×, warm %s× (gate ≤ %s)\n' \
     "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" "$OW_LIN_COLD" "$OW_LIN_WARM" "$GROWTH_MAX"
   echo
-  echo "### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind; gated: kind thunks + alloc, exact, against their own bounds; the ratios printed)"
+  echo "### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind; gated: the kind thunk and alloc marginals and its load; the ratios printed)"
   echo
-  echo "| fixture | n | attrs-ref thunks | kind thunks (bound) | kind alloc (bound) | thunks k/a | alloc k/a | cpu k/a | byte gate |"
+  echo "| fixture | n | attrs-ref thunks | kind thunks | kind alloc | thunks k/a | alloc k/a | cpu k/a | byte gate |"
   echo "|---|---|---:|---:|---:|---:|---:|---:|---|"
   for fx in migrated sealed; do
     sfx=""
     [[ "$fx" == sealed ]] && sfx="-sealed"
     for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
-      printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s | %s | %s |\n' \
-        "$fx" "$n" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}" "${THUNKS[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_THUNKS_MAX[$fx,$n]:-}" \
-        "${ALLOC[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_ALLOC_MAX[$fx,$n]:-}" "${KM_TR[$fx,$n]}" "${KM_AR[$fx,$n]}" "${KM_CR[$fx,$n]}" "${KM_BG[$fx,$n]}"
+      printf '| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}" "${THUNKS[kindMatch,$n,kind$sfx]}" \
+        "${ALLOC[kindMatch,$n,kind$sfx]}" "${KM_TR[$fx,$n]}" "${KM_AR[$fx,$n]}" "${KM_CR[$fx,$n]}" "${KM_BG[$fx,$n]}"
     done
   done
   echo
   printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, kind %s×, attrs-ref-sealed %s×, kind-sealed %s× (gate ≤ %s)\n' \
     "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "${KM_LIN[attrs-ref]}" "${KM_LIN[kind]}" "${KM_LIN[attrs-ref-sealed]}" "${KM_LIN[kind-sealed]}" "$GROWTH_MAX"
-  printf 'arming (planted per-node recompute, n=%s): kind thunks %s (kind/attrs-ref %s, alloc %s) — must exceed KINDMATCH_KIND_THUNKS_MAX[migrated,%s] = %s\n' \
-    "$KINDMATCH_SMALL" "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "$KM_PLANT_TR" "$KM_PLANT_AR" "$KINDMATCH_SMALL" "${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-}"
+  printf 'arming (planted per-node recompute, n=%s→%s): kind thunk marginal %s (n=%s kind/attrs-ref %s, alloc %s) — must exceed MARG_MAX[kindMatch,migrated,kind,t] = %s\n' \
+    "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "$(marg t kindMatch "$KINDMATCH_SMALL" "$KINDMATCH_BIG" kind-plant)" "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${MARG_MAX[kindMatch,migrated,kind,t]:-}"
   echo
-  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity; gated: the ratios, thunks + alloc, exact at full precision)"
+  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity; gated: the entity/attrs-ref marginal ratio, thunks + alloc, and the entity load)"
   echo
   echo "| fixture | n | attrs-ref thunks | entity thunks | thunks e/a | alloc e/a | cpu e/a | projection |"
   echo "|---|---|---:|---:|---:|---:|---:|---|"
@@ -1541,27 +1310,27 @@ emit_report() {
   echo
   printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, entity %s×, attrs-ref-sealed %s×, entity-sealed %s× (gate ≤ %s)\n' \
     "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "${EM_LIN[attrs-ref]}" "${EM_LIN[entity]}" "${EM_LIN[attrs-ref-sealed]}" "${EM_LIN[entity-sealed]}" "$GROWTH_MAX"
-  printf 'arming (planted per-instance kind re-derivation, n=%s): entity/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
-    "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "$(qshow "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]:-}")"
+  printf 'arming (planted per-instance kind re-derivation, n=%s→%s): entity/attrs-ref thunk marginal %s (n=%s ratio %s, alloc %s) — must exceed MARG_MAX[entityMatch,migrated,entity,t] = %s\n' \
+    "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "$(qshow "$(marg t entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" entity-plant)/$(marg t entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" attrs-ref)")" "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "$(qshow "${MARG_MAX[entityMatch,migrated,entity,t]:-}")"
   echo
-  echo "### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord; gated: coord thunks + alloc, exact, against their own bounds; the ratios printed)"
+  echo "### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord; gated: the coord thunk and alloc marginals and its load; the ratios printed)"
   echo
-  echo "| fixture | n | coord-ref thunks | coord thunks (bound) | coord alloc (bound) | thunks c/r | alloc c/r | cpu c/r | projection |"
+  echo "| fixture | n | coord-ref thunks | coord thunks | coord alloc | thunks c/r | alloc c/r | cpu c/r | projection |"
   echo "|---|---|---:|---:|---:|---:|---:|---:|---|"
   for fx in migrated sealed; do
     sfx=""
     [[ "$fx" == sealed ]] && sfx="-sealed"
     for n in "$COORDMATCH_SMALL" "$COORDMATCH_BIG"; do
-      printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s | %s | %s |\n' \
-        "$fx" "$n" "${THUNKS[coordMatch,$n,coord-ref$sfx]}" "${THUNKS[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_THUNKS_MAX[$fx,$n]:-}" \
-        "${ALLOC[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_ALLOC_MAX[$fx,$n]:-}" "${CM_TR[$fx,$n]}" "${CM_AR[$fx,$n]}" "${CM_CR[$fx,$n]}" "${CM_BG[$fx,$n]}"
+      printf '| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[coordMatch,$n,coord-ref$sfx]}" "${THUNKS[coordMatch,$n,coord$sfx]}" \
+        "${ALLOC[coordMatch,$n,coord$sfx]}" "${CM_TR[$fx,$n]}" "${CM_AR[$fx,$n]}" "${CM_CR[$fx,$n]}" "${CM_BG[$fx,$n]}"
     done
   done
   echo
   printf 'thunk linearity (%s → %s, ×4 step): coord-ref %s×, coord %s×, coord-ref-sealed %s×, coord-sealed %s× (gate ≤ %s)\n' \
     "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "${CM_LIN[coord-ref]}" "${CM_LIN[coord]}" "${CM_LIN[coord-ref-sealed]}" "${CM_LIN[coord-sealed]}" "$GROWTH_MAX"
   echo
-  echo "### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, gated: the thunk ratio, exact at full precision; alloc reported, gated by nothing)"
+  echo "### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, gated: the resolve/query-orig thunk marginal between consecutive sizes, and the resolve load at the smallest; alloc reported, gated by nothing)"
   echo
   echo "| n | query-orig thunks | resolve thunks | thunks r/q | alloc r/q | cpu r/q | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
@@ -1574,6 +1343,14 @@ emit_report() {
   printf 'arming (witnesses control, n=4..7 thunks): %s / %s / %s / %s; 6 → 7 step %s× (resolve %s×) — must exceed %s and resolve\n' \
     "${THUNKS[resolution,4,witnesses]}" "${THUNKS[resolution,5,witnesses]}" "${THUNKS[resolution,6,witnesses]}" "${THUNKS[resolution,7,witnesses]}" \
     "$RS_WIT_STEP" "$RS_RES_STEP" "$RESOLUTION_WITNESSES_GROWTH_MIN"
+  echo
+  echo "### load (the per-process constant: each member's own load, absolute; the small-size thunk counter of each gated arm, judged where its marginal held; startup, absolute)"
+  echo
+  echo "| row | reading | bound | delta | marginal | state | intercept |"
+  echo "|---|---|---|---|---|---|---|"
+  printf '%s' "$LOAD_TABLE"
+  echo
+  echo "$LOAD_LINE"
   echo
   local refs_v="DIFFER from" mems_v="differ from"
   [[ "$REF_ID" == "$ANCHOR_REFERENCE" ]] && refs_v=match
@@ -1594,6 +1371,10 @@ emit_report() {
         echo "and ${#RATCHETS[@]} reading(s) fell below their bound:"
         printf '  - %s\n' "${RATCHETS[@]}"
       fi
+      if [[ ${#REARMS[@]} -gt 0 ]]; then
+        echo "and ${#REARMS[@]} load row(s) re-arm with any change that adopts a moved marginal:"
+        printf '  - %s\n' "${REARMS[@]}"
+      fi
       ;;
     7 | 9)
       if [[ $VERDICT -eq 7 ]]; then
@@ -1606,11 +1387,225 @@ emit_report() {
       printf '  %s\n' "${REANCHOR_LINES[@]}"
       ;;
     8)
-      echo "RATCHET OWED — no gate regressed, and ${#RATCHETS[@]} cost reading(s) fell BELOW their bound. The change that adopts this combination lowers each one, and writes ANCHOR_MEMBERS='$MEMBERS_ID':"
-      printf '  - %s\n' "${RATCHETS[@]}"
+      echo "RATCHET OWED — no gate regressed, and ${#RATCHETS[@]} cost reading(s) fell BELOW their bound, and ${#REARMS[@]} load row(s) re-arm. The change that adopts this combination lowers each one and sets each re-arm (ci/perf-bench-bounds.py reads these lines), and writes ANCHOR_MEMBERS='$MEMBERS_ID':"
+      printf '  - %s\n' "${RATCHETS[@]+"${RATCHETS[@]}"}" "${REARMS[@]+"${REARMS[@]}"}"
       ;;
   esac
 }
+
+# ── marginal and load (den-hoag-r8y89; owner ruling (b) and OQ7, 2026-10-06) ─────────────────────
+# A cost row gates its MARGINAL, the counter at its big size minus the counter at its small size, so a
+# per-process constant cancels out of every row. Thunks are nrThunks. Alloc is the evaluator-ATTRIBUTED
+# bytes (ATT, sample_cell): exact, and free of the collector's 4,096 B block steps, which transfer 1:1
+# into a difference of totalBytes (owner ruling OQ7, arm β + U0: the unattributed remainder, strings
+# among it, is not gated). The constant is the LOAD, and it is gated three ways:
+#   member  — each member's own file-level load: its `load` cell minus its predecessor's in perf-bench.nix
+#             `loadOrder`, thunks and ATT, absolute. Exact, n-independent and blind to the shape of any
+#             workload cost, so a landing cannot hide a binding behind a change to a row's curvature
+#             (gate F1, arm (A)).
+#   row     — each gated arm's small-size thunk counter X_s, judged when the arm's own thunk marginal reads
+#             EQUAL to LOADM: X_s's change is then the constant's change, exactly. When the marginal moved
+#             it is judged on the three-size intercept against LOADI, if the arm is affine at three sizes
+#             both at the anchor and now; otherwise it is `confounded`, printed and not judged. The row
+#             reads what a member cell cannot: work a workload's first call does once (kindMatch's 13,888
+#             thunks against 89 at n=0), and a constant number of merges.
+#   startup — the startup cell, thunks and ATT, absolute.
+# A moved marginal RE-ARMS its row: `re-arm:` lines print the LOADM, LOADI and LOAD_MAX assignments at
+# this reading beside the marginal's own line, so adopting a marginal never leaves the row confounded for
+# good (gate F2). A confounded row whose X_s rose keeps its LOAD_MAX, so the next run judges the rise.
+REARMS=()
+cv() { if [[ $1 == t ]]; then echo "${THUNKS[$2,$3,$4]}"; else echo "${ATT[$2,$3,$4]}"; fi; }
+marg() { echo $(($(cv "$1" "$2" "$4" "$5") - $(cv "$1" "$2" "$3" "$5"))); }
+# mgate NAME LABEL CTR W S B NUMARM [DENARM]
+mgate() {
+  local name=$1 label=$2 c=$3 w=$4 s=$5 b=$6 na=$7 da=${8:-} r
+  r=$(marg "$c" "$w" "$s" "$b" "$na")
+  [[ -n $da ]] && r="$r/$(marg "$c" "$w" "$s" "$b" "$da")"
+  gate "marginal: $label" "$r" "${MARG_MAX[$name]:-}" "MARG_MAX[$name]"
+}
+LOAD_ROWS=()
+# mid_l W S B ARM — sets LI to the exact thunk intercept NUM/DEN when the arm is affine at its two sizes
+# and their midpoint, else to `-`. The mid cell (one rep) is sampled here, in this shell, never in a
+# command substitution: there a dead cell's exit 3 would leave only the subshell, and a re-read re-sample.
+LI=""
+mid_l() {
+  local w=$1 s=$2 b=$3 a=$4 m xs xb xm
+  m=$(((s + b) / 2))
+  [[ -n ${THUNKS[$w,$m,$a]:-} ]] || sample_cell "$w" "$m" "$a" 1
+  xs=${THUNKS[$w,$s,$a]} xb=${THUNKS[$w,$b,$a]} xm=${THUNKS[$w,$m,$a]}
+  if (((b - s) * xm == (b - m) * xs + (m - s) * xb)) && ((b * xs - s * xb > 0)); then
+    LI="$((b * xs - s * xb))/$((b - s))"
+  else
+    LI="-"
+  fi
+}
+nd() { awk -v r="$1" -v b="$2" 'function v(q, p) { if (q ~ /\//) { split(q, p, "/"); return p[1] / p[2] } return q + 0 } BEGIN { d = v(r) - v(b); if (d == int(d)) printf "%+d", d; else printf "%+.3f", d }'; }
+# rearm NAME LABEL MARGINAL XS LI STATE — the assignments that make a moved marginal's row judgeable again
+rearm() {
+  local name=$1 label=$2 m=$3 xs=$4 li=$5 st=$6
+  REARMS+=("re-arm: load: $label — set LOADM[$name] to $m")
+  [[ -n $li ]] && REARMS+=("re-arm: load: $label — set LOADI[$name] to $li")
+  if [[ $st == affine || $(qcmp "$xs" "${LOAD_MAX[$name]:-}") != gt ]]; then
+    REARMS+=("re-arm: load: $label — set LOAD_MAX[$name] to $xs")
+  fi
+}
+# lgate NAME LABEL W S B ARM — the row load of a gated arm (the header above).
+lgate() {
+  local name=$1 label=$2 w=$3 s=$4 b=$5 a=$6 xs m bm=${LOADM[$1]:-} st=judged li="-" d=""
+  xs=$(cv t "$w" "$s" "$a")
+  m=$(marg t "$w" "$s" "$b" "$a")
+  if [[ -n $REANCHOR ]]; then
+    mid_l "$w" "$s" "$b" "$a"
+    li=$LI
+    REANCHOR_LINES+=("LOAD_MAX[$name]=$xs   # load: $label; was ${LOAD_MAX[$name]:-}" "LOADM[$name]=$m   # load guard: $label marginal; was ${bm:-}" "LOADI[$name]=$li   # load intercept if affine at three sizes, else -; was ${LOADI[$name]:-}")
+    LOAD_ROWS+=("$name|$xs|${LOAD_MAX[$name]:-}|$m|anchor|$li|anchor")
+    return
+  fi
+  if [[ -z $bm ]]; then
+    FAILURES+=("unmeasured: load: $label has no anchored marginal LOADM[$name]")
+    st=unbound d=unbound
+  elif [[ $(qcmp "$m" "$bm") == eq ]]; then
+    gate "load: $label" "$xs" "${LOAD_MAX[$name]:-}" "LOAD_MAX[$name]"
+    d=$(nd "$xs" "${LOAD_MAX[$name]:-0}")
+    if [[ -n ${PERF_LOAD_MID:-} ]]; then
+      mid_l "$w" "$s" "$b" "$a"
+      li=$LI
+    fi
+  else
+    st=confounded d=confounded
+    mid_l "$w" "$s" "$b" "$a"
+    li=$LI
+    if [[ -n ${LOADI[$name]:-} && ${LOADI[$name]} != - && $li != - ]]; then
+      st=affine
+      gate "load (affine, marginal moved): $label" "$li" "${LOADI[$name]}" "LOADI[$name]"
+      d=$(nd "$li" "${LOADI[$name]}")
+    fi
+    rearm "$name" "$label" "$m" "$xs" "$li" "$st"
+  fi
+  LOAD_ROWS+=("$name|$xs|${LOAD_MAX[$name]:-}|$m|$st|$li|$d")
+}
+# the planted arms, at the big size too, so that the arming compares a MARGINAL
+sample_cell kindMatch "$KINDMATCH_BIG" kind-plant 1
+sample_cell entityMatch "$ENTITYMATCH_BIG" entity-plant 1
+
+for row in "${MATRIX[@]}"; do
+  read -r w b tags <<<"$row"
+  has_tag "$tags" r || has_tag "$tags" rb || continue
+  s=""
+  for row2 in "${MATRIX[@]}"; do
+    read -r w2 n2 t2 <<<"$row2"
+    [[ "$w2" == "$w" ]] && has_tag "$t2" small && { [[ -n $s ]] && FAILURES+=("marginal: $w has two small sizes in MATRIX ($s and $n2)"); s=$n2; }
+  done
+  if [[ -z $s ]]; then
+    FAILURES+=("marginal: $w n=$b has no small size in MATRIX")
+    continue
+  fi
+  if has_tag "$tags" r; then
+    mgate "$w,t" "$w n=$s→$b pure/ref thunks" t "$w" "$s" "$b" pure ref
+  else
+    mgate "$w,t,band" "$w n=$s→$b pure/ref thunks (band)" t "$w" "$s" "$b" pure ref
+  fi
+  mgate "$w,a" "$w n=$s→$b pure/ref alloc" a "$w" "$s" "$b" pure ref
+  lgate "$w" "$w n=$s→$b pure" "$w" "$s" "$b" pure
+done
+mgate "classShare,fixed,t" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed thunks" t classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
+lgate "classShare,fixed" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed" classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
+mgate "overrideWarm,warm,t" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm thunks" t overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
+mgate "overrideWarm,warm,a" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm alloc" a overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
+lgate "overrideWarm,warm" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm" overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
+for fx in migrated sealed; do
+  sfx=""
+  [[ "$fx" == sealed ]] && sfx="-sealed"
+  for c in t a; do
+    mgate "kindMatch,$fx,kind,$c" "kindMatch ($fx) n=$KINDMATCH_SMALL→$KINDMATCH_BIG kind $c" "$c" kindMatch "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "kind$sfx"
+    mgate "entityMatch,$fx,entity,$c" "entityMatch ($fx) n=$ENTITYMATCH_SMALL→$ENTITYMATCH_BIG entity/attrs-ref $c" "$c" entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "entity$sfx" "attrs-ref$sfx"
+    mgate "coordMatch,$fx,coord,$c" "coordMatch ($fx) n=$COORDMATCH_SMALL→$COORDMATCH_BIG coord $c" "$c" coordMatch "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "coord$sfx"
+  done
+  lgate "kindMatch,$fx,kind" "kindMatch ($fx) n=$KINDMATCH_SMALL→$KINDMATCH_BIG kind" kindMatch "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "kind$sfx"
+  lgate "entityMatch,$fx,entity" "entityMatch ($fx) n=$ENTITYMATCH_SMALL→$ENTITYMATCH_BIG entity" entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "entity$sfx"
+  lgate "coordMatch,$fx,coord" "coordMatch ($fx) n=$COORDMATCH_SMALL→$COORDMATCH_BIG coord" coordMatch "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "coord$sfx"
+done
+# resolution is super-linear, so it has no linear intercept: its marginals are the steps between
+# consecutive sizes, and its row load is the resolve arm at the smallest size, judged when the n=4→5
+# resolve marginal held, else confounded (spec OQ8).
+rs_prev=""
+for n in "${RESOLUTION_SIZES[@]}"; do
+  [[ -n $rs_prev ]] && mgate "resolution,$rs_prev-$n,t" "resolution n=$rs_prev→$n resolve/query-orig thunks" t resolution "$rs_prev" "$n" resolve query-orig
+  rs_prev=$n
+done
+rs_xs=${THUNKS[resolution,${RESOLUTION_SIZES[0]},resolve]}
+rs_m=$(marg t resolution "${RESOLUTION_SIZES[0]}" "${RESOLUTION_SIZES[1]}" resolve)
+rs_label="resolution n=${RESOLUTION_SIZES[0]} resolve"
+if [[ -n $REANCHOR ]]; then
+  REANCHOR_LINES+=("LOAD_MAX[resolution,resolve]=$rs_xs   # load: $rs_label; was ${LOAD_MAX[resolution,resolve]:-}" "LOADM[resolution,resolve]=$rs_m   # load guard: resolution marginal; was ${LOADM[resolution,resolve]:-}")
+  LOAD_ROWS+=("resolution,resolve|$rs_xs|${LOAD_MAX[resolution,resolve]:-}|$rs_m|anchor|-|anchor")
+elif [[ $(qcmp "$rs_m" "${LOADM[resolution,resolve]:-}") == eq ]]; then
+  gate "load: $rs_label" "$rs_xs" "${LOAD_MAX[resolution,resolve]:-}" "LOAD_MAX[resolution,resolve]"
+  LOAD_ROWS+=("resolution,resolve|$rs_xs|${LOAD_MAX[resolution,resolve]:-}|$rs_m|judged|-|$(nd "$rs_xs" "${LOAD_MAX[resolution,resolve]:-0}")")
+else
+  rearm resolution,resolve "$rs_label" "$rs_m" "$rs_xs" "" confounded
+  LOAD_ROWS+=("resolution,resolve|$rs_xs|${LOAD_MAX[resolution,resolve]:-}|$rs_m|confounded|-|confounded")
+fi
+# absolute load rows: startup, and every member's own load (its cell minus its predecessor's)
+aload() {
+  local name=$1 label=$2 r=$3
+  gate "load: $label" "$r" "${LOAD_MAX[$name]:-}" "LOAD_MAX[$name]"
+  LOAD_ROWS+=("$name|$r|${LOAD_MAX[$name]:-}|-|abs|-|$(nd "$r" "${LOAD_MAX[$name]:-0}")")
+}
+aload startup,t "startup pure thunks" "${THUNKS[startup,1,pure]}"
+aload startup,a "startup pure alloc" "${ATT[startup,1,pure]}"
+lprev=none
+for k in "${LOAD_ORDER[@]}"; do
+  aload "member,$k,t" "member $k thunks" "$(($(cv t load 1 "$k") - $(cv t load 1 "$lprev")))"
+  aload "member,$k,a" "member $k alloc" "$(($(cv a load 1 "$k") - $(cv a load 1 "$lprev")))"
+  lprev=$k
+done
+# ARMING: a planted per-node cost must read above the MARGINAL bound of the row it exists for
+if [[ -z $REANCHOR ]]; then
+  if [[ $(qcmp "$(marg t kindMatch "$KINDMATCH_SMALL" "$KINDMATCH_BIG" kind-plant)" "${MARG_MAX[kindMatch,migrated,kind,t]:-}") != gt ]]; then
+    FAILURES+=("kindMatch arming: the planted per-node recompute's marginal thunks do not exceed MARG_MAX[kindMatch,migrated,kind,t] — the bound cannot see the class this row exists for")
+  fi
+  if [[ $(qcmp "$(marg t entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" entity-plant)/$(marg t entityMatch "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" attrs-ref)" "${MARG_MAX[entityMatch,migrated,entity,t]:-}") != gt ]]; then
+    FAILURES+=("entityMatch arming: the planted per-instance re-derivation's marginal entity/attrs-ref thunks do not exceed MARG_MAX[entityMatch,migrated,entity,t] — the bound cannot see the class this row exists for")
+  fi
+fi
+# LOAD DELTA: one printed line, and a per-row table the landing's diff reads (ci/perf-bench-load-diff.py)
+LOAD_MOVED=0
+LOAD_JUDGED=0
+LOAD_CONF=0
+LOAD_MIN=""
+LOAD_MAX_D=""
+LOAD_TABLE=""
+LOAD_START_T="n/a"
+LOAD_START_A="n/a"
+LOAD_MEM_MOVED=()
+for lr in "${LOAD_ROWS[@]}"; do
+  IFS='|' read -r ln lread lbound lm lst lli d <<<"$lr"
+  LOAD_TABLE+="| $ln | $lread | ${lbound:-—} | $d | $lm | $lst | $lli |"$'\n'
+  [[ $ln == startup,t ]] && LOAD_START_T=$d
+  [[ $ln == startup,a ]] && LOAD_START_A=$d
+  if [[ $ln == member,* ]]; then
+    [[ $d != +0 ]] && LOAD_MEM_MOVED+=("${ln#member,} $d")
+    continue
+  fi
+  [[ $lst == abs ]] && continue
+  [[ $lst == confounded ]] && LOAD_CONF=$((LOAD_CONF + 1))
+  if [[ $lst == judged || $lst == affine ]]; then
+    LOAD_JUDGED=$((LOAD_JUDGED + 1))
+    if [[ $d != +0 && $d != unbound ]]; then
+      LOAD_MOVED=$((LOAD_MOVED + 1))
+      LOAD_MIN=$(awk -v a="${LOAD_MIN:-$d}" -v b="$d" 'BEGIN { print (b + 0 < a + 0) ? b : a }')
+      LOAD_MAX_D=$(awk -v a="${LOAD_MAX_D:-$d}" -v b="$d" 'BEGIN { print (b + 0 > a + 0) ? b : a }')
+    fi
+  fi
+done
+if [[ -n $REANCHOR ]]; then
+  LOAD_LINE="LOAD DELTA vs anchor: not judged (the identity moved)"
+else
+  lmem="members moved ${#LOAD_MEM_MOVED[@]} of $((2 * ${#LOAD_ORDER[@]}))"
+  [[ ${#LOAD_MEM_MOVED[@]} -gt 0 ]] && lmem+=" ($(printf '%s, ' "${LOAD_MEM_MOVED[@]}" | sed 's/, $//'))"
+  LOAD_LINE="LOAD DELTA vs anchor: startup thunks $LOAD_START_T, startup alloc $LOAD_START_A B, $lmem, rows moved $LOAD_MOVED of $LOAD_JUDGED judged ($LOAD_CONF confounded), per-row thunks min ${LOAD_MIN:-+0} max ${LOAD_MAX_D:-+0}"
+fi
 
 # ── the verdict, decided BEFORE the report prints and before any splice (gate C4) ──
 # Precedence: a regression or a non-cost failure (parity, linearity, arming, an unmeasured gate) is
@@ -1620,7 +1615,7 @@ if [[ ${#FAILURES[@]} -gt 0 ]]; then
   if [[ ${#AT_ORDER[@]} -gt 0 ]]; then VERDICT=6; else VERDICT=1; fi
 elif [[ -n $REANCHOR ]]; then
   if [[ "$MEMBERS_ID" == "$ANCHOR_MEMBERS" ]]; then VERDICT=7; else VERDICT=9; fi
-elif [[ ${#RATCHETS[@]} -gt 0 ]]; then
+elif [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]]; then
   VERDICT=8
 else
   VERDICT=0

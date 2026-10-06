@@ -176,6 +176,7 @@ let
     residue = residueOn [ ];
     leaks = builtins.filter (r: r.leak != [ ]) (censusOn [ ]);
     unappliedEntries = builtins.filter (k: !(isApplied k)) memberKeys;
+    inherit loadOrder; # perf-bench.sh samples one `load` cell per entry, in this order
     arming = {
       strike = armingStrike;
       fires = builtins.length (residueOn [ armingStrike ]);
@@ -1364,9 +1365,62 @@ let
     else
       throw "perf-bench: resolution has no stack '${stack}' (query-orig | resolve | witnesses)";
 
+  # ── load — one cell per member: its library loaded, no workload (den-hoag-r8y89 arm (A)) ──
+  # The cell for member k forces the top-level set of every member up to and including k, in
+  # `loadOrder`, each attribute to weak head normal form; perf-bench.sh gates each member's own load
+  # as the difference between its cell and its predecessor's (`none` loads nothing). In dependency
+  # order, a member's predecessors have already forced whatever of theirs its load demands, so the
+  # difference is k's own file-level load: every binding its top-level values reach, whatever shape
+  # its workload cost has. Work a member does only once a function of it is CALLED is not load here;
+  # the rows' small-size counters read that.
+  loadOrder = [
+    "gen-prelude"
+    "gen-algebra"
+    "gen-identity"
+    "gen-graph"
+    "gen-types"
+    "gen-scope"
+    "gen-memo"
+    "gen-merge"
+    "gen-schema"
+    "gen-aspects"
+    "gen-select"
+    "gen-class"
+  ];
+  load =
+    let
+      through =
+        builtins.foldl'
+          (
+            acc: k:
+            if acc.done then
+              acc
+            else
+              {
+                done = k == stack;
+                ks = acc.ks ++ [ k ];
+              }
+          )
+          {
+            done = stack == "none";
+            ks = [ ];
+          }
+          loadOrder;
+      # A retired attribute that throws (gen-graph's `boundedBy`) is loaded up to its throw and counted.
+      top =
+        v:
+        builtins.foldl' (a: x: if (builtins.tryEval x).success then a + 1 else a) 0 (builtins.attrValues v);
+    in
+    if through.done then
+      map (k: top env.${envName.${k}}) through.ks
+    else
+      throw "perf-bench: load has no stack '${stack}' (none | ${builtins.concatStringsSep " | " loadOrder})";
+
   projection =
     if workload == "preflight" then
       preflight
+    else if workload == "load" then
+      load
     else if workload == "classShare" then
       classShare
     else if workload == "overrideWarm" then

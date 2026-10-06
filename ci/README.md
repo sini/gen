@@ -175,24 +175,45 @@ the instrument is broken and the row has no result.
 
 The public [`BENCHMARKS.md`](../BENCHMARKS.md) trust artifact embeds this bench's live output; regenerate it with `nix run ./ci#perf-bench -- --update BENCHMARKS.md`. It rewrites only the marker-delimited section, splicing the tables in compact form (`|---|---:|`); the script never invokes a formatter itself, so the block reaches its committed padded form the same way every other table in the tree does — on the repo's format-before-commit pass through treefmt's mdformat (gfm-armed since `6e5c1d0`). Run the formatter after an `--update` and the spliced block is canonical; skip it and the block is the one part of the file out of the tree's own format.
 
-Three gate families (thresholds at the top of `perf-bench.sh`):
+Four gate families (bounds at the top of `perf-bench.sh`):
 
 - **parity** — every cell's sha256 projection digest must match across stacks. Ties the perf
   corpus to the validation bar: a "fast but wrong" change cannot pass.
-- **cost** (every cost row, den-hoag-r8y89) — EXACT and TWO-SIDED against that row's recorded bound,
-  which is its reading at the anchor identity (`ANCHOR_*` at the top of `perf-bench.sh`). A row whose
-  denominator is INDEPENDENT of gen (nixpkgs `ref`, or a rev-pinned frozen original: the matrix
-  rows, `wideFreeform`, `foreignMount`, `entityMatch`, `resolution`) gates its ratio as `NUM/DEN`, the
-  two raw counters compared by cross-multiplication; a row whose only control is gen itself
-  (`classShare`, `overrideWarm`, `kindMatch`, `coordMatch`) gates the guarded arm's OWN count, because
-  a shared-plane improvement moved a gen ÷ gen denominator and the ratio refused the optimization
-  (c3: coordMatch 1.000 → 1.001 with the excess a constant +398). There is no margin and no
-  tolerance (owner ruling P1 (i), 2026-10-05): above the bound is a regression, below it is
-  `ratchet:` (exit 8) until the bound is lowered in the same change. The 2026-09-21 derivations
-  beside each constant are the record of the former decimal bounds. `wideFreeform` keeps its own named constant for THUNKS because its claim is different — a parity
-  band (`WIDEFREEFORM_RATIO_MAX`) rather than a win-gate, since freeform absorption rides the same
-  per-key type merges nixpkgs.lib performs. Its real teeth are the linearity net, the thunk band,
-  and the deterministic counters (see the baseline block below for the rationale).
+- **cost** (every cost row, den-hoag-r8y89) — a row gates its MARGINAL, the counter at its big size
+  minus the counter at its small size (owner ruling (b), 2026-10-06), so a per-process constant
+  cancels out of it. It is EXACT and TWO-SIDED against `MARG_MAX`, the reading at the anchor identity
+  (`ANCHOR_*` at the top of `perf-bench.sh`). A row whose denominator is INDEPENDENT of gen (nixpkgs
+  `ref`, or a rev-pinned frozen original: the matrix rows, `wideFreeform`, `foreignMount`,
+  `entityMatch`, `resolution`) gates the ratio of marginals as `NUM/DEN`, compared by
+  cross-multiplication; a row whose only control is gen itself (`classShare`, `overrideWarm`,
+  `kindMatch`, `coordMatch`) gates the guarded arm's OWN marginal, because a shared-plane improvement
+  moved a gen ÷ gen denominator and the ratio refused the optimization (c3: coordMatch 1.000 → 1.001
+  with the excess a constant +398). Alloc is the evaluator-ATTRIBUTED bytes of the same stats file
+  (`envs + list + sets + values + symbols`), not `gc.totalBytes`, whose 4,096 B block steps transfer
+  1:1 into a difference (owner ruling OQ7, β + U0: the unattributed remainder, strings among it, is
+  not gated); each of the five fields must be present and non-zero, or the cell refuses by name. There
+  is no margin and no tolerance (owner ruling P1 (i), 2026-10-05): above the bound is a regression,
+  below it is `ratchet:` (exit 8) until the bound is lowered in the same change. `wideFreeform`'s
+  thunk marginal is a parity band rather than a win-gate, since freeform absorption rides the same
+  per-key type merges nixpkgs.lib performs; its real teeth are the linearity net and the
+  deterministic counters.
+- **load** (den-hoag-r8y89) — the per-process constant the marginals cancel, gated apart, so it cannot
+  creep in unseen. Three readings, each through the same exact gate (a rise is a regression, a fall a
+  ratchet): **member** — one `load` cell per member (`perf-bench.nix` `loadOrder`) forces the top-level
+  set of every member up to it, each attribute to weak head normal form, and a member's load is its
+  cell minus its predecessor's, thunks and attributed bytes: n-independent and exact, so a binding
+  added to any member reds that member's row whatever the landing does to a row's curvature (one
+  unused binding planted per member reds exactly that member's row); **row** — each gated arm's
+  small-size thunk counter, judged while the arm's own thunk marginal equals its anchored `LOADM`
+  (then the counter's change is the constant's change, exactly), or on its three-size intercept
+  against `LOADI` when the marginal moved and the arm is affine; otherwise `confounded`, printed and
+  not judged. The row reads what a member cell cannot: work a workload's first call does once, and a
+  constant number of merges. **startup** — the startup cell, absolute. A moved marginal prints its
+  row's `re-arm:` assignments, so adopting it leaves the row judgeable. The `### load` table and the
+  `LOAD DELTA` line print every reading. A member landing states its OWN load delta, which the anchor
+  cannot show when it lags an earlier unrelocked win (gate C2): `ci/perf-bench-load-diff.py` of two
+  runs at `PERF_LOAD_MID=1`, `--at <member>=rev:<parent>` and `--at <member>=rev:<landing>`; any
+  `ROSE:` row without an owner reading is a defect in the landing.
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
   ≥ 12×). A complexity-class threshold, not a cost, so it does not ratchet: removing a constant term
   moves a linear row's growth UP toward 4.0 (c3 moved registry alloc growth 3.960 → 3.961). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
@@ -229,13 +250,12 @@ evidence is admissible. The split is deliberate: perf-bench does counter-based r
 
 ★ **Four dedicated rows are RE-BASED** (den-hoag-r8y89): `classShare`, `overrideWarm`, `kindMatch` and
 `coordMatch` divide gen by gen over a shared plane (the reach census: each denominator forces live
-members), so they now gate the guarded arm's OWN count — `pure-fixed` thunks, `warm` thunks and alloc,
-`kind` and `coord` thunks and alloc, against `CLASSSHARE_FIXED_THUNKS_MAX`, `OVERRIDEWARM_WARM_*`,
-`KINDMATCH_KIND_*` and `COORDMATCH_COORD_*` — exactly and two-sidedly. The ratio bullets below describe
-the gates they replaced: those ratios are printed and gated by nothing, and `CLASSSHARE_RATIO_MAX`,
-`OVERRIDEWARM_RATIO_MAX`, `KINDMATCH_{THUNKS,ALLOC}_MAX` and `COORDMATCH_{THUNKS,ALLOC}_MAX` are gone.
-The byte and projection gates, the arming controls (kindMatch's now reads `kind-plant`'s thunks
-against `KINDMATCH_KIND_THUNKS_MAX[migrated,400]`) and linearity are unchanged.
+members), so they gate the guarded arm's OWN marginal and load — `pure-fixed` thunks, `warm` thunks and
+alloc, `kind` and `coord` thunks and alloc — exactly and two-sidedly. The ratio and per-size bullets
+below describe the gates the marginal form replaced (their bounds, with every derivation, are at hub
+`94e07ff`): those ratios are printed and gated by nothing. The byte and projection gates and linearity
+are unchanged; the two arming controls compare their plant's MARGINAL against the row's marginal bound
+(`kind-plant` and `entity-plant` run at both sizes).
 
 The `classShare` section adds its own two gates (own thresholds, not the pure/ref ones):
 
@@ -653,8 +673,8 @@ fresh run; the workload is never deleted to make it pass.
 
 ### Updating thresholds / workloads
 
-Counters are deterministic per evaluator identity — `nrThunks` always, `gc.totalBytes` because every
-cell runs with the collector off and every source sits at a `<hash>-source` store path of one length
+Counters are deterministic per evaluator identity — `nrThunks` always, the attributed bytes and
+`gc.totalBytes` because every cell runs with the collector off and every source sits at a `<hash>-source` store path of one length
 (`perf-bench.sh` header, with the measurements) — so CI host speed does not matter. Across hosts,
 `gc.totalBytes` also needs the host's nix-path kept out: the evaluator stores it on the heap at
 startup, and both its value and the channel it arrives by move later allocations: the CI runner's
@@ -671,22 +691,27 @@ is EXACT and TWO-SIDED, so every run ends in one of four states, each with its o
   linearity or arming gate failed. Raising a bound needs the five items below AND an owner reading
   (owner ruling P1 (i), 2026-10-05: no per-row tolerance; the coordMatch +398 "constant overhead" is
   the existing baseline, and any NEW growth, constant or not, fails).
-- **8** — RATCHET OWED: no regression, and at least one reading fell BELOW its bound. Each
-  `ratchet:` line names the assignment that lowers it. **The change that ADOPTS the improvement
+- **8** — RATCHET OWED: no regression, and at least one reading fell BELOW its bound, or a moved
+  marginal re-arms its load row. Each `ratchet:` line names the assignment that lowers it, and each
+  `re-arm:` line the `LOADM` / `LOADI` / `LOAD_MAX` assignment that keeps the row judgeable;
+  `python3 ci/perf-bench-bounds.py <report>` applies exactly those lines. **The change that ADOPTS the improvement
   carries the lowering** — for a member optimization that is the hub commit that moves the member's
   pin (a relock commit), never a later, unrelated landing; `relock-all` reads 8 as "stop at the hub
   and lower", not as a red of its dependents (den-hoag-2ffmc).
 - **7 / 9** — the evaluator, its allocator or a reference pin differs from `ANCHOR_*`, so NO cost
   gate is judged (owner ruling P5 (i): the environment moved, not gen). At 7 the members are
   `ANCHOR_MEMBERS` and the printed readings are recorded as the new bounds together with the new
-  identity — the one licensed raise of a bound without an owner reading. At 9 the members moved
+  identity — the one licensed raise of a bound without an owner reading
+  (`ci/perf-bench-bounds.py <report>` writes the bounds; the identity lines are written by hand). At 9 the members moved
   too, so recording would launder a member move into the baseline: re-run with `--at K=rev:<rev>`
   at `ANCHOR_MEMBERS` first, record, and let the member move be gated against the new anchor.
 
 Every change that writes a bound (a lowering, an owner-read raise, a re-anchor) writes
 `ANCHOR_MEMBERS` to the members it read at. **An edit to `perf-bench.nix` is an instrument change**:
 every cell's counters can move with it (adding one workload binding added one thunk to every cell),
-so its landing re-reads every bound at `ANCHOR_MEMBERS`, as den-hoag-r8y89's did, and says so. Never
+so its landing re-reads every bound and says so: plant `ANCHOR_EVALUATOR`, run, and record with
+`ci/perf-bench-bounds.py --instrument <report>`, which writes `ANCHOR_MEMBERS` to the members it read
+at. Never
 delete a workload to make a gate pass. New den shapes should be added to `perf-bench.nix` as they
 become hot in den-hoag (deep submodule nesting landed as `deepSubmodule`, wide freeform trees as
 `wideFreeform`, the foreign mount as `foreignMount`); a row with no recorded bound is refused as
