@@ -289,28 +289,28 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload         |    n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 | ---------------- | ---: | ----------: | -----------: | ------: | ---------: | --------: | ------ |
-| startup          |    1 |       0.019 |        0.034 |   1.753 |      1.567 |     1.865 | ok     |
-| scalar           | 2000 |       0.047 |        0.053 |   1.121 |      0.823 |     0.760 | ok     |
-| scalar           | 8000 |       0.122 |        0.124 |   1.021 |      0.818 |     0.754 | ok     |
-| registry         |  500 |       0.078 |        0.085 |   1.088 |      0.654 |     0.583 | ok     |
-| registry         | 2000 |       0.249 |        0.241 |   0.965 |      0.651 |     0.579 | ok     |
-| lazyRegistry     | 2000 |       0.247 |        0.241 |   0.977 |      0.644 |     0.575 | ok     |
-| threadedRegistry |  500 |       0.070 |        0.098 |   1.394 |      0.748 |     0.668 | ok     |
-| threadedRegistry | 2000 |       0.263 |        0.333 |   1.269 |      0.743 |     0.663 | ok     |
-| wrappedRegistry  |  500 |       0.138 |        0.144 |   1.047 |      0.657 |     0.585 | ok     |
-| wrappedRegistry  | 2000 |       0.440 |        0.401 |   0.910 |      0.652 |     0.580 | ok     |
-| schemaHosts      |  400 |       0.096 |        0.132 |   1.378 |      0.854 |     0.826 | ok     |
-| schemaHosts      | 1600 |       0.352 |        0.426 |   1.209 |      0.848 |     0.819 | ok     |
-| wideFreeform     | 2000 |       0.043 |        0.054 |   1.260 |      0.905 |     0.784 | ok     |
-| wideFreeform     | 8000 |       0.209 |        0.197 |   0.944 |      0.899 |     0.777 | ok     |
-| deepSubmodule    |  400 |       0.542 |        0.451 |   0.831 |      0.539 |     0.499 | ok     |
-| deepSubmodule    | 1600 |       1.150 |        0.952 |   0.828 |      0.539 |     0.498 | ok     |
-| foreignMount     |  500 |       0.058 |        0.087 |   1.491 |      1.030 |     1.016 | ok     |
-| foreignMount     | 2000 |       0.181 |        0.206 |   1.135 |      1.026 |     1.013 | ok     |
-| moduleFanIn      |  400 |       0.097 |        0.113 |   1.160 |      0.893 |     0.829 | ok     |
-| moduleFanIn      | 1600 |       0.349 |        0.380 |   1.087 |      0.891 |     0.827 | ok     |
-| sameLocFanIn     |  400 |       0.016 |        0.033 |   2.039 |      1.507 |     1.686 | ok     |
-| sameLocFanIn     | 1600 |       0.024 |        0.050 |   2.061 |      1.502 |     1.680 | ok     |
+| startup          |    1 |       0.019 |        0.031 |   1.621 |      1.567 |     1.865 | ok     |
+| scalar           | 2000 |       0.039 |        0.056 |   1.425 |      0.823 |     0.760 | ok     |
+| scalar           | 8000 |       0.131 |        0.127 |   0.964 |      0.818 |     0.754 | ok     |
+| registry         |  500 |       0.081 |        0.086 |   1.058 |      0.654 |     0.583 | ok     |
+| registry         | 2000 |       0.268 |        0.230 |   0.859 |      0.651 |     0.579 | ok     |
+| lazyRegistry     | 2000 |       0.272 |        0.249 |   0.913 |      0.644 |     0.575 | ok     |
+| threadedRegistry |  500 |       0.080 |        0.105 |   1.303 |      0.748 |     0.668 | ok     |
+| threadedRegistry | 2000 |       0.249 |        0.323 |   1.297 |      0.743 |     0.663 | ok     |
+| wrappedRegistry  |  500 |       0.074 |        0.079 |   1.064 |      0.657 |     0.585 | ok     |
+| wrappedRegistry  | 2000 |       0.438 |        0.390 |   0.891 |      0.652 |     0.580 | ok     |
+| schemaHosts      |  400 |       0.187 |        0.228 |   1.218 |      0.854 |     0.826 | ok     |
+| schemaHosts      | 1600 |       0.337 |        0.558 |   1.656 |      0.848 |     0.819 | ok     |
+| wideFreeform     | 2000 |       0.038 |        0.052 |   1.352 |      0.905 |     0.784 | ok     |
+| wideFreeform     | 8000 |       0.115 |        0.108 |   0.941 |      0.899 |     0.777 | ok     |
+| deepSubmodule    |  400 |       0.295 |        0.267 |   0.905 |      0.539 |     0.499 | ok     |
+| deepSubmodule    | 1600 |       1.148 |        0.940 |   0.819 |      0.539 |     0.498 | ok     |
+| foreignMount     |  500 |       0.057 |        0.076 |   1.336 |      1.030 |     1.016 | ok     |
+| foreignMount     | 2000 |       0.183 |        0.219 |   1.199 |      1.026 |     1.013 | ok     |
+| moduleFanIn      |  400 |       0.098 |        0.110 |   1.118 |      0.893 |     0.829 | ok     |
+| moduleFanIn      | 1600 |       0.348 |        0.371 |   1.069 |      0.891 |     0.827 | ok     |
+| sameLocFanIn     |  400 |       0.018 |        0.032 |   1.804 |      1.507 |     1.686 | ok     |
+| sameLocFanIn     | 1600 |       0.023 |        0.048 |   2.050 |      1.502 |     1.680 | ok     |
 
 > The ratios are printed to three places; the gates do not read them. Every ratio-gated row compares its two raw counters, NUM/DEN at full precision, EXACTLY and two-sidedly against its recorded bound (perf-bench.sh, beside each constant): above it is a regression, below it is a ratchet: owed in the same change. wideFreeform thunks are a parity band (WIDEFREEFORM_RATIO_MAX) rather than a win-gate, and ratchet like every other cost row. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of 3 interleaved samples, collector off). See ci/README.md.
 
@@ -318,10 +318,10 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload     |    n | pure cpu (s) | pure thunks | pure alloc |
 | ------------ | ---: | -----------: | ----------: | ---------: |
-| inheritHosts |  400 |        0.247 |     1408055 |   80586880 |
-| inheritHosts | 1600 |        0.880 |     5556455 |  317409504 |
+| inheritHosts |  400 |        0.232 |     1408055 |   80586880 |
+| inheritHosts | 1600 |        0.831 |     5556455 |  317409504 |
 | aspects      |  400 |        0.209 |     1228938 |   64165328 |
-| aspects      | 1600 |        0.756 |     4900338 |  255702096 |
+| aspects      | 1600 |        0.705 |     4900338 |  255702096 |
 
 > These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
 > track a grammar that moves by design ruling, so such a gate would red on ruled improvements
@@ -350,8 +350,8 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 | ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
-| 400  |     1679694 |       290629 |      0.173 |     0.177 |   0.295 | ok        |
-| 1600 |     6695694 |      1142029 |      0.171 |     0.174 |   0.208 | ok        |
+| 400  |     1679694 |       290629 |      0.173 |     0.177 |   0.253 | ok        |
+| 1600 |     6695694 |      1142029 |      0.171 |     0.174 |   0.212 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): pure-full 3.986×, pure-fixed 3.930× (gate ≤ 5.5)
 
@@ -359,8 +359,8 @@ thunk linearity (400 → 1600, ×4 step): pure-full 3.986×, pure-fixed 3.930× 
 
 | n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
 | ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
-| 400  |     1702500 |      391368 |      0.230 |     0.235 |   0.334 | ok        |
-| 1600 |     6784500 |     1528368 |      0.225 |     0.230 |   0.278 | ok        |
+| 400  |     1702500 |      391368 |      0.230 |     0.235 |   0.335 | ok        |
+| 1600 |     6784500 |     1528368 |      0.225 |     0.230 |   0.280 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): cold 3.985×, warm 3.905× (gate ≤ 5.5)
 
@@ -368,10 +368,10 @@ thunk linearity (400 → 1600, ×4 step): cold 3.985×, warm 3.905× (gate ≤ 5
 
 | fixture  | n    | attrs-ref thunks | kind thunks (bound) |  kind alloc (bound) | thunks k/a | alloc k/a | cpu k/a | byte gate |
 | -------- | ---- | ---------------: | ------------------: | ------------------: | ---------: | --------: | ------: | --------- |
-| migrated | 400  |           430913 |     411476 (411476) | 24024384 (24024384) |      0.955 |     0.974 |   1.314 | ok        |
-| migrated | 1600 |          1687913 |   1604276 (1604276) | 93375664 (93375664) |      0.950 |     0.968 |   0.930 | ok        |
-| sealed   | 400  |           436095 |     412013 (412013) | 24035072 (24035072) |      0.945 |     0.962 |   0.925 | ok        |
-| sealed   | 1600 |          1706295 |   1604813 (1604813) | 93386352 (93386352) |      0.941 |     0.955 |   0.986 | ok        |
+| migrated | 400  |           430913 |     411476 (411476) | 24024384 (24024384) |      0.955 |     0.974 |   0.880 | ok        |
+| migrated | 1600 |          1687913 |   1604276 (1604276) | 93375664 (93375664) |      0.950 |     0.968 |   0.973 | ok        |
+| sealed   | 400  |           436095 |     412013 (412013) | 24035072 (24035072) |      0.945 |     0.962 |   0.972 | ok        |
+| sealed   | 1600 |          1706295 |   1604813 (1604813) | 93386352 (93386352) |      0.941 |     0.955 |   0.945 | ok        |
 
 thunk linearity (400 → 1600, ×4 step): attrs-ref 3.917×, kind 3.899×, attrs-ref-sealed 3.913×, kind-sealed 3.895× (gate ≤ 5.5)
 arming (planted per-node recompute, n=400): kind thunks 2222448 (kind/attrs-ref 5.158, alloc 5.706) — must exceed KINDMATCH_KIND_THUNKS_MAX[migrated,400] = 411476
@@ -380,10 +380,10 @@ arming (planted per-node recompute, n=400): kind thunks 2222448 (kind/attrs-ref 
 
 | fixture  | n    | attrs-ref thunks | entity thunks | thunks e/a | alloc e/a | cpu e/a | projection |
 | -------- | ---- | ---------------: | ------------: | ---------: | --------: | ------: | ---------- |
-| migrated | 400  |           574411 |        557444 |      0.970 |     0.931 |   1.495 | ok         |
-| migrated | 1600 |          2277211 |       2186444 |      0.960 |     0.919 |   1.445 | ok         |
-| sealed   | 400  |           574411 |        562659 |      0.980 |     0.941 |   1.596 | ok         |
-| sealed   | 1600 |          2277211 |       2204859 |      0.968 |     0.929 |   1.511 | ok         |
+| migrated | 400  |           574411 |        557444 |      0.970 |     0.931 |   1.610 | ok         |
+| migrated | 1600 |          2277211 |       2186444 |      0.960 |     0.919 |   1.436 | ok         |
+| sealed   | 400  |           574411 |        562659 |      0.980 |     0.941 |   1.773 | ok         |
+| sealed   | 1600 |          2277211 |       2204859 |      0.968 |     0.929 |   1.470 | ok         |
 
 thunk linearity (400 → 1600, ×4 step): attrs-ref 3.964×, entity 3.922×, attrs-ref-sealed 3.964×, entity-sealed 3.919× (gate ≤ 5.5)
 arming (planted per-instance kind re-derivation, n=400): entity/attrs-ref thunks 8.566, alloc 8.341 — must exceed 557444/574411 (0.970462)
@@ -392,10 +392,10 @@ arming (planted per-instance kind re-derivation, n=400): entity/attrs-ref thunks
 
 | fixture  | n    | coord-ref thunks | coord thunks (bound) |   coord alloc (bound) | thunks c/r | alloc c/r | cpu c/r | projection |
 | -------- | ---- | ---------------: | -------------------: | --------------------: | ---------: | --------: | ------: | ---------- |
-| migrated | 400  |           800365 |      800763 (800763) |   43747504 (43747504) |      1.000 |     1.001 |   1.004 | ok         |
-| migrated | 1600 |          3173965 |    3174363 (3174363) | 173125712 (173125712) |      1.000 |     1.000 |   1.013 | ok         |
-| sealed   | 400  |           805553 |      807425 (807425) |   44134416 (44134416) |      1.002 |     1.002 |   1.051 | ok         |
-| sealed   | 1600 |          3192353 |    3194225 (3194225) | 174442400 (174442400) |      1.001 |     1.000 |   0.984 | ok         |
+| migrated | 400  |           800365 |      800763 (800763) |   43747504 (43747504) |      1.000 |     1.001 |   1.000 | ok         |
+| migrated | 1600 |          3173965 |    3174363 (3174363) | 173125712 (173125712) |      1.000 |     1.000 |   1.031 | ok         |
+| sealed   | 400  |           805553 |      807425 (807425) |   44134416 (44134416) |      1.002 |     1.002 |   0.965 | ok         |
+| sealed   | 1600 |          3192353 |    3194225 (3194225) | 174442400 (174442400) |      1.001 |     1.000 |   1.104 | ok         |
 
 thunk linearity (400 → 1600, ×4 step): coord-ref 3.966×, coord 3.964×, coord-ref-sealed 3.963×, coord-sealed 3.956× (gate ≤ 5.5)
 
@@ -403,12 +403,12 @@ thunk linearity (400 → 1600, ×4 step): coord-ref 3.966×, coord 3.964×, coor
 
 | n    | query-orig thunks | resolve thunks | thunks r/q | alloc r/q | cpu r/q | byte gate |
 | ---- | ----------------: | -------------: | ---------: | --------: | ------: | --------- |
-| 4    |              1267 |           2365 |      1.867 |     2.227 |   0.986 | ok        |
-| 5    |              1463 |           2533 |      1.731 |     1.964 |   1.227 | ok        |
-| 6    |              1699 |           2723 |      1.603 |     1.834 |   1.699 | ok        |
-| 7    |              1975 |           2935 |      1.486 |     1.737 |   1.315 | ok        |
-| 100  |            202483 |         118813 |      0.587 |     0.821 |   0.755 | ok        |
-| 1000 |          20016883 |       11070913 |      0.553 |     0.771 |   0.398 | ok        |
+| 4    |              1267 |           2365 |      1.867 |     2.228 |   1.550 | ok        |
+| 5    |              1463 |           2533 |      1.731 |     1.999 |   2.347 | ok        |
+| 6    |              1699 |           2723 |      1.603 |     1.767 |   1.177 | ok        |
+| 7    |              1975 |           2935 |      1.486 |     1.737 |   1.385 | ok        |
+| 100  |            202483 |         118813 |      0.587 |     0.821 |   0.878 | ok        |
+| 1000 |          20016883 |       11070913 |      0.553 |     0.771 |   0.489 | ok        |
 
 arming (witnesses control, n=4..7 thunks): 3467 / 8507 / 36509 / 219191; 6 → 7 step 6.004× (resolve 1.078×) — must exceed 3.0 and resolve
 
