@@ -10,13 +10,19 @@
 #                                        <!-- BEGIN PERF-BENCH --> / <!-- END PERF-BENCH --> block
 #                                        (the live BENCHMARKS.md section). Refuses a non-empty overlay.
 #
-# Exits: 0 all gates passed · 1 PERF REGRESSION (the published combination) · 2 the --update target
-# is unusable, or the arguments are · 3 a dead cell (die_cell) · 4 COMBINATION UNRESOLVED · 5
-# SUPPLY/DEMAND RESIDUE · 6 CANDIDATE OVER BOUND. 4/5/6 are separate codes on purpose: an
-# unresolvable sibling used to exit 1, the same code as a performance regression, so no caller could
-# tell "gen got slower" from "the network was down"; and a candidate breaching a bound derived at the
-# baseline anchor is a fact about a combination the repository has NOT adopted, which is a different
-# claim from "the published combination regressed".
+# Exits: 0 all gates passed, every cost reading EQUAL to its bound · 1 PERF REGRESSION (the published
+# combination) · 2 the --update target is unusable, or the arguments are · 3 a dead cell (die_cell) ·
+# 4 COMBINATION UNRESOLVED (an overlay, or the evaluator's own identity) · 5 SUPPLY/DEMAND RESIDUE ·
+# 6 CANDIDATE OVER BOUND · 7 RE-ANCHOR OWED: the evaluator or a reference moved and the members are
+# the anchored ones, so the printed readings are recordable as the new bounds · 8 RATCHET OWED: no
+# regression, and at least one cost reading fell BELOW its bound, which the change adopting it lowers
+# · 9 RE-ANCHOR BLOCKED: the evaluator or a reference moved AND the members did, so no reading is
+# recordable until the bench is re-run at ANCHOR_MEMBERS (`--at K=rev:<anchored>`). 4–9 are separate
+# codes on purpose: an unresolvable sibling used to exit 1, the same code as a performance
+# regression, so no caller could tell "gen got slower" from "the network was down"; a candidate
+# breaching a bound derived at the baseline anchor is a fact about a combination the repository has
+# NOT adopted; "gen got faster" (8) is not "gen got slower" (1); and an evaluator moving (7, 9) is
+# not gen moving. Precedence: 1/6 over 7/9 over 8.
 #
 # Injected by the flake app wrapper:
 #   PERF_WORKLOADS    — store path of the workload corpus (ci/perf-bench.nix)
@@ -25,10 +31,14 @@
 #
 # Gates (rationale + baselines: ci/README.md) — every gate reads a DETERMINISTIC evaluator counter:
 #   parity    — pure and ref digests identical for EVERY cell (byte-parity at benchmark scale)
-#   ratio     — at the largest size per workload: pure thunks/alloc ≤ that row's OWN derived bound
-#               (ROW_THUNKS_MAX / ROW_ALLOC_MAX below; COUNTER_RATIO_MAX only for an underived
-#               workload; wideFreeform's THUNKS ride a band ≤ WIDEFREEFORM_RATIO_MAX)
-#   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×)
+#   cost      — every cost row, through `gate`: EXACT and TWO-SIDED against its recorded bound. A
+#               row whose denominator is INDEPENDENT of gen (nixpkgs `ref`, or a rev-pinned frozen
+#               original) gates its ratio, NUM/DEN at full precision; a row whose only control is
+#               gen itself gates the guarded arm's OWN count. Above the bound is a regression; below
+#               it is `ratchet:`, refused until the bound is lowered in the same change
+#               (den-hoag-r8y89: the bench catches regressions and never obstructs optimizations)
+#   linearity — pure counters across a ×4 size step grow ≤ 5.5× (linear ≈ 4×; quadratic ≥ 12×);
+#               a complexity-class threshold, not a cost, so it does not ratchet
 #
 # cpu is measured, reported, and GATED BY NOTHING. Every gated axis above is a function of the
 # evaluated expression alone; cpuTime is a function of the expression AND the machine's state, so
@@ -47,7 +57,12 @@
 #
 # cpu is the median of $REPS INTERLEAVED samples: a row's arms are sampled round-robin, one rep of
 # each in turn, never as separate blocks (see run_row). thunk/alloc counters are deterministic per
-# nix version, taken from the last rep.
+# evaluator identity, taken from the last rep. ALLOC is deterministic only because every cell runs
+# with the collector off (GC_DONT_GC, sample_cell) and every source is a `<hash>-source` store path
+# of one length (the `--at path:` arm adds the directory to the store): measured, a collecting cell
+# moved by up to 9,648 B across six runs of one tree (deepSubmodule ref n=1600), and an overlay
+# path's length moved coordMatch coord n=400 by 576 B; with both removed, every rep and every
+# environment read the same byte.
 
 # ── the combination under test ────────────────────────────────────────────────
 # `--at <member>=<source>` overlays ONE member of the pure-side source set onto the baseline. The
@@ -59,8 +74,10 @@
 #
 # The five REFERENCE keys are refused by name. A ratio's denominator is its control: if both arms
 # float, a moved ratio is unattributable — you cannot tell whether gen got worse or nixpkgs got
-# better — and the ci/README.md rejection of an absolute pure-counter ratchet rests on `ref` being
-# byte-identical across arms.
+# better. A reference key moves only through ci/flake.lock, and that move owes a RE-ANCHOR (exit 7),
+# never a verdict. (The 2026-09-21 re-baseline rejected an absolute pure-counter ratchet BESIDE an
+# independent ratio, because there the ratio is the absolute up to a constant; den-hoag-r8y89 keeps
+# that for the independent rows and gates the absolute only where the control is gen itself.)
 UPDATE_FILE=""
 declare -A AT_SRC AT_STORE AT_REV
 AT_ORDER=()
@@ -133,8 +150,17 @@ for at_key in ${AT_ORDER[@]+"${AT_ORDER[@]}"}; do
     path:*)
       at_dir=${at_src#path:}
       if [[ -d "$at_dir" ]]; then
-        AT_STORE[$at_key]=$(readlink -f "$at_dir")
-        AT_REV[$at_key]="(path — UNPINNED)"
+        # Added to the store as `<hash>-source`, the shape and LENGTH of every pinned source: alloc
+        # moves with the source path's length (header), so a content-identical directory read in
+        # place would gate as a cost. A copy of a pinned tree resolves to that pin's own store path.
+        at_st=0
+        at_store=$(nix --extra-experimental-features nix-command store add --name source "$at_dir" 2>"$tmp/at-$at_key.err") || at_st=$?
+        if [[ $at_st -ne 0 || "$at_store" != /nix/store/*-source ]]; then
+          UNRESOLVED+=("$at_key=$at_src — adding it to the store failed (nix exit $at_st, '$at_store'): $(tr -s '[:space:]' ' ' <"$tmp/at-$at_key.err")")
+        else
+          AT_STORE[$at_key]=$at_store
+          AT_REV[$at_key]="(path — UNPINNED)"
+        fi
       else
         UNRESOLVED+=("$at_key=$at_src — no such directory")
       fi
@@ -173,17 +199,27 @@ if [[ ${#UNRESOLVED[@]} -gt 0 ]]; then
   exit 4
 fi
 
-# The source set this whole run reads. With no overlay it IS $PERF_SRCS, byte for byte.
+# The source set this whole run reads. With no overlay it IS $PERF_SRCS, byte for byte. An overlay's
+# set is $PERF_SRCS with the entry's line rewritten, added to the store under the same name: the same
+# flat attrset at a store path of the same length, so the overlay mechanism costs the cells nothing.
+# Measured: an `(import base) // { … }` file at a tmp path moved coordMatch coord n=1600 alloc by one
+# 4,080 B block with every source byte-identical, which an exact alloc gate reads as a regression.
 SRCS=$PERF_SRCS
 if [[ ${#AT_ORDER[@]} -gt 0 ]]; then
-  {
-    printf '(import %s) // {\n' "$PERF_SRCS"
-    for at_key in "${AT_ORDER[@]}"; do
-      printf '  "%s" = "%s";\n' "$at_key" "${AT_STORE[$at_key]}"
-    done
-    printf '}\n'
-  } >"$tmp/srcs.nix"
-  SRCS=$tmp/srcs.nix
+  cp "$PERF_SRCS" "$tmp/perf-srcs.nix"
+  for at_key in "${AT_ORDER[@]}"; do
+    at_line="  \"$at_key\" = \"${AT_STORE[$at_key]}\";"
+    awk -v k="  \"$at_key\" = " -v l="$at_line" 'index($0, k) == 1 { print l; hit++; next } { print } END { exit hit != 1 }' \
+      "$tmp/perf-srcs.nix" >"$tmp/perf-srcs.next" || {
+      echo "perf-bench: COMBINATION UNRESOLVED — $at_key has no single line in $PERF_SRCS to overlay; NO cells collected" >&2
+      exit 4
+    }
+    mv "$tmp/perf-srcs.next" "$tmp/perf-srcs.nix"
+  done
+  SRCS=$(nix --extra-experimental-features nix-command store add --mode flat --name perf-srcs.nix "$tmp/perf-srcs.nix") || {
+    echo "perf-bench: COMBINATION UNRESOLVED — the overlaid source set could not be added to the store; NO cells collected" >&2
+    exit 4
+  }
 fi
 
 # The baseline half of the echo, read from the resolved lock rather than re-derived here.
@@ -227,6 +263,8 @@ MATRIX=(
   "wideFreeform 8000 rb,big"
   "deepSubmodule 400 small"
   "deepSubmodule 1600 r,big"
+  "foreignMount 500 small"
+  "foreignMount 2000 r,big"
   "moduleFanIn 400 small"
   "moduleFanIn 1600 big"
   "sameLocFanIn 400 small"
@@ -234,14 +272,37 @@ MATRIX=(
 )
 
 REPS=3
-# The DEFAULT ratio ceiling — for a ratio-gated workload whose own bound has never been derived,
-# i.e. the "new den shapes should be added to perf-bench.nix" path in ci/README.md. Every workload
-# that HAS been derived carries its own bound in ROW_THUNKS_MAX / ROW_ALLOC_MAX below and never
-# reads this one. Nothing in the matrix reads it today.
-COUNTER_RATIO_MAX=0.90
 GROWTH_MAX=5.5
 
+# ── the identity every bound below was read under (den-hoag-r8y89) ───────────
+# A bound is a reading, and a reading is a function of the expression, the evaluator and the
+# allocator it links, and the five REFERENCE sources. When the evaluator, the allocator or a reference
+# differs from these lines the run gates NOTHING on cost: it prints every reading and exits 7 (or 9),
+# because a gen verdict against bounds read under another identity is unattributable. Re-anchoring
+# rewrites every bound and these lines together, and it is the one licensed raise of a bound without
+# an owner reading. ANCHOR_MEMBERS is the RECORD of the member revisions the bounds were read at, and
+# it is not part of the identity: a member is the change under test (owner ruling P5 (i), 2026-10-05),
+# so a member move is gated against the bounds, never re-anchored. A re-anchor is recordable only
+# from a run AT these members — otherwise a member regression travelling in the same relock as an
+# evaluator bump would be recorded as the new baseline (gate C1). Every change that writes a bound
+# (a ratchet, an owner-read raise, a re-anchor) writes ANCHOR_MEMBERS to the members it read at.
+# The evaluator is the `pkgs.nix` this app prepends to PATH, so CI and a local run share it; the
+# allocator is the boehm-gc in that evaluator's closure, keyed because `gc.totalBytes` is its
+# counter and a nix rebuild can move it under an unchanged --version (gate C5).
+ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.8'
+ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
+ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
+ANCHOR_MEMBERS='gen-algebra=de93454e5a6466bdd724ce15c666647358f9622a gen-aspects=e1ad87c83e3c249d7b1ab2c70b8b10105e0cce04 gen-class=fed0139ca309405adf7fe82da71d27d0abe1fb3a gen-graph=6f7300d3f69f844f713e98c26443a72119eeff2c gen-identity=19338f554a0030645b1eba88dfa89a470e5f8f30 gen-memo=fe1b501b6f4bc35590d5ec708ba4c3b9dc54858d gen-merge=b15c2825912aa3893833c398d8e1bd93f862dd14 gen-prelude=7f0513dd21c06e92ffe5131ea85d6b32b1b77a90 gen-schema=cd67d648b7664b1ee22e2453e5e9c0ccf922ce7f gen-scope=3a50a9c64dc3210db6776417f2242b81c4715016 gen-select=ff3229ca56ad5b6762f87634cab8bba1942c3f61 gen-types=37258c458f451c1f19d6380b8d5ba0e86eb73e59'
+
 # ── per-row ratio bounds — DERIVED, not chosen ────────────────────────────────
+# ★ THE FORM SINCE den-hoag-r8y89 (owner sitting den-hoag-rwuqw, ruling 10 arm A; P1 (i), P5 (i)):
+# every bound in this file is the EXACT reading at the anchor identity above, written as an integer
+# count or, on a ratio row, as NUM/DEN — the two raw counters, so the ratio is compared at full
+# precision and the bound carries its own provenance. MARGIN is 0 by construction and there is no
+# per-row tolerance: the bound EQUALS the reading on a green run, a reading above it is a regression
+# (raising it needs an owner reading on the five items in ci/README.md), and a reading below it is
+# `ratchet:` until the bound is lowered to it in the same change. The ANCHOR/MARGIN derivations that
+# follow are the record of how each row's former decimal bound was reached; the decimals are gone.
 # ADR-0032 ruling 5: the number is derived at implementation from the measured cost curve,
 # recorded with its derivation, and re-derived when the engine changes. The licensing rule is
 # ci/README.md §"Updating thresholds / workloads"; the derivation record is its 2026-09-21
@@ -282,33 +343,33 @@ declare -A ROW_THUNKS_MAX ROW_ALLOC_MAX
 # figure 0.912 / 0.756), at margin 0.000: a tightening, so it needs no licence (ci/README.md).
 # RESTORED to the original 0.90 (xzchx arm A, gen-merge 63ae058's path-free declaration walk):
 # 0.883 at gen-merge d37deb6. A tightening; the thunk bound is no longer interim.
-ROW_THUNKS_MAX[scalar,8000]=0.90
-ROW_ALLOC_MAX[scalar,8000]=0.754
+ROW_THUNKS_MAX[scalar,8000]=691066/844626
+ROW_ALLOC_MAX[scalar,8000]=42573120/56484848
 # registry n=2000 — anchors 0.776 / 0.631; ① 0.108340 / 0.101395, ② 0.064314 / 0.046820.
-ROW_THUNKS_MAX[registry,2000]=0.808
-ROW_ALLOC_MAX[registry,2000]=0.654
+ROW_THUNKS_MAX[registry,2000]=1418543/2179179
+ROW_ALLOC_MAX[registry,2000]=73299264/126644096
 # lazyRegistry n=2000 — anchors 0.777 / 0.632; ① 0.108440 / 0.101548, ② 0.064373 / 0.046891.
-ROW_THUNKS_MAX[lazyRegistry,2000]=0.809
-ROW_ALLOC_MAX[lazyRegistry,2000]=0.655
+ROW_THUNKS_MAX[lazyRegistry,2000]=1402542/2177174
+ROW_ALLOC_MAX[lazyRegistry,2000]=72657728/126453088
 # threadedRegistry n=2000 — the registry shape over nixpkgs `attrsWith { placeholder = "host"; }`,
 # a container outside the six, so the pure stack folds through gen-merge's threaded rebuild channel
 # (its merge runs three times per option, nixpkgs' once). ANCHORS 0.772 / 0.675 at Nix 2.34.8, gen-merge
 # 202cbd5 (branch f8mgj, the landing that opens the channel). MARGIN 0.000, the tightest honest
 # reading on a deterministic counter (as entityMatch's): the row is new, so no consolidation delta
-# was ever measured on it, and a bound below the default COUNTER_RATIO_MAX is a tightening, which
+# was ever measured on it, and a bound below the then-default COUNTER_RATIO_MAX (0.90, retired) is a tightening, which
 # needs no licence (ci/README.md). Arming: the planted stacks below, never a gated arm.
-ROW_THUNKS_MAX[threadedRegistry,2000]=0.772
-ROW_ALLOC_MAX[threadedRegistry,2000]=0.675
+ROW_THUNKS_MAX[threadedRegistry,2000]=1619102/2179181
+ROW_ALLOC_MAX[threadedRegistry,2000]=83947328/126644096
 # wrappedRegistry n=2000 — the registry shape under nixpkgs `coercedTo` (a container that adds no step)
 # over the stack's own `attrsOf`, which gen-merge keys at the option's root as the root is (keyWalk's
 # step-free arm, den-hoag-t1j4z). ANCHORS 0.652 / 0.580 at Nix 2.34.8, gen-merge b15c282 (main,
 # carrying t1j4z-b1's arm and t1j4z's agreeing-definitions serve) under this hub's other pins. MARGIN 0.000, the
-# threadedRegistry precedent: the row is new, and a bound below the default COUNTER_RATIO_MAX is a
+# threadedRegistry precedent: the row is new, and a bound below the then-default COUNTER_RATIO_MAX (0.90, retired) is a
 # tightening, which needs no licence (ci/README.md). Arming: a gen-merge without the arm cannot
 # evaluate the row at all (class (a) under `coercedTo`), and a fresh token planted as the arm's body
 # reds the bench naming it (landing-time seed; no per-run plant).
-ROW_THUNKS_MAX[wrappedRegistry,2000]=0.652
-ROW_ALLOC_MAX[wrappedRegistry,2000]=0.580
+ROW_THUNKS_MAX[wrappedRegistry,2000]=1420336/2179234
+ROW_ALLOC_MAX[wrappedRegistry,2000]=73401968/126648128
 # schemaHosts n=1600 — anchors 1.171 / 0.995; ① 0.197886 / 0.187996, ② 0.079462 / 0.057494.
 # The pure stack is HEAVIER than the frozen nixpkgs reference on this shape: this row is a
 # stated band, not a win-gate. What the band buys is in ci/README.md's 2026-09-21 block; whether
@@ -344,8 +405,8 @@ ROW_ALLOC_MAX[wrappedRegistry,2000]=0.580
 # Lix alike. The bound is the restored promise, as scalar's was at ab05306, not ANCHOR + MARGIN; the
 # ratchet to a derived anchor reads its alloc figure off CI's Determinate log, because the local
 # Determinate binary's allocation diverges from CI's. A tightening; the bounds are no longer interim.
-ROW_THUNKS_MAX[schemaHosts,1600]=0.90
-ROW_ALLOC_MAX[schemaHosts,1600]=0.90
+ROW_THUNKS_MAX[schemaHosts,1600]=2430537/2864692
+ROW_ALLOC_MAX[schemaHosts,1600]=137815536/168214464
 # deepSubmodule n=1600 — anchors 0.575 / 0.463; ① 0.105358 / 0.090347, ② 0.087229 / 0.065271.
 # RE-DERIVED for the Unit 2 engine (den-hoag-n6dh7; owner ruling 2026-09-28, ADR-0032 ruling 5 "re-
 # derived when the engine changes"), 0.618 / 0.495 → 0.643 / 0.595, margin 0.000, RATCHETED.
@@ -380,13 +441,20 @@ ROW_ALLOC_MAX[schemaHosts,1600]=0.90
 # (den-hoag-foreign-mount-parity-knhyg, built at the crossing site). Relock 49.
 # RATCHETED 0.541 / 0.500 → 0.539 / 0.498 by the gen-merge relock 51 set (den-hoag-fpxsd construction
 # L, den-hoag-threadedforeign-parity-residue-0hew4). Relock 51.
-ROW_THUNKS_MAX[deepSubmodule,1600]=0.539
-ROW_ALLOC_MAX[deepSubmodule,1600]=0.498
-declare -A ROW_RATCHET=([deepSubmodule,1600]=1)
+ROW_THUNKS_MAX[deepSubmodule,1600]=6226213/11557492
+ROW_ALLOC_MAX[deepSubmodule,1600]=325449760/653164176
+# foreignMount n=2000 — n option roots on ONE stock nixpkgs `submodule`, each mounted by gen-merge's
+# foreign-mount path (den-hoag-gijly OQ2, arm (a) + this row; before it no row reached the mount, and
+# an abort planted at its head left the bench green). The denominator is nixpkgs `evalModules` over
+# the same modules: the reach census (every source key poisoned in turn) kills `ref` on nixpkgs-lib
+# alone, and `pure` on gen-prelude, -types, -merge, -scope, -identity and -graph, so the row is
+# INDEPENDENT. Anchored at its landing; the mount's measured price over nixpkgs is the reading.
+ROW_THUNKS_MAX[foreignMount,2000]=1717897/1673781
+ROW_ALLOC_MAX[foreignMount,2000]=98764240/97486576
 # wideFreeform n=8000 — alloc anchor 0.806; ① 0.000154, ② 0.000090 (~free: this shape rides the
 # per-key type merges, not the declaration spine, so neither construction touches it). Its THUNK
 # bound is WIDEFREEFORM_RATIO_MAX below, which carries that row's own claim.
-ROW_ALLOC_MAX[wideFreeform,8000]=0.806
+ROW_ALLOC_MAX[wideFreeform,8000]=40703680/52381456
 
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
@@ -395,9 +463,18 @@ ROW_ALLOC_MAX[wideFreeform,8000]=0.806
 # 0.30 = measured + ~75% relative headroom, and enforces ≥3.33× — comfortably past the A1 fixed-input
 # reference (2.48×, ratio 0.403; the 1.89×→2.48× spine-tax band, spec §2.5) so an erosion BELOW the A1
 # band fires the gate ("any reduction" is not a pass). Sizes mirror schemaHosts/aspects (400→1600, ×4).
+# RE-BASED (den-hoag-r8y89): both arms are gen, so a shared-plane improvement moved the denominator
+# and a fixed/full ratio could refuse an optimization; no nixpkgs operation corresponds to fixed-input
+# class sharing (spec OQ1), so the row gates the guarded arm's OWN cost: `pure-fixed` thunks, exact.
+# Erosion of the reuse raises that cost and reds; the 0.30 ratio (≥ 3.33×, the A1 band) is printed,
+# gated by nothing. The domain, stated: a change that lowers the shared plane AND erodes the reuse
+# by less moves the fixed arm DOWN, so it passes as a ratchet and the erosion is absorbed into the
+# lowered bound; only the printed ratio shows it.
 CLASSSHARE_SMALL=400
 CLASSSHARE_BIG=1600
-CLASSSHARE_RATIO_MAX=0.30
+declare -A CLASSSHARE_FIXED_THUNKS_MAX
+CLASSSHARE_FIXED_THUNKS_MAX[400]=290629
+CLASSSHARE_FIXED_THUNKS_MAX[1600]=1142029
 
 # ── wideFreeform — THUNK band (only alloc keeps the default win-gate) ──
 # Freeform absorption is THUNK-parity with nixpkgs, not a pure win on that counter: unknown sibling keys
@@ -428,7 +505,7 @@ CLASSSHARE_RATIO_MAX=0.30
 # the doors; identical on nix, Determinate and Lix). The lean door construction took 55 of it back; no
 # internal-only path reaches 1.096, and publishing unchecked cores to reach it was rejected. A landing that
 # brings wideFreeform back under 1.096 re-tightens this band.
-WIDEFREEFORM_RATIO_MAX=1.097
+WIDEFREEFORM_RATIO_MAX=615425/684873
 
 # ── overrideWarm (gen-merge warm re-eval / memoized override) — its OWN threshold, own rationale ──
 # The warm path (README §"Warm re-eval") reuses the previous eval's declared-leaf values for locs outside
@@ -441,9 +518,16 @@ WIDEFREEFORM_RATIO_MAX=1.097
 # thunks AND alloc are gated (both are deterministic per Nix version and both genuinely reduce here — the
 # whole warm stack allocates less, unlike classShare where the digest serialization dominates alloc).
 # Sizes mirror classShare/schemaHosts/aspects (400 → 1600, ×4).
+# RE-BASED (den-hoag-r8y89), classShare's reason: `warm` thunks AND alloc, exact, against the arm's
+# own recorded cost; the warm/cold ratios are printed, gated by nothing. The same domain statement
+# holds: a shared-plane gain larger than a simultaneous reuse erosion reads as a ratchet.
 OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
-OVERRIDEWARM_RATIO_MAX=0.30
+declare -A OVERRIDEWARM_WARM_THUNKS_MAX OVERRIDEWARM_WARM_ALLOC_MAX
+OVERRIDEWARM_WARM_THUNKS_MAX[400]=391368
+OVERRIDEWARM_WARM_ALLOC_MAX[400]=20616848
+OVERRIDEWARM_WARM_THUNKS_MAX[1600]=1528368
+OVERRIDEWARM_WARM_ALLOC_MAX[1600]=80391888
 
 # ── kindMatch (kind identity at scale; den-hoag-l0y) — the owner's landing gate on ruling (a) ──
 # Ruling (a) keys every kind by its MINTED identity, and the owner's condition on it was that the hub
@@ -498,7 +582,6 @@ OVERRIDEWARM_RATIO_MAX=0.30
 # are one-sided). Re-derive with `nix run ./ci#perf-bench`.
 KINDMATCH_SMALL=400
 KINDMATCH_BIG=1600
-declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
 # RE-ANCHORED at gen-identity `410261b` (den-hoag-xvww), margin 0.000: the two kinds' mints cost
 # +275 thunks, a CONSTANT at both sizes, which moves the two n=400 thunk ratios one printed step
 # (0.972 → 0.973, 0.966 → 0.967; kind 408,851 / 409,422 against attrs-ref 420,215 / 423,531 thunks at
@@ -514,24 +597,33 @@ declare -A KINDMATCH_THUNKS_MAX KINDMATCH_ALLOC_MAX
 # migrated, n=400  — anchors 0.973 / 0.991.
 # RE-ANCHORED thunks 0.973 → 0.974, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
 # a650104 (kinds minted by a staged fold) alone; neither 67b690c nor gen-graph e10c49d moves it.
-KINDMATCH_THUNKS_MAX[migrated,400]=0.974
-KINDMATCH_ALLOC_MAX[migrated,400]=0.991
 # migrated, n=1600 — anchors 0.962 / 0.976 (1,602,162 / 1,664,803 thunks; 85,042,560 / 87,154,096 B).
 # RE-ANCHORED 0.962 / 0.976 → 0.963 / 0.977, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default):
 # thunks cross one printed step at + gen-schema fa26749 (`constructionRelation`); alloc crosses only
 # with the full landing (gen-merge 50250c1 + gen-schema 4b4244a + gen-aspects 25c6f86), no arm alone.
-KINDMATCH_THUNKS_MAX[migrated,1600]=0.963
-KINDMATCH_ALLOC_MAX[migrated,1600]=0.977
 # sealed, n=400    — anchors 0.967 / 0.984.
 # RE-ANCHORED thunks 0.967 → 0.968, margin 0.000 (den-hoag-ez1yq relock 32, R8 default): gen-scope
 # 67b690c (the quotient accessor); a650104 and gen-graph e10c49d leave it at 0.967.
-KINDMATCH_THUNKS_MAX[sealed,400]=0.968
-KINDMATCH_ALLOC_MAX[sealed,400]=0.984
 # sealed, n=1600   — anchors 0.957 / 0.970 (1,602,745 / 1,675,319 thunks; 85,050,064 / 87,719,184 B).
 # RE-ANCHORED thunks 0.957 → 0.958, margin 0.000 (den-hoag-bfc0k + 5xio7 relock, R8 default): crosses
 # one printed step only with the full landing; no single-member arm reds it.
-KINDMATCH_THUNKS_MAX[sealed,1600]=0.958
-KINDMATCH_ALLOC_MAX[sealed,1600]=0.970
+# RE-BASED (den-hoag-r8y89): the denominator runs the frozen matcher over the LIVE data plane
+# (gen-merge, -schema, -scope, … — the reach census), so it is gen-vs-gen and a shared-plane
+# improvement moved it. No nixpkgs operation corresponds to kind-identity selection (spec OQ1), so the
+# row gates the guarded arm's OWN cost, `kind` thunks and alloc, exact, per fixture and size; the
+# kind/attrs-ref ratios above are printed and gated by nothing. The KINDMATCH_{THUNKS,ALLOC}_MAX ratio
+# bounds whose derivation is recorded above are retired with them. What the frozen denominator still
+# buys is the byte gate. The arming control re-points: `kind-plant`'s thunks must exceed
+# KINDMATCH_KIND_THUNKS_MAX[migrated,400].
+declare -A KINDMATCH_KIND_THUNKS_MAX KINDMATCH_KIND_ALLOC_MAX
+KINDMATCH_KIND_THUNKS_MAX[migrated,400]=411476
+KINDMATCH_KIND_ALLOC_MAX[migrated,400]=24024384
+KINDMATCH_KIND_THUNKS_MAX[migrated,1600]=1604276
+KINDMATCH_KIND_ALLOC_MAX[migrated,1600]=93375664
+KINDMATCH_KIND_THUNKS_MAX[sealed,400]=412013
+KINDMATCH_KIND_ALLOC_MAX[sealed,400]=24035072
+KINDMATCH_KIND_THUNKS_MAX[sealed,1600]=1604813
+KINDMATCH_KIND_ALLOC_MAX[sealed,1600]=93386352
 
 # ── entityMatch (INSTANCE identity at scale; den-hoag-l0y U2) — the row that FORCES `id_hash` ──
 # gen-schema's instance stamp carries the kind's minted identity beside the key values, so two
@@ -615,23 +707,23 @@ declare -A ENTITYMATCH_THUNKS_MAX ENTITYMATCH_ALLOC_MAX
 #   67b690c (the quotient accessor) about +0.006 more; gen-graph e10c49d (the key-former door) alone
 #   moves only sealed n=400, 1.331 → 1.332. Alloc unmoved.
 # migrated, n=400  — 1.326 → 1.334.
-ENTITYMATCH_THUNKS_MAX[migrated,400]=1.334
-ENTITYMATCH_ALLOC_MAX[migrated,400]=1.137
+ENTITYMATCH_THUNKS_MAX[migrated,400]=557444/574411
+ENTITYMATCH_ALLOC_MAX[migrated,400]=31319392/33627840
 # migrated, n=1600 — anchors 1.307 / 1.116 (2,976,281 / 2,277,190 thunks; 148,649,792 / 133,249,584 B).
 # migrated, n=1600 — 1.307 / 1.116 → 1.321 / 1.128.
 # migrated, n=1600 — 1.321 → 1.329.
-ENTITYMATCH_THUNKS_MAX[migrated,1600]=1.329
-ENTITYMATCH_ALLOC_MAX[migrated,1600]=1.128
+ENTITYMATCH_THUNKS_MAX[migrated,1600]=2186444/2277211
+ENTITYMATCH_ALLOC_MAX[migrated,1600]=122482304/133250800
 # sealed, n=400    — anchors 1.317 / 1.129 (756,521 / 574,390 thunks; 37,976,080 / 33,622,624 B).
 # sealed, n=400    — 1.317 / 1.129 → 1.331 / 1.142.
 # sealed, n=400    — 1.331 → 1.339.
-ENTITYMATCH_THUNKS_MAX[sealed,400]=1.339
-ENTITYMATCH_ALLOC_MAX[sealed,400]=1.142
+ENTITYMATCH_THUNKS_MAX[sealed,400]=562659/574411
+ENTITYMATCH_ALLOC_MAX[sealed,400]=31651680/33627840
 # sealed, n=1600   — anchors 1.312 / 1.120 (2,986,721 / 2,277,190 thunks; 149,237,056 / 133,249,584 B).
 # sealed, n=1600   — 1.312 / 1.120 → 1.326 / 1.133.
 # sealed, n=1600   — 1.326 → 1.334.
-ENTITYMATCH_THUNKS_MAX[sealed,1600]=1.334
-ENTITYMATCH_ALLOC_MAX[sealed,1600]=1.133
+ENTITYMATCH_THUNKS_MAX[sealed,1600]=2204859/2277211
+ENTITYMATCH_ALLOC_MAX[sealed,1600]=123732096/133250800
 
 # ── coordMatch (the PRODUCT COORDINATE's identity decision at scale; den-hoag-8hqx0) ──
 # `adapters.product.coord dim kind entry` decides as `sel.entity` does: the stamp, then — at an equal
@@ -676,19 +768,24 @@ COORDMATCH_BIG=1600
 # sha256 of the JSON projection `[ "h0" … "h63" ]` (each of the 64 selectors selects its own cell),
 # both stacks.
 COORDMATCH_DIGEST=ec30bebff99631b2d8ef98e29a6403135aea466f4b4d1d2ab303d1dffefe77dc
-declare -A COORDMATCH_THUNKS_MAX COORDMATCH_ALLOC_MAX
-COORDMATCH_THUNKS_MAX[migrated,400]=1.000
 # RAISED 1.000 → 1.001 (owner-approved, den-hoag-470xp arm F): the residue is one GC heap block, not a
 # cost. ΔThunks coord−ref stays the row's constant 397 at gen-merge `3a8d116`, and the byte excess moves
 # by whole 4 096 B blocks whose sign changes with n (+1 block at n=400, −2 at n=1600), which a per-cell
 # cost could not do (reports/den-hoag-470xp-arm-f-landing-gate-v0.md §4.3).
-COORDMATCH_ALLOC_MAX[migrated,400]=1.001
-COORDMATCH_THUNKS_MAX[migrated,1600]=1.000
-COORDMATCH_ALLOC_MAX[migrated,1600]=1.000
-COORDMATCH_THUNKS_MAX[sealed,400]=1.002
-COORDMATCH_ALLOC_MAX[sealed,400]=1.002
-COORDMATCH_THUNKS_MAX[sealed,1600]=1.001
-COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
+# RE-BASED (den-hoag-r8y89), and this row is the measured case: both stacks share the live gen-schema
+# instances and plane, so gen-merge c3 (`ownUnmatched = []` when nothing is undeclared) lowered coord
+# and coord-ref alike and the ratio rose to 1.001 with the excess a constant +398. The row gates the
+# guarded arm's OWN cost, `coord` thunks and alloc, exact; the ratios are printed, gated by nothing,
+# and the COORDMATCH_{THUNKS,ALLOC}_MAX ratio bounds derived above are retired.
+declare -A COORDMATCH_COORD_THUNKS_MAX COORDMATCH_COORD_ALLOC_MAX
+COORDMATCH_COORD_THUNKS_MAX[migrated,400]=800763
+COORDMATCH_COORD_ALLOC_MAX[migrated,400]=43747504
+COORDMATCH_COORD_THUNKS_MAX[migrated,1600]=3174363
+COORDMATCH_COORD_ALLOC_MAX[migrated,1600]=173125712
+COORDMATCH_COORD_THUNKS_MAX[sealed,400]=807425
+COORDMATCH_COORD_ALLOC_MAX[sealed,400]=44134416
+COORDMATCH_COORD_THUNKS_MAX[sealed,1600]=3194225
+COORDMATCH_COORD_ALLOC_MAX[sealed,1600]=174442400
 
 # ── resolution (the one resolution calculus at scale; den-hoag-gayc U2b, design §5.8) ──
 # The hub's own peer shape — a COMPLETE peer relation with self-edges over n hosts, walked `peer*`
@@ -704,7 +801,8 @@ COORDMATCH_ALLOC_MAX[sealed,1600]=1.001
 # answers in first-reach order and gen-scope's own order cell pins that order. (2) RATIO, THUNKS
 # ONLY, every n: resolve/query-orig ≤ the bound. Alloc is reported and gated by nothing: at n = 4..7
 # a cell allocates 75–211 KB, so allocation's ~2.5 KB run-to-run jitter is over 1% and crosses a
-# printed step. (3) ARMING, every run: the `witnesses` arm (mode `witnesses`, the acyclic-path law,
+# printed step (that jitter was the collector's: with GC_DONT_GC every cell reads one byte count,
+# but no alloc gate is built on this row yet). (3) ARMING, every run: the `witnesses` arm (mode `witnesses`, the acyclic-path law,
 # which enumerates every simple path and is factorial in n here) at n = 4..7 only — it never returns
 # at n = 100 (gate P2) — must step 6 → 7 by at least RESOLUTION_WITNESSES_GROWTH_MIN and by more
 # than resolve's own 6 → 7 step. A polynomial of degree d steps 6 → 7 by (7/6)^d, so ×3 needs d ≥
@@ -742,12 +840,12 @@ RESOLUTION_SIZES=(4 5 6 7 100 1000)
 RESOLUTION_WITNESSES_SIZES=(4 5 6 7)
 RESOLUTION_WITNESSES_GROWTH_MIN=3.0
 declare -A RESOLUTION_THUNKS_MAX
-RESOLUTION_THUNKS_MAX[4]=1.922
-RESOLUTION_THUNKS_MAX[5]=1.778
-RESOLUTION_THUNKS_MAX[6]=1.642
-RESOLUTION_THUNKS_MAX[7]=1.519
-RESOLUTION_THUNKS_MAX[100]=0.588
-RESOLUTION_THUNKS_MAX[1000]=0.553
+RESOLUTION_THUNKS_MAX[4]=2365/1267
+RESOLUTION_THUNKS_MAX[5]=2533/1463
+RESOLUTION_THUNKS_MAX[6]=2723/1699
+RESOLUTION_THUNKS_MAX[7]=2935/1975
+RESOLUTION_THUNKS_MAX[100]=118813/202483
+RESOLUTION_THUNKS_MAX[1000]=11070913/20016883
 
 declare -A CPU CPU_SAMPLES THUNKS ALLOC DIG
 declare -A CR TR AR PAR
@@ -771,6 +869,8 @@ KM_PLANT_AR=""
 TRA_PURE=""
 TRA_REF=""
 FAILURES=()
+RATCHETS=()
+REANCHOR_LINES=()
 CELL=""
 
 # ── a dead cell names itself (exit 3) ─────────────────────────────────────────
@@ -825,8 +925,10 @@ sample_cell() {
   CELL="workload=$w n=$n stack=$s rep=$rep"
   # errexit fires at the ASSIGNMENT — a failing command substitution carries its own status, so a
   # bare redirect plus a later stats-file test would never be reached. The status is taken by hand.
+  # GC_DONT_GC: the collector off makes `gc.totalBytes` one byte count per tree (header); the
+  # evaluator then warns on stderr that it could not collect before reporting, which is expected.
   status=0
-  out=$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
+  out=$(GC_DONT_GC=1 NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$statf" nix-instantiate --eval --strict \
     "$PERF_WORKLOADS" --arg srcs "import $SRCS" \
     --argstr stack "$s" --argstr workload "$w" --arg n "$n" 2>"$errf") || status=$?
   CELL_ERRF=$errf
@@ -887,6 +989,41 @@ ratio() { awk "BEGIN{printf \"%.3f\", ($1)/($2)}"; }
 lte() { awk "BEGIN{exit !(($1) <= ($2))}"; }
 has_tag() { [[ ",$1," == *",$2,"* ]]; }
 
+# ── the cost gate: EXACT and TWO-SIDED (den-hoag-r8y89) ───────────────────────
+# A reading and a bound are each an integer count or a ratio of two, NUM/DEN. qcmp compares them by
+# cross-multiplying in shell integers, never through a printed decimal: a %.3f step was a tolerance
+# nobody chose, and two-sided it flaps at a rounding boundary (gate C6). It prints `bad` for anything
+# that is not such a value — an absent bound or a non-numeric reading is UNMEASURED, never a pass.
+# ponytail: 64-bit products; the largest gated pair today is ~1e9 B × ~1e9 B, 10× under the limit.
+qcmp() {
+  local a=$1 b=$2 an ad=1 bn bd=1
+  [[ $a =~ ^[0-9]+(/[1-9][0-9]*)?$ && $b =~ ^[0-9]+(/[1-9][0-9]*)?$ ]] || {
+    echo bad
+    return
+  }
+  an=${a%/*} bn=${b%/*}
+  [[ $a == */* ]] && ad=${a#*/}
+  [[ $b == */* ]] && bd=${b#*/}
+  if ((an * bd < bn * ad)); then echo lt; elif ((an * bd > bn * ad)); then echo gt; else echo eq; fi
+}
+qshow() { if [[ $1 == */* ]]; then awk -v q="$1" 'BEGIN{split(q, p, "/"); printf "%s (%.6f)", q, p[1] / p[2]}'; else printf '%s' "$1"; fi; }
+# gate LABEL READING BOUND BOUND-NAME — above is a regression; below is `ratchet:`, which names the
+# assignment that lowers the bound to the reading. Under an identity change (REANCHOR) nothing is
+# judged: the reading is printed as the assignment a re-anchor would record.
+gate() {
+  local label=$1 reading=$2 bound=$3 name=$4
+  if [[ -n $REANCHOR ]]; then
+    REANCHOR_LINES+=("$name=$reading   # $label; was $bound")
+    return
+  fi
+  case $(qcmp "$reading" "$bound") in
+    eq) ;;
+    gt) FAILURES+=("$label $(qshow "$reading") > $(qshow "$bound") ($name)") ;;
+    lt) RATCHETS+=("ratchet: $label $(qshow "$reading") < $(qshow "$bound") — lower $name to $reading") ;;
+    *) FAILURES+=("unmeasured: $label — reading '$reading' or bound '$bound' ($name) is not a count or NUM/DEN") ;;
+  esac
+}
+
 # ── pre-flight: the formals residue of THIS combination, before any cell ──────
 # Each member's entry object is applied with exactly the formals IT declares, read live with
 # `builtins.functionArgs` at the path the call site imports. This census reads those lambdas without
@@ -930,6 +1067,43 @@ if [[ "$PF_RESIDUE" -ne 0 ]]; then
   exit 5
 fi
 
+# ── the run's identity, against the anchor's (exit 4 if unreadable) ──────────
+# Read BEFORE any cell and before any verdict, so a run under another identity never declares green
+# and never splices (gate C4). An identity that cannot be read is UNRESOLVED, not "unchanged".
+EVAL_ID=""
+id_st=0
+EVAL_ID=$(nix-instantiate --version 2>"$tmp/id.err") || id_st=$?
+eval_store=$(readlink -f "$(command -v nix-instantiate)") || id_st=$?
+eval_store=${eval_store%/bin/*}
+nix-store --query --requisites "$eval_store" >"$tmp/id.closure" 2>>"$tmp/id.err" || id_st=$?
+ALLOC_IDS=()
+while IFS= read -r cp; do
+  [[ $cp =~ ^/nix/store/[a-z0-9]{32}-(boehm-gc-[^/]+)$ ]] && ALLOC_IDS+=("${BASH_REMATCH[1]}")
+done <"$tmp/id.closure"
+if [[ $id_st -ne 0 || -z "$EVAL_ID" || ${#ALLOC_IDS[@]} -ne 1 ]]; then
+  {
+    echo "perf-bench: EVALUATOR IDENTITY UNRESOLVED — nix exit $id_st, version '${EVAL_ID}', ${#ALLOC_IDS[@]} boehm-gc path(s) in the closure of '$eval_store' (exactly one is required); NO cells collected"
+    cat "$tmp/id.err"
+  } >&2
+  exit 4
+fi
+ALLOC_ID=${ALLOC_IDS[0]}
+REF_ID=$(jq -er '[to_entries[] | select(.value.axis == "reference") | "\(.key)=\(.value.rev)"] | sort | join(" ")' "$PERF_COMBINATION")
+# The members this run MEASURES: an overlay replaces its key's revision unless it resolved to the
+# baseline's own source; a `path:` overlay has no revision, so it never matches the anchor.
+mem_ids=()
+for ck in "${COMB_KEYS[@]}"; do
+  [[ "${BASE_AXIS[$ck]}" == reference ]] && continue
+  mrev=${BASE_REV[$ck]}
+  if [[ -n "${AT_STORE[$ck]:-}" && "${AT_STORE[$ck]}" != "${BASE_STORE[$ck]}" ]]; then mrev=${AT_REV[$ck]}; fi
+  mem_ids+=("$ck=$mrev")
+done
+MEMBERS_ID=$(printf '%s\n' "${mem_ids[@]}" | LC_ALL=C sort | paste -sd ' ')
+REANCHOR=""
+if [[ "$EVAL_ID" != "$ANCHOR_EVALUATOR" || "$ALLOC_ID" != "$ANCHOR_ALLOCATOR" || "$REF_ID" != "$ANCHOR_REFERENCE" ]]; then
+  REANCHOR=1
+fi
+
 # ── measure ──────────────────────────────────────────────────────────────────
 echo "collecting: ${#MATRIX[@]} cells (pure) + the ref arm of every non-noref row × $REPS reps ..." >&2
 for row in "${MATRIX[@]}"; do
@@ -957,29 +1131,23 @@ for row in "${MATRIX[@]}"; do
     PAR["$w,$n"]="MISMATCH"
     FAILURES+=("parity: $w n=$n pure=${DIG[$w,$n,pure]:-<none>} ref=${DIG[$w,$n,ref]:-<none>}")
   fi
-  # CR is computed and reported but never gated — see the cpu note in the header.
-  # Each gated assertion reads its OWN derived bound, falling back to the default for a workload
-  # nobody has derived yet. The fallback is what keeps "new den shapes should be added" a live path;
-  # it is not reached by anything in the matrix today.
+  # CR is computed and reported but never gated — see the cpu note in the header. TR/AR are the
+  # printed ratios; the gates read the raw counters as NUM/DEN. A row with no recorded bound is
+  # UNMEASURED (gate), so a new workload's first landing records its reading as its bound.
+  tq="${THUNKS[$w,$n,pure]}/${THUNKS[$w,$n,ref]}"
+  aq="${ALLOC[$w,$n,pure]}/${ALLOC[$w,$n,ref]}"
   if has_tag "$tags" r; then
-    tmax=${ROW_THUNKS_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
-    amax=${ROW_ALLOC_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
-    lte "${TR[$w,$n]}" "$tmax" || FAILURES+=("ratio: $w n=$n pure/ref thunks ${TR[$w,$n]} > $tmax")
-    lte "${AR[$w,$n]}" "$amax" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $amax")
-    if [[ -n ${ROW_RATCHET[$w,$n]:-} ]]; then
-      lte "$tmax" "${TR[$w,$n]}" || FAILURES+=("ratchet: $w n=$n pure/ref thunks ${TR[$w,$n]} < $tmax — lower ROW_THUNKS_MAX[$w,$n] to ${TR[$w,$n]}")
-      lte "$amax" "${AR[$w,$n]}" || FAILURES+=("ratchet: $w n=$n pure/ref alloc ${AR[$w,$n]} < $amax — lower ROW_ALLOC_MAX[$w,$n] to ${AR[$w,$n]}")
-    fi
+    gate "ratio: $w n=$n pure/ref thunks" "$tq" "${ROW_THUNKS_MAX[$w,$n]:-}" "ROW_THUNKS_MAX[$w,$n]"
+    gate "ratio: $w n=$n pure/ref alloc" "$aq" "${ROW_ALLOC_MAX[$w,$n]:-}" "ROW_ALLOC_MAX[$w,$n]"
   elif has_tag "$tags" rb; then
     # wideFreeform: ALLOC is a win-gate, THUNKS ride a parity band — two different CLAIMS, which is
     # why the band keeps its own named constant and its own failure wording.
-    amax=${ROW_ALLOC_MAX[$w,$n]:-$COUNTER_RATIO_MAX}
-    lte "${AR[$w,$n]}" "$amax" || FAILURES+=("ratio: $w n=$n pure/ref alloc ${AR[$w,$n]} > $amax")
-    lte "${TR[$w,$n]}" "$WIDEFREEFORM_RATIO_MAX" || FAILURES+=("ratio-band: $w n=$n pure/ref thunks ${TR[$w,$n]} > $WIDEFREEFORM_RATIO_MAX")
+    gate "ratio: $w n=$n pure/ref alloc" "$aq" "${ROW_ALLOC_MAX[$w,$n]:-}" "ROW_ALLOC_MAX[$w,$n]"
+    gate "ratio-band: $w n=$n pure/ref thunks" "$tq" "$WIDEFREEFORM_RATIO_MAX" "WIDEFREEFORM_RATIO_MAX"
   fi
 done
 
-for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount moduleFanIn sameLocFanIn; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -999,7 +1167,7 @@ done
 # DEDICATED section: classShare's two "stacks" are pure-full / pure-fixed (both the PURE engine), so
 # its ratios are fixed-vs-full — NOT the pure-vs-ref parity/counter-ratio semantics of the matrix loop
 # above. It runs its own two sizes × REPS, asserts the in-bench BYTE gate (full == fixed byte-for-byte,
-# the perf-scale twin of gateCore), gates the spine reduction against CLASSSHARE_RATIO_MAX, and owns its
+# the perf-scale twin of gateCore), gates the fixed arm's own thunks (re-based, den-hoag-r8y89), and owns its
 # linearity growth check. Failures print expected/actual/delta (the verbose STOP-on-diff discipline).
 delta() { awk "BEGIN{printf \"%+.4f\", ($1)-($2)}"; }
 for n in "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG"; do
@@ -1014,9 +1182,8 @@ for n in "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG"; do
   CS_TR[$n]=$(ratio "${THUNKS[classShare,$n,pure-fixed]}" "${THUNKS[classShare,$n,pure-full]}")
   CS_AR[$n]=$(ratio "${ALLOC[classShare,$n,pure-fixed]}" "${ALLOC[classShare,$n,pure-full]}")
   CS_CR[$n]=$(ratio "${CPU[classShare,$n,pure-fixed]}" "${CPU[classShare,$n,pure-full]}")
-  # SPINE-REDUCTION gate: fixed-input thunks ≤ full-merge thunks × threshold (the A1-band floor).
-  lte "${CS_TR[$n]}" "$CLASSSHARE_RATIO_MAX" \
-    || FAILURES+=("classShare spine gate: n=$n fixed/full thunks expected≤$CLASSSHARE_RATIO_MAX actual=${CS_TR[$n]} delta=$(delta "${CS_TR[$n]}" "$CLASSSHARE_RATIO_MAX") — spine reduction eroded below the A1 band")
+  # COST gate (re-based, den-hoag-r8y89): the fixed-input arm's OWN thunks; the ratio is printed.
+  gate "classShare: n=$n pure-fixed thunks (the spine reduction eroded, or the shared plane moved)" "${THUNKS[classShare,$n,pure-fixed]}" "${CLASSSHARE_FIXED_THUNKS_MAX[$n]:-}" "CLASSSHARE_FIXED_THUNKS_MAX[$n]"
 done
 # LINEARITY: both stacks stay linear in the core size (a quadratic core-merge blowup would fail here).
 CS_LIN_FULL=$(ratio "${THUNKS[classShare,$CLASSSHARE_BIG,pure-full]}" "${THUNKS[classShare,$CLASSSHARE_SMALL,pure-full]}")
@@ -1031,7 +1198,7 @@ lte "$CS_LIN_FIXED" "$GROWTH_MAX" \
 # its ratios are warm-vs-cold — a class of `overrides` edits over one base, cold re-merging the shared
 # registry per override, warm merging it ONCE (`prev`) and splicing it into each. It asserts the in-bench
 # BYTE gate (warm == cold byte-for-byte, the perf-scale twin of gen-merge's warm-vs-cold byte oracle),
-# gates the warm reuse (thunks AND alloc) against OVERRIDEWARM_RATIO_MAX, and owns its linearity check.
+# gates the warm arm's own thunks AND alloc (re-based, den-hoag-r8y89), and owns its linearity check.
 for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
   run_row overrideWarm "$n" cold warm
   # BYTE GATE (in-bench): the warm re-eval must be byte-identical to the cold from-scratch eval.
@@ -1044,11 +1211,9 @@ for n in "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG"; do
   OW_TR[$n]=$(ratio "${THUNKS[overrideWarm,$n,warm]}" "${THUNKS[overrideWarm,$n,cold]}")
   OW_AR[$n]=$(ratio "${ALLOC[overrideWarm,$n,warm]}" "${ALLOC[overrideWarm,$n,cold]}")
   OW_CR[$n]=$(ratio "${CPU[overrideWarm,$n,warm]}" "${CPU[overrideWarm,$n,cold]}")
-  # REUSE gate: warm thunks AND alloc ≤ cold × threshold (both deterministic, both reduce under reuse).
-  lte "${OW_TR[$n]}" "$OVERRIDEWARM_RATIO_MAX" \
-    || FAILURES+=("overrideWarm reuse gate: n=$n warm/cold thunks expected≤$OVERRIDEWARM_RATIO_MAX actual=${OW_TR[$n]} delta=$(delta "${OW_TR[$n]}" "$OVERRIDEWARM_RATIO_MAX") — warm reuse eroded")
-  lte "${OW_AR[$n]}" "$OVERRIDEWARM_RATIO_MAX" \
-    || FAILURES+=("overrideWarm reuse gate: n=$n warm/cold alloc expected≤$OVERRIDEWARM_RATIO_MAX actual=${OW_AR[$n]} delta=$(delta "${OW_AR[$n]}" "$OVERRIDEWARM_RATIO_MAX") — warm reuse eroded")
+  # COST gate (re-based, den-hoag-r8y89): the warm arm's OWN thunks and alloc; the ratios are printed.
+  gate "overrideWarm: n=$n warm thunks (warm reuse eroded, or the shared plane moved)" "${THUNKS[overrideWarm,$n,warm]}" "${OVERRIDEWARM_WARM_THUNKS_MAX[$n]:-}" "OVERRIDEWARM_WARM_THUNKS_MAX[$n]"
+  gate "overrideWarm: n=$n warm alloc (warm reuse eroded, or the shared plane moved)" "${ALLOC[overrideWarm,$n,warm]}" "${OVERRIDEWARM_WARM_ALLOC_MAX[$n]:-}" "OVERRIDEWARM_WARM_ALLOC_MAX[$n]"
 done
 # LINEARITY: both stacks stay linear in the registry size (a quadratic base merge would fail here).
 OW_LIN_COLD=$(ratio "${THUNKS[overrideWarm,$OVERRIDEWARM_BIG,cold]}" "${THUNKS[overrideWarm,$OVERRIDEWARM_SMALL,cold]}")
@@ -1079,10 +1244,8 @@ for fx in migrated sealed; do
     KM_TR[$fx,$n]=$(ratio "${THUNKS[kindMatch,$n,kind$sfx]}" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}")
     KM_AR[$fx,$n]=$(ratio "${ALLOC[kindMatch,$n,kind$sfx]}" "${ALLOC[kindMatch,$n,attrs-ref$sfx]}")
     KM_CR[$fx,$n]=$(ratio "${CPU[kindMatch,$n,kind$sfx]}" "${CPU[kindMatch,$n,attrs-ref$sfx]}")
-    lte "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}" \
-      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref thunks expected≤${KINDMATCH_THUNKS_MAX[$fx,$n]} actual=${KM_TR[$fx,$n]} delta=$(delta "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}") — the kind path costs more: the live gen-select per node, or a kind's mint price (gen-schema's mark, gen-identity's mint)")
-    lte "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}" \
-      || FAILURES+=("kindMatch ratio ($fx): n=$n kind/attrs-ref alloc expected≤${KINDMATCH_ALLOC_MAX[$fx,$n]} actual=${KM_AR[$fx,$n]} delta=$(delta "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}") — the kind path allocates more: the live gen-select per node, or a kind's mint price (gen-schema's mark, gen-identity's mint)")
+    gate "kindMatch ($fx): n=$n kind thunks (the live gen-select per node, a kind's mint price, or the data plane)" "${THUNKS[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_THUNKS_MAX[$fx,$n]:-}" "KINDMATCH_KIND_THUNKS_MAX[$fx,$n]"
+    gate "kindMatch ($fx): n=$n kind alloc (the live gen-select per node, a kind's mint price, or the data plane)" "${ALLOC[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_ALLOC_MAX[$fx,$n]:-}" "KINDMATCH_KIND_ALLOC_MAX[$fx,$n]"
   done
   for s in "attrs-ref$sfx" "kind$sfx"; do
     KM_LIN[$s]=$(ratio "${THUNKS[kindMatch,$KINDMATCH_BIG,$s]}" "${THUNKS[kindMatch,$KINDMATCH_SMALL,$s]}")
@@ -1099,8 +1262,8 @@ KM_PLANT_TR=$(ratio "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${THUNKS
 KM_PLANT_AR=$(ratio "${ALLOC[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${ALLOC[kindMatch,$KINDMATCH_SMALL,attrs-ref]}")
 [[ "${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}" == "${DIG[kindMatch,$KINDMATCH_SMALL,attrs-ref]}" ]] \
   || FAILURES+=("kindMatch arming: the planted per-node recompute selected a different node set (${DIG[kindMatch,$KINDMATCH_SMALL,kind-plant]}) — the plant no longer isolates cost")
-if lte "$KM_PLANT_TR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"; then
-  FAILURES+=("kindMatch arming: the planted per-node recompute read kind/attrs-ref thunks $KM_PLANT_TR ≤ ${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]} — the bound cannot see the class this row exists for")
+if [[ $(qcmp "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-}") != gt ]]; then
+  FAILURES+=("kindMatch arming: the planted per-node recompute read kind thunks ${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}, not above KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]=${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-} — the bound cannot see the class this row exists for")
 fi
 
 # ── threadedRegistry arming, every run: does the row reach the threaded path? ───────────────────
@@ -1147,10 +1310,8 @@ for fx in migrated sealed; do
     EM_TR[$fx,$n]=$(ratio "${THUNKS[entityMatch,$n,entity$sfx]}" "${THUNKS[entityMatch,$n,attrs-ref$sfx]}")
     EM_AR[$fx,$n]=$(ratio "${ALLOC[entityMatch,$n,entity$sfx]}" "${ALLOC[entityMatch,$n,attrs-ref$sfx]}")
     EM_CR[$fx,$n]=$(ratio "${CPU[entityMatch,$n,entity$sfx]}" "${CPU[entityMatch,$n,attrs-ref$sfx]}")
-    lte "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}" \
-      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref thunks expected≤${ENTITYMATCH_THUNKS_MAX[$fx,$n]} actual=${EM_TR[$fx,$n]} delta=$(delta "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}") — the entity path costs more per node (gen-schema's stamp, or gen-identity's per-mint price)")
-    lte "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}" \
-      || FAILURES+=("entityMatch ratio ($fx): n=$n entity/attrs-ref alloc expected≤${ENTITYMATCH_ALLOC_MAX[$fx,$n]} actual=${EM_AR[$fx,$n]} delta=$(delta "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}") — the entity path allocates more per node (gen-schema's stamp, or gen-identity's per-mint price)")
+    gate "entityMatch ratio ($fx): n=$n entity/attrs-ref thunks (gen-schema's stamp, or gen-identity's per-mint price)" "${THUNKS[entityMatch,$n,entity$sfx]}/${THUNKS[entityMatch,$n,attrs-ref$sfx]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]:-}" "ENTITYMATCH_THUNKS_MAX[$fx,$n]"
+    gate "entityMatch ratio ($fx): n=$n entity/attrs-ref alloc (gen-schema's stamp, or gen-identity's per-mint price)" "${ALLOC[entityMatch,$n,entity$sfx]}/${ALLOC[entityMatch,$n,attrs-ref$sfx]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]:-}" "ENTITYMATCH_ALLOC_MAX[$fx,$n]"
   done
   for s in "attrs-ref$sfx" "entity$sfx"; do
     EM_LIN[$s]=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_BIG,$s]}" "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,$s]}")
@@ -1165,7 +1326,7 @@ EM_PLANT_TR=$(ratio "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${
 EM_PLANT_AR=$(ratio "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" "${ALLOC[entityMatch,$ENTITYMATCH_SMALL,attrs-ref]}")
 [[ "${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}" == "$ENTITYMATCH_DIGEST_ENTITY" ]] \
   || FAILURES+=("entityMatch arming: the planted per-instance re-derivation selected a different node set (${DIG[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}) — the plant no longer isolates cost")
-if lte "$EM_PLANT_TR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"; then
+if [[ $(qcmp "${THUNKS[entityMatch,$ENTITYMATCH_SMALL,entity-plant]}/${THUNKS[entityMatch,$ENTITYMATCH_SMALL,attrs-ref]}" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]:-}") != gt ]]; then
   FAILURES+=("entityMatch arming: the planted per-instance re-derivation read entity/attrs-ref thunks $EM_PLANT_TR ≤ ${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]} — the bound cannot see the class this row exists for")
 fi
 
@@ -1186,10 +1347,8 @@ for fx in migrated sealed; do
     CM_TR[$fx,$n]=$(ratio "${THUNKS[coordMatch,$n,coord$sfx]}" "${THUNKS[coordMatch,$n,coord-ref$sfx]}")
     CM_AR[$fx,$n]=$(ratio "${ALLOC[coordMatch,$n,coord$sfx]}" "${ALLOC[coordMatch,$n,coord-ref$sfx]}")
     CM_CR[$fx,$n]=$(ratio "${CPU[coordMatch,$n,coord$sfx]}" "${CPU[coordMatch,$n,coord-ref$sfx]}")
-    lte "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}" \
-      || FAILURES+=("coordMatch ratio ($fx): n=$n coord/coord-ref thunks expected≤${COORDMATCH_THUNKS_MAX[$fx,$n]} actual=${CM_TR[$fx,$n]} delta=$(delta "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}") — the coordinate arm costs more: PER CELL (a kind read before the stamp decides) if the n=1600 excess over coord-ref is ~4× the n=400 excess, or a CONSTANT (per context or per selector; migrated n=400 has ~10 thunks of headroom) if the two are equal")
-    lte "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}" \
-      || FAILURES+=("coordMatch ratio ($fx): n=$n coord/coord-ref alloc expected≤${COORDMATCH_ALLOC_MAX[$fx,$n]} actual=${CM_AR[$fx,$n]} delta=$(delta "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}") — the coordinate arm allocates more: PER CELL (a per-cell kind projection) if the n=1600 excess over coord-ref is ~4× the n=400 excess, or a CONSTANT (per context or per selector; migrated n=400 has ~556 B of headroom) if the two are equal")
+    gate "coordMatch ($fx): n=$n coord thunks (PER CELL if the n=1600 excess over coord-ref is ~4× the n=400 excess, a CONSTANT if equal, the shared plane if coord-ref moved too)" "${THUNKS[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_THUNKS_MAX[$fx,$n]:-}" "COORDMATCH_COORD_THUNKS_MAX[$fx,$n]"
+    gate "coordMatch ($fx): n=$n coord alloc (PER CELL if the n=1600 excess over coord-ref is ~4× the n=400 excess, a CONSTANT if equal, the shared plane if coord-ref moved too)" "${ALLOC[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_ALLOC_MAX[$fx,$n]:-}" "COORDMATCH_COORD_ALLOC_MAX[$fx,$n]"
   done
   for s in "coord-ref$sfx" "coord$sfx"; do
     CM_LIN[$s]=$(ratio "${THUNKS[coordMatch,$COORDMATCH_BIG,$s]}" "${THUNKS[coordMatch,$COORDMATCH_SMALL,$s]}")
@@ -1212,8 +1371,7 @@ for n in "${RESOLUTION_SIZES[@]}"; do
   RS_TR[$n]=$(ratio "${THUNKS[resolution,$n,resolve]}" "${THUNKS[resolution,$n,query-orig]}")
   RS_AR[$n]=$(ratio "${ALLOC[resolution,$n,resolve]}" "${ALLOC[resolution,$n,query-orig]}")
   RS_CR[$n]=$(ratio "${CPU[resolution,$n,resolve]}" "${CPU[resolution,$n,query-orig]}")
-  lte "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}" \
-    || FAILURES+=("resolution ratio: n=$n resolve/query-orig thunks expected≤${RESOLUTION_THUNKS_MAX[$n]} actual=${RS_TR[$n]} delta=$(delta "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}") — the live walk costs more: per edge or per ⟨node, state⟩ if the n=1000 excess dominates, a constant (the lift, the WFL's construction) if only n=4..7 move")
+  gate "resolution ratio: n=$n resolve/query-orig thunks (per edge or per ⟨node, state⟩ if the n=1000 excess dominates, a constant if only n=4..7 move)" "${THUNKS[resolution,$n,resolve]}/${THUNKS[resolution,$n,query-orig]}" "${RESOLUTION_THUNKS_MAX[$n]:-}" "RESOLUTION_THUNKS_MAX[$n]"
 done
 # ARMING, every run: the witnesses control at n ≤ 7 must read super-linear (P2 pins it there).
 for n in "${RESOLUTION_WITNESSES_SIZES[@]}"; do
@@ -1267,7 +1425,7 @@ emit_report() {
       "${CR[$w,$n]}" "${TR[$w,$n]}" "${AR[$w,$n]}" "${PAR[$w,$n]}"
   done
   echo
-  printf '> Every ratio-gated row carries its OWN bound, derived from its measured anchor plus a margin smaller than the cheaper of the two constructions the one-engine consolidation introduced on it (the derivation is in perf-bench.sh beside each constant, the record in ci/README.md). wideFreeform thunks ride a parity band (gate ≤ %s) rather than a win-gate, because freeform absorption is thunk-parity with nixpkgs. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples). See ci/README.md.\n' "$WIDEFREEFORM_RATIO_MAX" "$REPS"
+  printf '> The ratios are printed to three places; the gates do not read them. Every ratio-gated row compares its two raw counters, NUM/DEN at full precision, EXACTLY and two-sidedly against its recorded bound (perf-bench.sh, beside each constant): above it is a regression, below it is a ratchet: owed in the same change. wideFreeform thunks are a parity band (WIDEFREEFORM_RATIO_MAX) rather than a win-gate, and ratchet like every other cost row. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of %s interleaved samples, collector off). See ci/README.md.\n' "$REPS"
   echo
   echo "### pure-only workloads (no reference arm; report-only counters, gated on linearity below)"
   echo
@@ -1290,12 +1448,12 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule moduleFanIn sameLocFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount moduleFanIn sameLocFanIn; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
   echo
-  echo "### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed, gate ≤ $CLASSSHARE_RATIO_MAX)"
+  echo "### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed; gated: pure-fixed thunks = CLASSSHARE_FIXED_THUNKS_MAX, the ratios printed)"
   echo
   echo "| n | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
@@ -1308,7 +1466,7 @@ emit_report() {
   printf 'thunk linearity (%s → %s, ×4 step): pure-full %s×, pure-fixed %s× (gate ≤ %s)\n' \
     "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" "$CS_LIN_FULL" "$CS_LIN_FIXED" "$GROWTH_MAX"
   echo
-  echo "### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm, gate ≤ $OVERRIDEWARM_RATIO_MAX on thunks + alloc)"
+  echo "### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm; gated: warm thunks + alloc = OVERRIDEWARM_WARM_{THUNKS,ALLOC}_MAX, the ratios printed)"
   echo
   echo "| n | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
@@ -1321,94 +1479,135 @@ emit_report() {
   printf 'thunk linearity (%s → %s, ×4 step): cold %s×, warm %s× (gate ≤ %s)\n' \
     "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" "$OW_LIN_COLD" "$OW_LIN_WARM" "$GROWTH_MAX"
   echo
-  echo "### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo "### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind; gated: kind thunks + alloc, exact, against their own bounds; the ratios printed)"
   echo
-  echo "| fixture | n | attrs-ref thunks | kind thunks | thunks k/a (≤) | alloc k/a (≤) | cpu k/a | byte gate |"
-  echo "|---|---|---:|---:|---:|---:|---:|---|"
+  echo "| fixture | n | attrs-ref thunks | kind thunks (bound) | kind alloc (bound) | thunks k/a | alloc k/a | cpu k/a | byte gate |"
+  echo "|---|---|---:|---:|---:|---:|---:|---:|---|"
   for fx in migrated sealed; do
     sfx=""
     [[ "$fx" == sealed ]] && sfx="-sealed"
     for n in "$KINDMATCH_SMALL" "$KINDMATCH_BIG"; do
-      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
-        "$fx" "$n" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}" "${THUNKS[kindMatch,$n,kind$sfx]}" \
-        "${KM_TR[$fx,$n]}" "${KINDMATCH_THUNKS_MAX[$fx,$n]}" "${KM_AR[$fx,$n]}" "${KINDMATCH_ALLOC_MAX[$fx,$n]}" "${KM_CR[$fx,$n]}" "${KM_BG[$fx,$n]}"
+      printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[kindMatch,$n,attrs-ref$sfx]}" "${THUNKS[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_THUNKS_MAX[$fx,$n]:-}" \
+        "${ALLOC[kindMatch,$n,kind$sfx]}" "${KINDMATCH_KIND_ALLOC_MAX[$fx,$n]:-}" "${KM_TR[$fx,$n]}" "${KM_AR[$fx,$n]}" "${KM_CR[$fx,$n]}" "${KM_BG[$fx,$n]}"
     done
   done
   echo
   printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, kind %s×, attrs-ref-sealed %s×, kind-sealed %s× (gate ≤ %s)\n' \
     "$KINDMATCH_SMALL" "$KINDMATCH_BIG" "${KM_LIN[attrs-ref]}" "${KM_LIN[kind]}" "${KM_LIN[attrs-ref-sealed]}" "${KM_LIN[kind-sealed]}" "$GROWTH_MAX"
-  printf 'arming (planted per-node recompute, n=%s): kind/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
-    "$KINDMATCH_SMALL" "$KM_PLANT_TR" "$KM_PLANT_AR" "${KINDMATCH_THUNKS_MAX[migrated,$KINDMATCH_SMALL]}"
+  printf 'arming (planted per-node recompute, n=%s): kind thunks %s (kind/attrs-ref %s, alloc %s) — must exceed KINDMATCH_KIND_THUNKS_MAX[migrated,%s] = %s\n' \
+    "$KINDMATCH_SMALL" "${THUNKS[kindMatch,$KINDMATCH_SMALL,kind-plant]}" "$KM_PLANT_TR" "$KM_PLANT_AR" "$KINDMATCH_SMALL" "${KINDMATCH_KIND_THUNKS_MAX[migrated,$KINDMATCH_SMALL]:-}"
   echo
-  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo "### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity; gated: the ratios, thunks + alloc, exact at full precision)"
   echo
-  echo "| fixture | n | attrs-ref thunks | entity thunks | thunks e/a (≤) | alloc e/a (≤) | cpu e/a | projection |"
+  echo "| fixture | n | attrs-ref thunks | entity thunks | thunks e/a | alloc e/a | cpu e/a | projection |"
   echo "|---|---|---:|---:|---:|---:|---:|---|"
   for fx in migrated sealed; do
     sfx=""
     [[ "$fx" == sealed ]] && sfx="-sealed"
     for n in "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG"; do
-      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
+      printf '| %s | %s | %s | %s | %s | %s | %s | %s |\n' \
         "$fx" "$n" "${THUNKS[entityMatch,$n,attrs-ref$sfx]}" "${THUNKS[entityMatch,$n,entity$sfx]}" \
-        "${EM_TR[$fx,$n]}" "${ENTITYMATCH_THUNKS_MAX[$fx,$n]}" "${EM_AR[$fx,$n]}" "${ENTITYMATCH_ALLOC_MAX[$fx,$n]}" "${EM_CR[$fx,$n]}" "${EM_BG[$fx,$n]}"
+        "${EM_TR[$fx,$n]}" "${EM_AR[$fx,$n]}" "${EM_CR[$fx,$n]}" "${EM_BG[$fx,$n]}"
     done
   done
   echo
   printf 'thunk linearity (%s → %s, ×4 step): attrs-ref %s×, entity %s×, attrs-ref-sealed %s×, entity-sealed %s× (gate ≤ %s)\n' \
     "$ENTITYMATCH_SMALL" "$ENTITYMATCH_BIG" "${EM_LIN[attrs-ref]}" "${EM_LIN[entity]}" "${EM_LIN[attrs-ref-sealed]}" "${EM_LIN[entity-sealed]}" "$GROWTH_MAX"
   printf 'arming (planted per-instance kind re-derivation, n=%s): entity/attrs-ref thunks %s, alloc %s — must exceed %s\n' \
-    "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]}"
+    "$ENTITYMATCH_SMALL" "$EM_PLANT_TR" "$EM_PLANT_AR" "$(qshow "${ENTITYMATCH_THUNKS_MAX[migrated,$ENTITYMATCH_SMALL]:-}")"
   echo
-  echo "### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord, per-fixture per-size bounds on thunks + alloc at anchor + 0.000)"
+  echo "### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord; gated: coord thunks + alloc, exact, against their own bounds; the ratios printed)"
   echo
-  echo "| fixture | n | coord-ref thunks | coord thunks | thunks c/r (≤) | alloc c/r (≤) | cpu c/r | projection |"
-  echo "|---|---|---:|---:|---:|---:|---:|---|"
+  echo "| fixture | n | coord-ref thunks | coord thunks (bound) | coord alloc (bound) | thunks c/r | alloc c/r | cpu c/r | projection |"
+  echo "|---|---|---:|---:|---:|---:|---:|---:|---|"
   for fx in migrated sealed; do
     sfx=""
     [[ "$fx" == sealed ]] && sfx="-sealed"
     for n in "$COORDMATCH_SMALL" "$COORDMATCH_BIG"; do
-      printf '| %s | %s | %s | %s | %s (%s) | %s (%s) | %s | %s |\n' \
-        "$fx" "$n" "${THUNKS[coordMatch,$n,coord-ref$sfx]}" "${THUNKS[coordMatch,$n,coord$sfx]}" \
-        "${CM_TR[$fx,$n]}" "${COORDMATCH_THUNKS_MAX[$fx,$n]}" "${CM_AR[$fx,$n]}" "${COORDMATCH_ALLOC_MAX[$fx,$n]}" "${CM_CR[$fx,$n]}" "${CM_BG[$fx,$n]}"
+      printf '| %s | %s | %s | %s (%s) | %s (%s) | %s | %s | %s | %s |\n' \
+        "$fx" "$n" "${THUNKS[coordMatch,$n,coord-ref$sfx]}" "${THUNKS[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_THUNKS_MAX[$fx,$n]:-}" \
+        "${ALLOC[coordMatch,$n,coord$sfx]}" "${COORDMATCH_COORD_ALLOC_MAX[$fx,$n]:-}" "${CM_TR[$fx,$n]}" "${CM_AR[$fx,$n]}" "${CM_CR[$fx,$n]}" "${CM_BG[$fx,$n]}"
     done
   done
   echo
   printf 'thunk linearity (%s → %s, ×4 step): coord-ref %s×, coord %s×, coord-ref-sealed %s×, coord-sealed %s× (gate ≤ %s)\n' \
     "$COORDMATCH_SMALL" "$COORDMATCH_BIG" "${CM_LIN[coord-ref]}" "${CM_LIN[coord]}" "${CM_LIN[coord-ref-sealed]}" "${CM_LIN[coord-sealed]}" "$GROWTH_MAX"
   echo
-  echo "### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, per-size thunk bounds at anchor + 0.000; alloc reported, gated by nothing)"
+  echo "### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, gated: the thunk ratio, exact at full precision; alloc reported, gated by nothing)"
   echo
-  echo "| n | query-orig thunks | resolve thunks | thunks r/q (≤) | alloc r/q | cpu r/q | byte gate |"
+  echo "| n | query-orig thunks | resolve thunks | thunks r/q | alloc r/q | cpu r/q | byte gate |"
   echo "|---|---:|---:|---:|---:|---:|---|"
   for n in "${RESOLUTION_SIZES[@]}"; do
-    printf '| %s | %s | %s | %s (%s) | %s | %s | %s |\n' \
+    printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
       "$n" "${THUNKS[resolution,$n,query-orig]}" "${THUNKS[resolution,$n,resolve]}" \
-      "${RS_TR[$n]}" "${RESOLUTION_THUNKS_MAX[$n]}" "${RS_AR[$n]}" "${RS_CR[$n]}" "${RS_BG[$n]}"
+      "${RS_TR[$n]}" "${RS_AR[$n]}" "${RS_CR[$n]}" "${RS_BG[$n]}"
   done
   echo
   printf 'arming (witnesses control, n=4..7 thunks): %s / %s / %s / %s; 6 → 7 step %s× (resolve %s×) — must exceed %s and resolve\n' \
     "${THUNKS[resolution,4,witnesses]}" "${THUNKS[resolution,5,witnesses]}" "${THUNKS[resolution,6,witnesses]}" "${THUNKS[resolution,7,witnesses]}" \
     "$RS_WIT_STEP" "$RS_RES_STEP" "$RESOLUTION_WITNESSES_GROWTH_MIN"
   echo
-  if [[ ${#FAILURES[@]} -eq 0 ]]; then
-    echo "ALL GATES PASSED (parity + ratio + linearity)"
-  elif [[ ${#AT_ORDER[@]} -gt 0 ]]; then
-    echo "CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on the CANDIDATE combination above, which this repository has not adopted:"
-    printf '  - %s\n' "${FAILURES[@]}"
-  else
-    echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed:"
-    printf '  - %s\n' "${FAILURES[@]}"
-  fi
+  local refs_v="DIFFER from" mems_v="differ from"
+  [[ "$REF_ID" == "$ANCHOR_REFERENCE" ]] && refs_v=match
+  [[ "$MEMBERS_ID" == "$ANCHOR_MEMBERS" ]] && mems_v=match
+  printf 'identity: evaluator "%s", allocator %s (anchor: "%s", %s); references %s the anchor; members %s ANCHOR_MEMBERS.\n' \
+    "$EVAL_ID" "$ALLOC_ID" "$ANCHOR_EVALUATOR" "$ANCHOR_ALLOCATOR" "$refs_v" "$mems_v"
+  echo
+  case $VERDICT in
+    0) echo "ALL GATES PASSED (parity + cost, exact + linearity)" ;;
+    1 | 6)
+      if [[ $VERDICT -eq 6 ]]; then
+        echo "CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on the CANDIDATE combination above, which this repository has not adopted:"
+      else
+        echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed:"
+      fi
+      printf '  - %s\n' "${FAILURES[@]}"
+      if [[ ${#RATCHETS[@]} -gt 0 ]]; then
+        echo "and ${#RATCHETS[@]} reading(s) fell below their bound:"
+        printf '  - %s\n' "${RATCHETS[@]}"
+      fi
+      ;;
+    7 | 9)
+      if [[ $VERDICT -eq 7 ]]; then
+        echo "RE-ANCHOR OWED — the evaluator, its allocator or a reference differs from the anchor, and the members ARE the anchored ones, so these readings are the new bounds. Record them with the identity line above (ANCHOR_EVALUATOR / ANCHOR_ALLOCATOR / ANCHOR_REFERENCE); nothing was gated on cost:"
+      else
+        echo "RE-ANCHOR BLOCKED — the evaluator, its allocator or a reference differs from the anchor AND the members differ from ANCHOR_MEMBERS, so a reading here would record a member move as the baseline. Re-run with \`--at K=rev:<rev>\` for every member below that differs, then record; nothing was gated on cost."
+        echo "  ANCHOR_MEMBERS: $ANCHOR_MEMBERS"
+        echo "  this run:       $MEMBERS_ID"
+      fi
+      printf '  %s\n' "${REANCHOR_LINES[@]}"
+      ;;
+    8)
+      echo "RATCHET OWED — no gate regressed, and ${#RATCHETS[@]} cost reading(s) fell BELOW their bound. The change that adopts this combination lowers each one, and writes ANCHOR_MEMBERS='$MEMBERS_ID':"
+      printf '  - %s\n' "${RATCHETS[@]}"
+      ;;
+  esac
 }
+
+# ── the verdict, decided BEFORE the report prints and before any splice (gate C4) ──
+# Precedence: a regression or a non-cost failure (parity, linearity, arming, an unmeasured gate) is
+# 1/6 whatever else holds; then an identity change, 7/9, under which no cost gate was judged; then
+# readings below their bounds, 8. A ratchet-only run is never a regression (gate C2).
+if [[ ${#FAILURES[@]} -gt 0 ]]; then
+  if [[ ${#AT_ORDER[@]} -gt 0 ]]; then VERDICT=6; else VERDICT=1; fi
+elif [[ -n $REANCHOR ]]; then
+  if [[ "$MEMBERS_ID" == "$ANCHOR_MEMBERS" ]]; then VERDICT=7; else VERDICT=9; fi
+elif [[ ${#RATCHETS[@]} -gt 0 ]]; then
+  VERDICT=8
+else
+  VERDICT=0
+fi
 
 emit_report | tee "$tmp/report.md"
 
 # ── optional: splice the report into a doc's marker block ─────────────────────
-# The FAILURES exit fires AFTER the splice — a failing run still records what it measured.
+# The FAILURES exit fires AFTER the splice — a failing run still records what it measured. A run
+# under another identity (7/9) splices NOTHING: its numbers are not a reading of the anchored bench.
 # Tables are spliced compact (`|---|---:|`); the repo's format-before-commit pass pads them to the
 # committed form, so run the formatter after an --update. Counters are deterministic, so a re-run then
 # diffs only the timing values inside the markers.
-if [[ -n "$UPDATE_FILE" ]]; then
+if [[ -n "$UPDATE_FILE" && $VERDICT -ne 7 && $VERDICT -ne 9 ]]; then
   # report.md opens with a blank line and closes on the gate summary; the trailing `print ""`
   # supplies the blank line mdformat wants before the closing HTML comment, so the spliced block
   # is already treefmt-clean.
@@ -1419,14 +1618,14 @@ if [[ -n "$UPDATE_FILE" ]]; then
   ' "$UPDATE_FILE" >"$UPDATE_FILE.tmp" && mv "$UPDATE_FILE.tmp" "$UPDATE_FILE"
 fi
 
-if [[ ${#FAILURES[@]} -ne 0 ]]; then
-  # The bounds are derived at the BASELINE anchor, so a candidate breaching one is a real,
-  # reportable fact about a combination the repository has not adopted — a different claim from
-  # "the published combination regressed", and it gets its own code rather than being folded in.
-  if [[ ${#AT_ORDER[@]} -gt 0 ]]; then
-    echo "perf-bench: CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on a candidate combination (see report above)" >&2
-    exit 6
-  fi
-  echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed (see report above)" >&2
-  exit 1
-fi
+# The bounds are derived at the BASELINE anchor, so a candidate breaching one is a real, reportable
+# fact about a combination the repository has not adopted — a different claim from "the published
+# combination regressed", and it gets its own code rather than being folded in.
+case $VERDICT in
+  1) echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed (see report above)" >&2 ;;
+  6) echo "perf-bench: CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on a candidate combination (see report above)" >&2 ;;
+  7) echo "perf-bench: RE-ANCHOR OWED — identity '$EVAL_ID' / '$ALLOC_ID' / references differ from the anchor at the anchored members; record the ${#REANCHOR_LINES[@]} readings above" >&2 ;;
+  8) echo "perf-bench: RATCHET OWED — ${#RATCHETS[@]} cost reading(s) below their bound and no regression; lower them in the adopting change (see report above)" >&2 ;;
+  9) echo "perf-bench: RE-ANCHOR BLOCKED — identity and members both moved; re-run at ANCHOR_MEMBERS before recording" >&2 ;;
+esac
+exit "$VERDICT"
