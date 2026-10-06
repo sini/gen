@@ -101,7 +101,9 @@ list, so an `inherits` change is priced per instance; pure-only, since the froze
 `deepSubmodule` (n replicated fixed-depth nested-submodule chains — the
 per-level engine recursion no flat-instance workload exercises), `wideFreeform` (n unknown sibling
 keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
-`moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
+`foreignMount` (n option roots on one stock nixpkgs `submodule`, each mounted by gen-merge's
+foreign-mount path, against nixpkgs `evalModules` over the same modules — den-hoag-gijly OQ2; before
+it no row reached the mount), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
 fold's length), `startup` (fixed cost, report-only).
 
@@ -164,8 +166,9 @@ n ∈ {4, 5, 6, 7, 100, 1000}. Its numerator is `resolve` (the live gen-scope `r
 FROZEN at `0db4e737` (`gen-graph-orig` in `ci/flake.nix`, the last revision before resolution moved
 into gen-scope), applied with the gen-prelude its own lock pins (`gen-prelude-orig`), so the denominator
 is frozen in full; its `query { mode = "all"; }` must reach the same nodes in the same order (the byte
-gate). Thunks are gated per n at anchor + 0.000; allocation is reported only, because the n ≤ 7 cells
-allocate under 211 KB and the run-to-run jitter crosses a printed step. A third stack, `witnesses`,
+gate). Thunks are gated per n, exactly; allocation is reported only (its old reason, the collector's
+run-to-run jitter, is gone since every cell runs with the collector off, but no alloc gate is built
+on this row). A third stack, `witnesses`,
 enumerates every simple path (NR-Cons) and is factorial in n: it runs at n ≤ 7 only, as the row's
 arming control on every run, and must step 6 → 7 by at least ×3 and by more than `resolve` does, or
 the instrument is broken and the row has no result.
@@ -176,21 +179,23 @@ Three gate families (thresholds at the top of `perf-bench.sh`):
 
 - **parity** — every cell's sha256 projection digest must match across stacks. Ties the perf
   corpus to the validation bar: a "fast but wrong" change cannot pass.
-- **ratio** (largest size per workload) — pure thunks/allocation ≤ **that row's own derived bound**
-  (deterministic evaluator counters). Each bound is its measured anchor plus a margin smaller than
-  the cheaper of the two constructions the one-engine consolidation introduced on that row and
-  counter; the derivation sits beside each constant in `perf-bench.sh` (`ROW_THUNKS_MAX` /
-  `ROW_ALLOC_MAX`) and the record is the 2026-09-21 baseline block below. `COUNTER_RATIO_MAX = 0.90`
-  survives only as the default for a workload nobody has derived yet, which is the "new den shapes"
-  path; no matrix row reads it. Headroom is deliberately NARROW — that is the point of the
-  derivation: a bound sitting well above its anchor absorbs a pure-side regression silently, and
-  four of the twelve bounds sit exactly AT their anchor, so any move of 0.001 is reported.
-  `wideFreeform` keeps its own named constant for THUNKS because its claim is different — a parity
+- **cost** (every cost row, den-hoag-r8y89) — EXACT and TWO-SIDED against that row's recorded bound,
+  which is its reading at the anchor identity (`ANCHOR_*` at the top of `perf-bench.sh`). A row whose
+  denominator is INDEPENDENT of gen (nixpkgs `ref`, or a rev-pinned frozen original: the matrix
+  rows, `wideFreeform`, `foreignMount`, `entityMatch`, `resolution`) gates its ratio as `NUM/DEN`, the
+  two raw counters compared by cross-multiplication; a row whose only control is gen itself
+  (`classShare`, `overrideWarm`, `kindMatch`, `coordMatch`) gates the guarded arm's OWN count, because
+  a shared-plane improvement moved a gen ÷ gen denominator and the ratio refused the optimization
+  (c3: coordMatch 1.000 → 1.001 with the excess a constant +398). There is no margin and no
+  tolerance (owner ruling P1 (i), 2026-10-05): above the bound is a regression, below it is
+  `ratchet:` (exit 8) until the bound is lowered in the same change. The 2026-09-21 derivations
+  beside each constant are the record of the former decimal bounds. `wideFreeform` keeps its own named constant for THUNKS because its claim is different — a parity
   band (`WIDEFREEFORM_RATIO_MAX`) rather than a win-gate, since freeform absorption rides the same
   per-key type merges nixpkgs.lib performs. Its real teeth are the linearity net, the thunk band,
   and the deterministic counters (see the baseline block below for the rationale).
 - **linearity** (pure side, ×4 size step) — thunk/alloc growth ≤ 5.5× (linear ≈ 4.0×, quadratic
-  ≥ 12×). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
+  ≥ 12×). A complexity-class threshold, not a cost, so it does not ratchet: removing a constant term
+  moves a linear row's growth UP toward 4.0 (c3 moved registry alloc growth 3.960 → 3.961). This is the net that would have caught the 2026-07-04 O(k²) `unique` key-union bug
   (fixed in gen-merge `976a87a`): pre-fix, scalar allocation grew ~11.5× over a 4× step.
 
 **cpu is measured, reported, and gated by nothing.** Each of the three families above reads a
@@ -221,6 +226,16 @@ this bench's to catch. A change that *claims* a wall-clock win is accepted under
 NULL-parity P1–P5 protocol (den-architecture, canreach-split spec §W), which is where wall-clock
 evidence is admissible. The split is deliberate: perf-bench does counter-based regression
 *detection*; §W does per-remedy wall-clock *acceptance*.
+
+★ **Four dedicated rows are RE-BASED** (den-hoag-r8y89): `classShare`, `overrideWarm`, `kindMatch` and
+`coordMatch` divide gen by gen over a shared plane (the reach census: each denominator forces live
+members), so they now gate the guarded arm's OWN count — `pure-fixed` thunks, `warm` thunks and alloc,
+`kind` and `coord` thunks and alloc, against `CLASSSHARE_FIXED_THUNKS_MAX`, `OVERRIDEWARM_WARM_*`,
+`KINDMATCH_KIND_*` and `COORDMATCH_COORD_*` — exactly and two-sidedly. The ratio bullets below describe
+the gates they replaced: those ratios are printed and gated by nothing, and `CLASSSHARE_RATIO_MAX`,
+`OVERRIDEWARM_RATIO_MAX`, `KINDMATCH_{THUNKS,ALLOC}_MAX` and `COORDMATCH_{THUNKS,ALLOC}_MAX` are gone.
+The byte and projection gates, the arming controls (kindMatch's now reads `kind-plant`'s thunks
+against `KINDMATCH_KIND_THUNKS_MAX[migrated,400]`) and linearity are unchanged.
 
 The `classShare` section adds its own two gates (own thresholds, not the pure/ref ones):
 
@@ -357,7 +372,8 @@ ruling 2026-09-28, ADR-0032 ruling 5). Unit 2 makes every nested tree an `nta` c
 0.000; ① is the 7516886 measurement, not re-derived. The anchor is read at gen-merge `0c49041`
 (arm (B), L5c, den-hoag-9d80v and den-hoag-1n12c, on the relock-38 mains). The loosening's licence is the reader-API spike
 (`den-ag-design/reports/den-hoag-n6dh7-reader-api-spike-v0.md`: no lever reaches 0.618 / 0.495) and
-the owner's reading. **The ratchet is mechanical:** `ROW_RATCHET` makes a reading BELOW the bound
+the owner's reading. **The ratchet is mechanical** (since den-hoag-r8y89 every cost row is a ratchet row and `ROW_RATCHET`
+is gone)**:** `ROW_RATCHET` made a reading BELOW the bound
 refuse as `ratchet:` until the bound is lowered to it in the same change, so the bound follows every
 reduction down and never moves up without a fresh owner reading. The gen-merge nesting-side rebuild
 (den-hoag-i4c0n, gen-merge `0010eb7` + `fa73591`: one discharge per nesting option, no freeform group without a
@@ -424,8 +440,10 @@ table: `deepSubmodule` +57%, `registry` +16%, `lazyRegistry` +16%, `wideFreeform
 against its 1.3 band — and `scalar` and `schemaHosts` had no absorption left at all, which is why
 they are the rows that reddened. That silent capacity is the defect this re-baseline removes.
 
-★ **Scope, stated because the headline is one-sided: every ratio gate in `perf-bench.sh` is an
-UPPER bound, and this re-baseline is a tightening on UPWARD moves only.** Nothing in this file
+★ **Scope, stated because the headline is one-sided** (as of 2026-09-21; since den-hoag-r8y89 every
+cost gate is two-sided, so a candidate whose counters go DOWN is refused as `ratchet:` until its bound
+falls with it — what the paragraph says about property suites still holds)**: every ratio gate in
+`perf-bench.sh` is an UPPER bound, and this re-baseline is a tightening on UPWARD moves only.** Nothing in this file
 refuses a candidate whose gated counters go DOWN — and a candidate that deletes a ruled property
 the perf corpus never evaluates gets *cheaper*, so it reads greener here, not redder. Raising
 `schemaHosts`' bound to 1.210 means such a candidate now also clears this gate, where the 0.90
@@ -635,13 +653,36 @@ fresh run; the workload is never deleted to make it pass.
 
 ### Updating thresholds / workloads
 
-Counters are deterministic per Nix version; the gates are ratios, so CI host speed does not
-matter. If a legitimate engine change shifts a ratio past a gate, update that row's bound in
-`perf-bench.sh` **in the same PR**, citing the new baseline table from the run output — never
+Counters are deterministic per evaluator identity — `nrThunks` always, `gc.totalBytes` because every
+cell runs with the collector off and every source sits at a `<hash>-source` store path of one length
+(`perf-bench.sh` header, with the measurements) — so CI host speed does not matter. Every cost gate
+is EXACT and TWO-SIDED, so every run ends in one of four states, each with its own exit code:
+
+- **0** — every cost reading EQUALS its bound.
+- **1** (6 for a `--at` candidate) — a regression: some reading is above its bound, or a parity,
+  linearity or arming gate failed. Raising a bound needs the five items below AND an owner reading
+  (owner ruling P1 (i), 2026-10-05: no per-row tolerance; the coordMatch +398 "constant overhead" is
+  the existing baseline, and any NEW growth, constant or not, fails).
+- **8** — RATCHET OWED: no regression, and at least one reading fell BELOW its bound. Each
+  `ratchet:` line names the assignment that lowers it. **The change that ADOPTS the improvement
+  carries the lowering** — for a member optimization that is the hub commit that moves the member's
+  pin (a relock commit), never a later, unrelated landing; `relock-all` reads 8 as "stop at the hub
+  and lower", not as a red of its dependents (den-hoag-2ffmc).
+- **7 / 9** — the evaluator, its allocator or a reference pin differs from `ANCHOR_*`, so NO cost
+  gate is judged (owner ruling P5 (i): the environment moved, not gen). At 7 the members are
+  `ANCHOR_MEMBERS` and the printed readings are recorded as the new bounds together with the new
+  identity — the one licensed raise of a bound without an owner reading. At 9 the members moved
+  too, so recording would launder a member move into the baseline: re-run with `--at K=rev:<rev>`
+  at `ANCHOR_MEMBERS` first, record, and let the member move be gated against the new anchor.
+
+Every change that writes a bound (a lowering, an owner-read raise, a re-anchor) writes
+`ANCHOR_MEMBERS` to the members it read at. **An edit to `perf-bench.nix` is an instrument change**:
+every cell's counters can move with it (adding one workload binding added one thunk to every cell),
+so its landing re-reads every bound at `ANCHOR_MEMBERS`, as den-hoag-r8y89's did, and says so. Never
 delete a workload to make a gate pass. New den shapes should be added to `perf-bench.nix` as they
 become hot in den-hoag (deep submodule nesting landed as `deepSubmodule`, wide freeform trees as
-`wideFreeform`); a new workload starts on the default `COUNTER_RATIO_MAX` and earns a derived bound
-of its own the first time someone measures what its cost is made of.
+`wideFreeform`, the foreign mount as `foreignMount`); a row with no recorded bound is refused as
+UNMEASURED, so a new workload's landing records its reading as its bound.
 
 **"Legitimate" is the load-bearing word, and it is defined here** (2026-09-21,
 `den-hoag-perfbench-564ad1c-jvkvp`). A ratio bound may be **loosened** only against **all five**:
@@ -669,10 +710,13 @@ of its own the first time someone measures what its cost is made of.
    deferred mechanisation of the cross-repository conjunction leaves **two** unmechanised arms, not
    one.
 
-**The rule is one-sided on purpose.** It licenses a bound to move UP; a bound moving DOWN is a
-tightening and needs no licence. Note what that does and does not cover: it governs the BOUND, not
-the CANDIDATE, and a candidate whose gated counters fall is not refused by anything in this file,
-except on a `ROW_RATCHET` row (`deepSubmodule`), where the bound must fall with it.
+**The licence is one-sided on purpose.** It licenses a bound to move UP; a bound moving DOWN is a
+tightening and needs no licence. The GATE is two-sided: a candidate whose gated counters fall is
+refused as `ratchet:` until the bound falls with it, on every cost row, so a hard-won optimization is
+preserved by the bound it lowered (owner sitting den-hoag-rwuqw, ruling 10 arm A). What a lowered
+bound cannot preserve, stated: on a re-based row (`classShare`, `overrideWarm`, `kindMatch`,
+`coordMatch`) a shared-plane gain landing together with a smaller arm-specific loss reads as one net
+fall and is ratcheted in; only the printed ratio shows the loss.
 
 Where the five cannot be produced, **the bound does not move and the change does not land**
 *(defaulted, reversible)*. Where they can, the loosening takes the recommendation and is banked for
