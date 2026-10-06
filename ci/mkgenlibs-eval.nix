@@ -640,7 +640,10 @@ let
     # `comparisonSubject`, the compared regime's subject. Nothing was removed.
     # gen-types 6orb8-u1 → 6orb8-u1b (den-hoag-6orb8 U1b): the surface gained ONE name, `stampOk`,
     # the completion stamp's reader a rebuilding boundary consults. Nothing was removed.
-    types = "3c410671814a37fa1678658e91113a74af40bdeaa328d1daf8ea2dc2419f8977";
+    # gen-types → 6orb8-a1 (den-hoag-6orb8 A1): the surface gained ONE name, `idOf`, the identity
+    # demand (a projection over `__mint` / `__sealed`) that replaced the retired `__id` field. Nothing
+    # was removed.
+    types = "14dc8e18ddba1ba25e1ece2f9216a4d593ffdcd470bc087f5369ecc721e7714b";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
