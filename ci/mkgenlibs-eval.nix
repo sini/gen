@@ -541,7 +541,7 @@ let
     # gen-merge f282ed0 → 652acc0 (relock 68, den-hoag-gi421): the surface gained ONE name,
     # `importedCarried`, the one reader of what a type wraps in either vocabulary. Nothing was
     # removed.
-    merge = "a9b0286daecbfbf45081ed0f65656ccc378f0c40b8499e97738ba0d757227aed";
+    merge = "2396c9f66fdfcff2557f1cd8bf667d92509c210281cf967dc38c8cb118aaec54";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
