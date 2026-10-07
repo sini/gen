@@ -183,24 +183,20 @@ folds ordered layers, least specific first, and keeps where each field's value c
 ```nix title="firewall-settings.nix"
 let
   gen = (builtins.getFlake "github:sini/gen").lib.mkGenLibs { };
-  schema = gen.settings.mkSchema {
-    aspect = {
-      name = "firewall";
-      id_hash = gen.identity.hashIdentity "aspect" [ "name" ] (label: { name = "firewall"; }.${label});
-    };
-    fields = {
-      allowedTCP = { default = [ 22 ]; merge = "append"; };
-      logLevel = { default = "warn"; };
-    };
+  firewall = {
+    name = "firewall";
+    id_hash = gen.identity.hashIdentity "aspect" [ "name" ] (label: { name = "firewall"; }.${label});
   };
-  result = gen.settings.resolveOne {
-    inherit schema;
-    layers = [
-      { scope = { env = "prod"; }; rendered = "prod"; via = null; value = { allowedTCP = [ 443 ]; }; }
-      { scope = { host = "web-1"; }; rendered = "web-1"; via = null;
-        value = { allowedTCP = [ 80 ]; logLevel = "info"; }; }
-    ];
+  schema = gen.settings.mkSchema firewall {
+    allowedTCP = { default = [ 22 ]; merge = "append"; };
+    logLevel = { default = "warn"; };
   };
+  # options first (`{ resolveRef; strict; }`, none here), then the schema, then the layers
+  result = gen.settings.resolveOne { } schema [
+    { scope = { env = "prod"; }; rendered = "prod"; via = null; value = { allowedTCP = [ 443 ]; }; }
+    { scope = { host = "web-1"; }; rendered = "web-1"; via = null;
+      value = { allowedTCP = [ 80 ]; logLevel = "info"; }; }
+  ];
 in
 { inherit (result) value; logLevelFrom = map (p: p.rendered) result.provenance.logLevel; }
 ```
