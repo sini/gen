@@ -93,7 +93,10 @@ registries), `threadedRegistry` (the same registry over nixpkgs `attrsWith` with
 gen-merge's threaded rebuild channel; its arming plant must fire on the pure arm only),
 `wrappedRegistry` (the same registry under nixpkgs `coercedTo` over the stack's own `attrsOf`, a
 container that adds no step, so the pure stack keys it at the option's root as the root is; a
-gen-merge without that arm cannot evaluate the row), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
+gen-merge without that arm cannot evaluate the row), `steppedRegistry` (the registry one step down: the
+instances in groups of 16 under a consumer's stepped `defineType` container, each group the stack's own
+`attrsOf`, which gen-merge keys as a container node; a gen-merge without that construction cannot
+evaluate the row), `schemaHosts` (gen-schema kind + instances; `id_hash` is minted and forced but kept out
 of the digest — the ADR-0016 excluded axis), `inheritHosts` (the same shape with a host kind inheriting
 two parents by name, on both gen-schema entry arms: the desugared parents ride every instance's module
 list, so an `inherits` change is priced per instance; pure-only, since the frozen reference predates
