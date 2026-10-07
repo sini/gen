@@ -88,11 +88,11 @@ aspect with key `hardware/cpu/intel`. Two aspects share a key only when they sit
 
 | Field | Contents |
 |---|---|
-| `nodes` | every aspect's id |
+| `nodes` | every aspect's id, and every anonymous declaration's: inline content written at an include position, keyed by where it was declared |
 | `parentOf` | each aspect's enclosing aspect, `null` for a top-level one |
-| `includesOf` | the includes that resolve to aspects in this set |
+| `includesOf` | the includes that resolve to aspects in this set, and an edge to each anonymous declaration's node |
 | `foreignIncludesOf` | `keyRef` references to aspects in another flake, left for federation to resolve |
-| `unresolvedIncludesOf` | positions in `includes` holding inline content instead of a reference |
+| `unresolvedIncludesOf` | positions in `includes` holding inline content that is no node: a named element, content past the depth budget, a guard record, a function, a deferred member |
 | `nodeData` | each aspect's value |
 
 A name in `includes` that matches no aspect fails with an error naming the aspect and the position:
