@@ -37,6 +37,7 @@
 {
   gen,
   lib,
+  lockedRepo,
 }:
 let
   # The roster of record, ADR-0015's own file, reached through the published surface rather than by
@@ -75,7 +76,7 @@ let
     let
       n = nodeOf l segs;
     in
-    if n == null then null else l.nodes.${n}.locked.repo or null;
+    if n == null then null else lockedRepo l.nodes.${n}.locked;
 
   # A reading over a lock: per member, the path it declares, the node it resolves to and that node's
   # repository, plus the verdict `repo == "gen-" + key`.
@@ -289,10 +290,10 @@ in
   report = {
     governs = "the hub's standalone entry (`default.nix`): which roster members it wires, and which repository's node each default resolves to";
     property = "the entry wires EVERY roster member, and each one defaults to a node of its own repository, at the member-scoped path [ <member> ]";
-    observable = "the member-to-path record the entry hands `wire`, resolved through the entry's OWN `resolve` binding against the ROOT `flake.lock`, compared on `locked.repo`";
+    observable = "the member-to-path record the entry hands `wire`, resolved through the entry's OWN `resolve` binding against the ROOT `flake.lock`, compared on the repository gen-harness `lockedRepo` reads from each node's `locked` (`repo`, or a `git` node's last `url` segment)";
     direction = "HERMETIC and EXACT over wiring; SILENT about building. Nothing is fetched and no member is forced, so a member that resolves correctly and then fails to evaluate is invisible here — that force is `mkgenlibs-eval`'s, which deepSeqs every roster member under `nix flake check ./ci`";
     domainSource = "`gen.lib.mkGenLibs { }`'s member keys minus `strata` — ADR-0015's roster of record — intersected with nothing and counted from nowhere else";
-    ceiling = "`locked.repo` is neither `owner` nor node/revision identity: a member repointed to a DIFFERENT node of the RIGHT repository passes here. The entry's declared path is the only statement of intent, so there is no independent expectation to compare a node against";
+    ceiling = "the repository name is neither `owner` nor node/revision identity: a member repointed to a DIFFERENT node of the RIGHT repository passes here. The entry's declared path is the only statement of intent, so there is no independent expectation to compare a node against";
 
     inherit (live)
       rows

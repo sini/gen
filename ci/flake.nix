@@ -315,6 +315,7 @@
       hubEntry = import ./hub-entry.nix {
         inherit (inputs) gen;
         inherit lib;
+        inherit (inputs.gen-harness.lib) lockedRepo;
       };
 
       # ── ci-declares-no-member — the one act that would re-form a ci copy of the pins ──
