@@ -54,10 +54,7 @@ let
     };
   };
 
-  projected = genDelivery.project {
-    inherit values cnf;
-    selectNodes = v: v.hosts;
-  };
+  projected = genDelivery.project { selectNodes = v: v.hosts; } cnf values;
 
   reflect = a: a;
   extra = {
@@ -67,16 +64,17 @@ let
   # THE HUB'S OWN WIRING — the consumer's node-keyed `gen.extraModules`, addressed to `nixos`.
   realizeHub =
     consumerExtras:
-    genDelivery.realize {
-      inherit projected;
-      terminals = {
+    genDelivery.realize
+      {
+        extraModules = {
+          nixos = consumerExtras;
+        };
+      }
+      {
         nixos = reflect;
         peer = reflect;
-      };
-      extraModules = {
-        nixos = consumerExtras;
-      };
-    };
+      }
+      projected;
   realized = realizeHub { alpha = [ extra ]; };
 
   forces = v: (builtins.tryEval (builtins.deepSeq v v)).success;
@@ -108,16 +106,17 @@ let
     # refusal discriminates from an unaddressed terminal-less class.
     node-keyed-extras-refuse =
       !(forces (
-        genDelivery.realize {
-          inherit projected;
-          terminals = {
+        genDelivery.realize
+          {
+            extraModules = {
+              alpha = [ extra ];
+            };
+          }
+          {
             nixos = reflect;
             peer = reflect;
-          };
-          extraModules = {
-            alpha = [ extra ];
-          };
-        }
+          }
+          projected
       ));
     # CONTROL, same instrument, same run — the addressed call evaluates, so the refusals above are the
     # addresses and not a fixture that throws on every call.

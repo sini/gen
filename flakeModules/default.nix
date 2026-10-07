@@ -225,10 +225,8 @@ let
     } nodeRegistryPath).here;
 
   projected = genDelivery.project {
-    values = composedCore.values;
-    cnf = cfg.aspectCnf;
     selectNodes = selectNodeRegistry;
-  };
+  } cfg.aspectCnf composedCore.values;
 
   composed = composedCore // {
     inherit (projected) aspects nodes;
@@ -299,11 +297,10 @@ let
   # interim module grows no contract, and a consumer wanting the layered surface uses gen-delivery
   # directly.
   realized = genDelivery.realize {
-    inherit projected terminals;
     extraModules = {
       nixos = cfg.extraModules;
     };
-  };
+  } terminals projected;
 in
 {
   options.gen = {
@@ -493,7 +490,7 @@ in
       readOnly = true;
       internal = true;
       default = realized;
-      defaultText = lib.literalExpression "genDelivery.realize { projected = <genDelivery.project { values; cnf = config.gen.aspectCnf; }>; inherit terminals; extraModules = { nixos = config.gen.extraModules; }; }";
+      defaultText = lib.literalExpression "genDelivery.realize { extraModules = { nixos = config.gen.extraModules; }; } terminals (genDelivery.project { selectNodes = <the node registry>; } config.gen.aspectCnf <values>)";
       description = ''
         The full class-major realize result (`{ <class>.<node> = artifact; }`) over `gen.terminals`.
         `flake.nixosConfigurations` is `realized.nixos or { }`; a consumer maps any other class off

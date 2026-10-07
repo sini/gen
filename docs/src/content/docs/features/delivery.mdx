@@ -35,21 +35,14 @@ let
       }
     ];
 
-  projected = gen.delivery.project {
-    values = declared.config;
-    inherit cnf;
-    selectNodes = values: values.services;
-  };
+  projected = gen.delivery.project { selectNodes = values: values.services; } cnf declared.config;
 
   # A data terminal: merge the class's modules into plain configuration, giving each module `node`.
   toData = { modules, bindings, ... }:
     (evalModuleTree { } ([ { freeformType = types.lazyAttrsOf types.anything; } ]
         ++ map (module: (gen.bind.wrap { bindings.node = bindings.node; } module).module) modules)).config;
 in
-gen.delivery.realize {
-  inherit projected;
-  terminals = { nixos = toData; terranix = toData; kubernetes = toData; };
-}
+gen.delivery.realize { } { nixos = toData; terranix = toData; kubernetes = toData; } projected
 ```
 
 ```console
@@ -78,8 +71,8 @@ values: the node's modules and its bindings. Here `node` is injected into each m
 
 | Feature | Functions and options | Purpose |
 |---|---|---|
-| Project | `delivery.project { values; cnf; selectNodes; deliveryClasses ? {}; instances ? {}; }` | Collect each node's modules per class from its aspects, keyed under the delivery class `deliveryClasses` names for a node's authored class (identity when absent); a reached parametric aspect through its `instances` |
-| Realise | `delivery.realize { projected; terminals; bindings?; refinements?; layerOrder?; extraModules?; }` | Call one terminal per class per node, and return `{ <class>.<node> = result; }` |
+| Project | `delivery.project { selectNodes; deliveryClasses ? {}; instances ? {}; } cnf values` | Collect each node's modules per class from its aspects, keyed under the delivery class `deliveryClasses` names for a node's authored class (identity when absent); a reached parametric aspect through its `instances` |
+| Realise | `delivery.realize { bindings?; refinements?; layerOrder?; extraModules?; } terminals projected` | Call one terminal per class per node, and return `{ <class>.<node> = result; }` |
 | Terminals | `bind.crossing.mkHostedTerminal`, `bind.crossing.mkOutputsTerminal` | Ready-made terminals for NixOS-style systems and for flake outputs |
 | Move content | `view.compositions.movement`, `carrier`, `scopeGraph`, `viewRelation` | Carry values along chosen edge labels, nearest source first |
 | See what lost | `.contributions`, `.shadowed`, `.withheld`, `.dropped` | Every value a view considered, and why each did or did not win |
@@ -150,19 +143,14 @@ let
       }
     ];
 
-  projected = gen.delivery.project {
-    values = result.config;
-    inherit cnf;
-    selectNodes = values: values.hosts;
-  };
+  projected = gen.delivery.project { selectNodes = values: values.hosts; } cnf result.config;
 in
-gen.delivery.realize {
-  inherit projected;
-  terminals.nixos = { name, modules, ... }:
+gen.delivery.realize { } {
+  nixos = { name, modules, ... }:
     "${name}: ${toString (builtins.length modules)} nixos modules";
-  terminals.terranix = { name, modules, ... }:
+  terranix = { name, modules, ... }:
     "${name}: ${toString (builtins.length modules)} terranix modules";
-}
+} projected
 ```
 
 ```console
@@ -175,7 +163,7 @@ $ nix eval --impure --json --file platform-delivery.nix
 
 `db-1` has no `terranix` content, so it does not appear under `terranix`.
 
-`selectNodes` names where your nodes live in `values`. It is required. Without it `project` fails:
+`selectNodes` names where your nodes live in `values`. It is an option with no default: a call that reads the nodes without it fails:
 
 ```
 gen-delivery: project: no node selector — `selectNodes` is required and has no default. It names WHICH resolved attrset of the caller's values holds the node instances.

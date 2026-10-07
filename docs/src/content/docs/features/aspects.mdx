@@ -65,7 +65,7 @@ graph data, so every query on [Graphs and Queries](/features/graphs/) runs over 
 | Identify | `key`, `aspectPath`, `pathKey` | The path-based identity of an aspect, such as `hardware/cpu/intel` |
 | Guard | `guard`, `pred`, `mkGuardVocab`, `applyGuard` | Include content only when a condition holds, with the condition and the body written as first-order terms |
 | Read the graph | `graphFacts cnf aspects`, `flatten` | Nodes, `includesOf`, `parentOf` and node data as plain attribute sets |
-| Federate | `link.link { sources; wire?; }`, `normalize`, `disjointUnion` | Combine aspect graphs from several flakes, keeping each node's origin |
+| Federate | `link.link { wire?; } sources`, `normalize`, `disjointUnion` | Combine aspect graphs from several flakes, keeping each node's origin |
 | Ports | `providesOf`, `requiresOf`, `checkCapability` | What an aspect graph offers and what it needs filled in |
 
 ## Details

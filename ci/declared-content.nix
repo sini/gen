@@ -91,10 +91,7 @@ let
   # baked the den word `hosts` into the substrate and projected `{ }` for every other spelling); the
   # hub builds it
   # from `gen.nodeRegistryPath`, and this fixture's registry is spelled `hosts`.
-  projected = genDelivery.project {
-    inherit values cnf;
-    selectNodes = v: v.hosts;
-  };
+  projected = genDelivery.project { selectNodes = v: v.hosts; } cnf values;
   entry = projected.aspects.web;
 
   # The RETIRED predicate, restated so the wrong-category arm is a discrimination rather than a
@@ -108,15 +105,11 @@ let
   tripwireTerminal = a: throw "gen ci declared-content: class terminal invoked for `${a.name}`";
   realizeWith =
     terminal:
-    genDelivery.realize {
-      inherit projected;
-      terminals = {
-        nixos = terminal;
-        metrics = terminal;
-        chan = terminal;
-      };
-      extraModules = { };
-    };
+    genDelivery.realize { extraModules = { }; } {
+      nixos = terminal;
+      metrics = terminal;
+      chan = terminal;
+    } projected;
   realized = realizeWith dataTerminal;
   realizedTripwire = realizeWith tripwireTerminal;
 
@@ -172,26 +165,19 @@ let
     # test that was removed, so it refuses by name rather than falling back.
     # `selectNodes` is given explicitly so `cnf` is the ONLY absence this refusal can be reporting —
     # since gen-delivery's node selector has no default there are two reachable refusals here, and
-    # without this the cell would assert *a* refusal without asserting which.
+    # without this the cell would assert *a* refusal without asserting which. `cnf` is a positional
+    # operand (den-hoag-7gp66 P2), so its absence is written as `null`, the absent state.
     absent-declaration-refuses =
-      !(forces (
-        genDelivery.project {
-          inherit values;
-          selectNodes = v: v.hosts;
-        }
-      ));
+      !(forces (genDelivery.project { selectNodes = v: v.hosts; } null values));
     # CONTROL, same call, same run — with the declaration it evaluates, so the refusal above is the
     # missing `cnf` and not a broken fixture.
     present-declaration-evaluates =
       forces
-        (genDelivery.project {
-          inherit values cnf;
-          selectNodes = v: v.hosts;
-        }).nodes;
+        (genDelivery.project { selectNodes = v: v.hosts; } cnf values).nodes;
 
     # ── THE HUB'S CALL SITE ──
     hub-calls-gen-delivery-project = occurs "genDelivery\\.project";
-    hub-passes-the-declaration = occurs "cnf = cfg\\.aspectCnf;";
+    hub-passes-the-declaration = occurs "cfg\\.aspectCnf composedCore\\.values";
     # ADR-0035 — the hub takes the node registry from the CONSUMER instead of spelling it `hosts`.
     # Lexical because `flakeModules.default` is a PATH this repository exports and only a consumer's
     # flake-parts eval runs its module (the file's header), so no value here can witness the call.

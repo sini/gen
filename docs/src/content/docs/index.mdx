@@ -277,21 +277,16 @@ let
   # The include edges, as graph data. `project` follows them itself.
   facts = gen.aspects.graphFacts cnf declared.config.aspects;
 
-  projected = gen.delivery.project {
-    values = declared.config;
-    inherit cnf;
-    selectNodes = v: v.hosts;
-  };
+  projected = gen.delivery.project { selectNodes = v: v.hosts; } cnf declared.config;
 
   # Each host's `nixos` modules, with `host` bound to that host's record.
-  realized = gen.delivery.realize {
-    inherit projected;
-    terminals.nixos =
+  realized = gen.delivery.realize { } {
+    nixos =
       { modules, bindings, ... }:
       (m.evalModuleTree { } ([
           { freeformType = t.lazyAttrsOf t.anything; }
         ] ++ map (mod: (gen.bind.wrap { bindings.host = bindings.node; } mod).module) modules)).config;
-  };
+  } projected;
 in
 {
   inherit (facts) includesOf;
