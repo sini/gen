@@ -481,7 +481,11 @@ let
     # gen-aspects 9043da6 → 52e73a9 (relock 61, den-hoag-gywcg): the surface gained ONE name,
     # `parsePath`, the inverse of the one injective path rendering `pathKey` (a rendered key back to its
     # segment list). Nothing was removed.
-    aspects = "9cbc93c7c7c67a7aa45020b750a6ff2d1e032d87a6123b888691a066a40dfba5";
+    # gen-aspects 9d29ae7 → dd46b38 (den-hoag-8hlo3 U2, anonymous declarations are nodes): the surface
+    # gained ONE name, `includeSitesOfInstance`, the include-site classifier keyed under an instance
+    # id (each content site's `target` is `<iid>/includes/<i>`), and LOST ONE, `includeSitesOfEntry`,
+    # which it replaces. No other member moved.
+    aspects = "c947f8d11c227cbcafc7ba5ec03e3c5bf0c578e6244d5662eb3ecf8c445f811e";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
