@@ -45,6 +45,9 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
+          # docs/public/.well-known/matrix is the Matrix delegation for gen.wtf;
+          # v5 drops dot-directories from the artifact unless asked.
+          include-hidden-files: true
 
   # Split from the build so pull requests get the build signal without a deploy.
   deploy:
