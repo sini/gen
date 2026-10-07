@@ -234,11 +234,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791297316,
-        "narHash": "sha256-hhtNTEOnDK8mAu5KRJ3cLLPzmhQjjK5hcHoc/ZH5pYo=",
+        "lastModified": 1791337664,
+        "narHash": "sha256-ogVtmKINFRuiJ6K+jKD6VQqLaUGpRLZ8nbAAzQIDdXA=",
         "owner": "sini",
         "repo": "gen-harness",
-        "rev": "c0ea2734feb04ac64802270a4ba481029e4f5e2b",
+        "rev": "79e1194de545446cad4802264c744b4f196114e4",
         "type": "github"
       },
       "original": {
@@ -416,16 +416,16 @@
         "nixpkgs-regression": "nixpkgs-regression"
       },
       "locked": {
-        "lastModified": 1790875667,
-        "narHash": "sha256-ldqXsv3UaPHCvvH0nlDvjNF7zM4wJmMjuyRy91/pVFM=",
+        "lastModified": 1791243198,
+        "narHash": "sha256-fuoqgE/DZMDByEYZyoOBNUxbf/JUMy2VLT8mFcYe0Fc=",
         "owner": "DeterminateSystems",
         "repo": "nix-src",
-        "rev": "8bb6b35147841a45b6dead93fc98339798d586f5",
+        "rev": "1ef903401b3426fbca74a692e158cca82d7c98ab",
         "type": "github"
       },
       "original": {
         "owner": "DeterminateSystems",
-        "ref": "v3.23.0",
+        "ref": "v3.23.1",
         "repo": "nix-src",
         "type": "github"
       }
