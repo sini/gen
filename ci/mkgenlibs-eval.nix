@@ -463,7 +463,10 @@ let
     # gen-algebra 18238b1 → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained ONE name,
     # `hasDeclaredSubject`, the reader of a registered construction's declared comparison subject.
     # Nothing was removed.
-    algebra = "332c5ee7a52cbf17801a9ed884fbcb2cf46ef04b055934c1ffdb7a5e121f2097";
+    # gen-algebra e62747f → f1d208b (relock 68, den-hoag-dg8d1): the surface gained TWO names,
+    # `hasMark` and `markOf`, the mark readers (decision and demand) beside `identityOf`. Nothing
+    # was removed.
+    algebra = "90c38511b4cdb3827057f22b53396798ab0918e1d3e4471dc84caae533372d61";
     # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
     # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
     # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
@@ -535,7 +538,10 @@ let
     # gen-merge c2405e0 → dd18d6b (relock 49, den-hoag-5kic): the surface gained ONE name,
     # `deriveType`, a type derived from a completed one and re-completed rather than overridden; it
     # is also `types.deriveType`. Nothing was removed.
-    merge = "785b14f78a6460742aa4571c107a85103acaa6eea841a0c30b4e4a2bb8259664";
+    # gen-merge f282ed0 → 652acc0 (relock 68, den-hoag-gi421): the surface gained ONE name,
+    # `importedCarried`, the one reader of what a type wraps in either vocabulary. Nothing was
+    # removed.
+    merge = "a9b0286daecbfbf45081ed0f65656ccc378f0c40b8499e97738ba0d757227aed";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -549,7 +555,9 @@ let
     # gen-prelude b2962cb → 0bed837 (relock 53, den-hoag-fyx6m): the surface gained ONE name,
     # `isStringLike`, vendored from nixpkgs `lib.isStringLike` for gen-types' `path` and `pathLike`.
     # Nothing was removed.
-    prelude = "d6145271c1d4a1f13db33a7ee2549662d6818a7fa5176a2deeeb0b1c308b96da";
+    # gen-prelude 7f80026 → fe448bb (relock 68, den-hoag-7jltk): the surface gained ONE name,
+    # `refusals`, the record of the text each door construct throws. Nothing was removed.
+    prelude = "edd90797fa5171dd1c62659587ca80eb1b2020d9f3f7e60bbf50fa4b257307f1";
     product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
     # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
     # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,

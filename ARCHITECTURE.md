@@ -122,6 +122,7 @@ flowchart TD
   gen_schema --> gen_identity
   gen_schema --> gen_merge
   gen_schema --> gen_prelude
+  gen_scope --> gen_algebra
   gen_scope --> gen_graph
   gen_scope --> gen_identity
   gen_scope --> gen_prelude
