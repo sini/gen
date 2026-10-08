@@ -72,7 +72,7 @@ that failed:
 ```nix
 gen.types.int.verify 22                              # null
 gen.types.int.verify "22"                            # "expected type 'int' but value \"22\" is of type 'string'"
-(gen.types.listOf gen.types.str).verify [ "deploy" 7 ]
+(gen.types.checkedListOf gen.types.str).verify [ "deploy" 7 ]
 # "in listOf<string> element: expected type 'string' but value 7 is of type 'int'"
 ```
 

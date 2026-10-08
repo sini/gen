@@ -83,7 +83,7 @@ gen-graph operates on materialized edge maps `{ id -> [id] }` rather than algebr
 
 gen-select's combinators compose the way graph expressions do:
 
-- `sel.and` and `sel.any` take a list of selectors and form their conjunction and disjunction. Both are associative and commutative, the laws overlay satisfies.
+- `sel.and` and `sel.anyOf` take a list of selectors and form their conjunction and disjunction. Both are associative and commutative, the laws overlay satisfies.
 - `sel.not` negates a selector.
 - Selectors combine without reference to the representation they are matched against. Adapters for scopes, graphs, registries and products supply the accessor interface, as graph expressions work over any `Graph` instance.
 

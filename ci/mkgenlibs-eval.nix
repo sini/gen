@@ -95,113 +95,173 @@ let
       binding = "buildNodes";
       cause = "a deliberate throwing tombstone for a retired constructor (gen-scope lib/build-nodes.nix, `── THE RETIRED NAME ──`). `buildRoots` returns `{ nodes, nodeOrder }` where this returned a bare node map, so a silent redirect would let every enumerating read answer `[ \"nodeOrder\" \"nodes\" ]` with no error: refusing the name means the call cannot be WRITTEN rather than being detected after it is";
       carrier = "OQ-1 of specs/2026-09-05-gen-hub-relock-migration-spec.md, ruled 2026-09-08";
+      successor = "buildRoots";
     }
     {
       member = "schema";
       binding = "ref";
       cause = "a deliberate throwing tombstone for a renamed type constructor (gen-schema lib/ref.nix, `── THE RETIRED NAME ──`). The type's values are declarations and `ref` names the use side, inverting Neron et al. 2015, so the constructor is `declarationOf` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (TERM ruling 2026-09-25, refused-by-name alias)";
+      successor = "declarationOf";
     }
     {
       member = "schema";
       binding = "fieldRef";
       cause = "a deliberate throwing tombstone for a renamed value constructor (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `mkFieldDeclaration` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "mkFieldDeclaration";
     }
     {
       member = "schema";
       binding = "isFieldRef";
       cause = "a deliberate throwing tombstone for a renamed predicate (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `isFieldDeclaration` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "isFieldDeclaration";
     }
     {
       member = "schema";
       binding = "fieldRefsIn";
       cause = "a deliberate throwing tombstone for a renamed scan (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationsIn` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "fieldDeclarationsIn";
     }
     {
       member = "schema";
       binding = "fieldRefMarker";
       cause = "a deliberate throwing tombstone for a renamed marker key (gen-schema lib/field-declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationMarker` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "fieldDeclarationMarker";
     }
     {
       member = "settings";
       binding = "ref";
       cause = "a deliberate throwing tombstone for a renamed value constructor (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `mkDeclaration` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "mkDeclaration";
     }
     {
       member = "settings";
       binding = "isRef";
       cause = "a deliberate throwing tombstone for a renamed predicate (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `isFieldDeclaration` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "isFieldDeclaration";
     }
     {
       member = "settings";
       binding = "refsIn";
       cause = "a deliberate throwing tombstone for a renamed scan (gen-settings lib/declaration.nix, `── THE RETIRED NAMES ──`). The value is a declaration (Neron et al. 2015) and the old name inverted that term, so it is `fieldDeclarationsIn` and the old name is refused by name, never silently aliased";
       carrier = "den-hoag-2zjg1 (Q1 \"a\" 2026-10-01; arm text \"keeping the old names as refused-by-name aliases\")";
+      successor = "fieldDeclarationsIn";
     }
     {
       member = "scope";
       binding = "query";
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the D<I<P selection is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "scope";
       binding = "queryAll";
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the every-witness gather is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "scope";
       binding = "ambiguous";
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the ambiguity test, redefined over distinct origins is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "scope";
       binding = "visibleFrom";
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the visible-declaration read is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "scope";
       binding = "queryReverse";
       cause = "a deliberate throwing tombstone for a surface retired by the one resolution calculus (gen-scope lib/resolve.nix, `RETIRED BY THE ONE CALCULUS`): the reverse-import gather, now the converse is `resolve` under a stated `wf` and `mode`, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "graph";
       binding = "query";
       cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): the labeled walk is gen-scope `resolve` over an evaluated scope (modes `all` / `paths` / `visible` are `reachable` / `witnesses` / `visible`), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "graph";
       binding = "regex";
       cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): a label expression is gen-scope `wellFormed`, built from a string or the published `wfl` constructors; the derivative engine is unpublished, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "graph";
       binding = "labeledFrom";
       cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): a graph to resolve over is lifted into a gen-scope evaluated scope, and a labeled record kept for `forgetLabels` / `labeledTranspose` / `cyclicEdgesWhere` is written as data, and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
     }
     {
       member = "graph";
       binding = "boundedBy";
       cause = "a deliberate throwing tombstone for a surface retired when gen-graph left the resolution calculus (gen-graph lib/default.nix, `RETIRED BY THE ONE CALCULUS`): boundary marks are read inside gen-scope `resolve` (each node declares `marks`, `bound` narrows, `withheld` names the mark, at the scopes `resolve` reached: a gen-graph `withheld` answered graph-total, including an edge withheld at a node the walk never visited, and gen-scope's does not), and the tombstone names that spelling, so an un-migrated call is refused where it is written rather than answering";
       carrier = "den-hoag-gayc D16, unit U3 (build spec 2026-09-28, owner-approved design; renamed exports keep refused-by-name aliases)";
+      successor = null;
+    }
+    {
+      member = "types";
+      binding = "listOf";
+      cause = "a deliberate throwing tombstone for a renamed checker (gen-types lib/default.nix, `── THE RETIRED NAMES ──`). A checker is a predicate over one value and gen-merge's `listOf` folds definitions across modules: two values of one sort with different meanings, so gen-merge keeps the nixpkgs-parity name and the checker is `checkedListOf`, the old name refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R10 rule 3, O4 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "checkedListOf";
+    }
+    {
+      member = "types";
+      binding = "attrsOf";
+      cause = "a deliberate throwing tombstone for a renamed checker (gen-types lib/default.nix, `── THE RETIRED NAMES ──`). A checker is a predicate over one value and gen-merge's `attrsOf` folds definitions across modules, so the checker is `checkedAttrsOf` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R10 rule 3, O4 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "checkedAttrsOf";
+    }
+    {
+      member = "types";
+      binding = "option";
+      cause = "a deliberate throwing tombstone for a renamed checker (gen-types lib/default.nix, `── THE RETIRED NAMES ──`). A checker is a predicate over one value and gen-merge's `option` is an option type, so the checker is `checkedOption` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R10 rule 3, O4 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "checkedOption";
+    }
+    {
+      member = "select";
+      binding = "any";
+      cause = "a deliberate throwing tombstone for a renamed selector constructor (gen-select lib/constructors.nix, `── THE RETIRED NAME ──`). gen-prelude's `any` is the list predicate and keeps the name by parity, so the disjunction is `anyOf` and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R10 rule 3, O5 provenance group defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "anyOf";
+    }
+    {
+      member = "product";
+      binding = "cell";
+      cause = "a deliberate throwing tombstone for a renamed addressing door (gen-product lib/default.nix, `── THE RETIRED NAMES ──`). A product's cell is the node a graph query takes, so the door takes the node's word, `nodeAt`, and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R8, O3 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "nodeAt";
+    }
+    {
+      member = "product";
+      binding = "cells";
+      cause = "a deliberate throwing tombstone for a renamed enumeration door (gen-product lib/default.nix, `── THE RETIRED NAMES ──`). A product's cell is the node a graph query takes, so the enumeration of node coordinates is `nodeCoordinates`, and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 L1 (grammar R8, O3 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
+      successor = "nodeCoordinates";
     }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 18;
+  retirementWidth = 24;
 
   ruledRetirement =
     let
@@ -210,6 +270,9 @@ let
         "binding"
         "cause"
         "carrier"
+        # The binding of the same member that replaces this one, or `null` for a name that retires
+        # with none (den-hoag-7gp66 rule S). A present `null` passes this presence check.
+        "successor"
       ];
       checked = map (
         x:
@@ -375,6 +438,61 @@ let
       s: retirementAt "${s}.${e.member}.${e.binding}" (buckets.${s}.${e.member} or null) e
     ) (bucketPathsOf e.member)
   ) ruledRetirement;
+
+  # ── rule C: every registered tombstone names a LIVE successor (den-hoag-7gp66 A3) ──
+  #
+  # Read from the register's `successor` field, never parsed from a throw message: prose is not data.
+  # A `null` successor is a retirement with none and is exempt by its value, not by a hand list. A
+  # successor is live when the member publishes it, it forces to WHNF, and it is not itself a
+  # registered tombstone of that member: a tombstone naming another tombstone sends its caller from
+  # one refusal to a second.
+  deadSuccessorsOf =
+    libs: entries:
+    map (e: "${e.member}.${e.binding}") (
+      builtins.filter (
+        e:
+        e.successor != null
+        && (
+          !((libs.${e.member} or { }) ? ${e.successor})
+          || !(builtins.tryEval (builtins.typeOf libs.${e.member}.${e.successor})).success
+          || builtins.any (r: r.member == e.member && r.binding == e.successor) entries
+        )
+      ) entries
+    );
+  successorDead = deadSuccessorsOf genLibs ruledRetirement;
+  # ARMING: one live successor, one planted entry whose successor is itself registered, one absent
+  # successor, and one retirement with none. Exactly the planted and the absent ones are named.
+  successorArming =
+    deadSuccessorsOf
+      {
+        alpha = {
+          new = 1;
+          old = throw "alpha: old";
+          older = throw "alpha: older";
+        };
+      }
+      [
+        {
+          member = "alpha";
+          binding = "old";
+          successor = "new";
+        }
+        {
+          member = "alpha";
+          binding = "older";
+          successor = "old";
+        }
+        {
+          member = "alpha";
+          binding = "oldest";
+          successor = "missing";
+        }
+        {
+          member = "alpha";
+          binding = "gone";
+          successor = null;
+        }
+      ];
 
   # ── the published export surface ──
   #
@@ -558,7 +676,10 @@ let
     # gen-prelude 7f80026 → fe448bb (relock 68, den-hoag-7jltk): the surface gained ONE name,
     # `refusals`, the record of the text each door construct throws. Nothing was removed.
     prelude = "edd90797fa5171dd1c62659587ca80eb1b2020d9f3f7e60bbf50fa4b257307f1";
-    product = "cc0703f389878e902f295bbb155ac4121f7889ba2f0c9ff4d14c9de06545ffbe";
+    # gen-product ba6d741 → bc29006 (den-hoag-7gp66 L1, grammar R8): the surface gained TWO names,
+    # `nodeAt` and `nodeCoordinates`; `cell` and `cells` became registered tombstones
+    # (retirementEntries above), so they are still published names. Nothing was removed.
+    product = "fd000f6b67fd6737cf3fd1875809d7b4d660b009841446a830ade49c95d0c5c3";
     # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
     # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,
     # `groundInstances`, which resolves a terms-only policy body at a context, and
@@ -627,7 +748,9 @@ let
     scope = "a5393968311a63822c332337c0fc5221c37d5c13430cc71942483f93576cc9eb";
     # gen-select 8ab4b1d → 37eccfc (relock 48, den-hoag-l0y U3): the surface gained ONE name, `subkind`,
     # the selector matching a kind or any subkind of it. Nothing was removed.
-    select = "5df8bc671b37fec1a92a3c159fab3a2575411430300a146cd90f3667e760dbeb";
+    # gen-select 96c3a97 → 8d04838 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained ONE
+    # name, `anyOf`; `any` became a registered tombstone. Nothing was removed.
+    select = "efd9370d9974310d71df8dd9accb959c04f4d59356e2d8b52fccbdba647b980b";
     # gen-settings 3449bfa → e7cafdd (den-hoag-2zjg1): the surface gained `mkDeclaration`,
     # `isFieldDeclaration` and `fieldDeclarationsIn`; `ref`, `isRef` and `refsIn` became registered
     # tombstones (retirementEntries above), so nothing was removed.
@@ -655,7 +778,10 @@ let
     # gen-types → 6orb8-a1 (den-hoag-6orb8 A1): the surface gained ONE name, `idOf`, the identity
     # demand (a projection over `__mint` / `__sealed`) that replaced the retired `__id` field. Nothing
     # was removed.
-    types = "14dc8e18ddba1ba25e1ece2f9216a4d593ffdcd470bc087f5369ecc721e7714b";
+    # gen-types 14c8936 → 2f9d4e8 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained THREE
+    # names, `checkedListOf`, `checkedAttrsOf` and `checkedOption`; `listOf`, `attrsOf` and `option`
+    # became registered tombstones. Nothing was removed.
+    types = "a2e30a02c2bfefea9f353bb83086bb061141488daa8d726178e4de1adaa268cb";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
@@ -1052,6 +1178,12 @@ in
     # ARMING — the pin's DOMAIN, the half `surfaceDrift` cannot see.
     arming-pin-covers-roster = pinDomain == memberKeys;
     retired-refusing = retirementFailed == [ ];
+    retirement-successor-live = successorDead == [ ];
+    arming-successor-names-dead =
+      successorArming == [
+        "alpha.older"
+        "alpha.oldest"
+      ];
     # ADR-0035 over the published names; the register admits by clause.
     surface-vocabulary = vocabularyUnregistered == [ ];
     vocabulary-register-live = vocabularyStale == [ ];
@@ -1093,6 +1225,8 @@ in
     "arming-drift-names-unpinned"
     "arming-pin-covers-roster"
     "retired-refusing"
+    "retirement-successor-live"
+    "arming-successor-names-dead"
     "surface-vocabulary"
     "vocabulary-register-live"
     "arming-vocabulary-names-planted"
@@ -1118,6 +1252,8 @@ in
     resolveFailed
     agreeFailed
     retirementFailed
+    successorDead
+    successorArming
     ;
   # ALIASED, not restated: the report's `inherit (g)` list takes an attribute of this LITERAL name, and
   # the binding above is `ruledRetirement`. The register prints on every run, including a run where it

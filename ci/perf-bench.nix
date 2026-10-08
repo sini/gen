@@ -1413,7 +1413,8 @@ let
         ]).config.hosts;
       ctx = P.mkContext (
         {
-          cellIds = names;
+          # the FROZEN reference still takes the field under its pre-grammar name (den-hoag-7gp66 R8)
+          ${if isRef then "cellIds" else "nodeIds"} = names;
           coordsFor = id: { host = hosts.${id}; };
         }
         // (if isRef then { } else { kinds.host = kH; })
