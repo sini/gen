@@ -101,14 +101,14 @@ g2 = {
   nodeData = id: hosts.${id};
 };
 
-graph.ancestorsOf { } g2 "host:web"   # [ "env:prod" ]
+graph.ancestorsOf g2 "host:web"   # [ "env:prod" ]
 ```
 
 `edges` and `parent` are two relations over the same node set, read by two accessors. A
 real graph can declare both, and more.
 
 Several gen-graph functions take an options set before the accessor record:
-`dependents`, `ancestorsOf`, `topoOrder`, `query` and `pathsBetween`. Pass `{ }` for the
+`dependents`, `topoOrder` and `pathsBetween`. Pass `{ }` for the
 defaults. Leaving it out fails with an error.
 
 ## The same model at any scale
