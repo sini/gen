@@ -461,7 +461,8 @@ let
     );
   successorDead = deadSuccessorsOf genLibs ruledRetirement;
   # ARMING: one live successor, one planted entry whose successor is itself registered, one absent
-  # successor, and one retirement with none. Exactly the planted and the absent ones are named.
+  # successor, one whose successor throws without being registered, and one retirement with none.
+  # Exactly the registered, the absent and the throwing ones are named, one per clause.
   successorArming =
     deadSuccessorsOf
       {
@@ -469,6 +470,7 @@ let
           new = 1;
           old = throw "alpha: old";
           older = throw "alpha: older";
+          broken = throw "alpha: broken";
         };
       }
       [
@@ -491,6 +493,12 @@ let
           member = "alpha";
           binding = "gone";
           successor = null;
+        }
+        # a successor that throws and is NOT registered: only the `tryEval` clause names it
+        {
+          member = "alpha";
+          binding = "stale";
+          successor = "broken";
         }
       ];
 
@@ -659,7 +667,10 @@ let
     # gen-merge f282ed0 → 652acc0 (relock 68, den-hoag-gi421): the surface gained ONE name,
     # `importedCarried`, the one reader of what a type wraps in either vocabulary. Nothing was
     # removed.
-    merge = "2396c9f66fdfcff2557f1cd8bf667d92509c210281cf967dc38c8cb118aaec54";
+    # gen-merge c1b2d1c → 946e84a (den-hoag-7gp66 L1, rebased onto gen-merge main 95123ec, which
+    # carries den-hoag-5ov3p): the surface gained ONE name, `partialSubmodule`, 5ov3p's partial
+    # submodule. Nothing was removed; the hash of the new list minus that name is the old line.
+    merge = "7d56c05a903c6840ce9c13ce7472908b8aa7c7f4512ed9ccd74e101006b3aa6b";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -748,7 +759,7 @@ let
     scope = "a5393968311a63822c332337c0fc5221c37d5c13430cc71942483f93576cc9eb";
     # gen-select 8ab4b1d → 37eccfc (relock 48, den-hoag-l0y U3): the surface gained ONE name, `subkind`,
     # the selector matching a kind or any subkind of it. Nothing was removed.
-    # gen-select 96c3a97 → 8d04838 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained ONE
+    # gen-select 96c3a97 → da73842 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained ONE
     # name, `anyOf`; `any` became a registered tombstone. Nothing was removed.
     select = "efd9370d9974310d71df8dd9accb959c04f4d59356e2d8b52fccbdba647b980b";
     # gen-settings 3449bfa → e7cafdd (den-hoag-2zjg1): the surface gained `mkDeclaration`,
@@ -778,7 +789,7 @@ let
     # gen-types → 6orb8-a1 (den-hoag-6orb8 A1): the surface gained ONE name, `idOf`, the identity
     # demand (a projection over `__mint` / `__sealed`) that replaced the retired `__id` field. Nothing
     # was removed.
-    # gen-types 14c8936 → 2f9d4e8 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained THREE
+    # gen-types 14c8936 → d3e5203 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained THREE
     # names, `checkedListOf`, `checkedAttrsOf` and `checkedOption`; `listOf`, `attrsOf` and `option`
     # became registered tombstones. Nothing was removed.
     types = "a2e30a02c2bfefea9f353bb83086bb061141488daa8d726178e4de1adaa268cb";
@@ -1183,6 +1194,7 @@ in
       successorArming == [
         "alpha.older"
         "alpha.oldest"
+        "alpha.stale"
       ];
     # ADR-0035 over the published names; the register admits by clause.
     surface-vocabulary = vocabularyUnregistered == [ ];
