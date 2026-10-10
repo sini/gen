@@ -89,6 +89,11 @@ let
   # AN ENTRY KEYS TO A BINDING — a `member` and the `binding` it publishes — AND NEVER TO A `file:line`.
   # A positional key is invalidated by the very act the register exists to survive: a pin bump moves
   # the lines in the file it would name.
+  #
+  # A `binding` and a `successor` are NAME-PATHS, keyed as gen-harness's `rootSurface.retired` keys
+  # them (den-hoag-o6b81): a top-level name is its own path, and a nested one is `"show.cell"`, each
+  # segment rendered as nixpkgs `showAttrPath` renders it. A path is compared by its rendering and
+  # never parsed (`render`, `lookupPath` and `minusPaths` below).
   retirementEntries = [
     {
       member = "scope";
@@ -258,10 +263,24 @@ let
       carrier = "den-hoag-7gp66 L1 (grammar R8, O3 defaulted 2026-10-07; old names stay as refused-by-name aliases)";
       successor = "nodeCoordinates";
     }
+    {
+      member = "product";
+      binding = "show.cell";
+      cause = "a deliberate throwing tombstone for a renamed display helper (gen-product lib/show.nix, `── THE RETIRED NAME ──`). A product's cell is the node a graph query takes, so the helper that names one in a refusal takes the node's word, `show.node`, and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-7gp66 P3 trailing row 15 (grammar R8; old names stay as refused-by-name aliases), admissible below the top level by den-hoag-o6b81";
+      successor = "show.node";
+    }
+    {
+      member = "aspects";
+      binding = "includeSitesOfEntry";
+      cause = "a deliberate throwing tombstone for a renamed include-site classifier (gen-aspects lib/default.nix, `── THE RETIRED NAME ──`). Anonymous include content became nodes keyed by declaration address (den-hoag-8hlo3 U2), so the classifier takes the instance id the content is keyed under, `includeSitesOfInstance cnf aspects iid entry`, and the old name is refused by name, never silently aliased";
+      carrier = "den-hoag-4akh9 (law batch v1 C9, ADR-0011's rider: a renamed export keeps a refused-by-name alias during migration)";
+      successor = "includeSitesOfInstance";
+    }
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 24;
+  retirementWidth = 26;
 
   ruledRetirement =
     let
@@ -270,7 +289,7 @@ let
         "binding"
         "cause"
         "carrier"
-        # The binding of the same member that replaces this one, or `null` for a name that retires
+        # The binding path of the same member that replaces this one, or `null` for a name that retires
         # with none (den-hoag-7gp66 rule S). A present `null` passes this presence check.
         "successor"
       ];
@@ -291,6 +310,59 @@ let
       throw "mkgenlibs-eval: the retirement register holds ${toString (builtins.length checked)} entries; its ruled width is ${toString retirementWidth}. A further entry is a NEW RULING and takes this line with it.";
 
   retiredIn = k: map (e: e.binding) (builtins.filter (e: e.member == k) ruledRetirement);
+
+  # nixpkgs `lib.strings.escapeNixIdentifier`, the segment rendering of `showAttrPath`, as
+  # gen-harness `root-surface.nix` renders a `retired` key.
+  seg =
+    n:
+    if builtins.match "[a-zA-Z_][a-zA-Z0-9_'-]*" n != null then
+      n
+    else
+      builtins.replaceStrings [ "$" ] [ "\\$" ] (builtins.toJSON n);
+  render = p: n: if p == "" then seg n else "${p}.${seg n}";
+  # `k` lies strictly under the rendered path `q`. `seg` is prefix-free, so at most one name of a
+  # namespace renders as `k` or as a path `k` lies under.
+  under = q: k: builtins.substring 0 (builtins.stringLength q + 1) k == "${q}.";
+  # The value at the rendered path `k`, forcing only the namespaces on the way, each under
+  # `tryEval`: a path through a throwing or non-attrset value is not found.
+  lookupPath =
+    p: v: k:
+    let
+      hits = builtins.filter (n: render p n == k || under (render p n) k) (builtins.attrNames v);
+      n = builtins.head hits;
+      t = builtins.tryEval v.${n};
+    in
+    if !(builtins.isAttrs v) || hits == [ ] then
+      { found = false; }
+    else if render p n == k then
+      {
+        found = true;
+        value = v.${n};
+      }
+    else if t.success && builtins.isAttrs t.value then
+      lookupPath (render p n) t.value k
+    else
+      { found = false; };
+  # `v` minus the rendered paths `ks`, by `removeAttrs` at each level the paths reach: every value the
+  # narrowing keeps is the same value, so `agree`'s `==` still compares a kept member by identity.
+  minusPaths =
+    p: ks: v:
+    let
+      names = builtins.attrNames v;
+      drop = builtins.filter (n: builtins.elem (render p n) ks) names;
+      into = builtins.filter (n: !(builtins.elem n drop) && builtins.any (under (render p n)) ks) names;
+    in
+    builtins.removeAttrs v drop
+    // builtins.listToAttrs (
+      map (n: {
+        name = n;
+        value =
+          let
+            x = v.${n};
+          in
+          if builtins.isAttrs x then minusPaths (render p n) ks x else x;
+      }) into
+    );
   # `removeAttrs` on a NON-ATTRSET raises an error `tryEval` does not catch, so the unguarded form
   # aborts the whole check UNNAMED on exactly the input `surfaceOf`'s non-attrset branch exists to
   # NAME. `r == [ ]` is the identity for the unregistered members: their values reach the arms
@@ -301,7 +373,7 @@ let
     let
       r = retiredIn k;
     in
-    if r == [ ] then v else builtins.removeAttrs v r;
+    if r == [ ] then v else minusPaths "" r v;
 
   # Force each key: deepSeq the lib's top-level attrset + values to WHNF — catches a broken import
   # wiring (missing dep arg, dep-signature drift) WITHOUT calling into each function. tryEval turns a
@@ -418,9 +490,12 @@ let
   # wide and it is recorded here rather than left to be discovered.
   retirementAt =
     label: v: e:
-    if !(builtins.isAttrs v) || !(v ? ${e.binding}) then
+    let
+      l = lookupPath "" v e.binding;
+    in
+    if !l.found then
       [ "${label}: registered, and the binding is absent" ]
-    else if (builtins.tryEval (builtins.deepSeq v.${e.binding} true)).success then
+    else if (builtins.tryEval (builtins.deepSeq l.value true)).success then
       [ "${label}: registered, and the binding forces cleanly" ]
     else
       [ ];
@@ -453,8 +528,11 @@ let
         e:
         e.successor != null
         && (
-          !((libs.${e.member} or { }) ? ${e.successor})
-          || !(builtins.tryEval (builtins.typeOf libs.${e.member}.${e.successor})).success
+          let
+            l = lookupPath "" (libs.${e.member} or { }) e.successor;
+          in
+          !l.found
+          || !(builtins.tryEval (builtins.typeOf l.value)).success
           || builtins.any (r: r.member == e.member && r.binding == e.successor) entries
         )
       ) entries
@@ -471,6 +549,10 @@ let
           old = throw "alpha: old";
           older = throw "alpha: older";
           broken = throw "alpha: broken";
+          ns = {
+            new = 1;
+            old = throw "alpha: ns.old";
+          };
         };
       }
       [
@@ -499,6 +581,17 @@ let
           member = "alpha";
           binding = "stale";
           successor = "broken";
+        }
+        # paths one namespace down: a live nested successor, and one absent under a live namespace
+        {
+          member = "alpha";
+          binding = "ns.old";
+          successor = "ns.new";
+        }
+        {
+          member = "alpha";
+          binding = "ns.older";
+          successor = "ns.missing";
         }
       ];
 
@@ -614,7 +707,10 @@ let
     # gained ONE name, `includeSitesOfInstance`, the include-site classifier keyed under an instance
     # id (each content site's `target` is `<iid>/includes/<i>`), and LOST ONE, `includeSitesOfEntry`,
     # which it replaces. No other member moved.
-    aspects = "c947f8d11c227cbcafc7ba5ec03e3c5bf0c578e6244d5662eb3ecf8c445f811e";
+    # gen-aspects 75e0acd → b2f4313 (relock 72, den-hoag-4akh9 5435ffa): the surface gained ONE name
+    # back, `includeSitesOfEntry`, as a registered throwing tombstone naming `includeSitesOfInstance`
+    # (law batch v1 C9). Nothing was removed; the hash of the new list minus that name is the old line.
+    aspects = "a5a425058c750c2367ca4cfb98cce8cd825c298a426a86b401790b81aaa89506";
     assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
     bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
     class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
@@ -670,7 +766,10 @@ let
     # gen-merge c1b2d1c → 946e84a (den-hoag-7gp66 L1, rebased onto gen-merge main 95123ec, which
     # carries den-hoag-5ov3p): the surface gained ONE name, `partialSubmodule`, 5ov3p's partial
     # submodule. Nothing was removed; the hash of the new list minus that name is the old line.
-    merge = "7d56c05a903c6840ce9c13ce7472908b8aa7c7f4512ed9ccd74e101006b3aa6b";
+    # gen-merge 425e522 → 7a55c1f (relock 72, den-hoag-m19bm b7e58df): the surface gained ONE name,
+    # `mkDefinition`, nixpkgs' definition record, a definition in its own file. Nothing was removed;
+    # the hash of the new list minus that name is the old line.
+    merge = "2e0d8e07845bdadabc83bf5e2c6302fa7c118a7ce9a1892ad07f0d5e8e1f4bb1";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -1195,6 +1294,7 @@ in
         "alpha.older"
         "alpha.oldest"
         "alpha.stale"
+        "alpha.ns.older"
       ];
     # ADR-0035 over the published names; the register admits by clause.
     surface-vocabulary = vocabularyUnregistered == [ ];

@@ -589,10 +589,10 @@ n=1600).
 it. `moduleFanIn` declares each loc twice, so it never reaches the length of the per-loc declaration
 fold; this row does: a typed redeclaration step that answers "am I the last typed declaration" by
 scanning the loc's sites is O(n) per step, so the loc costs O(n²) (den-hoag-bem8u; reverting that alone
-reads 12.3× thunks / 13.0× alloc per ×4 step against the 5.5× bound). Gated on linearity only, not on
-the pure/ref ratio and not on parity of a constant: pure/ref reads about 2.0 thunks and 2.3 alloc at
-n=1600, and that constant against nixpkgs comes from the checked pair merge each declaration pays, not
-from the per-loc fold, so a ratio gate would red it for a cause this row does not measure.
+reads 12.3× thunks / 13.0× alloc per ×4 step against the 5.5× bound). Gated on its pure/ref thunk and
+alloc marginals and its load, like every other cost row, and on linearity: the constant against nixpkgs
+is the cost each declaration pays in the fold (its redeclaration step and its declared-type fold step),
+which is this row's own subject (den-hoag-c7uhw: 0.897 in thunks per instance where it was armed).
 
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the

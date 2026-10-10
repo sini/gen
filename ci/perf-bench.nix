@@ -837,9 +837,9 @@ let
   # whether it is the last typed declaration; a step that answers that by scanning the loc's declaring
   # sites is O(n) per step, so O(n²) here and nowhere else in the matrix (den-hoag-bem8u).
   # moduleFanIn declares each loc twice, so it never reaches the per-loc fold's length.
-  # Gated on linearity only: the 2-2.5x constant against nixpkgs (pure/ref) comes from the checked pair
-  # merge each declaration pays, not from the per-loc fold this row meters, so a ratio gate would red it
-  # for a cause the row does not measure.
+  # Gated on its pure/ref marginals and its load, like every other cost row, and on linearity. The
+  # constant against nixpkgs is the cost each declaration pays in that fold (its redeclaration step and
+  # its declared-type fold step), which is this row's own subject (den-hoag-c7uhw).
   sameLocFanIn =
     P:
     let
