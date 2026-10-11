@@ -769,7 +769,11 @@ let
     # gen-merge 425e522 → 7a55c1f (relock 72, den-hoag-m19bm b7e58df): the surface gained ONE name,
     # `mkDefinition`, nixpkgs' definition record, a definition in its own file. Nothing was removed;
     # the hash of the new list minus that name is the old line.
-    merge = "2e0d8e07845bdadabc83bf5e2c6302fa7c118a7ce9a1892ad07f0d5e8e1f4bb1";
+    # gen-merge 7a55c1f → b4b4688 (relock 73; den-hoag-60hql Part C 175db64, den-hoag-7gp66 row 16
+    # 131b802, den-hoag-we9fu 9aaae99): the surface gained ONE name, `importedTypeWalkFuel`, the
+    # type-walk bound gen-schema's deferral reads. Nothing was removed; the hash of the new list minus
+    # that name is the old line.
+    merge = "8347a1ac5e96b29ccaf94dfa24ac2ef1885f88db0501ab230c17e73beef0f44c";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -891,7 +895,10 @@ let
     # gen-types 14c8936 → d3e5203 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained THREE
     # names, `checkedListOf`, `checkedAttrsOf` and `checkedOption`; `listOf`, `attrsOf` and `option`
     # became registered tombstones. Nothing was removed.
-    types = "a2e30a02c2bfefea9f353bb83086bb061141488daa8d726178e4de1adaa268cb";
+    # gen-types 4af4858 → 5641f5e (relock 73, den-hoag-7gp66 row 16 2c24316): the surface gained ONE
+    # name, `typeWitness`, the witness declaration a boundary ties on a record it builds. Nothing was
+    # removed; the hash of the new list minus that name is the old line.
+    types = "bdda4894fc71465ffc7ac14a66b47e0f7968d186647d4ef937aa315889b77ca3";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
