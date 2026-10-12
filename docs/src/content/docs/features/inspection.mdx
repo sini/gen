@@ -42,7 +42,10 @@ let
   program = gen.program.program (builtins.attrNames register.host ++ builtins.attrNames register.env) declarations;
   model = gen.program.model { inherit program; interpretation = [ ]; prior = null; complete = true; };
 in
-gen.inspect.mkInspector { inherit register relations declarations model; }
+gen.inspect.mkInspector {
+  inherit register relations declarations model;
+  minted = { nodes = { }; edges = [ ]; };
+}
 ```
 
 ```console
@@ -56,20 +59,26 @@ one derived edge exists:
 
 ```console
 $ nix eval --impure --json --file platform-inspector.nix \
-    --apply 'i: (i.why "reaches:web-1:db-1").derivations'
-[{
-  "fired": [
-    {"atom": "runsIn:web-1:prod", "sign": "pos", "verdict": "true"},
-    {"atom": "runsIn:db-1:prod", "sign": "pos", "verdict": "true"},
-    {"atom": "maintenance:db-1:prod", "sign": "neg", "verdict": "false"}
-  ],
-  "rule": {
-    "head": "reaches:web-1:db-1",
-    "neg": ["maintenance:db-1:prod"],
-    "pos": ["runsIn:web-1:prod", "runsIn:db-1:prod"]
-  }
-}]
+    --apply 'i: i.why "reaches:web-1:db-1"'
+{
+  "derivations": [{
+    "fired": [
+      {"atom": "runsIn:web-1:prod", "sign": "pos", "verdict": "true"},
+      {"atom": "runsIn:db-1:prod", "sign": "pos", "verdict": "true"},
+      {"atom": "maintenance:db-1:prod", "sign": "neg", "verdict": "false"}
+    ],
+    "rule": {
+      "head": "reaches:web-1:db-1",
+      "neg": ["maintenance:db-1:prod"],
+      "pos": ["runsIn:web-1:prod", "runsIn:db-1:prod"]
+    }
+  }],
+  "kind": "rule"
+}
 ```
+
+`kind = "rule"` says a rule program produced the edge. An edge you declared by hand answers with
+`kind = "declaration"` and the site that declared it instead of `derivations`.
 
 The rule fired because both positive conditions are true and the negative one is false.
 
@@ -77,7 +86,7 @@ The rule fired because both positive conditions are true and the negative one is
 
 | Feature | Functions | Purpose |
 |---|---|---|
-| Load a graph | `inspect.mkInspector { register; relations; declarations; model; }` | One set of facts from nodes, declared edges and solved rules |
+| Load a graph | `inspect.mkInspector { register; relations; declarations; model; minted; }` | One set of facts from nodes, declared edges and solved rules |
 | Read the facts | `.facts` | Nodes, edges with their origin, tables per kind, and a gen-graph value |
 | Query with SQL | `.query "SELECT …"` | Filter, join, sort and limit over `edge`, `reaches` and one table per kind |
 | Query with selectors | `.select selector` | The same filters as data; the result is again a set of facts |

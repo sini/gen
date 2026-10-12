@@ -38,22 +38,22 @@ Every figure below is derived from the regenerated live regression report at the
 
 | workload      |    n | thunks× | alloc× | reading                                                 |
 | ------------- | ---: | ------: | -----: | ------------------------------------------------------- |
-| deepSubmodule | 1600 |   1.74× |  2.16× | pure lower on both                                      |
-| registry      | 2000 |   1.29× |  1.58× | pure lower on both                                      |
-| lazyRegistry  | 2000 |   1.29× |  1.58× | pure lower on both                                      |
-| scalar        | 8000 |   1.10× |  1.32× | pure lower on both                                      |
-| wideFreeform  | 8000 |   0.91× |  1.24× | **pure HIGHER on thunks**; lower on allocation          |
-| schemaHosts   | 1600 |   1.12× |  1.27× | pure lower on both                                      |
+| deepSubmodule | 1600 |   2.22× |  2.34× | pure lower on both                                      |
+| registry      | 2000 |   1.96× |  2.19× | pure lower on both                                      |
+| lazyRegistry  | 2000 |   1.85× |  2.05× | pure lower on both                                      |
+| scalar        | 8000 |   1.50× |  1.55× | pure lower on both                                      |
+| wideFreeform  | 8000 |   1.28× |  1.39× | pure lower on both                                      |
+| schemaHosts   | 1600 |   1.32× |  1.31× | pure lower on both                                      |
 | aspects       | 1600 |       — |      — | **not measurable** — no reference arm exists            |
 | startup       |    1 |       — |      — | `n=1` fixed cost; there is no per-item slope to compare |
 
-**The claim, bounded to these rows and split by counter.** Scaling is linear on both stacks — every workload in the live report's linearity table grows **3.95–4.00×** across a ×4 size step, on both counters, gated ≤ 5.5 (the dedicated `classShare` and `overrideWarm` arms below run 3.93–4.00× on the same step). **On allocation**, pure-gen's per-item slope is lower on all six measurable rows, from 1.24× to 2.16×. **On thunks**, pure-gen is lower on five of six and **higher on one** — `wideFreeform`, by ~10%, which is by design and gated as a stated parity band, because freeform absorption is thunk-parity with nixpkgs. `lazyRegistry` is counted in both of those tallies on its **single-size ratio**, not on a derived slope: it runs at one size only, as the next paragraph states. `schemaHosts` was the second thunk row until 2026-09-27, a carried regression; its end is recorded below. `startup` is excluded from all of this by construction — at `n=1` there is no per-item slope — and must not be read as a counterexample.
+**The claim, bounded to these rows and split by counter.** Scaling is linear on both stacks — every workload in the live report's linearity table grows **3.67–3.99×** across a ×4 size step, on both counters (`sameLocFanIn` is the low end; every other workload reads 3.92–3.99×), gated ≤ 5.5 (the dedicated `classShare` and `overrideWarm` arms below run 3.89–3.98× on the same step). **On allocation**, pure-gen's per-item slope is lower on all six measurable rows, from 1.31× to 2.34×. **On thunks**, pure-gen is lower on all six, from 1.28× to 2.22×; no measurable row reads higher. `lazyRegistry` is counted in both of those tallies on its **single-size ratio**, not on a derived slope: it runs at one size only, as the next paragraph states. `schemaHosts` read higher on thunks until 2026-09-27, a carried regression; its end is recorded below. `startup` is excluded from all of this by construction — at `n=1` there is no per-item slope — and must not be read as a counterexample.
 
-**These ratios do stand as *slope* statements for the five workloads that run at two sizes, and here is why.** Those five run at two sizes in the live report, so the per-item slope ratio is recoverable from the ratio at each size plus the pure-side growth: with `pure(n) = a + s·n` on both stacks, `s_pure/s_ref = (g − 1) ÷ (g/r_big − 1/r_small)`. Across those five workloads and both counters that quantity differs from the large-`n` ratio by at most **0.002** — the measured ratio barely moves with size. `lazyRegistry` and `startup` run at one size only and carry no such derivation.
+**These ratios do stand as *slope* statements for the five workloads that run at two sizes, and here is why.** Those five run at two sizes in the live report, so the per-item slope ratio is recoverable from the ratio at each size plus the pure-side growth: with `pure(n) = a + s·n` on both stacks, `s_pure/s_ref = (g − 1) ÷ (g/r_big − 1/r_small)`. Across those five workloads and both counters that quantity differs from the large-`n` ratio by at most **0.003** — the measured ratio barely moves with size. `lazyRegistry` and `startup` run at one size only and carry no such derivation.
 
 **`aspects` — the audit's headline row — is withdrawn, not refreshed.** `ci/perf-bench.nix`'s reference provider carries no `aspects` member, structurally and on purpose: a frozen reference cannot track a grammar that moves by design ruling, so such a gate would red on ruled improvements rather than on regressions. The workload runs pure-only in the live report and carries no parity digest and no win-gate. **There is no comparison there to refresh, and the published 2.80× / 2.99× / 3.60× is not a quantity this harness can produce.**
 
-**`scalar` is published at `n=16000`; the current matrix runs `n=2000` and `n=8000` only.** The 1.10× above is a different cell from the published 1.27×, not a refresh of it.
+**`scalar` is published at `n=16000`; the current matrix runs `n=2000` and `n=8000` only.** The 1.50× above is a different cell from the published 1.27×, not a refresh of it.
 
 ### The `schemaHosts` thunk cost was INTERIM — and it has ended
 
@@ -267,51 +267,53 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | key              | axis      | source                   | rev / path   | leak |
 | ---------------- | --------- | ------------------------ | ------------ | ---- |
-| gen-algebra      | member    | baseline (flake.lock)    | 8dbf9bc6e774 | —    |
-| gen-aspects      | member    | baseline (flake.lock)    | 2ff4feb134ac | —    |
-| gen-class        | member    | baseline (flake.lock)    | 991641c54637 | —    |
-| gen-graph        | member    | baseline (flake.lock)    | 23674e750c76 | —    |
+| gen-algebra      | member    | baseline (flake.lock)    | 0d1c7ecfc519 | —    |
+| gen-aspects      | member    | baseline (flake.lock)    | 4e7b63cf4038 | —    |
+| gen-class        | member    | baseline (flake.lock)    | 51acd6159d2d | —    |
+| gen-graph        | member    | baseline (flake.lock)    | 9fede5fac788 | —    |
 | gen-graph-orig   | reference | baseline (ci/flake.lock) | 0db4e73708f3 | —    |
-| gen-identity     | member    | baseline (flake.lock)    | 4350968f0a4b | —    |
-| gen-memo         | member    | baseline (flake.lock)    | ddf8d26270a7 | —    |
-| gen-merge        | member    | baseline (flake.lock)    | a5480430ed24 | —    |
-| gen-prelude      | member    | baseline (flake.lock)    | da7dcf4e7969 | —    |
+| gen-identity     | member    | baseline (flake.lock)    | 3baf98fd4550 | —    |
+| gen-memo         | member    | baseline (flake.lock)    | a36afd028ad9 | —    |
+| gen-merge        | member    | baseline (flake.lock)    | b4b4688326f6 | —    |
+| gen-prelude      | member    | baseline (flake.lock)    | 85adc2fd9815 | —    |
 | gen-prelude-orig | reference | baseline (ci/flake.lock) | c471c9a12ef5 | —    |
-| gen-schema       | member    | baseline (flake.lock)    | 61b683284f3e | —    |
+| gen-schema       | member    | baseline (flake.lock)    | d8e140ff26d8 | —    |
 | gen-schema-orig  | reference | baseline (ci/flake.lock) | 2b7c2d39ad30 | —    |
-| gen-scope        | member    | baseline (flake.lock)    | 73effcefc1d7 | —    |
-| gen-select       | member    | baseline (flake.lock)    | 01768544e6df | —    |
+| gen-scope        | member    | baseline (flake.lock)    | 5b06a50bd6e1 | —    |
+| gen-select       | member    | baseline (flake.lock)    | 8d8a89202450 | —    |
 | gen-select-orig  | reference | baseline (ci/flake.lock) | 9285b5b8264a | —    |
-| gen-types        | member    | baseline (flake.lock)    | c8865e67accb | —    |
+| gen-types        | member    | baseline (flake.lock)    | 5641f5e94ca9 | —    |
 | nixpkgs-lib      | reference | baseline (ci/flake.lock) | db3f255737b9 | —    |
 
 > The leak column is the DEFAULTED formals this source set cannot name, so they resolved from that member's OWN lock rather than from the combination above — gen-graph is not a key here, which is why a leak is a declared class and not a refusal. The REQUIRED-and-unnameable residue is empty, or this run would have refused at exit 5 before collecting a cell; arming, same predicate: striking "prelude" from the environment fires on 7 of 12 applied entries. Entries that are not functions, so they declare no formals to read: gen-algebra, gen-identity, gen-prelude, gen-prelude-orig, nixpkgs-lib. The five reference keys do not take --at, because a ratio's denominator is its control.
 
 | workload         |    n | ref cpu (s) | pure cpu (s) | cpu p/r | thunks p/r | alloc p/r | parity |
 | ---------------- | ---: | ----------: | -----------: | ------: | ---------: | --------: | ------ |
-| startup          |    1 |       0.008 |        0.017 |   2.085 |      1.569 |     1.860 | ok     |
-| scalar           | 2000 |       0.024 |        0.033 |   1.362 |      0.823 |     0.760 | ok     |
-| scalar           | 8000 |       0.088 |        0.080 |   0.913 |      0.818 |     0.754 | ok     |
-| registry         |  500 |       0.049 |        0.049 |   1.012 |      0.654 |     0.583 | ok     |
-| registry         | 2000 |       0.159 |        0.142 |   0.892 |      0.651 |     0.579 | ok     |
-| lazyRegistry     |  500 |       0.049 |        0.054 |   1.100 |      0.647 |     0.578 | ok     |
-| lazyRegistry     | 2000 |       0.167 |        0.134 |   0.806 |      0.644 |     0.575 | ok     |
-| threadedRegistry |  500 |       0.047 |        0.058 |   1.245 |      0.748 |     0.668 | ok     |
-| threadedRegistry | 2000 |       0.167 |        0.198 |   1.190 |      0.743 |     0.663 | ok     |
-| wrappedRegistry  |  500 |       0.047 |        0.050 |   1.073 |      0.657 |     0.585 | ok     |
-| wrappedRegistry  | 2000 |       0.165 |        0.138 |   0.834 |      0.652 |     0.580 | ok     |
-| schemaHosts      |  400 |       0.066 |        0.079 |   1.190 |      0.854 |     0.826 | ok     |
-| schemaHosts      | 1600 |       0.227 |        0.261 |   1.152 |      0.848 |     0.819 | ok     |
-| wideFreeform     | 2000 |       0.024 |        0.035 |   1.452 |      0.905 |     0.784 | ok     |
-| wideFreeform     | 8000 |       0.080 |        0.074 |   0.925 |      0.899 |     0.777 | ok     |
-| deepSubmodule    |  400 |       0.199 |        0.164 |   0.825 |      0.538 |     0.499 | ok     |
-| deepSubmodule    | 1600 |       1.252 |        0.924 |   0.738 |      0.538 |     0.498 | ok     |
-| foreignMount     |  500 |       0.061 |        0.084 |   1.389 |      1.030 |     1.017 | ok     |
-| foreignMount     | 2000 |       0.192 |        0.237 |   1.232 |      1.026 |     1.013 | ok     |
-| moduleFanIn      |  400 |       0.072 |        0.074 |   1.035 |      0.893 |     0.829 | ok     |
-| moduleFanIn      | 1600 |       0.252 |        0.256 |   1.013 |      0.891 |     0.827 | ok     |
-| sameLocFanIn     |  400 |       0.013 |        0.023 |   1.783 |      1.507 |     1.686 | ok     |
-| sameLocFanIn     | 1600 |       0.015 |        0.035 |   2.390 |      1.502 |     1.680 | ok     |
+| startup          |    1 |       0.013 |        0.022 |   1.766 |      1.250 |     1.205 | ok     |
+| scalar           | 2000 |       0.038 |        0.042 |   1.090 |      0.670 |     0.650 | ok     |
+| scalar           | 8000 |       0.115 |        0.096 |   0.834 |      0.666 |     0.647 | ok     |
+| registry         |  500 |       0.060 |        0.061 |   1.022 |      0.515 |     0.461 | ok     |
+| registry         | 2000 |       0.216 |        0.142 |   0.660 |      0.511 |     0.457 | ok     |
+| lazyRegistry     |  500 |       0.068 |        0.057 |   0.826 |      0.543 |     0.492 | ok     |
+| lazyRegistry     | 2000 |       0.211 |        0.157 |   0.745 |      0.540 |     0.488 | ok     |
+| threadedRegistry |  500 |       0.061 |        0.075 |   1.238 |      0.648 |     0.595 | ok     |
+| threadedRegistry | 2000 |       0.212 |        0.251 |   1.183 |      0.643 |     0.590 | ok     |
+| wrappedRegistry  |  500 |       0.060 |        0.057 |   0.952 |      0.518 |     0.464 | ok     |
+| wrappedRegistry  | 2000 |       0.209 |        0.165 |   0.789 |      0.512 |     0.458 | ok     |
+| steppedRegistry  |  500 |       0.057 |        0.045 |   0.785 |      0.464 |     0.429 | ok     |
+| steppedRegistry  | 2000 |       0.177 |        0.121 |   0.686 |      0.461 |     0.426 | ok     |
+| schemaHosts      |  400 |       0.083 |        0.104 |   1.255 |      0.766 |     0.772 | ok     |
+| schemaHosts      | 1600 |       0.295 |        0.336 |   1.137 |      0.759 |     0.765 | ok     |
+| wideFreeform     | 2000 |       0.040 |        0.042 |   1.065 |      0.790 |     0.723 | ok     |
+| wideFreeform     | 8000 |       0.118 |        0.108 |   0.917 |      0.782 |     0.717 | ok     |
+| deepSubmodule    |  400 |       0.303 |        0.208 |   0.686 |      0.451 |     0.428 | ok     |
+| deepSubmodule    | 1600 |       1.127 |        0.798 |   0.708 |      0.450 |     0.428 | ok     |
+| foreignMount     |  500 |       0.052 |        0.075 |   1.447 |      1.030 |     1.027 | ok     |
+| foreignMount     | 2000 |       0.160 |        0.210 |   1.317 |      1.027 |     1.025 | ok     |
+| moduleFanIn      |  400 |       0.094 |        0.097 |   1.042 |      0.757 |     0.737 | ok     |
+| moduleFanIn      | 1600 |       0.328 |        0.310 |   0.943 |      0.754 |     0.735 | ok     |
+| sameLocFanIn     |  400 |       0.017 |        0.029 |   1.674 |      1.005 |     1.303 | ok     |
+| sameLocFanIn     | 1600 |       0.024 |        0.042 |   1.730 |      0.969 |     1.278 | ok     |
 
 > The ratios are printed to three places; the gates do not read them. Every cost row gates its MARGINAL, the counter at its big size minus the counter at its small size (a ratio row: the pure marginal over the ref marginal, NUM/DEN), EXACTLY and two-sidedly against MARG_MAX: above it is a regression, below it is a ratchet: owed in the same change. Alloc is gated as the evaluator-attributed bytes, not gc.totalBytes. The per-process constant is gated apart, in the load table below. The cpu column is report-only on every row: cpu depends on the machine as well as on the expression, so no gate reads it (median of 3 interleaved samples, collector off). See ci/README.md.
 
@@ -319,10 +321,10 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload     |    n | pure cpu (s) | pure thunks | pure alloc |
 | ------------ | ---: | -----------: | ----------: | ---------: |
-| inheritHosts |  400 |        0.158 |     1408164 |   80591744 |
-| inheritHosts | 1600 |        0.570 |     5556564 |  317410336 |
-| aspects      |  400 |        0.141 |     1252993 |   66061408 |
-| aspects      | 1600 |        0.484 |     4996393 |  263293184 |
+| inheritHosts |  400 |        0.206 |     1259410 |   75608224 |
+| inheritHosts | 1600 |        0.722 |     4961410 |  297470768 |
+| aspects      |  400 |        0.192 |     1160108 |   64682224 |
+| aspects      | 1600 |        0.700 |     4624808 |  257756688 |
 
 > These rows carry NO pure/ref digest parity and NO pure/ref win-gate: a frozen reference cannot
 > track a grammar that moves by design ruling, so such a gate would red on ruled improvements
@@ -334,135 +336,138 @@ The table below is emitted by the CI perf harness (`nix run ./ci#perf-bench`) on
 
 | workload         | sizes       | thunk growth | alloc growth |
 | ---------------- | ----------- | -----------: | -----------: |
-| scalar           | 2000 → 8000 |        3.947 |        3.943 |
-| registry         | 500 → 2000  |        3.970 |        3.960 |
-| threadedRegistry | 500 → 2000  |        3.962 |        3.956 |
-| wrappedRegistry  | 500 → 2000  |        3.955 |        3.949 |
-| schemaHosts      | 400 → 1600  |        3.955 |        3.948 |
-| inheritHosts     | 400 → 1600  |        3.946 |        3.938 |
-| aspects          | 400 → 1600  |        3.988 |        3.986 |
-| wideFreeform     | 2000 → 8000 |        3.934 |        3.936 |
-| deepSubmodule    | 400 → 1600  |        3.992 |        3.990 |
-| foreignMount     | 500 → 2000  |        3.973 |        3.972 |
-| moduleFanIn      | 400 → 1600  |        3.984 |        3.985 |
-| sameLocFanIn     | 400 → 1600  |        3.795 |        3.797 |
+| scalar           | 2000 → 8000 |        3.949 |        3.957 |
+| registry         | 500 → 2000  |        3.961 |        3.953 |
+| threadedRegistry | 500 → 2000  |        3.955 |        3.953 |
+| wrappedRegistry  | 500 → 2000  |        3.942 |        3.936 |
+| steppedRegistry  | 500 → 2000  |        3.957 |        3.955 |
+| schemaHosts      | 400 → 1600  |        3.950 |        3.945 |
+| inheritHosts     | 400 → 1600  |        3.939 |        3.934 |
+| aspects          | 400 → 1600  |        3.987 |        3.985 |
+| wideFreeform     | 2000 → 8000 |        3.922 |        3.935 |
+| deepSubmodule    | 400 → 1600  |        3.993 |        3.991 |
+| foreignMount     | 500 → 2000  |        3.977 |        3.979 |
+| moduleFanIn      | 400 → 1600  |        3.980 |        3.983 |
+| sameLocFanIn     | 400 → 1600  |        3.672 |        3.739 |
 
 ### classShare (gen-class tier-2 fixed-input spine gate; pure-full vs pure-fixed; gated: the pure-fixed thunk marginal and its load; the ratios printed)
 
 | n    | full thunks | fixed thunks | thunks f/f | alloc f/f | cpu f/f | byte gate |
 | ---- | ----------: | -----------: | ---------: | --------: | ------: | --------- |
-| 400  |     1679719 |       290659 |      0.173 |     0.177 |   0.291 | ok        |
-| 1600 |     6695719 |      1142059 |      0.171 |     0.174 |   0.202 | ok        |
+| 400  |     1314322 |       229506 |      0.175 |     0.179 |   0.287 | ok        |
+| 1600 |     5235922 |       898506 |      0.172 |     0.176 |   0.235 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): pure-full 3.986×, pure-fixed 3.929× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): pure-full 3.984×, pure-fixed 3.915× (gate ≤ 5.5)
 
 ### overrideWarm (gen-merge warm re-eval / memoized override; cold vs warm; gated: the warm thunk and alloc marginals and its load; the ratios printed)
 
 | n    | cold thunks | warm thunks | thunks w/c | alloc w/c | cpu w/c | byte gate |
 | ---- | ----------: | ----------: | ---------: | --------: | ------: | --------- |
-| 400  |     1702525 |      391446 |      0.230 |     0.235 |   0.364 | ok        |
-| 1600 |     6784525 |     1528446 |      0.225 |     0.230 |   0.287 | ok        |
+| 400  |     1337338 |      330655 |      0.247 |     0.256 |   0.422 | ok        |
+| 1600 |     5324938 |     1285255 |      0.241 |     0.249 |   0.302 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): cold 3.985×, warm 3.905× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): cold 3.982×, warm 3.887× (gate ≤ 5.5)
 
 ### kindMatch (kind identity at scale, den-hoag-l0y; frozen-gen-select attrs-ref vs live kind; gated: the kind thunk and alloc marginals and its load; the ratios printed)
 
 | fixture  | n    | attrs-ref thunks | kind thunks | kind alloc | thunks k/a | alloc k/a | cpu k/a | byte gate |
 | -------- | ---- | ---------------: | ----------: | ---------: | ---------: | --------: | ------: | --------- |
-| migrated | 400  |           431193 |      411757 |   24042192 |      0.955 |     0.974 |   0.917 | ok        |
-| migrated | 1600 |          1688193 |     1604557 |   93393488 |      0.950 |     0.968 |   1.002 | ok        |
-| sealed   | 400  |           436493 |      412412 |   24062528 |      0.945 |     0.962 |   0.984 | ok        |
-| sealed   | 1600 |          1706693 |     1605212 |   93409728 |      0.941 |     0.955 |   0.946 | ok        |
+| migrated | 400  |           379947 |      363314 |   22327696 |      0.956 |     0.977 |   0.950 | ok        |
+| migrated | 1600 |          1482747 |     1410314 |   86487088 |      0.951 |     0.970 |   0.962 | ok        |
+| sealed   | 400  |           385231 |      363955 |   22343936 |      0.945 |     0.963 |   0.964 | ok        |
+| sealed   | 1600 |          1501231 |     1410955 |   86507424 |      0.940 |     0.956 |   0.904 | ok        |
 
-thunk linearity (400 → 1600, ×4 step): attrs-ref 3.915×, kind 3.897×, attrs-ref-sealed 3.910×, kind-sealed 3.892× (gate ≤ 5.5)
-arming (planted per-node recompute, n=400→1600): kind thunk marginal 6664800 (n=400 kind/attrs-ref 5.183, alloc 5.740) — must exceed MARG_MAX[kindMatch,migrated,kind,t] = 1192800
+thunk linearity (400 → 1600, ×4 step): attrs-ref 3.903×, kind 3.882×, attrs-ref-sealed 3.897×, kind-sealed 3.877× (gate ≤ 5.5)
+arming (planted per-node recompute, n=400→1600): kind thunk marginal 6517800 (n=400 kind/attrs-ref 5.753, alloc 6.211) — must exceed MARG_MAX[kindMatch,migrated,kind,t] = 1047000
 
 ### entityMatch (instance identity at scale, den-hoag-l0y U2 + (β); frozen gen-schema + gen-select attrs-ref vs live entity; gated: the entity/attrs-ref marginal ratio, thunks + alloc, and the entity load)
 
 | fixture  | n    | attrs-ref thunks | entity thunks | thunks e/a | alloc e/a | cpu e/a | projection |
 | -------- | ---- | ---------------: | ------------: | ---------: | --------: | ------: | ---------- |
-| migrated | 400  |           574413 |        557741 |      0.971 |     0.932 |   1.515 | ok         |
-| migrated | 1600 |          2277213 |       2186741 |      0.960 |     0.919 |   1.415 | ok         |
-| sealed   | 400  |           574413 |        563074 |      0.980 |     0.942 |   1.583 | ok         |
-| sealed   | 1600 |          2277213 |       2205274 |      0.968 |     0.929 |   1.449 | ok         |
+| migrated | 400  |           574414 |        501496 |      0.873 |     0.873 |   1.526 | ok         |
+| migrated | 1600 |          2277214 |       1961896 |      0.862 |     0.860 |   1.360 | ok         |
+| sealed   | 400  |           574414 |        506813 |      0.882 |     0.883 |   1.437 | ok         |
+| sealed   | 1600 |          2277214 |       1980413 |      0.870 |     0.869 |   1.497 | ok         |
 
-thunk linearity (400 → 1600, ×4 step): attrs-ref 3.964×, entity 3.921×, attrs-ref-sealed 3.964×, entity-sealed 3.916× (gate ≤ 5.5)
-arming (planted per-instance kind re-derivation, n=400→1600): entity/attrs-ref thunk marginal 14850600/1702800 (8.721283) (n=400 ratio 8.636, alloc 8.427) — must exceed MARG_MAX[entityMatch,migrated,entity,t] = 1629000/1702800 (0.956660)
+thunk linearity (400 → 1600, ×4 step): attrs-ref 3.964×, entity 3.912×, attrs-ref-sealed 3.964×, entity-sealed 3.908× (gate ≤ 5.5)
+arming (planted per-instance kind re-derivation, n=400→1600): entity/attrs-ref thunk marginal 14083200/1702800 (8.270613) (n=400 ratio 8.191, alloc 8.232) — must exceed MARG_MAX[entityMatch,migrated,entity,t] = 1460400/1702800 (0.857646)
 
 ### coordMatch (the product coordinate's identity decision at scale, den-hoag-8hqx0; frozen gen-select coord-ref vs live coord; gated: the coord thunk and alloc marginals and its load; the ratios printed)
 
 | fixture  | n    | coord-ref thunks | coord thunks | coord alloc | thunks c/r | alloc c/r | cpu c/r | projection |
 | -------- | ---- | ---------------: | -----------: | ----------: | ---------: | --------: | ------: | ---------- |
-| migrated | 400  |           800430 |       800828 |    43747568 |      1.000 |     1.001 |   0.982 | ok         |
-| migrated | 1600 |          3174030 |      3174428 |   173129808 |      1.000 |     1.000 |   0.994 | ok         |
-| sealed   | 400  |           805616 |       807488 |    44138576 |      1.002 |     1.002 |   1.054 | ok         |
-| sealed   | 1600 |          3192416 |      3194288 |   174442464 |      1.001 |     1.000 |   1.021 | ok         |
+| migrated | 400  |           744696 |       745097 |    41770752 |      1.001 |     1.001 |   1.008 | ok         |
+| migrated | 1600 |          2951496 |      2951897 |   165242672 |      1.000 |     1.000 |   0.975 | ok         |
+| sealed   | 400  |           749996 |       751871 |    42178192 |      1.003 |     1.002 |   1.004 | ok         |
+| sealed   | 1600 |          2969996 |      2971871 |   166616736 |      1.001 |     1.001 |   1.067 | ok         |
 
-thunk linearity (400 → 1600, ×4 step): coord-ref 3.965×, coord 3.964×, coord-ref-sealed 3.963×, coord-sealed 3.956× (gate ≤ 5.5)
+thunk linearity (400 → 1600, ×4 step): coord-ref 3.963×, coord 3.962×, coord-ref-sealed 3.960×, coord-sealed 3.953× (gate ≤ 5.5)
 
 ### resolution (the one resolution calculus at scale, den-hoag-gayc U2b; frozen gen-graph query-orig vs live gen-scope resolve, gated: the resolve/query-orig thunk marginal between consecutive sizes, and the resolve load at the smallest; alloc reported, gated by nothing)
 
 | n    | query-orig thunks | resolve thunks | thunks r/q | alloc r/q | cpu r/q | byte gate |
 | ---- | ----------------: | -------------: | ---------: | --------: | ------: | --------- |
-| 4    |              1269 |           2367 |      1.865 |     2.228 |   1.384 | ok        |
-| 5    |              1465 |           2535 |      1.730 |     1.999 |   1.674 | ok        |
-| 6    |              1701 |           2725 |      1.602 |     1.767 |   1.307 | ok        |
-| 7    |              1977 |           2937 |      1.486 |     1.736 |   1.371 | ok        |
-| 100  |            202485 |         118815 |      0.587 |     0.821 |   0.758 | ok        |
-| 1000 |          20016885 |       11070915 |      0.553 |     0.771 |   0.455 | ok        |
+| 4    |              1270 |           1694 |      1.334 |     1.364 |   1.108 | ok        |
+| 5    |              1466 |           1862 |      1.270 |     1.292 |   0.997 | ok        |
+| 6    |              1702 |           2052 |      1.206 |     1.200 |   1.002 | ok        |
+| 7    |              1978 |           2264 |      1.145 |     1.171 |   1.133 | ok        |
+| 100  |            202486 |         118142 |      0.583 |     0.815 |   0.713 | ok        |
+| 1000 |          20016886 |       11070242 |      0.553 |     0.771 |   0.506 | ok        |
 
-arming (witnesses control, n=4..7 thunks): 3469 / 8509 / 36511 / 219193; 6 → 7 step 6.003× (resolve 1.078×) — must exceed 3.0 and resolve
+arming (witnesses control, n=4..7 thunks): 2796 / 7836 / 35838 / 218520; 6 → 7 step 6.097× (resolve 1.103×) — must exceed 3.0 and resolve
 
 ### load (the per-process constant: each member's own load, absolute; the small-size thunk counter of each gated arm, judged where its marginal held; startup, absolute)
 
 | row                         | reading | bound   | delta | marginal | state  | intercept |
 | --------------------------- | ------- | ------- | ----- | -------- | ------ | --------- |
-| scalar                      | 175073  | 175073  | +0    | 516000   | judged | -         |
-| registry                    | 357323  | 357323  | +0    | 1061250  | judged | -         |
-| lazyRegistry                | 353322  | 353322  | +0    | 1049250  | judged | -         |
-| threadedRegistry            | 408642  | 408642  | +0    | 1210500  | judged | -         |
-| wrappedRegistry             | 359150  | 359150  | +0    | 1061250  | judged | -         |
-| schemaHosts                 | 614601  | 614601  | +0    | 1816000  | judged | -         |
-| wideFreeform                | 156439  | 156439  | +0    | 459000   | judged | -         |
-| deepSubmodule               | 1556300 | 1556300 | +0    | 4657200  | judged | -         |
-| foreignMount                | 432406  | 432406  | +0    | 1285500  | judged | -         |
-| classShare,fixed            | 290659  | 290659  | +0    | 851400   | judged | -         |
-| overrideWarm,warm           | 391446  | 391446  | +0    | 1137000  | judged | -         |
-| kindMatch,migrated,kind     | 411757  | 411757  | +0    | 1192800  | judged | -         |
-| entityMatch,migrated,entity | 557741  | 557741  | +0    | 1629000  | judged | -         |
-| coordMatch,migrated,coord   | 800828  | 800828  | +0    | 2373600  | judged | -         |
-| kindMatch,sealed,kind       | 412412  | 412412  | +0    | 1192800  | judged | -         |
-| entityMatch,sealed,entity   | 563074  | 563074  | +0    | 1642200  | judged | -         |
-| coordMatch,sealed,coord     | 807488  | 807488  | +0    | 2386800  | judged | -         |
-| resolution,resolve          | 2367    | 2367    | +0    | 168      | judged | -         |
-| startup,t                   | 2952    | 2952    | +0    | -        | abs    | -         |
-| startup,a                   | 175062  | 175062  | +0    | -        | abs    | -         |
-| member,gen-prelude,t        | 140     | 140     | +0    | -        | abs    | -         |
-| member,gen-prelude,a        | 14646   | 14646   | +0    | -        | abs    | -         |
-| member,gen-algebra,t        | 78      | 78      | +0    | -        | abs    | -         |
-| member,gen-algebra,a        | 6467    | 6467    | +0    | -        | abs    | -         |
+| scalar                      | 142437  | 142437  | +0    | 420000   | judged | -         |
+| registry                    | 281393  | 281393  | +0    | 833250   | judged | -         |
+| lazyRegistry                | 296399  | 296399  | +0    | 878250   | judged | -         |
+| threadedRegistry            | 354325  | 354325  | +0    | 1047000  | judged | -         |
+| wrappedRegistry             | 283250  | 283250  | +0    | 833250   | judged | -         |
+| steppedRegistry             | 220354  | 220354  | +0    | 651651   | judged | -         |
+| schemaHosts                 | 550783  | 550783  | +0    | 1624800  | judged | -         |
+| wideFreeform                | 136546  | 136546  | +0    | 399000   | judged | -         |
+| deepSubmodule               | 1303144 | 1303144 | +0    | 3900000  | judged | -         |
+| foreignMount                | 432337  | 432337  | +0    | 1287000  | judged | -         |
+| sameLocFanIn                | 29197   | 29197   | +0    | 78000    | judged | -         |
+| classShare,fixed            | 229506  | 229506  | +0    | 669000   | judged | -         |
+| overrideWarm,warm           | 330655  | 330655  | +0    | 954600   | judged | -         |
+| kindMatch,migrated,kind     | 363314  | 363314  | +0    | 1047000  | judged | -         |
+| entityMatch,migrated,entity | 501496  | 501496  | +0    | 1460400  | judged | -         |
+| coordMatch,migrated,coord   | 745097  | 745097  | +0    | 2206800  | judged | -         |
+| kindMatch,sealed,kind       | 363955  | 363955  | +0    | 1047000  | judged | -         |
+| entityMatch,sealed,entity   | 506813  | 506813  | +0    | 1473600  | judged | -         |
+| coordMatch,sealed,coord     | 751871  | 751871  | +0    | 2220000  | judged | -         |
+| resolution,resolve          | 1694    | 1694    | +0    | 168      | judged | -         |
+| startup,t                   | 2353    | 2353    | +0    | -        | abs    | -         |
+| startup,a                   | 127609  | 127609  | +0    | -        | abs    | -         |
+| member,gen-prelude,t        | 151     | 151     | +0    | -        | abs    | -         |
+| member,gen-prelude,a        | 15324   | 15324   | +0    | -        | abs    | -         |
+| member,gen-algebra,t        | 88      | 88      | +0    | -        | abs    | -         |
+| member,gen-algebra,a        | 7135    | 7135    | +0    | -        | abs    | -         |
 | member,gen-identity,t       | 13      | 13      | +0    | -        | abs    | -         |
-| member,gen-identity,a       | 814     | 814     | +0    | -        | abs    | -         |
-| member,gen-graph,t          | 1753    | 1753    | +0    | -        | abs    | -         |
-| member,gen-graph,a          | 87889   | 87889   | +0    | -        | abs    | -         |
-| member,gen-types,t          | 485     | 485     | +0    | -        | abs    | -         |
-| member,gen-types,a          | 28946   | 28946   | +0    | -        | abs    | -         |
-| member,gen-scope,t          | 1754    | 1754    | +0    | -        | abs    | -         |
-| member,gen-scope,a          | 108025  | 108025  | +0    | -        | abs    | -         |
+| member,gen-identity,a       | 810     | 810     | +0    | -        | abs    | -         |
+| member,gen-graph,t          | 1827    | 1827    | +0    | -        | abs    | -         |
+| member,gen-graph,a          | 87835   | 87835   | +0    | -        | abs    | -         |
+| member,gen-types,t          | 493     | 493     | +0    | -        | abs    | -         |
+| member,gen-types,a          | 30243   | 30243   | +0    | -        | abs    | -         |
+| member,gen-scope,t          | 1566    | 1566    | +0    | -        | abs    | -         |
+| member,gen-scope,a          | 81206   | 81206   | +0    | -        | abs    | -         |
 | member,gen-memo,t           | 412     | 412     | +0    | -        | abs    | -         |
-| member,gen-memo,a           | 24242   | 24242   | +0    | -        | abs    | -         |
-| member,gen-merge,t          | 909     | 909     | +0    | -        | abs    | -         |
-| member,gen-merge,a          | 52173   | 52173   | +0    | -        | abs    | -         |
-| member,gen-schema,t         | 533     | 533     | +0    | -        | abs    | -         |
-| member,gen-schema,a         | 31812   | 31812   | +0    | -        | abs    | -         |
-| member,gen-aspects,t        | 292     | 292     | +0    | -        | abs    | -         |
-| member,gen-aspects,a        | 18699   | 18699   | +0    | -        | abs    | -         |
-| member,gen-select,t         | 51      | 51      | +0    | -        | abs    | -         |
-| member,gen-select,a         | 4755    | 4755    | +0    | -        | abs    | -         |
+| member,gen-memo,a           | 24220   | 24220   | +0    | -        | abs    | -         |
+| member,gen-merge,t          | 960     | 960     | +0    | -        | abs    | -         |
+| member,gen-merge,a          | 56570   | 56570   | +0    | -        | abs    | -         |
+| member,gen-schema,t         | 535     | 535     | +0    | -        | abs    | -         |
+| member,gen-schema,a         | 31956   | 31956   | +0    | -        | abs    | -         |
+| member,gen-aspects,t        | 593     | 593     | +0    | -        | abs    | -         |
+| member,gen-aspects,a        | 32656   | 32656   | +0    | -        | abs    | -         |
+| member,gen-select,t         | 52      | 52      | +0    | -        | abs    | -         |
+| member,gen-select,a         | 4912    | 4912    | +0    | -        | abs    | -         |
 | member,gen-class,t          | 210     | 210     | +0    | -        | abs    | -         |
 | member,gen-class,a          | 10097   | 10097   | +0    | -        | abs    | -         |
 
-LOAD DELTA vs anchor: startup thunks +0, startup alloc +0 B, members moved 0 of 24, rows moved 0 of 18 judged (0 confounded), per-row thunks min +0 max +0
+LOAD DELTA vs anchor: startup thunks +0, startup alloc +0 B, members moved 0 of 24, rows moved 0 of 20 judged (0 confounded), per-row thunks min +0 max +0
 
 identity: evaluator "nix-instantiate (Nix) 2.34.8", allocator boehm-gc-8.2.12 (anchor: "nix-instantiate (Nix) 2.34.8", boehm-gc-8.2.12); references match the anchor; members match ANCHOR_MEMBERS.
 
