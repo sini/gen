@@ -16,8 +16,23 @@ across every machine in a deployment. gen's graph model and its parametric aspec
 scopes became nodes, the movements of data became edges, and a feature that needs its host takes
 the host as an argument.
 
-{/* PLACEHOLDER (sini): how den started, what the limits of quirks and pipes were, and the moment
-the graph model became the design. */}
+den was extracted from its author's own configurations. A setup with several hosts and users
+repeats one pattern: a `mapAttrs` over the users, with each result installed into a host's
+configuration. den began as an abstraction over that iteration, with a declarative surface
+language and general code that walks the topology of the infrastructure. Through den v0.10 the
+implementation was plain maps and traversals.
+
+As den took on larger deployments, it needed new kinds of entity beyond hosts and homes (fleets,
+microVMs), values passed between entities, and typed schemas for them. den's core moved onto
+[nix-effects](https://github.com/kleisli-io/nix-effects), keeping its public API. The next planned
+kernel was [Ned](https://github.com/denful/ned), a stream library built on nix-effects. While
+designing that migration, den's problem turned out to map onto attribute-grammar evaluation over a
+scope graph, which became gen-scope. The step after that described the whole problem as logic
+programs over a graph of facts, and gen is the set of libraries for that model. den is being
+rebuilt on gen with the same public API and domain language.
+
+{/* PLACEHOLDER (sini): what the limits of quirks and pipes were, and the moment the graph model
+became the design. */}
 
 ## Timeline
 
