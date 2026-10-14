@@ -317,7 +317,7 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.8'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=64e3ce619190a8a6aac4748e3a9029e19afc74c2 gen-aspects=e9e1222f5b10d39f03c43d8b1a4b7f58c8c3d2a7 gen-class=b81665c2a6319adc7aaf599808668b31f16a681b gen-graph=33835053a084eea9066e048459fc2b6200e6dd68 gen-identity=b3d5788b15a681ad6ebf261bff0110f6ffa901f7 gen-memo=7872e449b8db5aa2027b36d9c0800e09f6b364a0 gen-merge=0700a1e5af44bb03dc46ee5eae6a0b0ec8f8d640 gen-prelude=89121543052aa6461664f0d4bacfeaa26a4b54c6 gen-schema=6698b12f8df12cf647b6431e4b1217a6c9bee8ae gen-scope=1afa586e1562aaba7b5225d61a4168b77dfa56ac gen-select=2f4bc1e2f7cac5c8d460f5df74ff042ce9a3641e gen-types=809164705b8ac78f55943ff0906526edaebd6d56'
+ANCHOR_MEMBERS='gen-algebra=6762f59c791b27a55d4394d13235b2f220b92e44 gen-aspects=af13d3a3fd1ae301a7fbf8afe9af39df05e11fc0 gen-class=5020b68d106ff8822df9a1a3dbe360bc851109dc gen-graph=b83a7ca78db864d3d3c0a554b9dc861e687fe857 gen-identity=3eca1243e903c60a0fd2a8b5035928886a85ef49 gen-memo=fbd70a0156bac1e82d7e65411a67c5ac35ce3898 gen-merge=78b6555ac9dc0c3c8239c08cb8ba5ce57bcc5159 gen-prelude=6e193df8dcd0b9ae8c26ec88755e4e1daaba022f gen-schema=a471cb49ce01e127e0fa41ff0a87dbeea3e2ee77 gen-scope=68aa63b9e3bd38113e8304940fa8903aadefc894 gen-select=35495faabef350ac39c33dfc38d32f477621d697 gen-types=9f998e826694cd4176c9681622cb907831671fb8'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -441,7 +441,7 @@ MARG_MAX[resolution,100-1000,t]=10952100/19814400
 LOAD_MAX[resolution,resolve]=1694
 LOADM[resolution,resolve]=168
 LOAD_MAX[startup,t]=2353
-LOAD_MAX[startup,a]=127721
+LOAD_MAX[startup,a]=127722
 LOAD_MAX[member,gen-prelude,t]=151
 LOAD_MAX[member,gen-prelude,a]=15324
 LOAD_MAX[member,gen-algebra,t]=88
@@ -457,7 +457,7 @@ LOAD_MAX[member,gen-scope,a]=81206
 LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
 LOAD_MAX[member,gen-merge,t]=960
-LOAD_MAX[member,gen-merge,a]=56682
+LOAD_MAX[member,gen-merge,a]=56678
 LOAD_MAX[member,gen-schema,t]=534
 LOAD_MAX[member,gen-schema,a]=31979
 LOAD_MAX[member,gen-aspects,t]=593
