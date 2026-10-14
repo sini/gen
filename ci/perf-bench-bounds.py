@@ -6,7 +6,9 @@ input, so the writer cannot compute a bound the gate would not.
 
 REPORT is the bench's stdout. By verdict:
   8 RATCHET OWED      every `— lower NAME to V` and `— set NAME to V` (re-arm) line is applied to its assignment,
-                      and ANCHOR_MEMBERS is written to the members the run read at.
+                      and ANCHOR_MEMBERS is written to the members the run read at. The header's stated count
+                      must equal the lines applied; a published run at moved members states 0 and 0, and only
+                      ANCHOR_MEMBERS is written.
   7 RE-ANCHOR OWED    the BOUNDS block is replaced by the run's `NAME=V   # …` lines (the identity lines
                       ANCHOR_EVALUATOR / ANCHOR_ALLOCATOR / ANCHOR_REFERENCE are written by hand, from the report).
   9 RE-ANCHOR BLOCKED refused: the members moved too. With --instrument (an edit to ci/perf-bench.{nix,sh} moves
@@ -73,8 +75,9 @@ if "RE-ANCHOR OWED" in report or "RE-ANCHOR BLOCKED" in report:
     n = len(lines)
 elif "RATCHET OWED" in report:
     pairs = re.findall(rf"^  - (?:ratchet|re-arm): .* — (?:lower|set) ({NAME}) to ({VAL})$", report, re.M)
-    if not pairs:
-        print("perf-bench-bounds: a RATCHET OWED report with no lower/set lines — UNREADABLE, not empty", file=sys.stderr)
+    want = re.findall(r"RATCHET OWED — no gate regressed, and ([0-9]+) cost reading\(s\) fell BELOW their bound, and ([0-9]+) load row\(s\) re-arm", report)
+    if len(want) != 1 or len(pairs) != int(want[0][0]) + int(want[0][1]):
+        print(f"perf-bench-bounds: a RATCHET OWED report stating {want} lower/set lines carries {len(pairs)} — UNREADABLE, not empty", file=sys.stderr)
         sys.exit(2)
     for name, v in pairs:
         pat = re.compile(r"^" + re.escape(name) + r"=.*$", re.M)

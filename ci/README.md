@@ -691,13 +691,16 @@ An evaluation that calls `nix-instantiate` directly, bypassing `nixi`, is not ca
 unnamed alloc drift. Pinned, CI and a workstation read the same byte on every cell. Every cost gate
 is EXACT and TWO-SIDED, so every run ends in one of four states, each with its own exit code:
 
-- **0** — every cost reading EQUALS its bound.
+- **0** — every cost reading EQUALS its bound, and a published run (no `--at`) is at `ANCHOR_MEMBERS`.
 - **1** (6 for a `--at` candidate) — a regression: some reading is above its bound, or a parity,
   linearity or arming gate failed. Raising a bound needs the five items below AND an owner reading
   (owner ruling P1 (i), 2026-10-05: no per-row tolerance; the coordMatch +398 "constant overhead" is
   the existing baseline, and any NEW growth, constant or not, fails).
 - **8** — RATCHET OWED: no regression, and at least one reading fell BELOW its bound, or a moved
-  marginal re-arms its load row. Each `ratchet:` line names the assignment that lowers it, and each
+  marginal re-arms its load row, or a published run (no `--at`) held every judged bound at members
+  other than `ANCHOR_MEMBERS`. That last case states `0 cost reading(s) … 0 load row(s) re-arm` and
+  owes only the record: the writer writes `ANCHOR_MEMBERS` and no bound, so a 0/0 8 from a scratch
+  relock is a stale record, not a ratchet. Each `ratchet:` line names the assignment that lowers it, and each
   `re-arm:` line the `LOADM` / `LOADI` / `LOAD_MAX` assignment that keeps the row judgeable;
   `python3 ci/perf-bench-bounds.py <report>` applies exactly those lines. **The change that ADOPTS the improvement
   carries the lowering** — for a member optimization that is the hub commit that moves the member's
@@ -711,8 +714,12 @@ is EXACT and TWO-SIDED, so every run ends in one of four states, each with its o
   too, so recording would launder a member move into the baseline: re-run with `--at K=rev:<rev>`
   at `ANCHOR_MEMBERS` first, record, and let the member move be gated against the new anchor.
 
-Every change that writes a bound (a lowering, an owner-read raise, a re-anchor) writes
-`ANCHOR_MEMBERS` to the members it read at. **An edit to `perf-bench.nix` is an instrument change**:
+`ANCHOR_MEMBERS` records the members at which every judged bound last held exactly. Every change
+that writes a bound (a lowering, an owner-read raise, a re-anchor) writes it to the members it read
+at, and so does the change adopting a published run that held every judged bound at other members
+(8, 0/0), so a member move already gated waits for no 9. The residual: a member move cost-neutral
+under this evaluator but not under the next is absorbed into that evaluator's 7, as a ratchet's
+record write already is. **An edit to `perf-bench.nix` is an instrument change**:
 every cell's counters can move with it (adding one workload binding added one thunk to every cell),
 so its landing re-reads every bound and says so: plant `ANCHOR_EVALUATOR`, run, and record with
 `ci/perf-bench-bounds.py --instrument <report>`, which writes `ANCHOR_MEMBERS` to the members it read

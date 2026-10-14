@@ -10,12 +10,15 @@
 #                                        <!-- BEGIN PERF-BENCH --> / <!-- END PERF-BENCH --> block
 #                                        (the live BENCHMARKS.md section). Refuses a non-empty overlay.
 #
-# Exits: 0 all gates passed, every cost reading EQUAL to its bound · 1 PERF REGRESSION (the published
+# Exits: 0 all gates passed, every cost reading EQUAL to its bound, and a published run is at
+# ANCHOR_MEMBERS · 1 PERF REGRESSION (the published
 # combination) · 2 the --update target is unusable, or the arguments are · 3 a dead cell (die_cell) ·
 # 4 COMBINATION UNRESOLVED (an overlay, or the evaluator's own identity) · 5 SUPPLY/DEMAND RESIDUE ·
 # 6 CANDIDATE OVER BOUND · 7 RE-ANCHOR OWED: the evaluator or a reference moved and the members are
 # the anchored ones, so the printed readings are recordable as the new bounds · 8 RATCHET OWED: no
-# regression, and at least one cost reading fell BELOW its bound, which the change adopting it lowers
+# regression, and at least one cost reading fell BELOW its bound, which the change adopting it lowers,
+# or a published run (no --at) is at members other than ANCHOR_MEMBERS, which the change adopting
+# them records (0 cost readings and 0 re-arms: ANCHOR_MEMBERS only)
 # · 9 RE-ANCHOR BLOCKED: the evaluator or a reference moved AND the members did, so no reading is
 # recordable until the bench is re-run at ANCHOR_MEMBERS (`--at K=rev:<anchored>`). 4–9 are separate
 # codes on purpose: an unresolvable sibling used to exit 1, the same code as a performance
@@ -305,19 +308,23 @@ GROWTH_MAX=5.5
 # differs from these lines the run gates NOTHING on cost: it prints every reading and exits 7 (or 9),
 # because a gen verdict against bounds read under another identity is unattributable. Re-anchoring
 # rewrites every bound and these lines together, and it is the one licensed raise of a bound without
-# an owner reading. ANCHOR_MEMBERS is the RECORD of the member revisions the bounds were read at, and
-# it is not part of the identity: a member is the change under test (owner ruling P5 (i), 2026-10-05),
+# an owner reading. ANCHOR_MEMBERS is the RECORD of the member revisions at which every judged bound
+# last held exactly, and it is not part of the identity: a member is the change under test (owner ruling P5 (i), 2026-10-05),
 # so a member move is gated against the bounds, never re-anchored. A re-anchor is recordable only
 # from a run AT these members — otherwise a member regression travelling in the same relock as an
 # evaluator bump would be recorded as the new baseline (gate C1). Every change that writes a bound
-# (a ratchet, an owner-read raise, a re-anchor) writes ANCHOR_MEMBERS to the members it read at.
+# (a ratchet, an owner-read raise, a re-anchor) writes ANCHOR_MEMBERS to the members it read at, and
+# so does a published run that held every judged bound at other members (8 with 0 bounds named), so
+# no member move already gated at its run waits for a 9. The residual: a member move cost-neutral
+# under this evaluator but not under the next is absorbed into that evaluator's 7, as a ratchet's
+# record write already is.
 # The evaluator is the `pkgs.nix` this app prepends to PATH, so CI and a local run share it; the
 # allocator is the boehm-gc in that evaluator's closure, keyed because `gc.totalBytes` is its
 # counter and a nix rebuild can move it under an unchanged --version (gate C5).
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.8'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=6762f59c791b27a55d4394d13235b2f220b92e44 gen-aspects=af13d3a3fd1ae301a7fbf8afe9af39df05e11fc0 gen-class=5020b68d106ff8822df9a1a3dbe360bc851109dc gen-graph=b83a7ca78db864d3d3c0a554b9dc861e687fe857 gen-identity=3eca1243e903c60a0fd2a8b5035928886a85ef49 gen-memo=fbd70a0156bac1e82d7e65411a67c5ac35ce3898 gen-merge=78b6555ac9dc0c3c8239c08cb8ba5ce57bcc5159 gen-prelude=6e193df8dcd0b9ae8c26ec88755e4e1daaba022f gen-schema=a471cb49ce01e127e0fa41ff0a87dbeea3e2ee77 gen-scope=68aa63b9e3bd38113e8304940fa8903aadefc894 gen-select=35495faabef350ac39c33dfc38d32f477621d697 gen-types=9f998e826694cd4176c9681622cb907831671fb8'
+ANCHOR_MEMBERS='gen-algebra=6762f59c791b27a55d4394d13235b2f220b92e44 gen-aspects=29099918f72aabd59adb769556df7601456f61d1 gen-class=52061f81e24a70faf3ef5530ce938c1fc41516a9 gen-graph=b83a7ca78db864d3d3c0a554b9dc861e687fe857 gen-identity=3eca1243e903c60a0fd2a8b5035928886a85ef49 gen-memo=fbd70a0156bac1e82d7e65411a67c5ac35ce3898 gen-merge=a9b46ce7a466c97ae5434641f319fff233776775 gen-prelude=6e193df8dcd0b9ae8c26ec88755e4e1daaba022f gen-schema=ac6afdde6529840cd9c8b8fe49a35cec5c570660 gen-scope=68aa63b9e3bd38113e8304940fa8903aadefc894 gen-select=266f0268cc58692e3e469a5968efd6b41892fcf5 gen-types=9f998e826694cd4176c9681622cb907831671fb8'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -1406,7 +1413,10 @@ emit_report() {
       ;;
     8)
       echo "RATCHET OWED — no gate regressed, and ${#RATCHETS[@]} cost reading(s) fell BELOW their bound, and ${#REARMS[@]} load row(s) re-arm. The change that adopts this combination lowers each one and sets each re-arm (ci/perf-bench-bounds.py reads these lines), and writes ANCHOR_MEMBERS='$MEMBERS_ID':"
-      printf '  - %s\n' "${RATCHETS[@]+"${RATCHETS[@]}"}" "${REARMS[@]+"${REARMS[@]}"}"
+      # `if`, not `&&`: under errexit + pipefail a false `&&` here fails `emit_report | tee`.
+      if [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]]; then
+        printf '  - %s\n' "${RATCHETS[@]+"${RATCHETS[@]}"}" "${REARMS[@]+"${REARMS[@]}"}"
+      fi
       ;;
   esac
 }
@@ -1630,12 +1640,14 @@ fi
 # ── the verdict, decided BEFORE the report prints and before any splice (gate C4) ──
 # Precedence: a regression or a non-cost failure (parity, linearity, arming, an unmeasured gate) is
 # 1/6 whatever else holds; then an identity change, 7/9, under which no cost gate was judged; then
-# readings below their bounds, 8. A ratchet-only run is never a regression (gate C2).
+# readings below their bounds, or a published run at members other than ANCHOR_MEMBERS, 8. A
+# ratchet-only run is never a regression (gate C2). A --at candidate's members differ by
+# construction, and it records nothing, so it keeps its 0.
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
   if [[ ${#AT_ORDER[@]} -gt 0 ]]; then VERDICT=6; else VERDICT=1; fi
 elif [[ -n $REANCHOR ]]; then
   if [[ "$MEMBERS_ID" == "$ANCHOR_MEMBERS" ]]; then VERDICT=7; else VERDICT=9; fi
-elif [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]]; then
+elif [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]] || [[ ${#AT_ORDER[@]} -eq 0 && "$MEMBERS_ID" != "$ANCHOR_MEMBERS" ]]; then
   VERDICT=8
 else
   VERDICT=0
@@ -1667,7 +1679,13 @@ case $VERDICT in
   1) echo "PERF REGRESSION — ${#FAILURES[@]} gate(s) failed (see report above)" >&2 ;;
   6) echo "perf-bench: CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on a candidate combination (see report above)" >&2 ;;
   7) echo "perf-bench: RE-ANCHOR OWED — identity '$EVAL_ID' / '$ALLOC_ID' / references differ from the anchor at the anchored members; record the ${#REANCHOR_LINES[@]} readings above" >&2 ;;
-  8) echo "perf-bench: RATCHET OWED — ${#RATCHETS[@]} cost reading(s) below their bound and no regression; lower them in the adopting change (see report above)" >&2 ;;
+  8)
+    if [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]]; then
+      echo "perf-bench: RATCHET OWED — ${#RATCHETS[@]} cost reading(s) below their bound and no regression; lower them in the adopting change (see report above)" >&2
+    else
+      echo "perf-bench: RATCHET OWED — every judged bound held, at members other than ANCHOR_MEMBERS; record them in the adopting change (python3 ci/perf-bench-bounds.py <report>)" >&2
+    fi
+    ;;
   9) echo "perf-bench: RE-ANCHOR BLOCKED — identity and members both moved; re-run at ANCHOR_MEMBERS before recording" >&2 ;;
 esac
 exit "$VERDICT"
