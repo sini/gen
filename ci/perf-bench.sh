@@ -293,6 +293,8 @@ MATRIX=(
   "deepSubmodule 1600 r,big"
   "foreignMount 500 small"
   "foreignMount 2000 r,big"
+  "foreignElement 500 small"
+  "foreignElement 2000 r,big"
   "moduleFanIn 400 small"
   "moduleFanIn 1600 big"
   "sameLocFanIn 400 small"
@@ -348,115 +350,120 @@ declare -A MARG_MAX LOAD_MAX LOADM LOADI
 # BEGIN BOUNDS
 MARG_MAX[scalar,t]=396000/632000
 MARG_MAX[scalar,a]=24302000/39182000
-LOAD_MAX[scalar]=134443
+LOAD_MAX[scalar]=134444
 LOADM[scalar]=396000
-LOADI[scalar]=14628000/6000
+LOADI[scalar]=14664000/6000
 MARG_MAX[registry,t]=757500/1632750
 MARG_MAX[registry,a]=38984000/87727000
-LOAD_MAX[registry]=256153
+LOAD_MAX[registry]=256154
 LOADM[registry]=757500
-LOADI[registry]=5479500/1500
+LOADI[registry]=5481000/1500
 MARG_MAX[lazyRegistry,t]=768000/1631250
 MARG_MAX[lazyRegistry,a]=40412000/87595000
-LOAD_MAX[lazyRegistry]=259659
+LOAD_MAX[lazyRegistry]=259660
 LOADM[lazyRegistry]=768000
-LOADI[lazyRegistry]=5488500/1500
+LOADI[lazyRegistry]=5490000/1500
 MARG_MAX[threadedRegistry,t]=936750/1632750
 MARG_MAX[threadedRegistry,a]=49761000/87727000
-LOAD_MAX[threadedRegistry]=317636
+LOAD_MAX[threadedRegistry]=317637
 LOADM[threadedRegistry]=936750
-LOADI[threadedRegistry]=8079000/1500
+LOADI[threadedRegistry]=8080500/1500
 MARG_MAX[wrappedRegistry,t]=757500/1632750
 MARG_MAX[wrappedRegistry,a]=38996000/87727000
-LOAD_MAX[wrappedRegistry]=258032
+LOAD_MAX[wrappedRegistry]=258033
 LOADM[wrappedRegistry]=757500
-LOADI[wrappedRegistry]=8298000/1500
+LOADI[wrappedRegistry]=8299500/1500
 MARG_MAX[steppedRegistry,t]=638646/1417923
 MARG_MAX[steppedRegistry,a]=32974883/76479824
-LOAD_MAX[steppedRegistry]=216002
+LOAD_MAX[steppedRegistry]=216003
 LOADM[steppedRegistry]=638646
 LOADI[steppedRegistry]=-
 MARG_MAX[schemaHosts,t]=1603600/2145200
 MARG_MAX[schemaHosts,a]=88019600/115548200
-LOAD_MAX[schemaHosts]=543772
+LOAD_MAX[schemaHosts]=543773
 LOADM[schemaHosts]=1603600
-LOADI[schemaHosts]=11086400/1200
+LOADI[schemaHosts]=11087600/1200
 MARG_MAX[wideFreeform,t,band]=399000/512000
 MARG_MAX[wideFreeform,a]=25350000/35030000
-LOAD_MAX[wideFreeform]=136552
+LOAD_MAX[wideFreeform]=136553
 LOADM[wideFreeform]=399000
 LOADI[wideFreeform]=21318000/6000
 MARG_MAX[deepSubmodule,t]=3856800/8666400
 MARG_MAX[deepSubmodule,a]=202180800/453759000
-LOAD_MAX[deepSubmodule]=1288765
+LOAD_MAX[deepSubmodule]=1288766
 LOADM[deepSubmodule]=3856800
-LOADI[deepSubmodule]=3789600/1200
+LOADI[deepSubmodule]=3799200/1200
 MARG_MAX[foreignMount,t]=1285500/1254000
 MARG_MAX[foreignMount,a]=69211000/67327000
-LOAD_MAX[foreignMount]=431847
+LOAD_MAX[foreignMount]=431848
 LOADM[foreignMount]=1285500
-LOADI[foreignMount]=5020500/1500
+LOADI[foreignMount]=5022000/1500
+MARG_MAX[foreignElement,t]=1644000/1488000
+MARG_MAX[foreignElement,a]=89335000/80563000
+LOAD_MAX[foreignElement]=551565
+LOADM[foreignElement]=1644000
+LOADI[foreignElement]=5347500/1500
 MARG_MAX[sameLocFanIn,t]=76800/81600
 MARG_MAX[sameLocFanIn,a]=5764800/4339200
-LOAD_MAX[sameLocFanIn]=28808
+LOAD_MAX[sameLocFanIn]=28809
 LOADM[sameLocFanIn]=76800
-LOADI[sameLocFanIn]=3843600/1200
+LOADI[sameLocFanIn]=3850800/1200
 MARG_MAX[classShare,fixed,t]=608400
-LOAD_MAX[classShare,fixed]=209286
+LOAD_MAX[classShare,fixed]=209287
 LOADM[classShare,fixed]=608400
-LOADI[classShare,fixed]=7783200/1200
+LOADI[classShare,fixed]=7784400/1200
 MARG_MAX[overrideWarm,warm,t]=894000
 MARG_MAX[overrideWarm,warm,a]=46585200
-LOAD_MAX[overrideWarm,warm]=310485
+LOAD_MAX[overrideWarm,warm]=310486
 LOADM[overrideWarm,warm]=894000
-LOADI[overrideWarm,warm]=14982000/1200
+LOADI[overrideWarm,warm]=14983200/1200
 MARG_MAX[kindMatch,migrated,kind,t]=1055400
 MARG_MAX[entityMatch,migrated,entity,t]=1442400/1702800
 MARG_MAX[coordMatch,migrated,coord,t]=2188800
 MARG_MAX[kindMatch,migrated,kind,a]=61704000
 MARG_MAX[entityMatch,migrated,entity,a]=79240800/91557600
 MARG_MAX[coordMatch,migrated,coord,a]=115935600
-LOAD_MAX[kindMatch,migrated,kind]=366127
+LOAD_MAX[kindMatch,migrated,kind]=366128
 LOADM[kindMatch,migrated,kind]=1055400
-LOADI[kindMatch,migrated,kind]=17298000/1200
-LOAD_MAX[entityMatch,migrated,entity]=495594
+LOADI[kindMatch,migrated,kind]=17193600/1200
+LOAD_MAX[entityMatch,migrated,entity]=495595
 LOADM[entityMatch,migrated,entity]=1442400
-LOADI[entityMatch,migrated,entity]=17752800/1200
-LOAD_MAX[coordMatch,migrated,coord]=739154
+LOADI[entityMatch,migrated,entity]=17754000/1200
+LOAD_MAX[coordMatch,migrated,coord]=739155
 LOADM[coordMatch,migrated,coord]=2188800
-LOADI[coordMatch,migrated,coord]=11464800/1200
+LOADI[coordMatch,migrated,coord]=11466000/1200
 MARG_MAX[kindMatch,sealed,kind,t]=1055400
 MARG_MAX[entityMatch,sealed,entity,t]=1455600/1702800
 MARG_MAX[coordMatch,sealed,coord,t]=2202000
 MARG_MAX[kindMatch,sealed,kind,a]=61704000
 MARG_MAX[entityMatch,sealed,entity,a]=80239200/91557600
 MARG_MAX[coordMatch,sealed,coord,a]=116934000
-LOAD_MAX[kindMatch,sealed,kind]=366774
+LOAD_MAX[kindMatch,sealed,kind]=366775
 LOADM[kindMatch,sealed,kind]=1055400
-LOADI[kindMatch,sealed,kind]=18067200/1200
-LOAD_MAX[entityMatch,sealed,entity]=500927
+LOADI[kindMatch,sealed,kind]=17970000/1200
+LOAD_MAX[entityMatch,sealed,entity]=500928
 LOADM[entityMatch,sealed,entity]=1455600
-LOADI[entityMatch,sealed,entity]=18872400/1200
-LOAD_MAX[coordMatch,sealed,coord]=745936
+LOADI[entityMatch,sealed,entity]=18873600/1200
+LOAD_MAX[coordMatch,sealed,coord]=745937
 LOADM[coordMatch,sealed,coord]=2202000
-LOADI[coordMatch,sealed,coord]=14323200/1200
+LOADI[coordMatch,sealed,coord]=14324400/1200
 MARG_MAX[resolution,4-5,t]=125/196
 MARG_MAX[resolution,5-6,t]=141/236
 MARG_MAX[resolution,6-7,t]=157/276
 MARG_MAX[resolution,7-100,t]=84537/200508
 MARG_MAX[resolution,100-1000,t]=7967700/19814400
-LOAD_MAX[resolution,resolve]=1595
+LOAD_MAX[resolution,resolve]=1596
 LOADM[resolution,resolve]=125
-LOAD_MAX[startup,t]=2366
-LOAD_MAX[startup,a]=128631
+LOAD_MAX[startup,t]=2367
+LOAD_MAX[startup,a]=128685
 LOAD_MAX[member,gen-prelude,t]=151
 LOAD_MAX[member,gen-prelude,a]=15324
 LOAD_MAX[member,gen-algebra,t]=88
-LOAD_MAX[member,gen-algebra,a]=7135
+LOAD_MAX[member,gen-algebra,a]=7130
 LOAD_MAX[member,gen-identity,t]=13
 LOAD_MAX[member,gen-identity,a]=810
 LOAD_MAX[member,gen-graph,t]=1827
-LOAD_MAX[member,gen-graph,a]=87835
+LOAD_MAX[member,gen-graph,a]=87831
 LOAD_MAX[member,gen-types,t]=494
 LOAD_MAX[member,gen-types,a]=30295
 LOAD_MAX[member,gen-scope,t]=1566
@@ -464,7 +471,7 @@ LOAD_MAX[member,gen-scope,a]=81206
 LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
 LOAD_MAX[member,gen-merge,t]=975
-LOAD_MAX[member,gen-merge,a]=57578
+LOAD_MAX[member,gen-merge,a]=57566
 LOAD_MAX[member,gen-schema,t]=537
 LOAD_MAX[member,gen-schema,a]=32111
 LOAD_MAX[member,gen-aspects,t]=593
@@ -984,7 +991,7 @@ for row in "${MATRIX[@]}"; do
   # (the marginal and load section, below the report).
 done
 
-for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount moduleFanIn sameLocFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement moduleFanIn sameLocFanIn; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1269,7 +1276,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount moduleFanIn sameLocFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement moduleFanIn sameLocFanIn; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done

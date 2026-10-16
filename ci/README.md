@@ -106,7 +106,9 @@ per-level engine recursion no flat-instance workload exercises), `wideFreeform` 
 keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpkgs thunk-parity band),
 `foreignMount` (n option roots on one stock nixpkgs `submodule`, each mounted by gen-merge's
 foreign-mount path, against nixpkgs `evalModules` over the same modules — den-hoag-gijly OQ2; before
-it no row reached the mount), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
+it no row reached the mount), `foreignElement` (n option roots, each gen-merge's `attrsOf` over one stock
+nixpkgs `submodule` element, the element reading its own declaring file, against nixpkgs' `attrsOf` —
+den-hoag-kjcpb; anchored at the landing above parity, its excess a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
 fold's length), `startup` (fixed cost; gated as the `startup,t|a` load rows).
 
