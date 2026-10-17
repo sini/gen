@@ -295,6 +295,8 @@ MATRIX=(
   "foreignMount 2000 r,big"
   "foreignElement 500 small"
   "foreignElement 2000 r,big"
+  "perOptionType 500 small"
+  "perOptionType 2000 r,big"
   "moduleFanIn 400 small"
   "moduleFanIn 1600 big"
   "sameLocFanIn 400 small"
@@ -403,6 +405,8 @@ MARG_MAX[foreignElement,a]=89335000/80563000
 LOAD_MAX[foreignElement]=551565
 LOADM[foreignElement]=1644000
 LOADI[foreignElement]=5347500/1500
+MARG_MAX[perOptionType,t]=406500/307500
+MARG_MAX[perOptionType,a]=24523000/18511000
 MARG_MAX[sameLocFanIn,t]=76800/81600
 MARG_MAX[sameLocFanIn,a]=5764800/4339200
 LOAD_MAX[sameLocFanIn]=28809
@@ -991,7 +995,7 @@ for row in "${MATRIX[@]}"; do
   # (the marginal and load section, below the report).
 done
 
-for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement moduleFanIn sameLocFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1276,7 +1280,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement moduleFanIn sameLocFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done

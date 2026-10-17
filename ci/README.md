@@ -108,7 +108,10 @@ keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpk
 foreign-mount path, against nixpkgs `evalModules` over the same modules — den-hoag-gijly OQ2; before
 it no row reached the mount), `foreignElement` (n option roots, each gen-merge's `attrsOf` over one stock
 nixpkgs `submodule` element, the element reading its own declaring file, against nixpkgs' `attrsOf` —
-den-hoag-kjcpb; anchored at the landing above parity, its excess a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
+den-hoag-kjcpb; anchored at the landing above parity, its excess a defect held for repair), `perOptionType` (n
+options, each constructing its own checked `attrsOf (listOf (nullOr int))`, against nixpkgs' `addCheck` over the same
+— the container door's per-construction cost, three constructions per instance; den-hoag-x5kcl; anchored at the
+landing above parity, its excess identity work and a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
 fold's length), `startup` (fixed cost; gated as the `startup,t|a` load rows).
 
