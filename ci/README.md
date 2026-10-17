@@ -108,9 +108,13 @@ keys absorbed by a root `freeformType` — the freeform-absorption path, a nixpk
 foreign-mount path, against nixpkgs `evalModules` over the same modules — den-hoag-gijly OQ2; before
 it no row reached the mount), `foreignElement` (n option roots, each gen-merge's `attrsOf` over one stock
 nixpkgs `submodule` element, the element reading its own declaring file, against nixpkgs' `attrsOf` —
-den-hoag-kjcpb; anchored at the landing above parity, its excess a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
+den-hoag-kjcpb; anchored at the landing above parity, its excess a defect held for repair), `perOptionType` (n
+options, each constructing its own checked `attrsOf (listOf (nullOr int))`, against nixpkgs' `addCheck` over the same
+— the container door's per-construction cost, three constructions per instance; den-hoag-x5kcl; anchored at the
+landing above parity, its excess identity work and a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
-fold's length), `startup` (fixed cost; gated as the `startup,t|a` load rows).
+fold's length), `keyedFanIn` (n keyed modules under one importer — the import walk's per-keyed-module
+cost), `startup` (fixed cost; gated as the `startup,t|a` load rows).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
 pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
@@ -595,6 +599,13 @@ reads 12.3× thunks / 13.0× alloc per ×4 step against the 5.5× bound). Gated 
 alloc marginals and its load, like every other cost row, and on linearity: the constant against nixpkgs
 is the cost each declaration pays in the fold (its redeclaration step and its declared-type fold step),
 which is this row's own subject (den-hoag-c7uhw: 0.897 in thunks per instance where it was armed).
+
+**`keyedFanIn`** — n modules each carrying an explicit `key` and defining one list option, imported by
+one module, against nixpkgs `evalModules` over the same modules. Every keyed module passes the import
+walk's key collection and dedup, where gen-merge reads its MEETING (den-hoag-9zyp7 OQ2: a key
+`<meeting>#<refinement>` meets every key sharing `<meeting>`), a per-keyed-module cost no other row
+reaches, since `moduleFanIn`'s and `sameLocFanIn`'s modules carry no key. Gated on its pure/ref
+marginals and its load, like every other cost row.
 
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the
