@@ -243,6 +243,13 @@ let
       successor = "checkedOption";
     }
     {
+      member = "types";
+      binding = "attrs";
+      cause = "a deliberate throwing tombstone for a renamed checker (gen-types lib/default.nix, `── THE RETIRED NAMES ──`). A checker is a predicate over one value and gen-merge's nullary `attrs` folds definitions across modules, so the checker is `checkedAttrs` and the old name is refused by name, never silently aliased; gen-merge's `types` link admits its shadow only because the loser is this tombstone";
+      carrier = "den-hoag-y9vzt (owner arm (D) 2026-10-18: R10 rule 3 applied to the one same-sort pair the L1 sweep never reached; link admits a shadow only over a registered tombstone)";
+      successor = "checkedAttrs";
+    }
+    {
       member = "select";
       binding = "any";
       cause = "a deliberate throwing tombstone for a renamed selector constructor (gen-select lib/constructors.nix, `── THE RETIRED NAME ──`). gen-prelude's `any` is the list predicate and keeps the name by parity, so the disjunction is `anyOf` and the old name is refused by name, never silently aliased";
@@ -280,7 +287,7 @@ let
   ];
   # A GATE, not a notification: a lock bump must not be able to grow this set, because a tombstone
   # entering a published surface is a design decision and takes a ruling.
-  retirementWidth = 26;
+  retirementWidth = 27;
 
   ruledRetirement =
     let
@@ -898,7 +905,9 @@ let
     # gen-types 4af4858 → 5641f5e (relock 73, den-hoag-7gp66 row 16 2c24316): the surface gained ONE
     # name, `typeWitness`, the witness declaration a boundary ties on a record it builds. Nothing was
     # removed; the hash of the new list minus that name is the old line.
-    types = "bdda4894fc71465ffc7ac14a66b47e0f7968d186647d4ef937aa315889b77ca3";
+    # gen-types ca90fb1 → c1311e4 (den-hoag-y9vzt, grammar R10 rule 3): the surface gained ONE name,
+    # `checkedAttrs`; `attrs` became a registered tombstone. Nothing was removed.
+    types = "83151324bad08ee9db84eb91179480a0429c66cbe4302099641016352269c942";
     # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
     # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
     # riders here — their hashes are unchanged, so no line for them was touched.
