@@ -796,7 +796,12 @@ let
     # Nothing was removed.
     # gen-prelude 7f80026 → fe448bb (relock 68, den-hoag-7jltk): the surface gained ONE name,
     # `refusals`, the record of the text each door construct throws. Nothing was removed.
-    prelude = "edd90797fa5171dd1c62659587ca80eb1b2020d9f3f7e60bbf50fa4b257307f1";
+    # gen-prelude 7dd9e4b → 92093b1 (the lock-currency relock; den-hoag-pl8cq 54fe807, den-hoag-gtwxg U1 726a33d):
+    # the surface gained EIGHT names, nixpkgs lib's `hasSuffix`, `removeSuffix`, `concatMapStrings`,
+    # `splitString`, `reverseList`, `remove` and `recursiveUpdate`, and `patternOf`, the
+    # pattern-shape reader. Nothing was removed; the hash of the new list minus those names is the
+    # old line.
+    prelude = "2c413afed98d4ea8ab2a6f2cbd3e0d2237a368d02489d773d0fd9c1992720a87";
     # gen-product ba6d741 → bc29006 (den-hoag-7gp66 L1, grammar R8): the surface gained TWO names,
     # `nodeAt` and `nodeCoordinates`; `cell` and `cells` became registered tombstones
     # (retirementEntries above), so they are still published names. Nothing was removed.
