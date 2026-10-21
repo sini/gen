@@ -91,7 +91,7 @@ The rule fired because both positive conditions are true and the negative one is
 | Query with SQL | `.query "SELECT …"` | Filter, join, sort and limit over `edge`, `reaches` and one table per kind |
 | Query with selectors | `.select selector` | The same filters as data; the result is again a set of facts |
 | Explain | `.why atom` | The rule and conditions behind a derived edge or a reachability row |
-| Render | `.render.mermaid facts` | A mermaid diagram, with derived edges dashed |
+| Render | `.render.mermaid { } facts`, `.render.dot { } facts` | A diagram, with derived edges dashed; options set the direction, shapes, labels and nesting |
 | Explain reuse | `memo.why`, `whyFor`, `whyNot`, `whyNotFor` | Why an incremental run did or did not recompute a node |
 | Trace values | `.provenance` on module and settings results | Which file or layer set each value (see [Typed Configuration](/features/configuration/)) |
 
@@ -100,10 +100,12 @@ The rule fired because both positive conditions are true and the negative one is
 ### Rendering
 
 `render.mermaid` turns the facts into a diagram. Declared edges are solid. Edges a rule derived are
-dashed:
+dashed. `render.dot` draws the same picture for graphviz. Both take one closed options set first, and
+`{ }` is the default picture: `direction` (`"LR"`), `shapeOf` (a node kind to a shape), `labelOf` (a
+node to its text) and `nest` (draw the `parent` edges as nesting).
 
 ```console
-$ nix eval --impure --raw --file platform-inspector.nix --apply 'i: i.render.mermaid i.facts'
+$ nix eval --impure --raw --file platform-inspector.nix --apply 'i: i.render.mermaid { } i.facts'
 ```
 
 ```mermaid
