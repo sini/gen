@@ -780,7 +780,10 @@ let
     # 131b802, den-hoag-we9fu 9aaae99): the surface gained ONE name, `importedTypeWalkFuel`, the
     # type-walk bound gen-schema's deferral reads. Nothing was removed; the hash of the new list minus
     # that name is the old line.
-    merge = "8347a1ac5e96b29ccaf94dfa24ac2ef1885f88db0501ab230c17e73beef0f44c";
+    # gen-merge 2ec0219 → 28653f3 (relock 12; den-hoag-jbddy 92c5734, den-hoag-2tna3 C2 7dc42ca): the
+    # surface gained ONE name, `engineOptionNames`, the option names the engine serves beside the
+    # declared ones, which gen-aspects' cnf door reads. Nothing was removed.
+    merge = "f1f8f1b3302cec410bf723dd16a5b6970ca27d45f89d13a4119dbb4e99b907bc";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -801,7 +804,11 @@ let
     # `splitString`, `reverseList`, `remove` and `recursiveUpdate`, and `patternOf`, the
     # pattern-shape reader. Nothing was removed; the hash of the new list minus those names is the
     # old line.
-    prelude = "2c413afed98d4ea8ab2a6f2cbd3e0d2237a368d02489d773d0fd9c1992720a87";
+    # gen-prelude 98d46cf → 7f9991f (relock 12; den-hoag-izo7a f5aa7d4, den-hoag-b6nyh U1 c2fd28a): the
+    # surface gained SIX names, izo7a's `absorb`, the quotient rule's one home, and b6nyh's
+    # `applicability`, `applicableKindOf`, `applicableLevels`, `applicablePatternOf` and
+    # `isApplicable`, the fuelled applicability walk. Nothing was removed.
+    prelude = "1594ac7ab57c58daa09101df32368c4498a9be5feaf51299e36239f8146e33b5";
     # gen-product ba6d741 → bc29006 (den-hoag-7gp66 L1, grammar R8): the surface gained TWO names,
     # `nodeAt` and `nodeCoordinates`; `cell` and `cells` became registered tombstones
     # (retirementEntries above), so they are still published names. Nothing was removed.
