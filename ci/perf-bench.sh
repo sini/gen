@@ -20,12 +20,16 @@
 # or a published run (no --at) is at members other than ANCHOR_MEMBERS, which the change adopting
 # them records (0 cost readings and 0 re-arms: ANCHOR_MEMBERS only)
 # · 9 RE-ANCHOR BLOCKED: the evaluator or a reference moved AND the members did, so no reading is
-# recordable until the bench is re-run at ANCHOR_MEMBERS (`--at K=rev:<anchored>`). 4–9 are separate
+# recordable until the bench is re-run at ANCHOR_MEMBERS (`--at K=rev:<anchored>`) · 10 FLEET WARNING:
+# every gate passed, and the fleetHost per-host ratio rose above FLEET_ANCHOR on an axis while staying
+# at or under FLEET_CEIL (ADR-0032: recorded, never failed; the warning lines print on every verdict).
+# 4–10 are separate
 # codes on purpose: an unresolvable sibling used to exit 1, the same code as a performance
 # regression, so no caller could tell "gen got slower" from "the network was down"; a candidate
 # breaching a bound derived at the baseline anchor is a fact about a combination the repository has
 # NOT adopted; "gen got faster" (8) is not "gen got slower" (1); and an evaluator moving (7, 9) is
-# not gen moving. Precedence: 1/6 over 7/9 over 8.
+# not gen moving; "gen lost margin, still under the ceiling" (10) is not "every reading equals its
+# bound" (0). Precedence: 1/6 over 7/9 over 8 over 10.
 #
 # Injected by the flake app wrapper:
 #   PERF_WORKLOADS    — store path of the workload corpus (ci/perf-bench.nix)
@@ -303,6 +307,8 @@ MATRIX=(
   "sameLocFanIn 1600 r,big"
   "keyedFanIn 400 small"
   "keyedFanIn 1600 r,big"
+  "fleetHost 10 small"
+  "fleetHost 100 big"
 )
 
 REPS=3
@@ -354,138 +360,138 @@ declare -A MARG_MAX LOAD_MAX LOADM LOADI
 # BEGIN BOUNDS
 MARG_MAX[scalar,t]=390000/632000
 MARG_MAX[scalar,a]=24398000/39182000
-LOAD_MAX[scalar]=132538
+LOAD_MAX[scalar]=132539
 LOADM[scalar]=390000
-LOADI[scalar]=15090000/6000
+LOADI[scalar]=15234000/6000
 MARG_MAX[registry,t]=763500/1632750
 MARG_MAX[registry,a]=39746000/87727000
-LOAD_MAX[registry]=258247
+LOAD_MAX[registry]=258248
 LOADM[registry]=763500
-LOADI[registry]=5620500/1500
+LOADI[registry]=5622000/1500
 MARG_MAX[lazyRegistry,t]=774000/1631250
 MARG_MAX[lazyRegistry,a]=41174000/87595000
-LOAD_MAX[lazyRegistry]=261752
+LOAD_MAX[lazyRegistry]=261753
 LOADM[lazyRegistry]=774000
-LOADI[lazyRegistry]=5628000/1500
+LOADI[lazyRegistry]=5629500/1500
 MARG_MAX[threadedRegistry,t]=942750/1632750
 MARG_MAX[threadedRegistry,a]=50523000/87727000
-LOAD_MAX[threadedRegistry]=319719
+LOAD_MAX[threadedRegistry]=319720
 LOADM[threadedRegistry]=942750
-LOADI[threadedRegistry]=8203500/1500
+LOADI[threadedRegistry]=8205000/1500
 MARG_MAX[wrappedRegistry,t]=763500/1632750
 MARG_MAX[wrappedRegistry,a]=39758000/87727000
-LOAD_MAX[wrappedRegistry]=260106
+LOAD_MAX[wrappedRegistry]=260107
 LOADM[wrappedRegistry]=763500
-LOADI[wrappedRegistry]=8409000/1500
+LOADI[wrappedRegistry]=8410500/1500
 MARG_MAX[steppedRegistry,t]=644739/1417923
 MARG_MAX[steppedRegistry,a]=33516275/76479824
-LOAD_MAX[steppedRegistry]=218125
+LOAD_MAX[steppedRegistry]=218126
 LOADM[steppedRegistry]=644739
 LOADI[steppedRegistry]=-
 MARG_MAX[schemaHosts,t]=1603600/2145200
 MARG_MAX[schemaHosts,a]=88768400/115548200
-LOAD_MAX[schemaHosts]=544215
+LOAD_MAX[schemaHosts]=544216
 LOADM[schemaHosts]=1603600
-LOADI[schemaHosts]=11618000/1200
+LOADI[schemaHosts]=11619200/1200
 MARG_MAX[wideFreeform,t,band]=399000/512000
 MARG_MAX[wideFreeform,a]=25350000/35030000
-LOAD_MAX[wideFreeform]=136639
+LOAD_MAX[wideFreeform]=136640
 LOADM[wideFreeform]=399000
-LOADI[wideFreeform]=21312000/6000
+LOADI[wideFreeform]=21840000/6000
 MARG_MAX[deepSubmodule,t]=4008000/8666400
 MARG_MAX[deepSubmodule,a]=212193600/453759000
-LOAD_MAX[deepSubmodule]=1339232
+LOAD_MAX[deepSubmodule]=1339233
 LOADM[deepSubmodule]=4008000
-LOADI[deepSubmodule]=3878400/1200
+LOADI[deepSubmodule]=3879600/1200
 MARG_MAX[foreignMount,t]=1284000/1254000
 MARG_MAX[foreignMount,a]=69235000/67327000
-LOAD_MAX[foreignMount]=431447
+LOAD_MAX[foreignMount]=431448
 LOADM[foreignMount]=1284000
-LOADI[foreignMount]=5148000/1500
+LOADI[foreignMount]=5172000/1500
 MARG_MAX[foreignElement,t]=1600500/1488000
 MARG_MAX[foreignElement,a]=87079000/80563000
-LOAD_MAX[foreignElement]=537165
+LOAD_MAX[foreignElement]=537166
 LOADM[foreignElement]=1600500
-LOADI[foreignElement]=5463000/1500
+LOADI[foreignElement]=5499000/1500
 MARG_MAX[perOptionType,t]=396000/307500
 MARG_MAX[perOptionType,a]=24403000/18511000
-LOAD_MAX[perOptionType]=135857
+LOAD_MAX[perOptionType]=135858
 LOADM[perOptionType]=396000
-LOADI[perOptionType]=5751000/1500
+LOADI[perOptionType]=5787000/1500
 MARG_MAX[sameLocFanIn,t]=76800/81600
 MARG_MAX[sameLocFanIn,a]=5764800/4339200
-LOAD_MAX[sameLocFanIn]=28905
+LOAD_MAX[sameLocFanIn]=28906
 LOADM[sameLocFanIn]=76800
-LOADI[sameLocFanIn]=3855600/1200
+LOADI[sameLocFanIn]=3967200/1200
 MARG_MAX[keyedFanIn,t]=110400/108000
 MARG_MAX[keyedFanIn,a]=7020600/5308800
-LOAD_MAX[keyedFanIn]=40250
+LOAD_MAX[keyedFanIn]=40251
 LOADM[keyedFanIn]=110400
-LOADI[keyedFanIn]=4032000/1200
+LOADI[keyedFanIn]=4141200/1200
 MARG_MAX[classShare,fixed,t]=613200
-LOAD_MAX[classShare,fixed]=211034
+LOAD_MAX[classShare,fixed]=211035
 LOADM[classShare,fixed]=613200
-LOADI[classShare,fixed]=7960800/1200
+LOADI[classShare,fixed]=7962000/1200
 MARG_MAX[overrideWarm,warm,t]=898800
 MARG_MAX[overrideWarm,warm,a]=47194800
-LOAD_MAX[overrideWarm,warm]=312263
+LOAD_MAX[overrideWarm,warm]=312264
 LOADM[overrideWarm,warm]=898800
-LOADI[overrideWarm,warm]=15195600/1200
+LOADI[overrideWarm,warm]=15196800/1200
 MARG_MAX[kindMatch,migrated,kind,t]=1057200
 MARG_MAX[entityMatch,migrated,entity,t]=1444200/1702800
 MARG_MAX[coordMatch,migrated,coord,t]=2191200
 MARG_MAX[kindMatch,migrated,kind,a]=62424000
 MARG_MAX[entityMatch,migrated,entity,a]=79960800/91557600
 MARG_MAX[coordMatch,migrated,coord,a]=116646000
-LOAD_MAX[kindMatch,migrated,kind]=367441
+LOAD_MAX[kindMatch,migrated,kind]=367442
 LOADM[kindMatch,migrated,kind]=1057200
-LOADI[kindMatch,migrated,kind]=18049200/1200
-LOAD_MAX[entityMatch,migrated,entity]=496923
+LOADI[kindMatch,migrated,kind]=18050400/1200
+LOAD_MAX[entityMatch,migrated,entity]=496924
 LOADM[entityMatch,migrated,entity]=1444200
-LOADI[entityMatch,migrated,entity]=18627600/1200
-LOAD_MAX[coordMatch,migrated,coord]=740368
+LOADI[entityMatch,migrated,entity]=18628800/1200
+LOAD_MAX[coordMatch,migrated,coord]=740369
 LOADM[coordMatch,migrated,coord]=2191200
-LOADI[coordMatch,migrated,coord]=11961600/1200
+LOADI[coordMatch,migrated,coord]=11962800/1200
 MARG_MAX[kindMatch,sealed,kind,t]=1057200
 MARG_MAX[entityMatch,sealed,entity,t]=1457400/1702800
 MARG_MAX[coordMatch,sealed,coord,t]=2204400
 MARG_MAX[kindMatch,sealed,kind,a]=62424000
 MARG_MAX[entityMatch,sealed,entity,a]=80959200/91557600
 MARG_MAX[coordMatch,sealed,coord,a]=117644400
-LOAD_MAX[kindMatch,sealed,kind]=368088
+LOAD_MAX[kindMatch,sealed,kind]=368089
 LOADM[kindMatch,sealed,kind]=1057200
-LOADI[kindMatch,sealed,kind]=18825600/1200
-LOAD_MAX[entityMatch,sealed,entity]=502256
+LOADI[kindMatch,sealed,kind]=18826800/1200
+LOAD_MAX[entityMatch,sealed,entity]=502257
 LOADM[entityMatch,sealed,entity]=1457400
-LOADI[entityMatch,sealed,entity]=19747200/1200
-LOAD_MAX[coordMatch,sealed,coord]=747150
+LOADI[entityMatch,sealed,entity]=19748400/1200
+LOAD_MAX[coordMatch,sealed,coord]=747151
 LOADM[coordMatch,sealed,coord]=2204400
-LOADI[coordMatch,sealed,coord]=14820000/1200
+LOADI[coordMatch,sealed,coord]=14821200/1200
 MARG_MAX[resolution,4-5,t]=125/196
 MARG_MAX[resolution,5-6,t]=141/236
 MARG_MAX[resolution,6-7,t]=157/276
 MARG_MAX[resolution,7-100,t]=84537/200508
 MARG_MAX[resolution,100-1000,t]=7967700/19814400
-LOAD_MAX[resolution,resolve]=1636
+LOAD_MAX[resolution,resolve]=1637
 LOADM[resolution,resolve]=125
-LOAD_MAX[startup,t]=2460
-LOAD_MAX[startup,a]=133202
+LOAD_MAX[startup,t]=2461
+LOAD_MAX[startup,a]=133289
 LOAD_MAX[member,gen-prelude,t]=198
 LOAD_MAX[member,gen-prelude,a]=18985
 LOAD_MAX[member,gen-algebra,t]=88
-LOAD_MAX[member,gen-algebra,a]=7080
+LOAD_MAX[member,gen-algebra,a]=7076
 LOAD_MAX[member,gen-identity,t]=13
 LOAD_MAX[member,gen-identity,a]=810
 LOAD_MAX[member,gen-graph,t]=1826
-LOAD_MAX[member,gen-graph,a]=87861
+LOAD_MAX[member,gen-graph,a]=87860
 LOAD_MAX[member,gen-types,t]=496
 LOAD_MAX[member,gen-types,a]=30494
 LOAD_MAX[member,gen-scope,t]=1602
-LOAD_MAX[member,gen-scope,a]=82507
+LOAD_MAX[member,gen-scope,a]=82501
 LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
 LOAD_MAX[member,gen-merge,t]=989
-LOAD_MAX[member,gen-merge,a]=58831
+LOAD_MAX[member,gen-merge,a]=58827
 LOAD_MAX[member,gen-schema,t]=541
 LOAD_MAX[member,gen-schema,a]=32512
 LOAD_MAX[member,gen-aspects,t]=600
@@ -495,6 +501,22 @@ LOAD_MAX[member,gen-select,a]=4966
 LOAD_MAX[member,gen-class,t]=210
 LOAD_MAX[member,gen-class,a]=10097
 # END BOUNDS
+
+# ── the fleetHost row's ceiling and anchor (ADR-0032), OUTSIDE the BOUNDS block ─────────────────
+# The row's quantity is its per-host pure/ref marginal, NUM/DEN, on thunks (t) and attributed bytes (a).
+# FLEET_CEIL is the ruled ceiling: a reading above it FAILS. No tool writes it; raising it is an owner
+# act. FLEET_ANCHOR is the best ratio achieved on each axis: a reading above it (and at or under the
+# ceiling) is a WARNING, exit 10, recorded in the relock commit and report; a reading below it is
+# `ratchet:`. It only moves DOWN, by construction rather than by a check: it sits outside BOUNDS, so
+# the 7/9 re-anchor that replaces that block cannot reach it; the bench prints no assignment for it
+# under an identity change and none for a rise; and perf-bench-bounds.py writes it only from a
+# `— lower` line. An environment move (evaluator, allocator or a reference pin) does not re-anchor it
+# upward either: interim, owed an owner reading (den-hoag-idzev). One assignment per line, since the
+# writer substitutes a whole line.
+declare -A FLEET_ANCHOR
+FLEET_CEIL=3/5
+FLEET_ANCHOR[t]=620460/1310790
+FLEET_ANCHOR[a]=32244240/70373040
 
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
@@ -697,6 +719,7 @@ TRA_REF=""
 FAILURES=()
 RATCHETS=()
 REANCHOR_LINES=()
+FLEET_WARNINGS=()
 CELL=""
 
 # ── a dead cell names itself (exit 3) ─────────────────────────────────────────
@@ -1390,6 +1413,20 @@ emit_report() {
     "${THUNKS[resolution,4,witnesses]}" "${THUNKS[resolution,5,witnesses]}" "${THUNKS[resolution,6,witnesses]}" "${THUNKS[resolution,7,witnesses]}" \
     "$RS_WIT_STEP" "$RS_RES_STEP" "$RESOLUTION_WITNESSES_GROWTH_MIN"
   echo
+  echo "### fleetHost (ADR-0032's fleet row: the per-host pure/ref marginal, n=$FLEET_SMALL→$FLEET_BIG; above FLEET_CEIL FAILS, above FLEET_ANCHOR WARNS, and the anchor only moves down)"
+  echo
+  echo "| axis | reading | FLEET_ANCHOR | FLEET_CEIL | state |"
+  echo "|---|---|---|---|---|"
+  for c in t a; do
+    printf '| %s | %s | %s | %s | %s |\n' "$c" "$(qshow "${FLEET_R[$c]}")" "$(qshow "${FLEET_ANCHOR[$c]:-}")" "$(qshow "$FLEET_CEIL")" "${FLEET_STATE[$c]}"
+  done
+  echo
+  if [[ ${#FLEET_WARNINGS[@]} -gt 0 ]]; then
+    printf -- '- %s\n' "${FLEET_WARNINGS[@]}"
+    echo
+  fi
+  echo "> NOT MET: the real NixOS per-host marginal (gen against nixpkgs, per NixOS host). This row measures a synthetic host, far smaller than a NixOS host, so a reading under the ceiling here does not say gen out-performs nixpkgs on NixOS hosts (den-hoag-multihost-reuse-metric-li1no)."
+  echo
   echo "### load (the per-process constant: each member's own load, absolute; the small-size thunk counter of each gated arm, judged where its marginal held; startup, absolute)"
   echo
   echo "| row | reading | bound | delta | marginal | state | intercept |"
@@ -1406,6 +1443,7 @@ emit_report() {
   echo
   case $VERDICT in
     0) echo "ALL GATES PASSED (parity + cost, exact + linearity)" ;;
+    10) echo "FLEET WARNING — every gate passed, and fleetHost rose above FLEET_ANCHOR on ${#FLEET_WARNINGS[@]} axis/axes, under FLEET_CEIL (ADR-0032: recorded in the relock commit and report, not failed); the lines are in the fleetHost section above." ;;
     1 | 6)
       if [[ $VERDICT -eq 6 ]]; then
         echo "CANDIDATE OVER BOUND — ${#FAILURES[@]} gate(s) failed on the CANDIDATE combination above, which this repository has not adopted:"
@@ -1620,6 +1658,40 @@ if [[ -z $REANCHOR ]]; then
     FAILURES+=("entityMatch arming: the planted per-instance re-derivation's marginal entity/attrs-ref thunks do not exceed MARG_MAX[entityMatch,migrated,entity,t] — the bound cannot see the class this row exists for")
   fi
 fi
+# FLEET: ADR-0032's fleetHost row. The ceiling is absolute, so it is judged under an identity change
+# too; the anchor comparison runs on every verdict, and it never emits a REANCHOR_LINES assignment.
+FLEET_SMALL=""
+FLEET_BIG=""
+for row in "${MATRIX[@]}"; do
+  read -r w n tags <<<"$row"
+  [[ "$w" == fleetHost ]] || continue
+  has_tag "$tags" small && FLEET_SMALL=$n
+  has_tag "$tags" big && FLEET_BIG=$n
+done
+declare -A FLEET_R FLEET_STATE
+for c in t a; do
+  r="$(marg "$c" fleetHost "$FLEET_SMALL" "$FLEET_BIG" pure)/$(marg "$c" fleetHost "$FLEET_SMALL" "$FLEET_BIG" ref)"
+  FLEET_R[$c]=$r
+  label="fleetHost n=$FLEET_SMALL→$FLEET_BIG pure/ref $c per host"
+  vc=$(qcmp "$r" "$FLEET_CEIL")
+  va=$(qcmp "$r" "${FLEET_ANCHOR[$c]:-}")
+  if [[ $vc == bad || $va == bad ]]; then
+    FLEET_STATE[$c]=unmeasured
+    FAILURES+=("unmeasured: fleetHost $c — reading '$r', FLEET_CEIL '$FLEET_CEIL' or FLEET_ANCHOR[$c] '${FLEET_ANCHOR[$c]:-}' is not a count or NUM/DEN")
+  elif [[ $vc == gt ]]; then
+    FLEET_STATE[$c]="FAIL (above the ceiling)"
+    FAILURES+=("$label $(qshow "$r") > $(qshow "$FLEET_CEIL") (FLEET_CEIL, ADR-0032)")
+  elif [[ $va == gt ]]; then
+    FLEET_STATE[$c]=WARNING
+    FLEET_WARNINGS+=("fleetHost WARNING $c: $(qshow "$r") > anchor FLEET_ANCHOR[$c]=$(qshow "${FLEET_ANCHOR[$c]}")")
+  elif [[ $va == lt ]]; then
+    FLEET_STATE[$c]="ratchet (below the anchor)"
+    RATCHETS+=("ratchet: $label $(qshow "$r") < $(qshow "${FLEET_ANCHOR[$c]}") — lower FLEET_ANCHOR[$c] to $r")
+  else
+    FLEET_STATE[$c]="held (equals the anchor)"
+  fi
+done
+
 # LOAD DELTA: one printed line, and a per-row table the landing's diff reads (ci/perf-bench-load-diff.py)
 LOAD_MOVED=0
 LOAD_JUDGED=0
@@ -1661,7 +1733,8 @@ fi
 # ── the verdict, decided BEFORE the report prints and before any splice (gate C4) ──
 # Precedence: a regression or a non-cost failure (parity, linearity, arming, an unmeasured gate) is
 # 1/6 whatever else holds; then an identity change, 7/9, under which no cost gate was judged; then
-# readings below their bounds, or a published run at members other than ANCHOR_MEMBERS, 8. A
+# readings below their bounds, or a published run at members other than ANCHOR_MEMBERS, 8; then a
+# fleetHost rise above its anchor and under its ceiling, 10. A
 # ratchet-only run is never a regression (gate C2). A --at candidate's members differ by
 # construction, and it records nothing, so it keeps its 0.
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
@@ -1670,6 +1743,8 @@ elif [[ -n $REANCHOR ]]; then
   if [[ "$MEMBERS_ID" == "$ANCHOR_MEMBERS" ]]; then VERDICT=7; else VERDICT=9; fi
 elif [[ ${#RATCHETS[@]} -gt 0 || ${#REARMS[@]} -gt 0 ]] || [[ ${#AT_ORDER[@]} -eq 0 && "$MEMBERS_ID" != "$ANCHOR_MEMBERS" ]]; then
   VERDICT=8
+elif [[ ${#FLEET_WARNINGS[@]} -gt 0 ]]; then
+  VERDICT=10
 else
   VERDICT=0
 fi
@@ -1708,5 +1783,6 @@ case $VERDICT in
     fi
     ;;
   9) echo "perf-bench: RE-ANCHOR BLOCKED — identity and members both moved; re-run at ANCHOR_MEMBERS before recording" >&2 ;;
+  10) printf 'perf-bench: FLEET WARNING (ADR-0032) — %s\n' "${FLEET_WARNINGS[@]}" >&2 ;;
 esac
 exit "$VERDICT"

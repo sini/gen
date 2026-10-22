@@ -37,12 +37,18 @@ jobs:
 
   # Performance: perf-regression gates on deterministic evaluator counters (parity at scale +
   # thunk/alloc ratios + linearity). cpu is reported but gated by nothing — see ci/README.md.
+  # Exit 10, FLEET WARNING (ADR-0032), is green with an annotation; every other non-zero is red.
   perf-bench:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      - run: nix run ./ci#perf-bench
+      - run: |
+          nix run ./ci#perf-bench || {
+            rc=$?
+            [ "$rc" -eq 10 ] && echo "::warning::fleetHost WARNING (ADR-0032): the per-host ratio rose above FLEET_ANCHOR, under FLEET_CEIL; see the fleetHost section of the report. NOT MET: the real NixOS per-host marginal (den-hoag-multihost-reuse-metric-li1no)."
+            [ "$rc" -eq 10 ]
+          }
 
   # Reported, gated by nothing (den-hoag-6fmmb): the ADR-0006 sole-evaluator scan. A refusal is the
   # ruled property being TRUE of a tree, disposed of by an owner act — an exception entry or the

@@ -15,7 +15,9 @@ REPORT is the bench's stdout. By verdict:
                       every cell, so its own landing re-reads every bound at its member set; run it with
                       ANCHOR_EVALUATOR planted), as 7, and ANCHOR_MEMBERS is written to the run's members.
 A raise is never written: a reading above its bound needs an owner reading (ci/README.md), and the bench prints
-no assignment for it. Exits 0 on a write, 1 on a report it cannot record, 2 on an unreadable input.
+no assignment for it. FLEET_ANCHOR[t|a] (ADR-0032's fleetHost anchor, outside BOUNDS) is written only by the 8
+path, from its `— lower` line: the 7/9 paths read only BOUNDS names, so no re-anchor reaches it. Exits 0 on a
+write, 1 on a report it cannot record, 2 on an unreadable input.
 """
 import re
 import sys
@@ -37,6 +39,8 @@ if not re.search(r"^identity: evaluator ", report, re.M):
     sys.exit(2)
 
 NAME = r"(?:MARG_MAX|LOAD_MAX|LOADM|LOADI)\[[^\]]+\]"
+# The 8 path's names: BOUNDS' and the fleet anchor, which only a lowering writes.
+LOWER_NAME = rf"(?:{NAME}|FLEET_ANCHOR\[[ta]\])"
 VAL = r"(?:[0-9]+(?:/[0-9]+)?|-)"
 
 
@@ -74,7 +78,7 @@ if "RE-ANCHOR OWED" in report or "RE-ANCHOR BLOCKED" in report:
         script = set_members(script, members_line(r"^  this run:\s+(.*)$"))
     n = len(lines)
 elif "RATCHET OWED" in report:
-    pairs = re.findall(rf"^  - (?:ratchet|re-arm): .* — (?:lower|set) ({NAME}) to ({VAL})$", report, re.M)
+    pairs = re.findall(rf"^  - (?:ratchet|re-arm): .* — (?:lower|set) ({LOWER_NAME}) to ({VAL})$", report, re.M)
     want = re.findall(r"RATCHET OWED — no gate regressed, and ([0-9]+) cost reading\(s\) fell BELOW their bound, and ([0-9]+) load row\(s\) re-arm", report)
     if len(want) != 1 or len(pairs) != int(want[0][0]) + int(want[0][1]):
         print(f"perf-bench-bounds: a RATCHET OWED report stating {want} lower/set lines carries {len(pairs)} — UNREADABLE, not empty", file=sys.stderr)

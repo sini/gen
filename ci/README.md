@@ -607,6 +607,16 @@ walk's key collection and dedup, where gen-merge reads its MEETING (den-hoag-9zy
 reaches, since `moduleFanIn`'s and `sameLocFanIn`'s modules carry no key. Gated on its pure/ref
 marginals and its load, like every other cost row.
 
+**`fleetHost`** — n hosts, each a separate evaluation of 4 modules (scalars, `mkDefault`/`mkIf`, an
+`attrsOf (submodule)` of 5 users and one of 10 services, a `listOf` merged across two modules), the
+shape of one `nixosSystem` per host. It is ADR-0032's fleet row, and it is not a `MARG_MAX` row: its
+per-host pure/ref marginal (n = 10 → 100), on thunks and on attributed bytes, FAILS above
+`FLEET_CEIL` (3/5) and WARNS above `FLEET_ANCHOR`, the best ratio achieved, which only moves down
+(exit 10 below). Both sit outside the BOUNDS block, so no re-anchor writes them. It joins no linearity
+or load gate. NOT MET: the real NixOS per-host marginal (gen against nixpkgs, per NixOS host); this row
+is a synthetic host, far smaller than a NixOS host, and a reading under its ceiling does not say gen
+out-performs nixpkgs on NixOS hosts (den-hoag-multihost-reuse-metric-li1no).
+
 **`wideFreeform`** — n unknown sibling keys absorbed by a root `freeformType` (`lazyAttrsOf str`)
 alongside declared options, with mkDefault/mkForce/mkIf layers driving priority discharge through the
 absorption path. Its **thunk** ratio sits in a parity band rather than below a win-gate:
@@ -702,7 +712,7 @@ runs through `nixi`, which passes `--option nix-path ''` (`NIX_PIN`) and so over
 `NIX_PATH` alike, and the identity block refuses by name (exit 4, `HOST NIX-PATH REACHES THE EVALUATOR`) a run in which `builtins.nixPath` is not `[]`: a lost `NIX_PIN` definition reds by name.
 An evaluation that calls `nix-instantiate` directly, bypassing `nixi`, is not caught and reds as an
 unnamed alloc drift. Pinned, CI and a workstation read the same byte on every cell. Every cost gate
-is EXACT and TWO-SIDED, so every run ends in one of four states, each with its own exit code:
+is EXACT and TWO-SIDED, so every run ends in one of five states, each with its own exit code:
 
 - **0** — every cost reading EQUALS its bound, and a published run (no `--at`) is at `ANCHOR_MEMBERS`.
 - **1** (6 for a `--at` candidate) — a regression: some reading is above its bound, or a parity,
@@ -719,6 +729,13 @@ is EXACT and TWO-SIDED, so every run ends in one of four states, each with its o
   carries the lowering** — for a member optimization that is the hub commit that moves the member's
   pin (a relock commit), never a later, unrelated landing; `relock-all` reads 8 as "stop at the hub
   and lower", not as a red of its dependents (den-hoag-2ffmc).
+- **10** — FLEET WARNING: every gate passed, and the `fleetHost` per-host ratio rose above
+  `FLEET_ANCHOR` on an axis while staying at or under `FLEET_CEIL` (ADR-0032: recorded, never failed).
+  The `fleetHost WARNING` lines print in the report on every verdict, and `relock-all` carries them,
+  with the members its relock moved, into the hub relock commit and its report. CI's `perf-bench` job
+  reads 10 as green with an annotation. A reading below the anchor is `ratchet:` (8), and the writer
+  lowers `FLEET_ANCHOR` from that line; nothing raises it, including an evaluator or reference move
+  (interim, owed an owner reading, den-hoag-idzev). Precedence: 1/6, then 7/9, then 8, then 10.
 - **7 / 9** — the evaluator, its allocator or a reference pin differs from `ANCHOR_*`, so NO cost
   gate is judged (owner ruling P5 (i): the environment moved, not gen). At 7 the members are
   `ANCHOR_MEMBERS` and the printed readings are recorded as the new bounds together with the new
