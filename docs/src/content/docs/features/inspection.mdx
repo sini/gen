@@ -59,7 +59,7 @@ one derived edge exists:
 
 ```console
 $ nix eval --impure --json --file platform-inspector.nix \
-    --apply 'i: i.why "reaches:web-1:db-1"'
+    --apply 'i: i.why (builtins.toJSON [ "reaches" "web-1" "db-1" ])'
 {
   "derivations": [{
     "fired": [
