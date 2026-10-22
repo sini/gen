@@ -783,7 +783,10 @@ let
     # gen-merge 2ec0219 → 28653f3 (relock 12; den-hoag-jbddy 92c5734, den-hoag-2tna3 C2 7dc42ca): the
     # surface gained ONE name, `engineOptionNames`, the option names the engine serves beside the
     # declared ones, which gen-aspects' cnf door reads. Nothing was removed.
-    merge = "f1f8f1b3302cec410bf723dd16a5b6970ca27d45f89d13a4119dbb4e99b907bc";
+    # gen-merge f251ddb → 7fa8b34 (relock 13; den-hoag-1k5mi 5157af5, den-hoag-2wo5a 8e03a42): the
+    # surface gained ONE name, `verifyValue`, a whole value judged against a composite option type.
+    # Nothing was removed; the hash of the new list minus that name is the old line.
+    merge = "53f9b064232030a1ddb4d8d6ccf085732e01e7870c10a355056d93fcbe9c8e5d";
     # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
     # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
     # other member moved.
@@ -856,7 +859,11 @@ let
     # gen-schema 620bf64 → 4c30e07 (den-hoag-8x97u, relock 47): the surface gained ONE name,
     # `entryReservation`, the reservation a kind entry's import closure is checked against. Nothing
     # was removed and no other member's names moved.
-    schema = "d6259d6dc90d1dd8d683b9c2658b064a4e44a4a065f401e38cb375290593ace9";
+    #
+    # gen-schema cd204ee → d34de39 (relock 13; den-hoag-w523e e092a34): the surface gained ONE name,
+    # `ancestorsForKind`, a kind's ancestors in a linear extension of inheritance. Nothing was
+    # removed; the hash of the new list minus that name is the old line.
+    schema = "5c4a14b984ba985bcc8ac679ff102f871e0e3b62f87659ae721ff42df6817d4d";
     # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
     # declaration-bearing members moved this member's published surface.
     #

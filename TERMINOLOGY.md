@@ -80,7 +80,7 @@ These terms are shared across multiple libraries.
 
 ### gen-prelude — Pure Utility Base
 
-The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-types, gen-merge, gen-scope, gen-graph, gen-select, gen-bind, gen-dispatch, and gen-memo are all built on it (Class B). With the module-system substrate (`gen-types → gen-merge`) now hosting gen-schema and gen-aspects, the whole library level is nixpkgs-lib-free — full nixpkgs enters only at the terminal plane (historically the gen-flake terminal, now this hub's interim `flakeModules.default` and gen-delivery's `realize` — ADR-0031 F3).
+The nixpkgs-lib-free substrate. Re-exports of `builtins` plus a vendored set of `lib` utilities, with zero dependency on nixpkgs. gen-types, gen-merge, gen-scope, gen-graph, gen-bind, gen-dispatch, and gen-memo are all built on it (Class B). With the module-system substrate (`gen-types → gen-merge`) now hosting gen-schema and gen-aspects, the whole library level is nixpkgs-lib-free — full nixpkgs enters only at the terminal plane (historically the gen-flake terminal, now this hub's interim `flakeModules.default` and gen-delivery's `realize` — ADR-0031 F3).
 
 | Term                 | Definition                                                                                              | Provenance |
 | -------------------- | ------------------------------------------------------------------------------------------------------- | ---------- |
@@ -252,7 +252,7 @@ Pure graph query combinators. Queries take accessor functions, not node maps.
 
 ### gen-select — Selector Algebra
 
-Pattern matching over attributed graph positions. Zero-dependency (Class A, builtins only) — intensional equality is inlined name-equality; no gen-algebra or gen-prelude dependency.
+Pattern matching over attributed graph positions. One library dependency, gen-algebra, for the identity-regime discipline `selectorEq` reads; no gen-prelude or nixpkgs.lib dependency.
 
 | Term              | Definition                                                                                                                                                                                                                                                                                                  | Provenance                                                    |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |

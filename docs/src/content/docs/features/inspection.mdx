@@ -108,18 +108,18 @@ $ nix eval --impure --raw --file platform-inspector.nix --apply 'i: i.render.mer
 
 ```mermaid
 flowchart LR
-  dev["dev<br/>env"]
-  prod["prod<br/>env"]
-  db_1["db-1<br/>host"]
-  db_2["db-2<br/>host"]
-  web_1["web-1<br/>host"]
-  web_2["web-2<br/>host"]
-  db_2 -->|maintenance| dev
-  db_1 -->|runsIn| prod
-  db_2 -->|runsIn| dev
-  web_1 -->|runsIn| prod
-  web_2 -->|runsIn| dev
-  web_1 -.->|reaches| db_1
+  n0["dev<br/>env"]
+  n1["prod<br/>env"]
+  n2["db-1<br/>host"]
+  n3["db-2<br/>host"]
+  n4["web-1<br/>host"]
+  n5["web-2<br/>host"]
+  n3 -->|"maintenance"| n0
+  n2 -->|"runsIn"| n1
+  n3 -->|"runsIn"| n0
+  n4 -->|"runsIn"| n1
+  n5 -->|"runsIn"| n0
+  n4 -.->|"reaches"| n2
 ```
 
 ### Reachability

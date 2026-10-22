@@ -91,7 +91,7 @@ gen-select's context shape directly maps to scope graph navigation:
 
 - **Context fields**: The five accessor functions (`data`, `parent`, `children`, `ancestors`, `siblings`) model the scope graph traversal axes from Neron Sections 2.2-2.4. `data` maps to D(S) declarations; `parent` maps to P(S) parent scope; `children` and `ancestors` provide directional traversal along P-edges; `siblings` provides lateral traversal within a scope.
 
-- **`adapters.scope.mkContext`**: Bridges gen-scope's `{ node, get }` accessor pair to gen-select's context shape, creating a direct structural correspondence between scope graph nodes and selector evaluation positions.
+- **`adapters.scope.mkContext`**: Bridges gen-scope's `{ node, childrenIds }` accessor pair to gen-select's context shape, creating a direct structural correspondence between scope graph nodes and selector evaluation positions.
 
 - **`sel.within`**: Matches when any ancestor satisfies a predicate — this is exactly "reachable via P-edges" in Neron's calculus.
 
