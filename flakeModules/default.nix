@@ -257,7 +257,8 @@ let
       peerKeys = builtins.attrNames args.extent;
       a = record.adapter {
         inherit (args) extent extraModules;
-        peersOf = _: peerKeys;
+        # PROBE ONLY (ien5k OQ2 pricing): the reader's own fixture field, never a hub contract.
+        peersOf = _: [ args.name ] ++ (args.bindings.node.peers or [ ]);
         marksOf = _: [ ];
         engine = genScope;
         readerId = args.name;
