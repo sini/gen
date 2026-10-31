@@ -226,6 +226,8 @@ let
 
   projected = genDelivery.project {
     selectNodes = selectNodeRegistry;
+    # PROBE (ien5k T3): the syntactic membership read over the registry option's definitions.
+    membersOf = import ./t3reader-probe.nix { } (lib.getAttrFromPath nodeRegistryPath composedCore.options);
   } cfg.aspectCnf composedCore.values;
 
   composed = composedCore // {

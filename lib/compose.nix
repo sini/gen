@@ -114,6 +114,8 @@ let
         # party said it — restating it under this construct's vocabulary would mint a second
         # spelling for one object and make the surface appear to answer a question it did not.
         provenance = result.provenance;
+        # PROBE (ien5k T3): the option tree, for a syntactic membership read. Never a main.
+        options = result.options;
 
         # `override edits` → a fresh compose of the ORIGINAL args merged with `edits`
         # (mergeComposeArgs). The admission is the plane's: `warmAdmits` is handed the key this
