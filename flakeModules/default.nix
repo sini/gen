@@ -226,6 +226,13 @@ let
 
   projected = genDelivery.project {
     selectNodes = selectNodeRegistry;
+    # PROBE (ien5k T3 precondition): the syntactic membership read, the gen-schema publication simulated
+    # by the tree's own `t3pub` (absent: every node falls back).
+    membersOf = import ./t3x-probe.nix { genMerge = roster.merge; } {
+      regOpt = lib.getAttrFromPath nodeRegistryPath composedCore.options;
+      loc = nodeRegistryPath;
+      pub = composedCore.values.t3pub or null;
+    };
   } cfg.aspectCnf composedCore.values;
 
   composed = composedCore // {
