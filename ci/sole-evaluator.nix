@@ -446,6 +446,46 @@ let
   # Output is built as SEGMENTS (runs of one classification), not character-by-character, so a
   # file of ordinary size does not pay for `n` list appends: one append per MODE CHANGE, not per
   # character.
+  # ★ ONE STEP PER LINE, EACH CARRY FORCED AS IT IS MADE: `walkLines step init lines` is the list of
+  # the carries `step` returns, line by line, each from the one before. It is not a `foldl'` over an
+  # appended list: `foldl'` forces its accumulator only to WHNF, so a record field naming the previous
+  # carry chained one deferred step per LINE, and forcing the last recursed once per line (gen-merge's
+  # 10,137-line `lib/modules.nix` passed Nix's default max-call-depth of 10,000); and appending to the
+  # carried list copied it every line, quadratic in the line count. `genericClosure` iterates, and
+  # the `seq` makes each carry before the next is asked for, so depth and allocation are linear.
+  # `step` forces whichever of its fields the next line reads (`seededScanDepth` is the cell).
+  walkLines =
+    step: init: lines:
+    let
+      n = builtins.length lines;
+    in
+    map (it: it.carry) (
+      builtins.tail (
+        builtins.genericClosure {
+          startSet = [
+            {
+              key = 0;
+              carry = init;
+            }
+          ];
+          operator =
+            it:
+            if it.key == n then
+              [ ]
+            else
+              let
+                c = step it.carry (builtins.elemAt lines it.key);
+              in
+              builtins.seq c [
+                {
+                  key = it.key + 1;
+                  carry = c;
+                }
+              ];
+        }
+      )
+    );
+
   stripText =
     text:
     let
@@ -675,25 +715,24 @@ let
           # still counting when the line's own characters run out, that newline is the next
           # position it consumes.
           skipAfterNewline = if final.skip > 0 then final.skip - 1 else 0;
-          nextRenderedLines = carry.renderedLines ++ [ rendered ];
         in
-        {
-          stack = final.stack;
-          skip = skipAfterNewline;
-          # Same amortizing force as the inner fold's `stack`/`segments`, cheap insurance at the
-          # OUTER scope: this list's length is the file's LINE count, already far under the
-          # measured-safe fold depth for the largest file in the corpus, but the deferred-force
-          # shape that overflowed the character-level fold is exactly this shape too.
-          renderedLines = builtins.seq nextRenderedLines nextRenderedLines;
-        };
-
-      finalCarry = lib.foldl' processLine {
-        stack = [ { t = "top"; } ];
-        skip = 0;
-        renderedLines = [ ];
-      } lines;
+        # The carry the next line reads is forced here (`walkLines`); the rendered text stays lazy.
+        builtins.seq final.stack (
+          builtins.seq skipAfterNewline {
+            stack = final.stack;
+            skip = skipAfterNewline;
+            inherit rendered;
+          }
+        );
     in
-    builtins.concatStringsSep "\n" finalCarry.renderedLines;
+    builtins.concatStringsSep "\n" (
+      map (c: c.rendered) (
+        walkLines processLine {
+          stack = [ { t = "top"; } ];
+          skip = 0;
+        } lines
+      )
+    );
 
   # ── THE BINDING-POSITION MASK: A NAME BEING BOUND IS NOT A CONSTRUCT BEING DRIVEN ──
   # The criterion's own cause names "the three constructs by which a Nix expression drives an
@@ -841,28 +880,29 @@ let
   # positives take — visible at all.
   maskInheritNames =
     lines:
-    (lib.foldl'
-      (
-        acc: lineText:
-        let
-          fast = !acc.inClause && !(hasInfix inheritKeyword lineText);
-          r = if fast then null else maskInheritLine { inherit (acc) inClause depth; } lineText;
-          nextOut = acc.out ++ [ (if fast then lineText else r.text) ];
-        in
+    map (c: c.text) (
+      walkLines
+        (
+          acc: lineText:
+          let
+            fast = !acc.inClause && !(hasInfix inheritKeyword lineText);
+            r = if fast then null else maskInheritLine { inherit (acc) inClause depth; } lineText;
+            inClause = if fast then acc.inClause else r.inClause;
+            depth = if fast then acc.depth else r.depth;
+          in
+          builtins.seq inClause (
+            builtins.seq depth {
+              inherit inClause depth;
+              text = if fast then lineText else r.text;
+            }
+          )
+        )
         {
-          inClause = if fast then acc.inClause else r.inClause;
-          depth = if fast then acc.depth else r.depth;
-          # Same amortizing force `stripText` applies to its line list, for the same reason.
-          out = builtins.seq nextOut nextOut;
+          inClause = false;
+          depth = 0;
         }
-      )
-      {
-        inClause = false;
-        depth = 0;
-        out = [ ];
-      }
-      lines
-    ).out;
+        lines
+    );
 
   # ★ THE READ AND THE STRIP ARE ONE STAGE PER FILE, AND EVERY WORLD BELOW SHARES IT. `raw` is kept
   # beside `kept` because a second read of the same tree is a second population that can disagree
@@ -1288,6 +1328,17 @@ let
   '';
   bindingPositionSites = hitsIn criterion (prep "bindingPosition.nix" bindingPositionText);
 
+  # Axis 10 — THE SCAN'S DEPTH DOES NOT GROW WITH A FILE'S LINE COUNT. 30,000 lines, three times Nix's
+  # default max-call-depth, with a construct on the first and the last: a strip or mask whose carry
+  # chains per line overflows evaluating this, and one that drops lines loses the last site.
+  scanDepthLines = 30000;
+  scanDepthText = builtins.concatStringsSep "\n" (
+    lib.genList (
+      i: if i == 0 || i == scanDepthLines - 1 then "  x = evalModuleTree { };" else "  y = 1;"
+    ) scanDepthLines
+  );
+  scanDepthSites = hitsIn criterion (prep "scanDepth.nix" scanDepthText);
+
   # Axis 9 — THE COMMENT STATE, ARMED AS AN INVARIANCE AND NOT AS A COUNT (den-hoag-ghkyx).
   # ★ THE SEED IS A STRAY `"` INSIDE A `#` COMMENT, and the claim is that the enumeration does not
   # move under it. The same body is run TWICE through the real `prep`/`hitsIn` — once clean, once
@@ -1487,6 +1538,13 @@ let
         "bindingPosition.nix:13"
       ];
     };
+    seededScanDepth = {
+      sites = scanDepthSites;
+      expected = [
+        "scanDepth.nix:1"
+        "scanDepth.nix:${toString scanDepthLines}"
+      ];
+    };
     # The seed is one `"` appended to each comment; `clean` is its live control in the same run.
     # The seed text is not written down anywhere a later reader could quote — it is a single
     # quote character, which is in every corpus already and therefore carries no false liveness.
@@ -1649,6 +1707,10 @@ let
       arming.seededCommentState.clean == arming.seededCommentState.expected
       && arming.seededCommentState.seeded == arming.seededCommentState.expected;
 
+    # O12 — THE SCAN'S DEPTH IS BOUNDED: a file of 30,000 lines is read to both of its sites. An
+    # unbounded scan does not read false here, it overflows the evaluation of this whole report.
+    scan-depth-bounded = arming.seededScanDepth.sites == arming.seededScanDepth.expected;
+
     # ★ den-hoag-0pk67 unit-c-instruments-build — THE ARMING'S OWN KEY, additive only: O1..O10
     # above are untouched, so no ruling-cleared reading changes disposition by this landing.
     # `rec` lets this reuse O2, O6, O8, O9 and O10 BY NAME — each is ALREADY pure arming, with no
@@ -1678,6 +1740,7 @@ let
       && strip-sound
       && binding-position-sound
       && comment-state-sound
+      && scan-depth-bounded
       && site-keyed-exception
       && (arming.seededRuledLive.planted == arming.seededRuledLive.expected);
   };
