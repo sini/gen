@@ -1,42 +1,18 @@
 # PROBE (ien5k T3 precondition; never a main). The syntactic membership read with its precondition
 # SIMULATED: `pub.<field>` stands for gen-schema's publication of the definitions an instance receives
-# for a field from everything but the node's own definitions (the kind tree, extraModules), `null`
-# where an opaque module or the registry pipeline reaches the field. The node's own definitions are
-# read off the registry option's served `definitionsWithLocations`, each node module classified by
-# gen-merge's published `moduleSyntax`; more than one definition in all is `null` (their order is
-# gen-merge's collection law). The value is gen-merge's own option fold, `mergeOption`.
+# for a field from everything but the node's own definitions, `null` where gen-schema cannot state them.
+# A node's own definitions are the registry option's served `definitionsWithLocations` values for it;
+# exactly one definition in all, folded by gen-merge's option fold with the single-definition statement
+# (variant G3: G2 with the element type's `shorthandOnlyDefinesConfig` in place of a module classification).
 { genMerge }:
 let
-  syn = genMerge.moduleSyntax;
   plain = v: builtins.isAttrs v && !(v ? _type) && !(v ? __functor);
-  structuredMeta = builtins.filter (k: k != "config" && k != "_file") syn.structured;
-  shorthandMeta = builtins.filter (k: k != "_file") syn.shorthandMeta;
-  hasAny = ks: m: builtins.any (k: m ? ${k}) ks;
+  # A definition of an instance is its CONFIG where the element type says so (`shorthandOnlyDefinesConfig`,
+  # the type's own statement, as nixpkgs' `submodule` reads an attrset definition); anything not a plain
+  # attrset, or not a type stating it, is not syntactic here.
   defsIn =
-    undeclared: field: file: m:
-    if !(plain m) then
-      null
-    else if hasAny syn.structuring m then
-      # a structured node module defines through `config` alone; any other key is refused or
-      # read by the engine, so the definitions are not syntactic
-      if builtins.any (k: k != "config" && k != "_file") (builtins.attrNames m) then
-        null
-      else if !(m ? config) then
-        [ ]
-      else if !(plain m.config) then
-        null
-      else if undeclared m.config then
-        null
-      else if m.config ? ${field} then
-        [
-          {
-            inherit file;
-            value = m.config.${field};
-          }
-        ]
-      else
-        [ ]
-    else if hasAny shorthandMeta m || undeclared m then
+    shorthand: undeclared: field: file: m:
+    if !shorthand || !(plain m) || undeclared m then
       null
     else if m ? ${field} then
       [
@@ -59,6 +35,7 @@ let
   rdefs = regOpt.definitionsWithLocations;
   wholeOk = side != null && builtins.all (d: plain d.value) rdefs;
   subOpts = regOpt.type.getSubOptions [ ];
+  shorthand = (regOpt.type.nestedTypes.elemType or { }).shorthandOnlyDefinesConfig or false;
   decl = subOpts.${field} or null;
   # SIMULATES gen-schema's strict check (strict.nix `unmatchedPaths`, top level only here): a key the
   # kind does not declare makes the module read refuse, so the reader must not serve
@@ -66,7 +43,7 @@ let
   instanceDefinitions =
     node:
     let
-      per = map (d: if d.value ? ${node} then defsIn undeclared field d.file d.value.${node} else [ ]) rdefs;
+      per = map (d: if d.value ? ${node} then defsIn shorthand undeclared field d.file d.value.${node} else [ ]) rdefs;
       all = side ++ builtins.concatLists per;
     in
     if builtins.any (x: x == null) per || builtins.length all > 1 then null else all;
