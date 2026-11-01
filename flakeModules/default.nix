@@ -261,7 +261,7 @@ let
     let
       mine = projected.nodes.${r}.members;
     in
-    builtins.filter (p: true) keys;
+    builtins.filter (p: builtins.any (x: builtins.elem x mine) projected.nodes.${p}.members) keys;
   terminalOf =
     record: args:
     let
