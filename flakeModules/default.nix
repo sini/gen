@@ -260,8 +260,9 @@ let
     keys: r:
     let
       mine = projected.nodes.${r}.members;
+      mineSet = builtins.listToAttrs (map (x: { name = x; value = null; }) mine);
     in
-    builtins.filter (p: builtins.any (x: builtins.elem x mine) projected.nodes.${p}.members) keys;
+    builtins.filter (p: builtins.any (x: mineSet ? ${x}) projected.nodes.${p}.members) keys;
   terminalOf =
     record: args:
     let
