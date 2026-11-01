@@ -261,7 +261,7 @@ let
   declaredOf =
     p:
     let
-      t = membersOf p;
+      t = null;
     in
     if t != null then t else peerRegistry.${p}.aspects or [ ];
   declaredCoMembers =
