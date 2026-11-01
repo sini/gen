@@ -73,10 +73,29 @@ else
   if d == null then
     null
   else
-    genMerge.mergeOption (
-      loc
-      ++ [
-        node
-        field
-      ]
-    ) decl d
+    # value-only option fold with the single-definition statement (what gen-merge would publish):
+    # a lone property-free definition outranks the declared default, so the fold reads it alone
+    let
+      lone = builtins.length d == 1 && !((builtins.head d).value ? _type);
+      readOnly = decl.readOnly or false;
+      seeded =
+        if decl ? default then
+          [
+            {
+              file = "<default>";
+              value = genMerge.mkOptionDefault decl.default;
+            }
+          ]
+          ++ d
+        else
+          d;
+      ds = if !readOnly && lone then d else seeded;
+      v = genMerge.mergeDefs (
+        loc
+        ++ [
+          node
+          field
+        ]
+      ) decl.type ds;
+    in
+    if readOnly && builtins.length seeded > 1 then null else if decl ? apply then decl.apply v else v
