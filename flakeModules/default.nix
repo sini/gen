@@ -227,8 +227,9 @@ let
   projected = genDelivery.project {
     selectNodes = selectNodeRegistry;
     # PROBE (ien5k T3): the syntactic membership read over the registry option's definitions.
-    membersOf = import ./t3reader-probe.nix { } (lib.getAttrFromPath nodeRegistryPath composedCore.options);
+    inherit membersOf;
   } cfg.aspectCnf composedCore.values;
+  membersOf = import ./t3reader-probe.nix { } (lib.getAttrFromPath nodeRegistryPath composedCore.options);
 
   composed = composedCore // {
     inherit (projected) aspects nodes;
@@ -253,13 +254,29 @@ let
   # `peer`, and `marksOf` is the STATED empty policy `_: [ ]` (no marks concept exists at this hub),
   # so gen-bind's `opaque` default never applies here. ARM B (aspect-membership-derived peer sets)
   # is a future narrowing, not decided here.
+  # PROBE (ien5k Q3 arm B, never a main): a node's peers are the other members of the class that
+  # declare one of the aspects it declares. `declaredOf` is the read: SYN = the T3 syntactic reader,
+  # falling back to the registry value where it answers null; REG = the registry value alone.
+  peerRegistry = selectNodeRegistry composedCore.values;
+  declaredOf =
+    p:
+    let
+      t = membersOf p;
+    in
+    if t != null then t else peerRegistry.${p}.aspects or [ ];
+  declaredCoMembers =
+    keys: r:
+    let
+      mine = declaredOf r;
+    in
+    builtins.filter (p: p != r && builtins.any (x: builtins.elem x mine) (declaredOf p)) keys;
   terminalOf =
     record: args:
     let
       peerKeys = builtins.attrNames args.extent;
       a = record.adapter {
         inherit (args) extent extraModules;
-        peersOf = _: peerKeys;
+        peersOf = declaredCoMembers peerKeys;
         marksOf = _: [ ];
         engine = genScope;
         readerId = args.name;
