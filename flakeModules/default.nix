@@ -261,7 +261,7 @@ let
   declaredOf =
     p:
     let
-      t = null;
+      t = membersOf p;
     in
     if t != null then t else peerRegistry.${p}.aspects or [ ];
   declaredCoMembers =
@@ -269,7 +269,7 @@ let
     let
       mine = declaredOf r;
     in
-    builtins.filter (p: p != r && builtins.any (x: builtins.elem x mine) (declaredOf p)) keys;
+    builtins.filter (p: builtins.any (x: builtins.elem x mine) (declaredOf p)) keys;
   terminalOf =
     record: args:
     let
