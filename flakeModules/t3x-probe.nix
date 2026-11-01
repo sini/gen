@@ -13,15 +13,19 @@ let
   shorthandMeta = builtins.filter (k: k != "_file") syn.shorthandMeta;
   hasAny = ks: m: builtins.any (k: m ? ${k}) ks;
   defsIn =
-    field: file: m:
+    undeclared: field: file: m:
     if !(plain m) then
       null
     else if hasAny syn.structuring m then
-      if hasAny structuredMeta m then
+      # a structured node module defines through `config` alone; any other key is refused or
+      # read by the engine, so the definitions are not syntactic
+      if builtins.any (k: k != "config" && k != "_file") (builtins.attrNames m) then
         null
       else if !(m ? config) then
         [ ]
       else if !(plain m.config) then
+        null
+      else if undeclared m.config then
         null
       else if m.config ? ${field} then
         [
@@ -32,7 +36,7 @@ let
         ]
       else
         [ ]
-    else if hasAny shorthandMeta m then
+    else if hasAny shorthandMeta m || undeclared m then
       null
     else if m ? ${field} then
       [
@@ -54,11 +58,15 @@ let
   side = if pub == null then null else pub.${field} or null;
   rdefs = regOpt.definitionsWithLocations;
   wholeOk = side != null && builtins.all (d: plain d.value) rdefs;
-  decl = (regOpt.type.getSubOptions [ ]).${field} or null;
+  subOpts = regOpt.type.getSubOptions [ ];
+  decl = subOpts.${field} or null;
+  # SIMULATES gen-schema's strict check (strict.nix `unmatchedPaths`, top level only here): a key the
+  # kind does not declare makes the module read refuse, so the reader must not serve
+  undeclared = c: builtins.any (k: !(subOpts ? ${k})) (builtins.attrNames c);
   instanceDefinitions =
     node:
     let
-      per = map (d: if d.value ? ${node} then defsIn field d.file d.value.${node} else [ ]) rdefs;
+      per = map (d: if d.value ? ${node} then defsIn undeclared field d.file d.value.${node} else [ ]) rdefs;
       all = side ++ builtins.concatLists per;
     in
     if builtins.any (x: x == null) per || builtins.length all > 1 then null else all;
