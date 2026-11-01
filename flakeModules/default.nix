@@ -253,13 +253,22 @@ let
   # `peer`, and `marksOf` is the STATED empty policy `_: [ ]` (no marks concept exists at this hub),
   # so gen-bind's `opaque` default never applies here. ARM B (aspect-membership-derived peer sets)
   # is a future narrowing, not decided here.
+  # PROBE (ien5k Q3 arm B, never a main): a node's peers are the members of the class that declare
+  # one of the aspects it declares — `members · members⁻¹`, itself included — read from the one
+  # membership answer `project` publishes on each node record (`projected.nodes.<n>.members`).
+  declaredCoMembers =
+    keys: r:
+    let
+      mine = projected.nodes.${r}.members;
+    in
+    builtins.filter (p: builtins.any (x: builtins.elem x mine) projected.nodes.${p}.members) keys;
   terminalOf =
     record: args:
     let
       peerKeys = builtins.attrNames args.extent;
       a = record.adapter {
         inherit (args) extent extraModules;
-        peersOf = _: peerKeys;
+        peersOf = declaredCoMembers peerKeys;
         marksOf = _: [ ];
         engine = genScope;
         readerId = args.name;
