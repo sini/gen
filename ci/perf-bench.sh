@@ -307,6 +307,8 @@ MATRIX=(
   "sameLocFanIn 1600 r,big"
   "keyedFanIn 400 small"
   "keyedFanIn 1600 r,big"
+  "openNested 500 small"
+  "openNested 2000 r,big"
   "fleetHost 10 small"
   "fleetHost 100 big"
 )
@@ -432,6 +434,16 @@ MARG_MAX[classShare,fixed,t]=613200
 LOAD_MAX[classShare,fixed]=210854
 LOADM[classShare,fixed]=613200
 LOADI[classShare,fixed]=7962000/1200
+MARG_MAX[openNested,t]=-
+MARG_MAX[openNested,a]=-
+LOAD_MAX[openNested]=-
+LOADM[openNested]=-
+LOADI[openNested]=-
+MARG_MAX[overrideCount,warm,t]=-
+MARG_MAX[overrideCount,warm,a]=-
+LOAD_MAX[overrideCount,warm]=-
+LOADM[overrideCount,warm]=-
+LOADI[overrideCount,warm]=-
 MARG_MAX[overrideWarm,warm,t]=898800
 MARG_MAX[overrideWarm,warm,a]=47194800
 LOAD_MAX[overrideWarm,warm]=313877
@@ -559,6 +571,10 @@ CLASSSHARE_BIG=1600
 # larger than a simultaneous reuse erosion reads as a ratchet.
 OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
+# overrideCount (den-hoag-xrh86): n is the override COUNT over a fixed 400-host registry, so the warm marginal over
+# a 4x step is the cost of 9 warm evaluations, the axis overrideWarm's pinned count hides
+OVERRIDECOUNT_SMALL=3
+OVERRIDECOUNT_BIG=12
 
 # ── kindMatch (kind identity at scale; den-hoag-l0y) — the owner's landing gate on ruling (a) ──
 # Ruling (a) keys every kind by its MINTED identity, and the owner's condition on it was that the hub
@@ -1028,7 +1044,7 @@ for row in "${MATRIX[@]}"; do
   # (the marginal and load section, below the report).
 done
 
-for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn openNested; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1100,6 +1116,11 @@ lte "$OW_LIN_COLD" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: cold thunks expected≤$GROWTH_MAX actual=${OW_LIN_COLD}× delta=$(delta "$OW_LIN_COLD" "$GROWTH_MAX") over a 4× size step")
 lte "$OW_LIN_WARM" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
+
+# overrideCount: the warm stack only, at the two override counts; its byte gate is overrideWarm's above
+for n in "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG"; do
+  run_row overrideCount "$n" warm
+done
 
 # ── kindMatch — kind identity at scale (den-hoag-l0y; the gate derivation is beside the constants) ──
 # DEDICATED section (classShare precedent). Per fixture, the stacks are attrs-ref (the FROZEN
@@ -1313,7 +1334,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn openNested; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
@@ -1599,6 +1620,9 @@ for row in "${MATRIX[@]}"; do
 done
 mgate "classShare,fixed,t" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed thunks" t classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
 lgate "classShare,fixed" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed" classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
+mgate "overrideCount,warm,t" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm thunks" t overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
+mgate "overrideCount,warm,a" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm alloc" a overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
+lgate "overrideCount,warm" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm" overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
 mgate "overrideWarm,warm,t" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm thunks" t overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
 mgate "overrideWarm,warm,a" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm alloc" a overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
 lgate "overrideWarm,warm" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm" overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
