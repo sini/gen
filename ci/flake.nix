@@ -480,6 +480,7 @@
                   surfaceHash
                   surfaceDrift
                   surfaceDriftNames
+                  surfaceLost
                   arming
                   pinDomain
                   vocabularyUnregistered
