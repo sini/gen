@@ -12,7 +12,7 @@
 #
 # Exits: 0 all gates passed, every cost reading EQUAL to its bound, and a published run is at
 # ANCHOR_MEMBERS · 1 PERF REGRESSION (the published
-# combination) · 2 the --update target is unusable, or the arguments are · 3 a dead cell (die_cell) ·
+# combination) · 2 the --update target is unusable, or the arguments are, or the BOUNDS block's load shape is · 3 a dead cell (die_cell) ·
 # 4 COMBINATION UNRESOLVED (an overlay, or the evaluator's own identity) · 5 SUPPLY/DEMAND RESIDUE ·
 # 6 CANDIDATE OVER BOUND · 7 RE-ANCHOR OWED: the evaluator or a reference moved and the members are
 # the anchored ones, so the printed readings are recordable as the new bounds · 8 RATCHET OWED: no
@@ -352,91 +352,96 @@ ANCHOR_MEMBERS='gen-algebra=ac92bc949bb499ee0d13b6994c0d738244cb0ccd gen-aspects
 #   LOAD_MAX  the load: each member's own load (`member,<key>,t|a`), each gated arm's small-size thunk
 #             counter, and the startup cell's thunks and attributed bytes.
 #   LOADM     each gated arm's own thunk marginal at the anchor: its X_s is judged only while it holds.
-#   LOADI     each gated arm's three-size thunk intercept at the anchor, or `-` where it is not affine.
+#   LOADA     `affine` where the gated arm is affine at its three sizes at the anchor, else `-`. Its intercept
+#             is DERIVED, never written (`loadi`, below): LOAD_MAX − LOADM·s/(b−s), the line through the
+#             anchored small-size load with the anchored marginal. A written intercept was a second datum for
+#             one fact, and hand raises and the ratchet's `lower LOAD_MAX` left it stale on 13 of 21 affine
+#             rows (den-hoag-loadi-stale-after-loadmax-raise-5mq5q); a raise of LOAD_MAX now moves it with it.
+#             A `LOADI` assignment is refused before any cell, as is a gated row with no LOADA.
 # The block is written by ci/perf-bench-bounds.py from a run's own printed lines, never by hand. The
 # per-size ratio bounds these rows gated until den-hoag-r8y89's marginal form, with every anchor, margin,
 # ratchet and re-anchor recorded beside them, are at hub `94e07ff` (`git show 94e07ff:ci/perf-bench.sh`).
-declare -A MARG_MAX LOAD_MAX LOADM LOADI
+declare -A MARG_MAX LOAD_MAX LOADM LOADA LOADI
 # BEGIN BOUNDS
 MARG_MAX[scalar,t]=390000/632000
 MARG_MAX[scalar,a]=24398000/39182000
 LOAD_MAX[scalar]=132560
 LOADM[scalar]=390000
-LOADI[scalar]=15234000/6000
+LOADA[scalar]=affine
 MARG_MAX[registry,t]=763500/1632750
 MARG_MAX[registry,a]=39746000/87727000
 LOAD_MAX[registry]=258061
 LOADM[registry]=763500
-LOADI[registry]=5622000/1500
+LOADA[registry]=affine
 MARG_MAX[lazyRegistry,t]=774000/1631250
 MARG_MAX[lazyRegistry,a]=41174000/87595000
 LOAD_MAX[lazyRegistry]=261566
 LOADM[lazyRegistry]=774000
-LOADI[lazyRegistry]=5629500/1500
+LOADA[lazyRegistry]=affine
 MARG_MAX[threadedRegistry,t]=942750/1632750
 MARG_MAX[threadedRegistry,a]=50523000/87727000
 LOAD_MAX[threadedRegistry]=319536
 LOADM[threadedRegistry]=942750
-LOADI[threadedRegistry]=8205000/1500
+LOADA[threadedRegistry]=affine
 MARG_MAX[wrappedRegistry,t]=763500/1632750
 MARG_MAX[wrappedRegistry,a]=39758000/87727000
 LOAD_MAX[wrappedRegistry]=259923
 LOADM[wrappedRegistry]=763500
-LOADI[wrappedRegistry]=8410500/1500
+LOADA[wrappedRegistry]=affine
 MARG_MAX[steppedRegistry,t]=644739/1417923
 MARG_MAX[steppedRegistry,a]=33516275/76479824
 LOAD_MAX[steppedRegistry]=218149
 LOADM[steppedRegistry]=644739
-LOADI[steppedRegistry]=-
+LOADA[steppedRegistry]=-
 MARG_MAX[schemaHosts,t]=1463200/2145200
 MARG_MAX[schemaHosts,a]=83402000/115548200
 LOAD_MAX[schemaHosts]=495875
 LOADM[schemaHosts]=1463200
-LOADI[schemaHosts]=9770000/1200
+LOADA[schemaHosts]=affine
 MARG_MAX[wideFreeform,t,band]=399000/512000
 MARG_MAX[wideFreeform,a]=25350000/35030000
 LOAD_MAX[wideFreeform]=136452
 LOADM[wideFreeform]=399000
-LOADI[wideFreeform]=21840000/6000
+LOADA[wideFreeform]=affine
 MARG_MAX[deepSubmodule,t]=4008000/8666400
 MARG_MAX[deepSubmodule,a]=212193600/453759000
 LOAD_MAX[deepSubmodule]=1339263
 LOADM[deepSubmodule]=4008000
-LOADI[deepSubmodule]=3879600/1200
+LOADA[deepSubmodule]=affine
 MARG_MAX[foreignMount,t]=1284000/1254000
 MARG_MAX[foreignMount,a]=69235000/67327000
 LOAD_MAX[foreignMount]=431468
 LOADM[foreignMount]=1284000
-LOADI[foreignMount]=5172000/1500
+LOADA[foreignMount]=affine
 MARG_MAX[foreignElement,t]=1600500/1488000
 MARG_MAX[foreignElement,a]=87079000/80563000
 LOAD_MAX[foreignElement]=537189
 LOADM[foreignElement]=1600500
-LOADI[foreignElement]=5499000/1500
+LOADA[foreignElement]=affine
 MARG_MAX[perOptionType,t]=396000/307500
 MARG_MAX[perOptionType,a]=24403000/18511000
 LOAD_MAX[perOptionType]=135670
 LOADM[perOptionType]=396000
-LOADI[perOptionType]=5787000/1500
+LOADA[perOptionType]=affine
 MARG_MAX[sameLocFanIn,t]=76800/81600
 MARG_MAX[sameLocFanIn,a]=5716800/4339200
 LOAD_MAX[sameLocFanIn]=28718
 LOADM[sameLocFanIn]=76800
-LOADI[sameLocFanIn]=3967200/1200
+LOADA[sameLocFanIn]=affine
 MARG_MAX[keyedFanIn,t]=110400/108000
 MARG_MAX[keyedFanIn,a]=7020600/5308800
 LOAD_MAX[keyedFanIn]=40057
 LOADM[keyedFanIn]=110400
-LOADI[keyedFanIn]=4141200/1200
+LOADA[keyedFanIn]=affine
 MARG_MAX[classShare,fixed,t]=613200
 LOAD_MAX[classShare,fixed]=210854
 LOADM[classShare,fixed]=613200
-LOADI[classShare,fixed]=7962000/1200
+LOADA[classShare,fixed]=affine
 MARG_MAX[overrideWarm,warm,t]=898800
 MARG_MAX[overrideWarm,warm,a]=47194800
 LOAD_MAX[overrideWarm,warm]=313877
 LOADM[overrideWarm,warm]=898800
-LOADI[overrideWarm,warm]=15196800/1200
+LOADA[overrideWarm,warm]=affine
 MARG_MAX[kindMatch,migrated,kind,t]=1000800
 MARG_MAX[entityMatch,migrated,entity,t]=1330200/1702800
 MARG_MAX[coordMatch,migrated,coord,t]=2077200
@@ -445,13 +450,13 @@ MARG_MAX[entityMatch,migrated,entity,a]=75957600/91557600
 MARG_MAX[coordMatch,migrated,coord,a]=112642800
 LOAD_MAX[kindMatch,migrated,kind]=345538
 LOADM[kindMatch,migrated,kind]=1000800
-LOADI[kindMatch,migrated,kind]=14325600/1200
+LOADA[kindMatch,migrated,kind]=affine
 LOAD_MAX[entityMatch,migrated,entity]=455703
 LOADM[entityMatch,migrated,entity]=1330200
-LOADI[entityMatch,migrated,entity]=14763600/1200
+LOADA[entityMatch,migrated,entity]=affine
 LOAD_MAX[coordMatch,migrated,coord]=701016
 LOADM[coordMatch,migrated,coord]=2077200
-LOADI[coordMatch,migrated,coord]=10339200/1200
+LOADA[coordMatch,migrated,coord]=affine
 MARG_MAX[kindMatch,sealed,kind,t]=1000800
 MARG_MAX[entityMatch,sealed,entity,t]=1343400/1702800
 MARG_MAX[coordMatch,sealed,coord,t]=2090400
@@ -460,13 +465,13 @@ MARG_MAX[entityMatch,sealed,entity,a]=76956000/91557600
 MARG_MAX[coordMatch,sealed,coord,a]=113641200
 LOAD_MAX[kindMatch,sealed,kind]=345662
 LOADM[kindMatch,sealed,kind]=1000800
-LOADI[kindMatch,sealed,kind]=14474400/1200
+LOADA[kindMatch,sealed,kind]=affine
 LOAD_MAX[entityMatch,sealed,entity]=460513
 LOADM[entityMatch,sealed,entity]=1343400
-LOADI[entityMatch,sealed,entity]=15255600/1200
+LOADA[entityMatch,sealed,entity]=affine
 LOAD_MAX[coordMatch,sealed,coord]=707275
 LOADM[coordMatch,sealed,coord]=2090400
-LOADI[coordMatch,sealed,coord]=12570000/1200
+LOADA[coordMatch,sealed,coord]=affine
 MARG_MAX[resolution,4-5,t]=125/196
 MARG_MAX[resolution,5-6,t]=141/236
 MARG_MAX[resolution,6-7,t]=157/276
@@ -517,6 +522,22 @@ declare -A FLEET_ANCHOR
 FLEET_CEIL=3/5
 FLEET_ANCHOR[t]=620460/1310790
 FLEET_ANCHOR[a]=32244240/70373040
+
+# ── the load bounds' own shape, before any cell (exit 2) ──
+# A row's intercept is derived from LOAD_MAX and LOADM, so a written one is refused rather than read; and every
+# gated arm (a LOADM row other than resolution's, which is super-linear and has no intercept) carries LOADA, since
+# an absent flag would leave the row unjudged on a moved marginal with nothing said.
+LOAD_SHAPE=()
+for k in "${!LOADI[@]}"; do LOAD_SHAPE+=("LOADI[$k] is written; the intercept is derived from LOAD_MAX[$k] and LOADM[$k], so set LOADA[$k] to affine or -"); done
+for k in "${!LOADM[@]}"; do
+  [[ $k == resolution,resolve ]] && continue
+  [[ ${LOADA[$k]:-} == affine || ${LOADA[$k]:-} == - ]] || LOAD_SHAPE+=("LOADA[$k] is '${LOADA[$k]:-}', not affine or -")
+done
+for k in "${!LOADA[@]}"; do [[ -n ${LOADM[$k]:-} ]] || LOAD_SHAPE+=("LOADA[$k] has no LOADM[$k]"); done
+if ((${#LOAD_SHAPE[@]})); then
+  printf 'perf-bench: the BOUNDS block is unusable — %s\n' "${LOAD_SHAPE[@]}" >&2
+  exit 2
+fi
 
 # ── classShare (gen-class tier-2 fixed-input spine gate) — its OWN threshold, own rationale ──
 # The fixed-input path (applyCoreFixed) skips gen-merge's discharge/fold/verify spine for the shared
@@ -1494,12 +1515,12 @@ emit_report() {
 #             (gate F1, arm (A)).
 #   row     — each gated arm's small-size thunk counter X_s, judged when the arm's own thunk marginal reads
 #             EQUAL to LOADM: X_s's change is then the constant's change, exactly. When the marginal moved
-#             it is judged on the three-size intercept against LOADI, if the arm is affine at three sizes
+#             it is judged on the three-size intercept against the one LOAD_MAX and LOADM derive (`loadi`), if the arm is affine at three sizes
 #             both at the anchor and now; otherwise it is `confounded`, printed and not judged. The row
 #             reads what a member cell cannot: work a workload's first call does once (kindMatch's 13,888
 #             thunks against 89 at n=0), and a constant number of merges.
 #   startup — the startup cell, thunks and ATT, absolute.
-# A moved marginal RE-ARMS its row: `re-arm:` lines print the LOADM, LOADI and LOAD_MAX assignments at
+# A moved marginal RE-ARMS its row: `re-arm:` lines print the LOADM, LOADA and LOAD_MAX assignments at
 # this reading beside the marginal's own line, so adopting a marginal never leaves the row confounded for
 # good (gate F2). A confounded row whose X_s rose keeps its LOAD_MAX, so the next run judges the rise.
 REARMS=()
@@ -1528,25 +1549,32 @@ mid_l() {
     LI="-"
   fi
 }
+# loadi NAME S B — the anchored three-size intercept of an affine row, DERIVED from its two bounds: the line through
+# (S, LOAD_MAX) with slope LOADM/(B−S) meets n=0 at (LOAD_MAX·(B−S) − LOADM·S)/(B−S), the form mid_l reads. `-` when
+# the row is not affine at the anchor; a negative intercept is not a count, so qcmp reads it as unmeasured.
+loadi() {
+  local x=${LOAD_MAX[$1]:-} m=${LOADM[$1]:-}
+  if [[ ${LOADA[$1]:-} == affine && $x =~ ^[0-9]+$ && $m =~ ^[0-9]+$ ]]; then echo "$((x * ($3 - $2) - m * $2))/$(($3 - $2))"; else echo -; fi
+}
 nd() { awk -v r="$1" -v b="$2" 'function v(q, p) { if (q ~ /\//) { split(q, p, "/"); return p[1] / p[2] } return q + 0 } BEGIN { d = v(r) - v(b); if (d == int(d)) printf "%+d", d; else printf "%+.3f", d }'; }
 # rearm NAME LABEL MARGINAL XS LI STATE — the assignments that make a moved marginal's row judgeable again
 rearm() {
   local name=$1 label=$2 m=$3 xs=$4 li=$5 st=$6
   REARMS+=("re-arm: load: $label — set LOADM[$name] to $m")
-  [[ -n $li ]] && REARMS+=("re-arm: load: $label — set LOADI[$name] to $li")
+  [[ -n $li ]] && REARMS+=("re-arm: load: $label — set LOADA[$name] to $([[ $li == - ]] && echo - || echo affine)")
   if [[ $st == affine || $(qcmp "$xs" "${LOAD_MAX[$name]:-}") != gt ]]; then
     REARMS+=("re-arm: load: $label — set LOAD_MAX[$name] to $xs")
   fi
 }
 # lgate NAME LABEL W S B ARM — the row load of a gated arm (the header above).
 lgate() {
-  local name=$1 label=$2 w=$3 s=$4 b=$5 a=$6 xs m bm=${LOADM[$1]:-} st=judged li="-" d=""
+  local name=$1 label=$2 w=$3 s=$4 b=$5 a=$6 xs m bm=${LOADM[$1]:-} st=judged li="-" lia d=""
   xs=$(cv t "$w" "$s" "$a")
   m=$(marg t "$w" "$s" "$b" "$a")
   if [[ -n $REANCHOR ]]; then
     mid_l "$w" "$s" "$b" "$a"
     li=$LI
-    REANCHOR_LINES+=("LOAD_MAX[$name]=$xs   # load: $label; was ${LOAD_MAX[$name]:-}" "LOADM[$name]=$m   # load guard: $label marginal; was ${bm:-}" "LOADI[$name]=$li   # load intercept if affine at three sizes, else -; was ${LOADI[$name]:-}")
+    REANCHOR_LINES+=("LOAD_MAX[$name]=$xs   # load: $label; was ${LOAD_MAX[$name]:-}" "LOADM[$name]=$m   # load guard: $label marginal; was ${bm:-}" "LOADA[$name]=$([[ $li == - ]] && echo - || echo affine)   # affine at three sizes (intercept $li, derived from LOAD_MAX and LOADM), else -; was ${LOADA[$name]:-}")
     LOAD_ROWS+=("$name|$xs|${LOAD_MAX[$name]:-}|$m|anchor|$li|anchor")
     return
   fi
@@ -1564,10 +1592,16 @@ lgate() {
     st=confounded d=confounded
     mid_l "$w" "$s" "$b" "$a"
     li=$LI
-    if [[ -n ${LOADI[$name]:-} && ${LOADI[$name]} != - && $li != - ]]; then
+    if [[ ${LOADA[$name]:-} == affine && $li != - ]]; then
       st=affine
-      gate "load (affine, marginal moved): $label" "$li" "${LOADI[$name]}" "LOADI[$name]"
-      d=$(nd "$li" "${LOADI[$name]}")
+      lia=$(loadi "$name" "$s" "$b")
+      # a fall needs no line of its own: the re-arm below writes LOAD_MAX and LOADM, which derive this reading
+      case $(qcmp "$li" "$lia") in
+        eq | lt) ;;
+        gt) FAILURES+=("load (affine, marginal moved): $label $(qshow "$li") > $(qshow "$lia") (the intercept LOAD_MAX[$name] and LOADM[$name] derive)") ;;
+        *) FAILURES+=("unmeasured: load (affine, marginal moved): $label — reading '$li' or derived intercept '$lia' is not a count or NUM/DEN") ;;
+      esac
+      d=$(nd "$li" "$lia")
     fi
     rearm "$name" "$label" "$m" "$xs" "$li" "$st"
   fi

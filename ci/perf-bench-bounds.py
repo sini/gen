@@ -14,8 +14,9 @@ REPORT is the bench's stdout. By verdict:
   9 RE-ANCHOR BLOCKED refused: the members moved too. With --instrument (an edit to ci/perf-bench.{nix,sh} moves
                       every cell, so its own landing re-reads every bound at its member set; run it with
                       ANCHOR_EVALUATOR planted), as 7, and ANCHOR_MEMBERS is written to the run's members.
-A raise is never written: a reading above its bound needs an owner reading (ci/README.md), and the bench prints
-no assignment for it. FLEET_ANCHOR[t|a] (ADR-0032's fleetHost anchor, outside BOUNDS) is written only by the 8
+LOADA is a row's affinity flag (its intercept is derived from LOAD_MAX and LOADM, never written), and a report that
+assigns LOADI is refused as one from a bench before LOADA. A raise is never written: a reading above its bound needs
+an owner reading (ci/README.md), and the bench prints no assignment for it. FLEET_ANCHOR[t|a] (ADR-0032's fleetHost anchor, outside BOUNDS) is written only by the 8
 path, from its `— lower` line: the 7/9 paths read only BOUNDS names, so no re-anchor reaches it. Exits 0 on a
 write, 1 on a report it cannot record, 2 on an unreadable input.
 """
@@ -34,14 +35,17 @@ except OSError as e:
     print(f"perf-bench-bounds: unreadable input: {e}", file=sys.stderr)
     sys.exit(2)
 
+if re.search(r"LOADI\[", report):
+    print(f"perf-bench-bounds: {report_f} assigns LOADI, a written intercept; the bench derives it from LOAD_MAX and LOADM, so this report is from a bench before LOADA — re-run it", file=sys.stderr)
+    sys.exit(2)
 if not re.search(r"^identity: evaluator ", report, re.M):
     print(f"perf-bench-bounds: {report_f} is not a complete bench report (no identity line) — UNREADABLE, not empty", file=sys.stderr)
     sys.exit(2)
 
-NAME = r"(?:MARG_MAX|LOAD_MAX|LOADM|LOADI)\[[^\]]+\]"
+NAME = r"(?:MARG_MAX|LOAD_MAX|LOADM|LOADA)\[[^\]]+\]"
 # The 8 path's names: BOUNDS' and the fleet anchor, which only a lowering writes.
 LOWER_NAME = rf"(?:{NAME}|FLEET_ANCHOR\[[ta]\])"
-VAL = r"(?:[0-9]+(?:/[0-9]+)?|-)"
+VAL = r"(?:[0-9]+(?:/[0-9]+)?|-|affine)"
 
 
 def members_line(pat):

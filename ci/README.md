@@ -217,8 +217,10 @@ Four gate families (bounds at the top of `perf-bench.sh`):
   predecessor's function body reads on its callers' rows); **row** — each gated arm's
   small-size thunk counter, judged while the arm's own thunk marginal equals its anchored `LOADM`
   (then the counter's change is the constant's change, exactly), or on its three-size intercept
-  against `LOADI` when the marginal moved and the arm is affine; otherwise `confounded`, printed and
-  not judged. The row reads what a member cell cannot: work a workload's first call does once, and a
+  when the marginal moved and the arm is affine (`LOADA`); otherwise `confounded`, printed and not
+  judged. The anchored intercept is derived from `LOAD_MAX` and `LOADM`, never written, so an
+  owner-read raise of `LOAD_MAX` moves it too; a `LOADI` assignment, or a gated row without
+  `LOADA`, is refused before any cell (exit 2). The row reads what a member cell cannot: work a workload's first call does once, and a
   constant number of merges. **startup** — the startup cell, absolute. A moved marginal prints its
   row's `re-arm:` assignments, so adopting it leaves the row judgeable. The `### load` table and the
   `LOAD DELTA` line print every reading. A member landing states its OWN load delta, which the anchor
@@ -724,7 +726,7 @@ is EXACT and TWO-SIDED, so every run ends in one of five states, each with its o
   other than `ANCHOR_MEMBERS`. That last case states `0 cost reading(s) … 0 load row(s) re-arm` and
   owes only the record: the writer writes `ANCHOR_MEMBERS` and no bound, so a 0/0 8 from a scratch
   relock is a stale record, not a ratchet. Each `ratchet:` line names the assignment that lowers it, and each
-  `re-arm:` line the `LOADM` / `LOADI` / `LOAD_MAX` assignment that keeps the row judgeable;
+  `re-arm:` line the `LOADM` / `LOADA` / `LOAD_MAX` assignment that keeps the row judgeable;
   `python3 ci/perf-bench-bounds.py <report>` applies exactly those lines. **The change that ADOPTS the improvement
   carries the lowering** — for a member optimization that is the hub commit that moves the member's
   pin (a relock commit), never a later, unrelated landing; `relock-all` reads 8 as "stop at the hub

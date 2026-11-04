@@ -9,12 +9,12 @@
 # buckets carry exactly what the declaration assigns them, and that a bucket entry is the same VALUE
 # as the flat member rather than a second evaluation of the same source.
 #
-# It also checks the PUBLISHED EXPORT SURFACE: the names each member publishes, fingerprinted per
-# member and compared against a hand-maintained pin (`expectedSurface`). The forcing arms above catch
-# a pin bump that THROWS; this one catches a pin bump that merely CHANGES — an export removed, added
-# or renamed, or a member replaced by a different library, none of which breaks the wiring. The
-# observable is names, never a rev/narHash/outPath, so a docs-only bump leaves the fingerprint
-# byte-identical; a behaviour change under an unchanged export surface is outside this arm by
+# It also checks the PUBLISHED EXPORT SURFACE: the name-paths each member publishes, at every depth,
+# compared against a hand-maintained pin (`expectedSurface`, `ci/surface-paths.nix`). The forcing arms
+# above catch a pin bump that THROWS; this one catches a pin bump that merely CHANGES — an export
+# removed, added or renamed, or a member replaced by a different library, none of which breaks the
+# wiring — and refuses a LOST path by name (`surface-kept`). The observable is names, never a
+# rev/narHash/outPath, so a docs-only bump leaves the pin's reading byte-identical; a behaviour change under an unchanged export surface is outside this arm by
 # construction, and the AGREEMENT arm above is what covers value identity.
 #
 # `gen` is the hub itself: its root flake, read at `self`'s own locked identity (ci/flake.nix), so
@@ -617,14 +617,43 @@ let
   # member from aborting the whole eval unnamed, and gives it a surface value that cannot match a
   # pinned hash. The non-attrset branch does the same job for a member that stops being an attrset:
   # a shape change becomes a named drift rather than an uncaught `attrNames` error.
+  # ★ A PUBLISHED NAME IS A PATH THROUGH PLAIN NAMESPACES (den-hoag-hr4yg arm (a)). The walk is gen-harness
+  # `root-surface.nix`'s: a namespace is an attrset that is not `_type`-tagged and not a derivation, a
+  # `__functor` set included, and every other value is a leaf, forced to WHNF only to tell which it is
+  # (under `tryEval`, so a tombstone is a leaf and still a path). One difference, and it is the reason
+  # the pin can be read: a `__`-prefixed name (`__functor`, `__functionArgs`, a door's `__contract`, a
+  # checker's `__payload`) is the representation's protocol field, which consumers reach through a
+  # reader, so it is neither a path nor descended. Measured at hub 2b4c0e5: 1,259 paths over the 23
+  # members, the same set the vocabulary walk's namespaces give minus its 227 `__` paths, and stable from
+  # depth 8 to 200; with the `__` fields counted it is 3,337, 2,078 of them protocol fields.
+  pathsOf =
+    p: v:
+    builtins.concatMap (
+      n:
+      let
+        q = render p n;
+        t = builtins.tryEval (
+          let
+            x = v.${n};
+          in
+          builtins.isAttrs x && !(x ? _type) && (x.type or null) != "derivation"
+        );
+      in
+      [ q ] ++ (if t.success && t.value then pathsOf q v.${n} else [ ])
+    ) (builtins.filter (n: builtins.substring 0 2 n != "__") (builtins.attrNames v));
   surfaceOf =
     k:
     let
       t = builtins.tryEval (
         let
           v = genLibs.${k};
+          l =
+            if builtins.isAttrs v then
+              builtins.sort builtins.lessThan (pathsOf "" v)
+            else
+              [ (builtins.typeOf v) ];
         in
-        if builtins.isAttrs v then builtins.attrNames v else [ (builtins.typeOf v) ]
+        builtins.deepSeq l l
       );
     in
     if t.success then t.value else [ "<throws>" ];
@@ -636,342 +665,73 @@ let
     }) memberKeys
   );
 
-  # Hand-maintained on the SAME contract as `expectedKeys`: bump the moved member's line in the same
-  # commit as the pin bump that moved it, so this stays a tripwire rather than silent drift. A member
-  # with no entry drifts by construction (`or null`) — a new roster member is pinned or it is named,
-  # never defaulted into agreement. Regenerate through THIS flake, which resolves every member from
-  # the root `flake.lock`. The per-member value is `surfaceHashes.<key>`; the aggregate
-  # `surfaceHash` is a different quantity and never belongs on a line here:
-  #   nix eval ./ci#lib.mkGenLibsEval.surfaceHashes --raw --apply \
-  #     'h: builtins.concatStringsSep "\n" (map (k: "    ${k} = \"${h.${k}}\";") (builtins.attrNames h))'
+  # Hand-maintained on the SAME contract as `expectedKeys`: the moved member's paths move in the same
+  # commit as the pin bump that moved them, so this stays a tripwire rather than silent drift. A member
+  # with no entry drifts by construction (`or null`): a new roster member is pinned or it is named, never
+  # defaulted into agreement. The pin is a SET of name-paths per member (`ci/surface-paths.nix`), so a
+  # drift names the paths that moved, at any depth, and a nested rename (`show.cell` → `show.node`) is a
+  # drift where the top-level hash it replaced was blind to it.
   #
-  # ★ THE PRE-FLIGHT, ANSWERABLE BEFORE THE BUMP (den-hoag-w1tr4 OQ-5): whether a candidate member
-  # revision moves that member's published name set AS THE HUB COMPOSES IT — a property of the two
-  # revisions and the revs the hub injects around them, not of the commits between them and not of
-  # the member's flake alone. 17 of the 21 members are plain re-exports (`x = (input "gen-X").lib`)
-  # and for those a bare `#lib` eval agrees; FOUR are hub-wired (`program`, `delivery`, `class`,
-  # `assemble` above) and a bare `#lib` eval is WRONG for all four: it throws on three ("expected a
-  # set but found a function", their `.lib` IS the function the hub applies) and on `class` it
-  # AGREES ON HASH WHILE READING A DIFFERENT OBJECT — the flake `.lib` leaves `merge = null`, the hub
-  # re-imports with the tier-2 kernel injected, and the two name sets merely happen to agree today.
-  # The form below mirrors the root `flake.nix` `outputs` (the members, `lib/hubSubstrate.nix`'s
-  # applied fold, then `import ./.`), so it is total over every member. The ci flake has no input
-  # named `gen`, and `lib/mkGenLibs.nix` takes resolved member values, not `genInputs`, so neither
-  # can stand in for the root flake here. `plain` is the root flake's list of plain re-exports:
-  #
-  #   nix eval --impure --raw --expr '
-  #     let
-  #       hub = builtins.getFlake "git+file://<clone>/gen";
-  #       gi = hub.inputs // { gen-<member> = builtins.getFlake "git+file://<clone>/gen-<member>?rev=<newRev>"; };
-  #       plain = [ <the plain member keys, as in flake.nix `members`> ];
-  #       members = builtins.listToAttrs (map (k: { name = k; value = gi."gen-${k}".lib; }) plain);
-  #       applied = builtins.mapAttrs (k: args: gi."gen-${k}".lib args)
-  #         (import "${hub}/lib/hubSubstrate.nix" (members // applied));
-  #       roster = import "${hub}" (members // applied);
-  #     in builtins.hashString "sha256" (builtins.toJSON (builtins.attrNames roster.<key>))'
-  #
-  # Arm it first: with `gi = hub.inputs` it must reproduce every pinned line below.
-  #
-  # Compare the result against `expectedSurface.<key>` below. Equal ⇒ free rider, no regeneration
-  # owed. Differ ⇒ the bump carries the regenerated line in the SAME commit as the pin move — the
-  # intermediate state (pin moved, line stale) must not exist in history, exactly like the
-  # regeneration route above.
-  expectedSurface = {
-    # gen-algebra cacf36e81f → 3940d61654 (den-hoag-markof-partial-preimage-znfjq): the surface
-    # gained FOUR names, `componentsPreimage`, `preimageTagOf`, `sealedCollisionEq` and
-    # `sealedMarker`, a composite's per-component preimage tags and its by-name sealed-collision
-    # refusal. Nothing was removed.
-    # gen-algebra d017bc30b2 → 5a8d8d5362 (den-hoag-b7u1v): the surface LOST one name, `search`,
-    # the retired Search-monad namespace (gen-scope is the sole evaluator, ADR-0008 §1). Nothing
-    # was added.
-    # gen-algebra 6534ab3 → 18238b1 (relock 51, den-hoag-lwbb1 unit 1): the surface gained ONE name,
-    # `term`, the first-order term algebra extracted from gen-bind's BodyTerm. Nothing was removed.
-    # gen-algebra 18238b1 → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained ONE name,
-    # `hasDeclaredSubject`, the reader of a registered construction's declared comparison subject.
-    # Nothing was removed.
-    # gen-algebra e62747f → f1d208b (relock 68, den-hoag-dg8d1): the surface gained TWO names,
-    # `hasMark` and `markOf`, the mark readers (decision and demand) beside `identityOf`. Nothing
-    # was removed.
-    algebra = "90c38511b4cdb3827057f22b53396798ab0918e1d3e4471dc84caae533372d61";
-    # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
-    # `hasClassContent`, the class-content predicate over an aspect. No other member moved.
-    # gen-aspects ff664f5 → 15f3f8e (den-hoag-5q36i U1): the surface gained ONE name, `isGuardLeaf`,
-    # gen-aspects' own guard-leaf predicate, which delivery reuses. `includeSitesOf` and `nodeIdOf`
-    # are `graphFacts` fields, not top-level names. Nothing was removed.
-    # gen-aspects e466063 → 7ac3fd1 (relock 48, den-hoag-0cmbt U3): the surface gained ONE name,
-    # `instanceOf`, which mints an aspect instance from its aspect and the sources of the keys it
-    # receives. Nothing was removed and no other member moved.
-    # gen-aspects 357249b → 7d6a009 (relock 49, den-hoag-0cmbt U4): the surface gained TWO names,
-    # `instancesFor`, the instance relation over a scope's suppliers, and `includeSitesOfEntry`, the
-    # one include-site classifier it lifts. Nothing was removed.
-    # gen-aspects 0acfc5c → 1062acb (relock 51, den-hoag-lwbb1 unit 2): the surface LOST one name,
-    # `toArgData`, retired with the custom guard forms now that a guard is a first-order term.
-    # Nothing was added.
-    # gen-aspects 9043da6 → 52e73a9 (relock 61, den-hoag-gywcg): the surface gained ONE name,
-    # `parsePath`, the inverse of the one injective path rendering `pathKey` (a rendered key back to its
-    # segment list). Nothing was removed.
-    # gen-aspects 9d29ae7 → dd46b38 (den-hoag-8hlo3 U2, anonymous declarations are nodes): the surface
-    # gained ONE name, `includeSitesOfInstance`, the include-site classifier keyed under an instance
-    # id (each content site's `target` is `<iid>/includes/<i>`), and LOST ONE, `includeSitesOfEntry`,
-    # which it replaces. No other member moved.
-    # gen-aspects 75e0acd → b2f4313 (relock 72, den-hoag-4akh9 5435ffa): the surface gained ONE name
-    # back, `includeSitesOfEntry`, as a registered throwing tombstone naming `includeSitesOfInstance`
-    # (law batch v1 C9). Nothing was removed; the hash of the new list minus that name is the old line.
-    aspects = "a5a425058c750c2367ca4cfb98cce8cd825c298a426a86b401790b81aaa89506";
-    assemble = "fc9d7d15711aef75161972c90ae9ced3b8beb520d2dc381b1c4074df80169fac";
-    bind = "b208c57ed918aed942c1a778aa2d321b78a7eba8a6bd5b9b518d3f74281e40bc";
-    class = "82391568b8217b01fa44faa7fd359ae818591e5bb12ee4e954da59b33958b5a2";
-    delivery = "8b0f007d723a6023c14af50860e247cf9f5aef7a51cd5c7f2cdf654add84f8ab";
-    dispatch = "b6b0c94a150ba0aadad4a22c85c8f189b542592710ea51201f3d9151f8d00cc2";
-    # gen-graph cfc2a90d7b → 00fe4bf4e9 (den-hoag-lock-currency-ruling-ez1yq, taken by the
-    # lock-currency relock): the surface gained ONE name, `lowlink`, a third SCC-partition arm
-    # (Tarjan's DFS iterated over a persistent trie) published beside `fbNode` and `fbWork`.
-    # Nothing was removed and no other member moved.
-    #
-    # gen-graph 4649d8390b → 04993c2228 (den-hoag-gayc U1a): the surface gained ONE name, `key`, the
-    # key formers with the refusal prefix a parameter, which gen-scope's calculus binds. Nothing was
-    # removed.
-    #
-    # gen-graph ce977b5576 → ab81c86405 (den-hoag-gayc U3, gen-graph leaves the resolution
-    # calculus): the surface lost SEVEN names, `queryArrivals`, `queryFold`, `ranksOf`, `rankOf`,
-    # `rankWordOf`, `wordLess` and `pathLess`, which had no caller; `query`, `regex`, `labeledFrom`
-    # and `boundedBy` became registered tombstones (retirementEntries above), so they are still
-    # published names. Nothing was added.
-    graph = "5d5ead1bc3b5cb92c788d0468fc90e0bf95908ba4922d39b893d21ce9dcd2041";
-    identity = "ae39363fd50eb2100013362d3d43563146bf24fe8539675c8e8a944d62eaa201";
-    # gen-inspect, the roster's 22nd member and the 4th at `framework`: the library that
-    # interrogates a materialized graph. Its surface is 13 names — the IR construction and its
-    # gen-graph wrapper, the three-route compile rule with its reserved set, the door, the copied
-    # parser's two entry points, the executor's two, the selector API and the renderers.
-    inspect = "f7d77bca2538837379cb3fe80c22a12a48e2e008d68625491dd8beff1b93875c";
-    link = "90b36cc605f281fd7dd1d2dcf9af76c2fcf5cebdead79376b724ee2958e930a4";
-    memo = "b7342e22fec4f96698e5a88a755635be782fb27e3f4c0f7868eb1a7cca2b6166";
-    # gen-merge 3aa6dacca9 → 7516886fcc (the lock-currency relock): the surface gained ONE name,
-    # `declaredOptions`, the declared-option reader over an evaluated module tree. Nothing was
-    # removed and no other member moved.
-    #
-    # gen-merge 0e6340fdfa → 888872807c (den-hoag-u92up, taken by the lock-currency relock): the
-    # surface gained ONE name, `mergeTypes`, the engine's type-merge relation published for a
-    # consumer holding two types it did not build. Nothing was removed and no other member moved.
-    #
-    # gen-merge 88919f8 → 50250c1 (den-hoag-bfc0k): the surface gained ONE name, `closuresFirst`,
-    # the comparison subject of a value that can carry a type record. Nothing was removed.
-    #
-    # gen-merge 1b95c7e → 9be19f2 (den-hoag-n6dh7 Unit 2, den-hoag-1n12c): the surface gained ONE
-    # name, `moduleSyntax`, the reader's own structured/shorthand key lists, which gen-schema reads
-    # instead of restating them. Nothing was removed and no other member moved.
-    # gen-merge ec5a99d → aa61dd8 (den-hoag-zakjg U1, den-hoag-ydro3 arm (c)): the surface gained TWO
-    # names, `priorityBand` and `bandedLeaves`, each contributor's leaves sorted into force, set,
-    # default or unset. ydro3's `types.witnessRecord` is inside `types`, not a top-level name, so it
-    # moves no digest here. Nothing was removed.
-    # gen-merge c2405e0 → dd18d6b (relock 49, den-hoag-5kic): the surface gained ONE name,
-    # `deriveType`, a type derived from a completed one and re-completed rather than overridden; it
-    # is also `types.deriveType`. Nothing was removed.
-    # gen-merge f282ed0 → 652acc0 (relock 68, den-hoag-gi421): the surface gained ONE name,
-    # `importedCarried`, the one reader of what a type wraps in either vocabulary. Nothing was
-    # removed.
-    # gen-merge c1b2d1c → 946e84a (den-hoag-7gp66 L1, rebased onto gen-merge main 95123ec, which
-    # carries den-hoag-5ov3p): the surface gained ONE name, `partialSubmodule`, 5ov3p's partial
-    # submodule. Nothing was removed; the hash of the new list minus that name is the old line.
-    # gen-merge 425e522 → 7a55c1f (relock 72, den-hoag-m19bm b7e58df): the surface gained ONE name,
-    # `mkDefinition`, nixpkgs' definition record, a definition in its own file. Nothing was removed;
-    # the hash of the new list minus that name is the old line.
-    # gen-merge 7a55c1f → b4b4688 (relock 73; den-hoag-60hql Part C 175db64, den-hoag-7gp66 row 16
-    # 131b802, den-hoag-we9fu 9aaae99): the surface gained ONE name, `importedTypeWalkFuel`, the
-    # type-walk bound gen-schema's deferral reads. Nothing was removed; the hash of the new list minus
-    # that name is the old line.
-    # gen-merge 2ec0219 → 28653f3 (relock 12; den-hoag-jbddy 92c5734, den-hoag-2tna3 C2 7dc42ca): the
-    # surface gained ONE name, `engineOptionNames`, the option names the engine serves beside the
-    # declared ones, which gen-aspects' cnf door reads. Nothing was removed.
-    # gen-merge f251ddb → 7fa8b34 (relock 13; den-hoag-1k5mi 5157af5, den-hoag-2wo5a 8e03a42): the
-    # surface gained ONE name, `verifyValue`, a whole value judged against a composite option type.
-    # Nothing was removed; the hash of the new list minus that name is the old line.
-    merge = "a9e514bc12d2fbb5b44d540d56267ce3e7a9799559ab99cca8688183715d2e50";
-    # gen-prelude eddf617 → 0ac7b66 (den-hoag-7gp66 P1): the surface gained THREE names,
-    # `checkOptions`, `checkRequired` and `resolve`, the door constructs. Nothing was removed and no
-    # other member moved.
-    #
-    # gen-prelude 0e2d39d → 02dc956 (den-hoag-7gp66 P2 L0): the surface gained ONE name, `door`,
-    # the door constructor. `isFunction` and `functionArgs` keep their names and became nixpkgs'
-    # functor-aware readers. Nothing was removed.
-    #
-    # gen-prelude 6487a87 → f7247d1 (den-hoag-7gp66 P2 v1.2): the surface gained ONE name,
-    # `checkGuarded`, the misplaced-option guard `door`'s `optionsStep` applies. Nothing was removed.
-    # gen-prelude b2962cb → 0bed837 (relock 53, den-hoag-fyx6m): the surface gained ONE name,
-    # `isStringLike`, vendored from nixpkgs `lib.isStringLike` for gen-types' `path` and `pathLike`.
-    # Nothing was removed.
-    # gen-prelude 7f80026 → fe448bb (relock 68, den-hoag-7jltk): the surface gained ONE name,
-    # `refusals`, the record of the text each door construct throws. Nothing was removed.
-    # gen-prelude 7dd9e4b → 92093b1 (the lock-currency relock; den-hoag-pl8cq 54fe807, den-hoag-gtwxg U1 726a33d):
-    # the surface gained EIGHT names, nixpkgs lib's `hasSuffix`, `removeSuffix`, `concatMapStrings`,
-    # `splitString`, `reverseList`, `remove` and `recursiveUpdate`, and `patternOf`, the
-    # pattern-shape reader. Nothing was removed; the hash of the new list minus those names is the
-    # old line.
-    # gen-prelude 98d46cf → 7f9991f (relock 12; den-hoag-izo7a f5aa7d4, den-hoag-b6nyh U1 c2fd28a): the
-    # surface gained SIX names, izo7a's `absorb`, the quotient rule's one home, and b6nyh's
-    # `applicability`, `applicableKindOf`, `applicableLevels`, `applicablePatternOf` and
-    # `isApplicable`, the fuelled applicability walk. Nothing was removed.
-    prelude = "1594ac7ab57c58daa09101df32368c4498a9be5feaf51299e36239f8146e33b5";
-    # gen-product ba6d741 → bc29006 (den-hoag-7gp66 L1, grammar R8): the surface gained TWO names,
-    # `nodeAt` and `nodeCoordinates`; `cell` and `cells` became registered tombstones
-    # (retirementEntries above), so they are still published names. Nothing was removed.
-    product = "fd000f6b67fd6737cf3fd1875809d7b4d660b009841446a830ade49c95d0c5c3";
-    # gen-program (den-hoag-qq9vt): the surface gained ONE name, `ruleEdges`. Nothing was removed.
-    # gen-program c913d05 → 04c9161 (relock 51, den-hoag-lwbb1 unit 3): the surface gained TWO names,
-    # `groundInstances`, which resolves a terms-only policy body at a context, and
-    # `codomainBreaches`, the per-firing codomain check the gen-rules door applies. Nothing was
-    # removed.
-    program = "e4cf1540eb0d2be27eb306eb487cf395fbe2f4a42b47fb38501aa11547a48704";
-    # gen-rules, the roster's 23rd member and the 5th at `framework`: the one closure crossing. Its
-    # surface was 5 names — the loader lowering and its registration table, the door, and the two
-    # catalogue patterns. gen-rules d473539 → relock 64 (den-hoag-lwbb1 S1 (a), den-hoag-1wdng): the
-    # surface gained TWO names, `lambdasMount`, the registration table mounted inside the aspect
-    # submodule, and `registrations`, the tables a load-time closure's site names. Nothing was removed.
-    rules = "2a9bce7a102ab1196f5d58fd19b5ca837ded06096240bae431cf80d35e675fb0";
-    # gen-schema 88c41cb → 168cf21 (den-hoag-pgpg8): the surface gained ONE name,
-    # `identityKeysForKind`, the kind-boundary identity-key derivation. Nothing was removed and no
-    # other member moved.
-    #
-    # gen-schema f8e0e17 → 056ee9b (the inheritance relocation, step 4): the surface gained ONE
-    # name, `evalSchema` (lib/eval-schema.nix, the staged pass that resolves kind `inherits` by
-    # name against the frozen output of a strictly earlier pass). Nothing was removed and no other
-    # member moved.
-    #
-    # gen-schema f207b53 → 8fb5b42 (den-hoag-markof-partial-preimage-znfjq): the surface gained
-    # ONE name, `kindEq`, the kind comparison that refuses a sealed-only collision by name.
-    # Nothing was removed.
-    #
-    # gen-schema c9c5cc9 → 4b4244a (den-hoag-bfc0k): the surface gained TWO names,
-    # `constructionRelation` (the merge relation of a type built per construction) and
-    # `keySemanticsRecords` (the record positions its keySemantics grammar fixes). Nothing was
-    # removed.
-    #
-    # gen-schema f99df45 → f7ecf39 (den-hoag-2zjg1): the surface gained ONE name,
-    # `declarationOf`; `ref` became a registered tombstone (retirementEntries above), so it is still
-    # a published name and nothing was removed.
-    #
-    # gen-schema 749cfdd → 620bf64 (den-hoag-2zjg1, the TERM ruling reaching the value constructor):
-    # the surface gained the declaration-named `mkFieldDeclaration`, `isFieldDeclaration`,
-    # `fieldDeclarationsIn` and `fieldDeclarationMarker`, and the four names they replace, `fieldRef`,
-    # `isFieldRef`, `fieldRefsIn` and `fieldRefMarker`, became registered tombstones
-    # (retirementEntries above): still published names, so nothing was removed.
-    #
-    # gen-schema 620bf64 → 4c30e07 (den-hoag-8x97u, relock 47): the surface gained ONE name,
-    # `entryReservation`, the reservation a kind entry's import closure is checked against. Nothing
-    # was removed and no other member's names moved.
-    #
-    # gen-schema cd204ee → d34de39 (relock 13; den-hoag-w523e e092a34): the surface gained ONE name,
-    # `ancestorsForKind`, a kind's ancestors in a linear extension of inheritance. Nothing was
-    # removed; the hash of the new list minus that name is the old line.
-    schema = "5c4a14b984ba985bcc8ac679ff102f871e0e3b62f87659ae721ff42df6817d4d";
-    # gen-scope d24e0d983f → 41c7d9f5ea (den-hoag-wk8g8): the hub relock onto the four
-    # declaration-bearing members moved this member's published surface.
-    #
-    # gen-scope e64c00719a → e355bb866a (den-hoag-n6dh7 Unit 1, the recursive NTA channel): the
-    # surface gained FOUR names, `childDepth`, `decodeNta`, `flattenChildren` and `mintNtaId`.
-    # Nothing was removed and no other member moved.
-    #
-    # gen-scope f5f2b6550c → a650104f6f (kinds minted by a staged fold): the surface lost ONE name,
-    # `isKindSet`, the registry provenance test the fold made redundant. Nothing was added and no
-    # other member moved.
-    #
-    # gen-scope c25d0e6db2 → b4418fa822 (den-hoag-4kh.53.54): the surface lost ONE name, `paramAttr`,
-    # the retired parameter-attribute accessor. Nothing was added and no other member moved.
-    #
-    # gen-scope 70c286a → 5afbb0f (relock 48, den-hoag-0cmbt U5): the surface gained ONE name,
-    # `argumentBinding`. Nothing was removed.
-    #
-    # gen-scope 7ab60ef → 995461f (den-hoag-gayc, the one resolution calculus): the surface gained
-    # `wellFormed`, `labelOrder`, `neron` and `wfl`; `resolve` names the calculus where it named the
-    # D<I<P selector; `query`, `queryAll`, `ambiguous`, `visibleFrom` and `queryReverse` are
-    # tombstones (`retirementEntries`).
-    scope = "a5393968311a63822c332337c0fc5221c37d5c13430cc71942483f93576cc9eb";
-    # gen-select 8ab4b1d → 37eccfc (relock 48, den-hoag-l0y U3): the surface gained ONE name, `subkind`,
-    # the selector matching a kind or any subkind of it. Nothing was removed.
-    # gen-select 96c3a97 → da73842 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained ONE
-    # name, `anyOf`; `any` became a registered tombstone. Nothing was removed.
-    select = "efd9370d9974310d71df8dd9accb959c04f4d59356e2d8b52fccbdba647b980b";
-    # gen-settings 3449bfa → e7cafdd (den-hoag-2zjg1): the surface gained `mkDeclaration`,
-    # `isFieldDeclaration` and `fieldDeclarationsIn`; `ref`, `isRef` and `refsIn` became registered
-    # tombstones (retirementEntries above), so nothing was removed.
-    settings = "0ad19eb12ce7cc7851c97fb00a9b2a756cf95d2806a556c1892414852da383b8";
-    # gen-types 1542e47126 → c8ea733eba (den-hoag-z3nrc, taken by the lock-currency relock): the
-    # surface gained ONE name, `identityGuard`, the step-indexed guard that bounds type nesting for
-    # identity. Nothing was removed and no other member moved.
-    #
-    # gen-types 048dd55fb → ef69ea948 (the construction-payload reader, taken by the lock-currency
-    # relock): the surface gained ONE name, `payloadOf`, the certifying reader of a checker's
-    # `__payload`. Nothing was removed. gen-merge re-exports it inside its `types` namespace only,
-    # so its own published names did not move.
-    #
-    # gen-types 496d882 → f6115ec (den-hoag-ydro3): the surface gained TWO names, `rewritesCheck` and
-    # `witnessedCheck`, the check-witness protocol that detects a wrapper rewriting a record's
-    # `check`. Nothing was removed.
-    # gen-types f6115ec → 3f8b7ca (den-hoag-ydro3 arm (c)): the surface gained ONE name,
-    # `witnessRecord`, the one record `witnessedCheck` publishes twice, for a producer that publishes
-    # it itself. Nothing was removed.
-    # gen-types d1930bf → 6orb8-u1 (den-hoag-6orb8 U1): the surface gained TWO names, `mkIdentity`,
-    # the per-component identity half a producer outside gen-types builds through, and
-    # `comparisonSubject`, the compared regime's subject. Nothing was removed.
-    # gen-types 6orb8-u1 → 6orb8-u1b (den-hoag-6orb8 U1b): the surface gained ONE name, `stampOk`,
-    # the completion stamp's reader a rebuilding boundary consults. Nothing was removed.
-    # gen-types → 6orb8-a1 (den-hoag-6orb8 A1): the surface gained ONE name, `idOf`, the identity
-    # demand (a projection over `__mint` / `__sealed`) that replaced the retired `__id` field. Nothing
-    # was removed.
-    # gen-types 14c8936 → d3e5203 (den-hoag-7gp66 L1, grammar R10 rule 3): the surface gained THREE
-    # names, `checkedListOf`, `checkedAttrsOf` and `checkedOption`; `listOf`, `attrsOf` and `option`
-    # became registered tombstones. Nothing was removed.
-    # gen-types 4af4858 → 5641f5e (relock 73, den-hoag-7gp66 row 16 2c24316): the surface gained ONE
-    # name, `typeWitness`, the witness declaration a boundary ties on a record it builds. Nothing was
-    # removed; the hash of the new list minus that name is the old line.
-    # gen-types ca90fb1 → c1311e4 (den-hoag-y9vzt, grammar R10 rule 3): the surface gained ONE name,
-    # `checkedAttrs`; `attrs` became a registered tombstone. Nothing was removed.
-    types = "83151324bad08ee9db84eb91179480a0429c66cbe4302099641016352269c942";
-    # gen-view 2656d3cc38 → eccb0d2a78 (den-hoag-wk8g8): same relock, this member's published
-    # surface also moved. `gen-bind` and `gen-select` moved in the same relock but are free
-    # riders here — their hashes are unchanged, so no line for them was touched.
-    # gen-view 5d0835a → 47106a8 (den-hoag-zakjg U2/U3): the surface gained TWO names,
-    # `headPositions` and `joinedTrace`. Nothing was removed.
-    # gen-view 83796dc → gayc-u2a (den-hoag-gayc U2a, D14): the surface lost TWO names,
-    # `labelWellFormedness` and `labelOrder`. E and < are the resolution calculus's own parameters
-    # and gen-scope builds them (`wellFormed`, `labelOrder`); they are removed, not re-exported.
-    # Nothing was added.
-    view = "ea9490675935a131800e05e0de5af68aa317a9fa45597a2fddb22bb9057fed72";
-  };
+  # ★ A LOST PATH IS NOT RE-PINNED AWAY. C9 (law batch v1; ADR-0011's rider): a renamed or retired export
+  # keeps a refused-by-name alias, a registered tombstone, which is still a published path. So a pinned
+  # path the live surface no longer publishes is an unaliased loss, and `surface-kept` refuses it by
+  # name. The one regeneration route, `surfaceRepin`, writes the UNION of the pin and the live paths:
+  # it adds what a bump gained and never drops what it lost, so the routine re-pin cannot accept a loss
+  # (the hash re-pin did, at gen-aspects 84400bf, `includeSitesOfEntry`). A path leaves the pin only by
+  # a hand deletion of its line, the act that retires its tombstone and its register entry with it.
+  # Regenerate one member through THIS flake, which resolves every member from the root `flake.lock`:
+  #   nix eval ./ci#lib.mkGenLibsEval.surfaceRepin.<key> --json
+  expectedSurface = import ./surface-paths.nix;
 
-  # EXPORTED below, and that export is the only route that regenerates what this arm compares. It is
-  # not on the report list: the report is what the derivation carries, this is what a maintainer
-  # reads at eval time.
-  surfaceHashes = builtins.listToAttrs (
-    map (k: {
-      name = k;
-      value = builtins.hashString "sha256" (builtins.toJSON surface.${k});
-    }) memberKeys
-  );
+  # EXPORTED below, and that export is the only route that regenerates the pin: per member, the pin's
+  # paths and the live ones, sorted, so it never drops a lost path (above).
+  repinOf =
+    expected: surf:
+    builtins.mapAttrs (k: live: builtins.attrNames (setOf ((expected.${k} or [ ]) ++ live))) surf;
+  # a list of strings as a set; its `attrNames` is the sorted, de-duplicated list
+  setOf =
+    xs:
+    builtins.listToAttrs (
+      map (x: {
+        name = x;
+        value = null;
+      }) xs
+    );
+  surfaceRepin = repinOf expectedSurface surface;
   # ── THE PREDICATE ──
   #
   # Lifted to a function of its two inputs so a SEEDED world runs THIS code and not a copy of it.
   # That is the arming construction `direction-of-dependence.nix` states and `sole-evaluator.nix`
-  # repeats, and this file was named by both as the one that lacked it.
-  #
-  # Reported as a LIST, so a failure names the member instead of only denying — the same shape
-  # `resolveFailed` and `strataMissing` already take. `builtins.attrNames surf` is `memberKeys` on
-  # the live call (`surface` is built from them) and the recomputed hash is `surfaceHashes.${k}`, so
-  # the live reading is unchanged; the `or null` branch is preserved verbatim, because it is the arm
-  # that keeps a new roster member from defaulting into agreement.
+  # repeats. Per drifted member, the paths it LOST (pinned, no longer published) and GAINED (published,
+  # unpinned); a member with no pin entry drifts with every path gained, the `or null` arm that keeps a
+  # new roster member from defaulting into agreement.
   driftOf =
     expected: surf:
-    builtins.filter (
-      k: (expected.${k} or null) != builtins.hashString "sha256" (builtins.toJSON surf.${k})
-    ) (builtins.attrNames surf);
+    let
+      one =
+        k:
+        let
+          pin = expected.${k} or null;
+          live = setOf surf.${k};
+          pinned = setOf (if pin == null then [ ] else pin);
+        in
+        {
+          lost = if pin == null then [ ] else builtins.filter (q: !(live ? ${q})) pin;
+          gained = builtins.filter (q: !(pinned ? ${q})) surf.${k};
+          unpinned = pin == null;
+        };
+      all = builtins.mapAttrs (k: _: one k) surf;
+    in
+    builtins.removeAttrs all (
+      builtins.filter (k: !(all.${k}.unpinned || all.${k}.lost != [ ] || all.${k}.gained != [ ])) (
+        builtins.attrNames all
+      )
+    );
+  lostOf = d: builtins.concatMap (k: map (q: "${k}.${q}") d.${k}.lost) (builtins.attrNames d);
 
-  surfaceDrift = driftOf expectedSurface surface;
-  surfaceDriftNames = builtins.listToAttrs (
-    map (k: {
-      name = k;
-      value = surface.${k};
-    }) surfaceDrift
-  );
+  surfaceDriftNames = driftOf expectedSurface surface;
+  surfaceDrift = builtins.attrNames surfaceDriftNames;
+  surfaceLost = lostOf surfaceDriftNames;
   # The roll-up. It is in the report for a reason the drift list cannot serve: after an
   # ACKNOWLEDGED bump (surface moved, `expectedSurface` re-pinned in the same commit) the drift list
   # is empty again and the rest of the report is unchanged, so without this field the derivation
@@ -995,39 +755,79 @@ let
   # arming row goes false at once — spurious reds masking the one true red. The fixture is therefore
   # disjoint from `surface`, and a correct build that moves a real export surface cannot break these
   # greens; the only cell such a build moves is `surface-pinned`, which is the one that should move.
-  armSurface = {
-    alpha = [
-      "one"
-      "two"
-    ];
-    beta = [ "three" ];
+  # The fixture is a LIBRARY, so the arming runs the walk too: a nested namespace, a `__functor` set
+  # (descended), a `__` protocol field (skipped), a `_type` value and a throwing tombstone (leaves).
+  armLib = {
+    alpha = {
+      one = 1;
+      two = 2;
+      ns = {
+        cell = 1;
+        node = 2;
+        __contract = {
+          required = [ ];
+        };
+      };
+      door = {
+        __functor = _: x: x;
+        step = 1;
+      };
+      opt = {
+        _type = "option";
+        inner = 1;
+      };
+      gone = throw "alpha: gone";
+    };
+    beta = {
+      three = 3;
+    };
   };
-  armPin = builtins.mapAttrs (_: v: builtins.hashString "sha256" (builtins.toJSON v)) armSurface;
-  arming = {
-    # The positive control on the five refusals below: without it a `driftOf` that named EVERY
-    # member would satisfy all five and the arming would certify a predicate that never agrees.
-    clean = driftOf armPin armSurface;
-    added = driftOf armPin (armSurface // { alpha = armSurface.alpha ++ [ "four" ]; });
-    removed = driftOf armPin (armSurface // { alpha = [ "one" ]; });
-    renamed = driftOf armPin (
-      armSurface
-      // {
-        alpha = [
-          "one"
-          "TWO"
-        ];
-      }
+  armSurface = builtins.mapAttrs (_: v: builtins.sort builtins.lessThan (pathsOf "" v)) armLib;
+  armPin = armSurface;
+  armWith =
+    alpha:
+    builtins.mapAttrs (_: v: builtins.sort builtins.lessThan (pathsOf "" v)) (
+      armLib // { inherit alpha; }
     );
-    reordered = driftOf armPin (
-      armSurface
-      // {
-        alpha = [
-          "two"
-          "one"
-        ];
-      }
+  arming = {
+    # The walk itself: the paths above, and none of `__contract`, `door.__functor` or `opt.inner`.
+    walk = armSurface.alpha;
+    # The positive control on the refusals below: without it a `driftOf` that named EVERY member
+    # would satisfy them all and the arming would certify a predicate that never agrees.
+    clean = driftOf armPin armSurface;
+    added = driftOf armPin (armWith (armLib.alpha // { four = 4; }));
+    removed = lostOf (driftOf armPin (armWith (builtins.removeAttrs armLib.alpha [ "two" ])));
+    # The nested rename with no alias (`ns.cell` → `ns.cellNode`): the class a top-level pin cannot see.
+    renamedNested = lostOf (
+      driftOf armPin (
+        armWith (
+          armLib.alpha
+          // {
+            ns = builtins.removeAttrs armLib.alpha.ns [ "cell" ] // {
+              cellNode = 1;
+            };
+          }
+        )
+      )
+    );
+    # The same rename under C9: `ns.cell` kept as a throwing tombstone. Nothing is lost; the new name
+    # is a gain the re-pin takes.
+    aliasedNested = driftOf armPin (
+      armWith (
+        armLib.alpha
+        // {
+          ns = armLib.alpha.ns // {
+            cell = throw "alpha: ns.cell is ns.cellNode";
+            cellNode = 1;
+          };
+        }
+      )
     );
     unpinned = driftOf (builtins.removeAttrs armPin [ "alpha" ]) armSurface;
+    # The re-pin keeps a lost path: the routine route cannot accept a loss.
+    repinKeepsLost = builtins.elem "two" (
+      (repinOf armPin (armWith (builtins.removeAttrs armLib.alpha [ "two" ]))).alpha
+    );
   };
 
   # The one LIVE-COUPLED arm, and the predecessor's OTHER death mode expressed as a cell: a pin entry
@@ -1049,9 +849,8 @@ let
   #
   # ADR-0035: no host, user, system, machine, service, cluster or their synonyms appear in gen's
   # types, kinds, labels, options, error text or documentation as anything but an example a
-  # framework might declare. `surface-pinned` cannot see this class: it hashes each member's
-  # top-level names, and a den word sits as readily in a nested export (`crossing.*`, `fixtures.*`)
-  # or in a formal.
+  # framework might declare. `surface-pinned` cannot see this class: it pins which name-paths
+  # exist, not the words they spell, and a den word sits as readily in a formal.
   #
   # THE POPULATION: every roster member plus the hub's own `compose`, walked through PLAIN attrsets
   # (not `_type`, option-type or functor sets) to depth 4, and the attrset formals of every function
@@ -1312,14 +1111,43 @@ in
     buckets-resolve = resolveFailed == [ ];
     buckets-agree = agreeFailed == [ ];
     surface-pinned = surfaceDrift == [ ];
+    # C9 at every depth: no pinned path is lost without its refused-by-name alias (den-hoag-hr4yg).
+    surface-kept = surfaceLost == [ ];
     # ARMING — the comparison itself, over the synthetic fixture. A failing key here is the arming
     # having stopped firing, and it is RED: a guard that can no longer refuse is not a passing guard.
-    arming-drift-silent-on-agreement = arming.clean == [ ];
-    arming-drift-names-added = arming.added == [ "alpha" ];
-    arming-drift-names-removed = arming.removed == [ "alpha" ];
-    arming-drift-names-renamed = arming.renamed == [ "alpha" ];
-    arming-drift-names-reordered = arming.reordered == [ "alpha" ];
-    arming-drift-names-unpinned = arming.unpinned == [ "alpha" ];
+    arming-surface-walk =
+      arming.walk == [
+        "door"
+        "door.step"
+        "gone"
+        "ns"
+        "ns.cell"
+        "ns.node"
+        "one"
+        "opt"
+        "two"
+      ];
+    arming-drift-silent-on-agreement = arming.clean == { };
+    arming-drift-names-added =
+      arming.added == {
+        alpha = {
+          lost = [ ];
+          gained = [ "four" ];
+          unpinned = false;
+        };
+      };
+    arming-drift-names-removed = arming.removed == [ "alpha.two" ];
+    arming-drift-names-nested-loss = arming.renamedNested == [ "alpha.ns.cell" ];
+    arming-drift-alias-loses-nothing =
+      arming.aliasedNested == {
+        alpha = {
+          lost = [ ];
+          gained = [ "ns.cellNode" ];
+          unpinned = false;
+        };
+      };
+    arming-drift-names-unpinned = builtins.attrNames arming.unpinned == [ "alpha" ];
+    arming-repin-keeps-lost = arming.repinKeepsLost;
     # ARMING — the pin's DOMAIN, the half `surfaceDrift` cannot see.
     arming-pin-covers-roster = pinDomain == memberKeys;
     retired-refusing = retirementFailed == [ ];
@@ -1364,12 +1192,15 @@ in
     "buckets-resolve"
     "buckets-agree"
     "surface-pinned"
+    "surface-kept"
+    "arming-surface-walk"
     "arming-drift-silent-on-agreement"
     "arming-drift-names-added"
     "arming-drift-names-removed"
-    "arming-drift-names-renamed"
-    "arming-drift-names-reordered"
+    "arming-drift-names-nested-loss"
+    "arming-drift-alias-loses-nothing"
     "arming-drift-names-unpinned"
+    "arming-repin-keeps-lost"
     "arming-pin-covers-roster"
     "retired-refusing"
     "retirement-successor-live"
@@ -1408,9 +1239,10 @@ in
   retirementRegister = ruledRetirement;
   inherit
     surfaceHash
-    surfaceHashes
+    surfaceRepin
     surfaceDrift
     surfaceDriftNames
+    surfaceLost
     vocabularyUnregistered
     vocabularyStale
     vocabularyArming
