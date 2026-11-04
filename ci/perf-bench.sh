@@ -307,6 +307,8 @@ MATRIX=(
   "sameLocFanIn 1600 r,big"
   "keyedFanIn 400 small"
   "keyedFanIn 1600 r,big"
+  "openNested 500 small"
+  "openNested 2000 r,big"
   "fleetHost 10 small"
   "fleetHost 100 big"
 )
@@ -336,7 +338,7 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.9'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=ac92bc949bb499ee0d13b6994c0d738244cb0ccd gen-aspects=66f58a2a2bf71692ac6d8b95a77f7a7695beecd1 gen-class=d33815761e06b47160bcd6738a1d7dd6d01704f9 gen-graph=edfe3d51b9bf0c3a4b5abb92cd04ec27de4393b0 gen-identity=49acb9737780b6903a102da4d5da60707f6bd7ca gen-memo=e7e19feb8702c8839dcc2b71746562a2ef2539e3 gen-merge=38071c516bf70b54c34f672c7571d1d859ab4d21 gen-prelude=18608069f1271035065edaec3e49c4bba7033c40 gen-schema=981fb1c505cd6c71ad6fa76c4d44d996d4607aa2 gen-scope=aa81a98794783fdd837dc58a3859838d3baa4278 gen-select=68e30246935c4bdd75a3123bc4ea3285608c0c37 gen-types=c1fba4db808b09b086a09c6550011365f8ef6275'
+ANCHOR_MEMBERS='gen-algebra=ac92bc949bb499ee0d13b6994c0d738244cb0ccd gen-aspects=66f58a2a2bf71692ac6d8b95a77f7a7695beecd1 gen-class=d33815761e06b47160bcd6738a1d7dd6d01704f9 gen-graph=edfe3d51b9bf0c3a4b5abb92cd04ec27de4393b0 gen-identity=49acb9737780b6903a102da4d5da60707f6bd7ca gen-memo=e7e19feb8702c8839dcc2b71746562a2ef2539e3 gen-merge=38cae36c36c8ef2c79c65733fb30760855d6739a gen-prelude=18608069f1271035065edaec3e49c4bba7033c40 gen-schema=981fb1c505cd6c71ad6fa76c4d44d996d4607aa2 gen-scope=aa81a98794783fdd837dc58a3859838d3baa4278 gen-select=68e30246935c4bdd75a3123bc4ea3285608c0c37 gen-types=c1fba4db808b09b086a09c6550011365f8ef6275'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -360,96 +362,106 @@ declare -A MARG_MAX LOAD_MAX LOADM LOADI
 # BEGIN BOUNDS
 MARG_MAX[scalar,t]=390000/632000
 MARG_MAX[scalar,a]=24398000/39182000
-LOAD_MAX[scalar]=132560
+LOAD_MAX[scalar]=132561
 LOADM[scalar]=390000
 LOADI[scalar]=15234000/6000
 MARG_MAX[registry,t]=763500/1632750
 MARG_MAX[registry,a]=39746000/87727000
-LOAD_MAX[registry]=258061
+LOAD_MAX[registry]=258062
 LOADM[registry]=763500
 LOADI[registry]=5622000/1500
 MARG_MAX[lazyRegistry,t]=774000/1631250
 MARG_MAX[lazyRegistry,a]=41174000/87595000
-LOAD_MAX[lazyRegistry]=261566
+LOAD_MAX[lazyRegistry]=261567
 LOADM[lazyRegistry]=774000
 LOADI[lazyRegistry]=5629500/1500
 MARG_MAX[threadedRegistry,t]=942750/1632750
 MARG_MAX[threadedRegistry,a]=50523000/87727000
-LOAD_MAX[threadedRegistry]=319536
+LOAD_MAX[threadedRegistry]=319537
 LOADM[threadedRegistry]=942750
 LOADI[threadedRegistry]=8205000/1500
 MARG_MAX[wrappedRegistry,t]=763500/1632750
 MARG_MAX[wrappedRegistry,a]=39758000/87727000
-LOAD_MAX[wrappedRegistry]=259923
+LOAD_MAX[wrappedRegistry]=259924
 LOADM[wrappedRegistry]=763500
 LOADI[wrappedRegistry]=8410500/1500
 MARG_MAX[steppedRegistry,t]=644739/1417923
 MARG_MAX[steppedRegistry,a]=33516275/76479824
-LOAD_MAX[steppedRegistry]=218149
+LOAD_MAX[steppedRegistry]=218150
 LOADM[steppedRegistry]=644739
 LOADI[steppedRegistry]=-
 MARG_MAX[schemaHosts,t]=1463200/2145200
 MARG_MAX[schemaHosts,a]=83402000/115548200
-LOAD_MAX[schemaHosts]=495875
+LOAD_MAX[schemaHosts]=495353
 LOADM[schemaHosts]=1463200
 LOADI[schemaHosts]=9770000/1200
 MARG_MAX[wideFreeform,t,band]=399000/512000
 MARG_MAX[wideFreeform,a]=25350000/35030000
-LOAD_MAX[wideFreeform]=136452
+LOAD_MAX[wideFreeform]=136453
 LOADM[wideFreeform]=399000
 LOADI[wideFreeform]=21840000/6000
 MARG_MAX[deepSubmodule,t]=4008000/8666400
 MARG_MAX[deepSubmodule,a]=212193600/453759000
-LOAD_MAX[deepSubmodule]=1339263
+LOAD_MAX[deepSubmodule]=1339264
 LOADM[deepSubmodule]=4008000
 LOADI[deepSubmodule]=3879600/1200
 MARG_MAX[foreignMount,t]=1284000/1254000
 MARG_MAX[foreignMount,a]=69235000/67327000
-LOAD_MAX[foreignMount]=431468
+LOAD_MAX[foreignMount]=431469
 LOADM[foreignMount]=1284000
 LOADI[foreignMount]=5172000/1500
 MARG_MAX[foreignElement,t]=1600500/1488000
 MARG_MAX[foreignElement,a]=87079000/80563000
-LOAD_MAX[foreignElement]=537189
+LOAD_MAX[foreignElement]=537190
 LOADM[foreignElement]=1600500
 LOADI[foreignElement]=5499000/1500
 MARG_MAX[perOptionType,t]=396000/307500
 MARG_MAX[perOptionType,a]=24403000/18511000
-LOAD_MAX[perOptionType]=135670
+LOAD_MAX[perOptionType]=135671
 LOADM[perOptionType]=396000
 LOADI[perOptionType]=5787000/1500
 MARG_MAX[sameLocFanIn,t]=76800/81600
 MARG_MAX[sameLocFanIn,a]=5716800/4339200
-LOAD_MAX[sameLocFanIn]=28718
+LOAD_MAX[sameLocFanIn]=28719
 LOADM[sameLocFanIn]=76800
 LOADI[sameLocFanIn]=3967200/1200
 MARG_MAX[keyedFanIn,t]=110400/108000
 MARG_MAX[keyedFanIn,a]=7020600/5308800
-LOAD_MAX[keyedFanIn]=40057
+LOAD_MAX[keyedFanIn]=40058
 LOADM[keyedFanIn]=110400
 LOADI[keyedFanIn]=4141200/1200
 MARG_MAX[classShare,fixed,t]=613200
-LOAD_MAX[classShare,fixed]=210854
+LOAD_MAX[classShare,fixed]=210855
 LOADM[classShare,fixed]=613200
 LOADI[classShare,fixed]=7962000/1200
-MARG_MAX[overrideWarm,warm,t]=898800
-MARG_MAX[overrideWarm,warm,a]=47194800
-LOAD_MAX[overrideWarm,warm]=313877
-LOADM[overrideWarm,warm]=898800
-LOADI[overrideWarm,warm]=15196800/1200
+MARG_MAX[openNested,t]=1527000/2595000
+MARG_MAX[openNested,a]=81907500/138511000
+LOAD_MAX[openNested]=511899
+LOADM[openNested]=1527000
+LOADI[openNested]=4347000/1500
+MARG_MAX[overrideCount,warm,t]=8766
+MARG_MAX[overrideCount,warm,a]=476712
+LOAD_MAX[overrideCount,warm]=227393
+LOADM[overrideCount,warm]=8766
+LOADI[overrideCount,warm]=2020230/9
+MARG_MAX[overrideWarm,warm,t]=658800
+MARG_MAX[overrideWarm,warm,a]=34426800
+LOAD_MAX[overrideWarm,warm]=230315
+LOADM[overrideWarm,warm]=658800
+LOADI[overrideWarm,warm]=12856800/1200
 MARG_MAX[kindMatch,migrated,kind,t]=1000800
 MARG_MAX[entityMatch,migrated,entity,t]=1330200/1702800
 MARG_MAX[coordMatch,migrated,coord,t]=2077200
 MARG_MAX[kindMatch,migrated,kind,a]=61272000
 MARG_MAX[entityMatch,migrated,entity,a]=75957600/91557600
 MARG_MAX[coordMatch,migrated,coord,a]=112642800
-LOAD_MAX[kindMatch,migrated,kind]=345538
+LOAD_MAX[kindMatch,migrated,kind]=345016
 LOADM[kindMatch,migrated,kind]=1000800
 LOADI[kindMatch,migrated,kind]=14325600/1200
-LOAD_MAX[entityMatch,migrated,entity]=455703
+LOAD_MAX[entityMatch,migrated,entity]=455181
 LOADM[entityMatch,migrated,entity]=1330200
 LOADI[entityMatch,migrated,entity]=14763600/1200
-LOAD_MAX[coordMatch,migrated,coord]=701016
+LOAD_MAX[coordMatch,migrated,coord]=700494
 LOADM[coordMatch,migrated,coord]=2077200
 LOADI[coordMatch,migrated,coord]=10339200/1200
 MARG_MAX[kindMatch,sealed,kind,t]=1000800
@@ -458,13 +470,13 @@ MARG_MAX[coordMatch,sealed,coord,t]=2090400
 MARG_MAX[kindMatch,sealed,kind,a]=61272000
 MARG_MAX[entityMatch,sealed,entity,a]=76956000/91557600
 MARG_MAX[coordMatch,sealed,coord,a]=113641200
-LOAD_MAX[kindMatch,sealed,kind]=345662
+LOAD_MAX[kindMatch,sealed,kind]=345663
 LOADM[kindMatch,sealed,kind]=1000800
 LOADI[kindMatch,sealed,kind]=14474400/1200
-LOAD_MAX[entityMatch,sealed,entity]=460513
+LOAD_MAX[entityMatch,sealed,entity]=460514
 LOADM[entityMatch,sealed,entity]=1343400
 LOADI[entityMatch,sealed,entity]=15255600/1200
-LOAD_MAX[coordMatch,sealed,coord]=707275
+LOAD_MAX[coordMatch,sealed,coord]=707276
 LOADM[coordMatch,sealed,coord]=2090400
 LOADI[coordMatch,sealed,coord]=12570000/1200
 MARG_MAX[resolution,4-5,t]=125/196
@@ -474,8 +486,8 @@ MARG_MAX[resolution,7-100,t]=84537/200508
 MARG_MAX[resolution,100-1000,t]=7967700/19814400
 LOAD_MAX[resolution,resolve]=1637
 LOADM[resolution,resolve]=125
-LOAD_MAX[startup,t]=2482
-LOAD_MAX[startup,a]=134362
+LOAD_MAX[startup,t]=2483
+LOAD_MAX[startup,a]=134394
 LOAD_MAX[member,gen-prelude,t]=198
 LOAD_MAX[member,gen-prelude,a]=18985
 LOAD_MAX[member,gen-algebra,t]=88
@@ -490,8 +502,8 @@ LOAD_MAX[member,gen-scope,t]=1602
 LOAD_MAX[member,gen-scope,a]=82529
 LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
-LOAD_MAX[member,gen-merge,t]=1011
-LOAD_MAX[member,gen-merge,a]=60059
+LOAD_MAX[member,gen-merge,t]=1012
+LOAD_MAX[member,gen-merge,a]=60091
 LOAD_MAX[member,gen-schema,t]=552
 LOAD_MAX[member,gen-schema,a]=33182
 LOAD_MAX[member,gen-aspects,t]=617
@@ -559,6 +571,10 @@ CLASSSHARE_BIG=1600
 # larger than a simultaneous reuse erosion reads as a ratchet.
 OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
+# overrideCount (den-hoag-xrh86): n is the override COUNT over a fixed 400-host registry, so the warm marginal
+# over the 4x step is the cost of 9 warm evaluations, the axis overrideWarm's pinned count hides
+OVERRIDECOUNT_SMALL=3
+OVERRIDECOUNT_BIG=12
 
 # ── kindMatch (kind identity at scale; den-hoag-l0y) — the owner's landing gate on ruling (a) ──
 # Ruling (a) keys every kind by its MINTED identity, and the owner's condition on it was that the hub
@@ -1028,7 +1044,7 @@ for row in "${MATRIX[@]}"; do
   # (the marginal and load section, below the report).
 done
 
-for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn; do
+for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn openNested; do
   small_n=""
   big_n=""
   for row in "${MATRIX[@]}"; do
@@ -1100,6 +1116,11 @@ lte "$OW_LIN_COLD" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: cold thunks expected≤$GROWTH_MAX actual=${OW_LIN_COLD}× delta=$(delta "$OW_LIN_COLD" "$GROWTH_MAX") over a 4× size step")
 lte "$OW_LIN_WARM" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
+
+# overrideCount: the warm stack at the two override counts; its byte gate is overrideWarm's above
+for n in "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG"; do
+  run_row overrideCount "$n" warm
+done
 
 # ── kindMatch — kind identity at scale (den-hoag-l0y; the gate derivation is beside the constants) ──
 # DEDICATED section (classShare precedent). Per fixture, the stacks are attrs-ref (the FROZEN
@@ -1313,7 +1334,7 @@ emit_report() {
   echo
   echo "| workload | sizes | thunk growth | alloc growth |"
   echo "|---|---|---:|---:|"
-  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn; do
+  for w in scalar registry threadedRegistry wrappedRegistry steppedRegistry schemaHosts inheritHosts aspects wideFreeform deepSubmodule foreignMount foreignElement perOptionType moduleFanIn sameLocFanIn keyedFanIn openNested; do
     printf '| %s | %s → %s | %s | %s |\n' \
       "$w" "${LIN_SMALL[$w]}" "${LIN_BIG[$w]}" "${LIN_TG[$w]}" "${LIN_AG[$w]}"
   done
@@ -1599,6 +1620,9 @@ for row in "${MATRIX[@]}"; do
 done
 mgate "classShare,fixed,t" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed thunks" t classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
 lgate "classShare,fixed" "classShare n=$CLASSSHARE_SMALL→$CLASSSHARE_BIG pure-fixed" classShare "$CLASSSHARE_SMALL" "$CLASSSHARE_BIG" pure-fixed
+mgate "overrideCount,warm,t" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm thunks" t overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
+mgate "overrideCount,warm,a" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm alloc" a overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
+lgate "overrideCount,warm" "overrideCount overrides=$OVERRIDECOUNT_SMALL→$OVERRIDECOUNT_BIG warm" overrideCount "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG" warm
 mgate "overrideWarm,warm,t" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm thunks" t overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
 mgate "overrideWarm,warm,a" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm alloc" a overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm
 lgate "overrideWarm,warm" "overrideWarm n=$OVERRIDEWARM_SMALL→$OVERRIDEWARM_BIG warm" overrideWarm "$OVERRIDEWARM_SMALL" "$OVERRIDEWARM_BIG" warm

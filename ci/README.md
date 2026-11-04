@@ -114,7 +114,10 @@ options, each constructing its own checked `attrsOf (listOf (nullOr int))`, agai
 landing above parity, its excess identity work and a defect held for repair), `moduleFanIn` (n modules each declaring 17 keys, defining one and freeform-adding five at one level — the
 module-count axis), `sameLocFanIn` (n modules declaring one typed option — the per-loc declaration
 fold's length), `keyedFanIn` (n keyed modules under one importer — the import walk's per-keyed-module
-cost), `startup` (fixed cost; gated as the `startup,t|a` load rows).
+cost), `openNested` (n instances of an open submodule, a function module as nixpkgs' common shape, each
+declaring an `attrsOf` of a second function submodule given one entry: two open evaluations and one nested
+submodule construction per instance, which no other row builds; den-hoag-xrh86), `startup` (fixed cost; gated
+as the `startup,t|a` load rows).
 
 `classShare` is a separate workload with its own dedicated harness section (it is NOT in the
 pure/ref matrix): its two "stacks" are `pure-full` / `pure-fixed` — both the pure engine — measuring
@@ -132,6 +135,11 @@ shape). `cold` re-merges the shared registry from scratch per override (the no-r
 evaluates the base once and reuses it via `warmFrom`/`editedModules`, so the registry loc — outside the
 1-module edit's dirty footprint — splices byte-for-byte and only the edited `nodeId` and the dirty
 `summary` re-merge. Both return the same projections byte-identically.
+
+`overrideCount` is `overrideWarm`'s warm stack with `n` the override COUNT over a fixed 400-host registry
+(sizes 3 → 12), so its warm marginal is the cost of nine warm evaluations started from one prior: the axis
+`overrideWarm`'s pinned 6 hides, where a per-override term reads as a load constant (den-hoag-xrh86). Its
+thunk and alloc marginals and its load are gated as `overrideWarm`'s are.
 
 `kindMatch` is the third dedicated workload, and the owner's landing gate on den-hoag-l0y ruling (a):
 a kind is keyed by its MINTED identity, and any regression is a defect. Two kinds share one name
