@@ -571,8 +571,8 @@ CLASSSHARE_BIG=1600
 # larger than a simultaneous reuse erosion reads as a ratchet.
 OVERRIDEWARM_SMALL=400
 OVERRIDEWARM_BIG=1600
-# overrideCount (den-hoag-xrh86): n is the override COUNT over a fixed 400-host registry, so the warm marginal over
-# a 4x step is the cost of 9 warm evaluations, the axis overrideWarm's pinned count hides
+# overrideCount (den-hoag-xrh86): n is the override COUNT over a fixed 400-host registry, so the warm marginal
+# over the 4x step is the cost of 9 warm evaluations, the axis overrideWarm's pinned count hides
 OVERRIDECOUNT_SMALL=3
 OVERRIDECOUNT_BIG=12
 
@@ -1117,7 +1117,7 @@ lte "$OW_LIN_COLD" "$GROWTH_MAX" \
 lte "$OW_LIN_WARM" "$GROWTH_MAX" \
   || FAILURES+=("overrideWarm linearity: warm thunks expected≤$GROWTH_MAX actual=${OW_LIN_WARM}× delta=$(delta "$OW_LIN_WARM" "$GROWTH_MAX") over a 4× size step")
 
-# overrideCount: the warm stack only, at the two override counts; its byte gate is overrideWarm's above
+# overrideCount: the warm stack at the two override counts; its byte gate is overrideWarm's above
 for n in "$OVERRIDECOUNT_SMALL" "$OVERRIDECOUNT_BIG"; do
   run_row overrideCount "$n" warm
 done

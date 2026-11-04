@@ -221,7 +221,10 @@ let
   P = if stack == "pure" || stack == "pure-plant" then pureP else refP;
 
   # ── helpers (builtins only — neither stack pays for these) ──
-  idx = builtins.genList (i: i) n;
+  # overrideCount's registry is a fixed 400 hosts, its `n` being the override count (den-hoag-xrh86)
+  # (branched outside the call, so neither argument is a thunk)
+  idx =
+    if workload == "overrideCount" then builtins.genList (i: i) 400 else builtins.genList (i: i) n;
   toAttrs = f: builtins.listToAttrs (map f idx);
   toAttrsIf = pred: f: builtins.listToAttrs (map f (builtins.filter pred idx));
   even = i: builtins.bitAnd i 1 == 0;
@@ -1057,7 +1060,6 @@ let
       sameLocFanIn
       keyedFanIn
       fleetHost
-      openNested
       ;
   };
 
@@ -1211,52 +1213,6 @@ let
       }
     ) memberIdx;
 
-  # ── openNested — the function-module submodule, nested (den-hoag-xrh86) ──
-  # Each of n instances is an OPEN submodule (a function module, `{ name, ... }:`, nixpkgs' common shape),
-  # so its value stratum collects the set itself and both strata build an argument set; each declares
-  # `inner`, an attrsOf of another function submodule given one entry. Two open evaluations and one nested
-  # submodule construction per instance: the open-set argument sets and the nested type's own slots scale
-  # with it, and no other row builds either.
-  openNested =
-    P:
-    let
-      inner =
-        { name, ... }:
-        {
-          options.v = P.mkOption {
-            type = P.types.int;
-            default = 1;
-          };
-        };
-      sub =
-        { name, ... }:
-        {
-          options = {
-            addr = P.mkOption { type = P.types.str; };
-            inner = P.mkOption {
-              type = P.types.attrsOf (P.types.submodule inner);
-              default = { };
-            };
-          };
-        };
-      eval = P.eval { } [
-        {
-          options.hosts = P.mkOption {
-            type = P.types.attrsOf (P.types.submodule sub);
-            default = { };
-          };
-        }
-        {
-          config.hosts = toAttrs (i: {
-            name = "h${toString i}";
-            value.addr = "10.0.0.${toString i}";
-            value.inner.x = { };
-          });
-        }
-      ];
-    in
-    eval.config.hosts;
-
   # ── overrideWarm — gen-merge's warm re-eval (memoized override) gate (README §"Warm re-eval") ──
   # A shared registry-heavy base (den-hoag emit shape: a marked-pure data module + a clean force layer +
   # one dirty config-reading module) that a class of `overrides` cheap 1-module edits is applied over —
@@ -1277,24 +1233,17 @@ let
   # `config` would stale-splice and diverge here). The warm/cold thunk ratio is the measured reuse; the
   # projection forces the whole registry in both stacks (cold `overrides` times, warm once via the splice).
   #
-  # overrideCount is the same expression at a FIXED registry (`size` = 400) with `n` the override count, so
-  # its marginal over n is the cost of one warm evaluation, the axis overrideWarm's pinned 6 cannot see: a
-  # per-override term reads as a load constant there (den-hoag-xrh86).
-  overrideWarm = overrideWarmWith {
-    size = n;
-    overrides = 6; # a fixed class of edits over one base (mirrors the corpus 6-agent class); n scales the registry
-  };
-  overrideCount = overrideWarmWith {
-    size = 400;
-    overrides = n;
-  };
-  overrideWarmWith =
-    { size, overrides }:
+  # overrideCount is this expression with `n` the override COUNT over a fixed 400-host registry (`idx`), so
+  # its marginal over n is the cost of one warm evaluation: the axis the pinned 6 hides, where a
+  # per-override term reads as a load constant (den-hoag-xrh86).
+  overrideWarm =
     let
-      ovIdx = builtins.genList (i: i) overrides;
-      sizeIdx = builtins.genList (i: i) size;
-      toAttrs = f: builtins.listToAttrs (map f sizeIdx);
-      toAttrsIf = pred: f: builtins.listToAttrs (map f (builtins.filter pred sizeIdx));
+      overrides = 6; # a fixed class of edits over one base (mirrors the corpus 6-agent class); n scales the registry
+      ovIdx =
+        if workload == "overrideCount" then
+          builtins.genList (i: i) n
+        else
+          builtins.genList (i: i) overrides;
 
       sub = {
         options = {
@@ -1833,10 +1782,50 @@ let
       load
     else if workload == "classShare" then
       classShare
-    else if workload == "overrideWarm" then
+    else if workload == "overrideWarm" || workload == "overrideCount" then
       overrideWarm
-    else if workload == "overrideCount" then
-      overrideCount
+    # openNested (den-hoag-xrh86): each of n instances is an OPEN submodule (a function module, nixpkgs'
+    # common shape) declaring `inner`, an attrsOf of another function submodule given one entry: two open
+    # evaluations and one nested submodule construction per instance, which no other row builds. Inline,
+    # so no other row's process allocates its binding.
+    else if workload == "openNested" then
+      let
+        inner =
+          { name, ... }:
+          {
+            options.v = P.mkOption {
+              type = P.types.int;
+              default = 1;
+            };
+          };
+        sub =
+          { name, ... }:
+          {
+            options = {
+              addr = P.mkOption { type = P.types.str; };
+              inner = P.mkOption {
+                type = P.types.attrsOf (P.types.submodule inner);
+                default = { };
+              };
+            };
+          };
+        eval = P.eval { } [
+          {
+            options.hosts = P.mkOption {
+              type = P.types.attrsOf (P.types.submodule sub);
+              default = { };
+            };
+          }
+          {
+            config.hosts = toAttrs (i: {
+              name = "h${toString i}";
+              value.addr = "10.0.0.${toString i}";
+              value.inner.x = { };
+            });
+          }
+        ];
+      in
+      eval.config.hosts
     else if workload == "kindMatch" then
       kindMatch
     else if workload == "entityMatch" then
