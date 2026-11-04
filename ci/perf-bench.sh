@@ -355,7 +355,7 @@ ANCHOR_MEMBERS='gen-algebra=ac92bc949bb499ee0d13b6994c0d738244cb0ccd gen-aspects
 #   LOADA     `affine` where the gated arm is affine at its three sizes at the anchor, else `-`. Its intercept
 #             is DERIVED, never written (`loadi`, below): LOAD_MAX − LOADM·s/(b−s), the line through the
 #             anchored small-size load with the anchored marginal. A written intercept was a second datum for
-#             one fact, and hand raises and the ratchet's `lower LOAD_MAX` left it stale on 13 of 21 affine
+#             one fact, and hand raises and the ratchet's `lower LOAD_MAX` left it stale on 14 of 21 affine
 #             rows (den-hoag-loadi-stale-after-loadmax-raise-5mq5q); a raise of LOAD_MAX now moves it with it.
 #             A `LOADI` assignment is refused before any cell, as is a gated row with no LOADA.
 # The block is written by ci/perf-bench-bounds.py from a run's own printed lines, never by hand. The
