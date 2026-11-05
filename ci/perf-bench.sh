@@ -479,6 +479,7 @@ MARG_MAX[resolution,7-100,t]=84537/200508
 MARG_MAX[resolution,100-1000,t]=7967700/19814400
 LOAD_MAX[resolution,resolve]=1637
 LOADM[resolution,resolve]=125
+LOADA[resolution,resolve]=-
 LOAD_MAX[startup,t]=2482
 LOAD_MAX[startup,a]=134362
 LOAD_MAX[member,gen-prelude,t]=198
@@ -525,12 +526,12 @@ FLEET_ANCHOR[a]=32244240/70373040
 
 # ── the load bounds' own shape, before any cell (exit 2) ──
 # A row's intercept is derived from LOAD_MAX and LOADM, so a written one is refused rather than read; and every
-# gated arm (a LOADM row other than resolution's, which is super-linear and has no intercept) carries LOADA, since
-# an absent flag would leave the row unjudged on a moved marginal with nothing said.
+# gated arm (every LOADM row) carries LOADA, since an absent flag would leave the row unjudged on a moved marginal
+# with nothing said. A super-linear row has no intercept and says so with `-` (resolution's, below), so the refusal
+# names no row.
 LOAD_SHAPE=()
 for k in "${!LOADI[@]}"; do LOAD_SHAPE+=("LOADI[$k] is written; the intercept is derived from LOAD_MAX[$k] and LOADM[$k], so set LOADA[$k] to affine or -"); done
 for k in "${!LOADM[@]}"; do
-  [[ $k == resolution,resolve ]] && continue
   [[ ${LOADA[$k]:-} == affine || ${LOADA[$k]:-} == - ]] || LOAD_SHAPE+=("LOADA[$k] is '${LOADA[$k]:-}', not affine or -")
 done
 for k in "${!LOADA[@]}"; do [[ -n ${LOADM[$k]:-} ]] || LOAD_SHAPE+=("LOADA[$k] has no LOADM[$k]"); done
@@ -1660,7 +1661,7 @@ rs_xs=${THUNKS[resolution,${RESOLUTION_SIZES[0]},resolve]}
 rs_m=$(marg t resolution "${RESOLUTION_SIZES[0]}" "${RESOLUTION_SIZES[1]}" resolve)
 rs_label="resolution n=${RESOLUTION_SIZES[0]} resolve"
 if [[ -n $REANCHOR ]]; then
-  REANCHOR_LINES+=("LOAD_MAX[resolution,resolve]=$rs_xs   # load: $rs_label; was ${LOAD_MAX[resolution,resolve]:-}" "LOADM[resolution,resolve]=$rs_m   # load guard: resolution marginal; was ${LOADM[resolution,resolve]:-}")
+  REANCHOR_LINES+=("LOAD_MAX[resolution,resolve]=$rs_xs   # load: $rs_label; was ${LOAD_MAX[resolution,resolve]:-}" "LOADM[resolution,resolve]=$rs_m   # load guard: resolution marginal; was ${LOADM[resolution,resolve]:-}" "LOADA[resolution,resolve]=-   # super-linear: no linear intercept (spec OQ8); was ${LOADA[resolution,resolve]:-}")
   LOAD_ROWS+=("resolution,resolve|$rs_xs|${LOAD_MAX[resolution,resolve]:-}|$rs_m|anchor|-|anchor")
 elif [[ $(qcmp "$rs_m" "${LOADM[resolution,resolve]:-}") == eq ]]; then
   gate "load: $rs_label" "$rs_xs" "${LOAD_MAX[resolution,resolve]:-}" "LOAD_MAX[resolution,resolve]"

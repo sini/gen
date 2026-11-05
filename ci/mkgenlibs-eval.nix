@@ -305,8 +305,10 @@ let
         let
           missing' = builtins.filter (f: !(x ? ${f}) || x.${f} == "") required;
         in
-        if missing' == [ ] then
+        if missing' == [ ] && removalRefusal x == null then
           x
+        else if missing' == [ ] then
+          throw "mkgenlibs-eval: a retirement register entry (${x.member}.${x.binding}): ${removalRefusal x}"
         else
           throw "mkgenlibs-eval: a retirement register entry (${x.member or "?"}.${x.binding or "?"}) omits required field(s): ${builtins.concatStringsSep ", " missing'}. An entry with no stated cause and no carrier is the unbounded allow-list this check refuses."
       ) retirementEntries;
@@ -317,6 +319,29 @@ let
       throw "mkgenlibs-eval: the retirement register holds ${toString (builtins.length checked)} entries; its ruled width is ${toString retirementWidth}. A further entry is a NEW RULING and takes this line with it.";
 
   retiredIn = k: map (e: e.binding) (builtins.filter (e: e.member == k) ruledRetirement);
+
+  # A protocol field: its rendered segment begins `__` (a `__` name is a plain identifier, so `seg` leaves
+  # it unquoted, and the last segment of a rendered path is what follows its last `.`).
+  isDunder = n: builtins.substring 0 2 n == "__";
+  pathIsDunder = k: builtins.match "(.*\\.)?__[^.\"]*" k != null;
+  # ★ THE REMOVAL FORM. An entry with `tombstone = false` publishes NO tombstone: it admits that the path
+  # is gone. It is open to a `__` path only. C9 holds for every other export (a retired name keeps a
+  # refused-by-name alias), and for a `__` field a tombstone is the harm the walk's header names. The
+  # entry's binding must be ABSENT at every locus and HELD by the pin (`retirementFailed`), so it cannot
+  # outlive the removal or admit a path that was never published. `surface-kept` subtracts exactly these
+  # paths from a member's lost set.
+  isRemoval = e: !(e.tombstone or true);
+  removalRefusal =
+    e:
+    if e ? tombstone && !(builtins.isBool e.tombstone) then
+      "`tombstone` is ${builtins.toJSON e.tombstone}, not a boolean"
+    else if isRemoval e && !(pathIsDunder e.binding) then
+      "`tombstone = false` admits the removal of a `__` protocol field only; a retired export keeps a refused-by-name tombstone (C9)"
+    else
+      null;
+  admittedRemovals = builtins.foldl' (
+    acc: e: acc // { ${e.member} = (acc.${e.member} or [ ]) ++ [ e.binding ]; }
+  ) { } (builtins.filter isRemoval ruledRetirement);
 
   # nixpkgs `lib.strings.escapeNixIdentifier`, the segment rendering of `showAttrPath`, as
   # gen-harness `root-surface.nix` renders a `retired` key.
@@ -500,7 +525,9 @@ let
     let
       l = lookupPath "" v e.binding;
     in
-    if !l.found then
+    if isRemoval e then
+      (if l.found then [ "${label}: registered as removed, and the binding is present" ] else [ ])
+    else if !l.found then
       [ "${label}: registered, and the binding is absent" ]
     else if (builtins.tryEval (builtins.deepSeq l.value true)).success then
       [ "${label}: registered, and the binding forces cleanly" ]
@@ -515,7 +542,13 @@ let
 
   retirementFailed = builtins.concatMap (
     e:
-    retirementAt "${e.member}.${e.binding}" (genLibs.${e.member} or null) e
+    (
+      if isRemoval e && !(builtins.elem e.binding (expectedSurface.${e.member} or [ ])) then
+        [ "${e.member}.${e.binding}: registered as removed, and the pin does not hold the path" ]
+      else
+        [ ]
+    )
+    ++ retirementAt "${e.member}.${e.binding}" (genLibs.${e.member} or null) e
     ++ builtins.concatMap (
       s: retirementAt "${s}.${e.member}.${e.binding}" (buckets.${s}.${e.member} or null) e
     ) (bucketPathsOf e.member)
@@ -620,12 +653,19 @@ let
   # ★ A PUBLISHED NAME IS A PATH THROUGH PLAIN NAMESPACES (den-hoag-hr4yg arm (a)). The walk is gen-harness
   # `root-surface.nix`'s: a namespace is an attrset that is not `_type`-tagged and not a derivation, a
   # `__functor` set included, and every other value is a leaf, forced to WHNF only to tell which it is
-  # (under `tryEval`, so a tombstone is a leaf and still a path). One difference, and it is the reason
-  # the pin can be read: a `__`-prefixed name (`__functor`, `__functionArgs`, a door's `__contract`, a
-  # checker's `__payload`) is the representation's protocol field, which consumers reach through a
-  # reader, so it is neither a path nor descended. Measured at hub 2b4c0e5: 1,259 paths over the 23
-  # members, the same set the vocabulary walk's namespaces give minus its 227 `__` paths, and stable from
-  # depth 8 to 200; with the `__` fields counted it is 3,337, 2,078 of them protocol fields.
+  # (under `tryEval`, so a tombstone is a leaf and still a path). One difference: a `__`-prefixed name
+  # (`__functor`, `__functionArgs`, a door's `__contract`, a type's `__typeSelf`) is a LEAF path. It is
+  # pinned, and it is never descended. It is pinned because it is consumed surface: measured 2026-11-04
+  # (reports/den-hoag-loadi-stale-after-loadmax-raise-5mq5q-m3-landing-gate-v0.md, files reading the field
+  # as `.<name>` or `? <name>`), production lib/ reads it across member boundaries. gen-merge reads gen-types'
+  # `__typeSelf` (6 files), `__sealed` (6) and `__payload` (3); gen-schema reads `__mint` (31); gen-dispatch
+  # reads gen-select's `__sel` (1). gen-demo cells read `__contract` (6) and `__mint` (15). Unpinned, a lost
+  # `types.int.__typeSelf` left every gate green while gen-merge's `t ? __typeSelf` silently took its other
+  # branch. It is never descended because its interior is a representation, not a name a consumer
+  # addresses: a door's formals live under `__functionArgs`, and walking them would make a removed formal
+  # a "lost export". A C9 tombstone cannot remedy that, and for a `__` field it is HARMFUL, because
+  # `t ? __typeSelf` turns true and the read throws. A deliberate `__` removal is therefore admitted by a
+  # register entry with `tombstone = false` (the register, above), never by a tombstone.
   pathsOf =
     p: v:
     builtins.concatMap (
@@ -639,8 +679,8 @@ let
           builtins.isAttrs x && !(x ? _type) && (x.type or null) != "derivation"
         );
       in
-      [ q ] ++ (if t.success && t.value then pathsOf q v.${n} else [ ])
-    ) (builtins.filter (n: builtins.substring 0 2 n != "__") (builtins.attrNames v));
+      [ q ] ++ (if !(isDunder n) && t.success && t.value then pathsOf q v.${n} else [ ])
+    ) (builtins.attrNames v);
   surfaceOf =
     k:
     let
@@ -678,7 +718,9 @@ let
   # name. The one regeneration route, `surfaceRepin`, writes the UNION of the pin and the live paths:
   # it adds what a bump gained and never drops what it lost, so the routine re-pin cannot accept a loss
   # (the hash re-pin did, at gen-aspects 84400bf, `includeSitesOfEntry`). A path leaves the pin only by
-  # a hand deletion of its line, the act that retires its tombstone and its register entry with it.
+  # a hand deletion of its line, the act that retires its tombstone and its register entry with it. A
+  # `__` path has no tombstone (the walk's header says why): its deliberate removal is admitted by a
+  # register entry with `tombstone = false`, and its pin line stays as the record.
   # Regenerate one member through THIS flake, which resolves every member from the root `flake.lock`:
   #   nix eval ./ci#lib.mkGenLibsEval.surfaceRepin.<key> --json
   expectedSurface = import ./surface-paths.nix;
@@ -704,9 +746,10 @@ let
   # That is the arming construction `direction-of-dependence.nix` states and `sole-evaluator.nix`
   # repeats. Per drifted member, the paths it LOST (pinned, no longer published) and GAINED (published,
   # unpinned); a member with no pin entry drifts with every path gained, the `or null` arm that keeps a
-  # new roster member from defaulting into agreement.
+  # new roster member from defaulting into agreement. `admitted` is the register's removal entries per
+  # member: a pinned path they name is not lost, and the pin keeps its line as the record.
   driftOf =
-    expected: surf:
+    admitted: expected: surf:
     let
       one =
         k:
@@ -714,9 +757,10 @@ let
           pin = expected.${k} or null;
           live = setOf surf.${k};
           pinned = setOf (if pin == null then [ ] else pin);
+          gone = setOf (admitted.${k} or [ ]);
         in
         {
-          lost = if pin == null then [ ] else builtins.filter (q: !(live ? ${q})) pin;
+          lost = if pin == null then [ ] else builtins.filter (q: !(live ? ${q}) && !(gone ? ${q})) pin;
           gained = builtins.filter (q: !(pinned ? ${q})) surf.${k};
           unpinned = pin == null;
         };
@@ -729,7 +773,7 @@ let
     );
   lostOf = d: builtins.concatMap (k: map (q: "${k}.${q}") d.${k}.lost) (builtins.attrNames d);
 
-  surfaceDriftNames = driftOf expectedSurface surface;
+  surfaceDriftNames = driftOf admittedRemovals expectedSurface surface;
   surfaceDrift = builtins.attrNames surfaceDriftNames;
   surfaceLost = lostOf surfaceDriftNames;
   # The roll-up. It is in the report for a reason the drift list cannot serve: after an
@@ -756,7 +800,8 @@ let
   # disjoint from `surface`, and a correct build that moves a real export surface cannot break these
   # greens; the only cell such a build moves is `surface-pinned`, which is the one that should move.
   # The fixture is a LIBRARY, so the arming runs the walk too: a nested namespace, a `__functor` set
-  # (descended), a `__` protocol field (skipped), a `_type` value and a throwing tombstone (leaves).
+  # (descended), a `__` protocol field (a leaf, not descended), a `_type` value and a throwing tombstone
+  # (leaves).
   armLib = {
     alpha = {
       one = 1;
@@ -782,6 +827,7 @@ let
       three = 3;
     };
   };
+  noContract = builtins.removeAttrs armLib.alpha.ns [ "__contract" ];
   armSurface = builtins.mapAttrs (_: v: builtins.sort builtins.lessThan (pathsOf "" v)) armLib;
   armPin = armSurface;
   armWith =
@@ -790,16 +836,17 @@ let
       armLib // { inherit alpha; }
     );
   arming = {
-    # The walk itself: the paths above, and none of `__contract`, `door.__functor` or `opt.inner`.
+    # The walk itself: the paths above, `ns.__contract` and `door.__functor` as leaves, and none of
+    # `ns.__contract.required` or `opt.inner`.
     walk = armSurface.alpha;
     # The positive control on the refusals below: without it a `driftOf` that named EVERY member
     # would satisfy them all and the arming would certify a predicate that never agrees.
-    clean = driftOf armPin armSurface;
-    added = driftOf armPin (armWith (armLib.alpha // { four = 4; }));
-    removed = lostOf (driftOf armPin (armWith (builtins.removeAttrs armLib.alpha [ "two" ])));
+    clean = driftOf { } armPin armSurface;
+    added = driftOf { } armPin (armWith (armLib.alpha // { four = 4; }));
+    removed = lostOf (driftOf { } armPin (armWith (builtins.removeAttrs armLib.alpha [ "two" ])));
     # The nested rename with no alias (`ns.cell` → `ns.cellNode`): the class a top-level pin cannot see.
     renamedNested = lostOf (
-      driftOf armPin (
+      driftOf { } armPin (
         armWith (
           armLib.alpha
           // {
@@ -812,7 +859,7 @@ let
     );
     # The same rename under C9: `ns.cell` kept as a throwing tombstone. Nothing is lost; the new name
     # is a gain the re-pin takes.
-    aliasedNested = driftOf armPin (
+    aliasedNested = driftOf { } armPin (
       armWith (
         armLib.alpha
         // {
@@ -823,7 +870,20 @@ let
         }
       )
     );
-    unpinned = driftOf (builtins.removeAttrs armPin [ "alpha" ]) armSurface;
+    unpinned = driftOf { } (builtins.removeAttrs armPin [ "alpha" ]) armSurface;
+    # A `__` field lost reds by name; the same loss with its removal admitted (the register's
+    # `tombstone = false` form) loses nothing.
+    removedDunder = lostOf (driftOf { } armPin (armWith (armLib.alpha // { ns = noContract; })));
+    removedDunderAdmitted = driftOf { alpha = [ "ns.__contract" ]; } armPin (
+      armWith (armLib.alpha // { ns = noContract; })
+    );
+    # The removal form is open to `__` paths only.
+    removalScope = map pathIsDunder [
+      "__x"
+      "ns.__contract"
+      "show.cell"
+      "ns.\"__x.y\""
+    ];
     # The re-pin keeps a lost path: the routine route cannot accept a loss.
     repinKeepsLost = builtins.elem "two" (
       (repinOf armPin (armWith (builtins.removeAttrs armLib.alpha [ "two" ]))).alpha
@@ -1118,9 +1178,11 @@ in
     arming-surface-walk =
       arming.walk == [
         "door"
+        "door.__functor"
         "door.step"
         "gone"
         "ns"
+        "ns.__contract"
         "ns.cell"
         "ns.node"
         "one"
@@ -1148,6 +1210,15 @@ in
       };
     arming-drift-names-unpinned = builtins.attrNames arming.unpinned == [ "alpha" ];
     arming-repin-keeps-lost = arming.repinKeepsLost;
+    arming-drift-names-dunder-loss = arming.removedDunder == [ "alpha.ns.__contract" ];
+    arming-drift-admits-removal = arming.removedDunderAdmitted == { };
+    arming-removal-dunder-only =
+      arming.removalScope == [
+        true
+        true
+        false
+        false
+      ];
     # ARMING — the pin's DOMAIN, the half `surfaceDrift` cannot see.
     arming-pin-covers-roster = pinDomain == memberKeys;
     retired-refusing = retirementFailed == [ ];
@@ -1201,6 +1272,9 @@ in
     "arming-drift-alias-loses-nothing"
     "arming-drift-names-unpinned"
     "arming-repin-keeps-lost"
+    "arming-drift-names-dunder-loss"
+    "arming-drift-admits-removal"
+    "arming-removal-dunder-only"
     "arming-pin-covers-roster"
     "retired-refusing"
     "retirement-successor-live"
@@ -1243,6 +1317,7 @@ in
     surfaceDrift
     surfaceDriftNames
     surfaceLost
+    admittedRemovals
     vocabularyUnregistered
     vocabularyStale
     vocabularyArming
