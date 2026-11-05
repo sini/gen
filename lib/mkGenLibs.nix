@@ -202,9 +202,10 @@ let
     # substrate, which is the distinction the unapplied root exists to hold. Entry landed when
     # content existed, per the ruled roster timing.
     inherit delivery;
-    # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Unlike the
-    # self-wiring libs above (each resolves its own deps), gen-class's flake `.lib` leaves merge = null, so
-    # the hub re-imports its ./lib with the tier-2 kernel injected — mkGenLibs.class carries applyCoreFixed.
+    # gen-class is Class B: prelude required, merge injected for the tier-2 fixed-input path. Its flake `.lib`
+    # applies its declared gen-merge input (`import ./. { prelude; merge = gen-merge.lib; }`), and the hub's
+    # `gen-class.inputs.gen-merge.follows` makes that the hub's own gen-merge, so `class` is that `.lib`
+    # unchanged and mkGenLibs.class carries a live applyCoreFixed (measured: it passes the `merge` null guard).
     inherit class;
 
     # gen-assemble publishes its root UNAPPLIED: the shared framework toolkit takes its whole
