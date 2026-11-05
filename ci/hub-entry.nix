@@ -316,12 +316,14 @@ let
         else
           builtins.abort "hub-entry: an unexpected refusal from the planted entry: ${m}";
     } "${gen}/default.nix" args;
-  # A member root standing in for every node, so nothing is fetched: it forces each lock edge it is
-  # handed, which builds the members those edges reach. A leaf receives `{ }`, a non-leaf all three seams.
+  # A member root standing in for every node, so nothing is fetched. Like a real shim's `forced`, its
+  # root value is not in WHNF until every lock edge it is handed is, so a member cycle that slipped the
+  # check would read here exactly as it does on real members: `infinite recursion`. A leaf receives
+  # `{ }`, a non-leaf all three seams.
   fixtureSrc =
     _:
     builtins.toFile "hub-entry-fixture-member.nix" ''
-      { inputs ? { }, src ? null, dep ? null }: builtins.mapAttrs (_: v: builtins.seq v true) inputs
+      { inputs ? { }, src ? null, dep ? null }: builtins.seq (builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) inputs) null) { }
     '';
   # Every member built, every edge it carries forced; `true` iff that evaluation completes.
   buildsOn =
