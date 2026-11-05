@@ -36,8 +36,11 @@
 #     nested copy in a hand-edited member lock is invisible to a root-edge reader). Identity is read
 #     from `locked` and NORMALISED — github owner/repo lowercased, a `git`/`tarball` URL on
 #     `github.com/<o>/<r>` parsed to the same key — and EVERY keyable identity is compared, roster or
-#     not. Price, ruled: same REVISION, not same INSTANCE — a member imported twice standalone is
-#     evaluated twice. Consequence, ruled: a targeted partial hub relock is no longer publishable
+#     not. Price, ruled 2026-09-25: same REVISION, not same INSTANCE — a member imported twice
+#     standalone is evaluated twice. SUPERSEDED FOR THE HUB PATH (owner-ruled 2026-10-20,
+#     den-hoag-idhzc arm X, ADR-0008 ledger): the hub's standalone `import gen { }` builds one value per
+#     lock node and answers every member's edges with it, so a member is evaluated once there; a member's
+#     own standalone entry (`import gen-merge { }`) still pays the price. Consequence, ruled: a targeted partial hub relock is no longer publishable
 #     (reverses den-hoag-kx1d3's verdict); leaf-first `relock-all` is what keeps R1 green.
 # R2 `hub-root-follows-complete` — ONE NODE per repository in the hub's root lock: each keyable
 #     identity a hub root input resolves to is reached at that input's node only. This is the flake
@@ -50,7 +53,8 @@
 #     whose URL embeds the release, so no second nixpkgs node ever shares its identity. The uncovered
 #     roots are named in `report.hubFollows.uncoveredRoots` and on every run.
 # Together they discharge den-hoag-hub-entry-paths-disagree-silently-oii6u AT REVISION: both entry
-# paths resolve one revision per roster member. Not at instance on the standalone path — the ruled price.
+# paths resolve one revision per roster member, and the hub's standalone path is at INSTANCE by
+# construction (`default.nix`'s `dep`, den-hoag-idhzc); a member's own standalone entry is not.
 # A member with no root lock (`lockAbsent`) is converged by construction only if its `flake.nix`
 # declares no inputs, and `root-plane-domain-floor` evaluates that rather than assuming it.
 #

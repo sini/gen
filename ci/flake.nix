@@ -885,7 +885,7 @@
                 echo "ROOT-PLANE COHERENCE (R1): ${toString rc.siteCount} sites of ${toString rc.identityCount} repositories over ${toString (builtins.length rc.locks)} root locks (the hub + every member root lock at this hub's pin), every node reachable by node path; ${toString (builtins.length rc.incoherent)} repositories at more than one revision. Out of domain (unkeyable): ${lib.concatStringsSep " " rc.outOfDomain}"
                 echo "HUB FOLLOWS (R2): ${toString hf.nodeCount} nodes in the hub root lock, ${toString hf.strayCount} strays over ${toString (builtins.length hf.strayRepos)} repositories. Root inputs R2 cannot key, so a second instance of them is NOT seen: ${lib.concatStringsSep " " hf.uncoveredRoots}"
                 ${lib.optionalString (builtins.elem "root-plane-coherent" rootFailed) ''
-                  echo "ROOT-PLANE INCOHERENCE — one repository at more than one revision across the root plane, so the standalone path loads it twice (owner-ruled 2026-09-25):" >&2
+                  echo "ROOT-PLANE INCOHERENCE — one repository at more than one revision across the root plane, so a member's own standalone entry loads it twice (owner-ruled 2026-09-25; the hub's standalone entry builds one value per node, den-hoag-idhzc):" >&2
                   ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg (rootRow r)} >&2") rc.incoherentRows}
                   ${lib.concatMapStringsSep "\n" (r: "echo ${lib.escapeShellArg "    REFUSED: ${r}"} >&2") (
                     map (i: "${i} pinned without a rev") rc.unlocked ++ map (x: "${x} unresolvable edge") rc.unresolved

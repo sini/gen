@@ -63,21 +63,174 @@ let
         if builtins.isString v then v else builtins.foldl' following lock.root v;
     in
     segs: builtins.foldl' following lock.root segs;
-  fetch = resolve lock;
+  # A `follows` path that cycles through the root (`a` follows `b`, `b` follows `a`) recurses in
+  # `following` before any check below can run. It is OUT OF DOMAIN: no evaluator writes such a lock.
+  #
+  # `fetch` IS THE SHIM'S WHOLE PATH-TO-STORE-PATH CONCERN, AND IT LEAVES THROUGH `wire`'s RECORD:
+  # the resolver above, `node` (that resolver on this lock) and `locked` (a node's store path), so the
+  # entry cells drive these exact bindings rather than a transcription of them. The rule is the one
+  # every member shim carries (ADR-0037: every gen library follows the SAME pattern).
+  fetch = {
+    inherit resolve;
+    node = resolve lock;
+    # A locked node's store path through the FIXED-OUTPUT form: upstream Nix returns a valid path without
+    # consulting its git tarball cache. `github` only, over its exact key set; anything else refuses by
+    # name rather than falling back to `fetchTree`.
+    locked =
+      locked:
+      if
+        builtins.attrNames locked == [
+          "lastModified"
+          "narHash"
+          "owner"
+          "repo"
+          "rev"
+          "type"
+        ]
+        && locked.type == "github"
+      then
+        builtins.fetchTarball {
+          url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.tar.gz";
+          sha256 = locked.narHash;
+        }
+      else
+        throw "gen: a locked node of type `${toString (locked.type or null)}` with attributes ${toString (builtins.attrNames locked)} has no fixed-output form here; refusing rather than falling back to fetchTree";
+  };
 in
 {
   inputs ? { },
-  src ? segs: "${builtins.fetchTree lock.nodes.${fetch segs}.locked}",
-  # `import p { }` is the ONE call text that answers every roster member alike, leaf or not
-  # (den-hoag-iev2q): a zero-dependency member's root is a NULLARY FUNCTION and not a bare value, so
-  # there is no second shape here to dispatch on. The arity test this replaced carried an `else v`
-  # arm nothing in the roster could take, under a comment asserting three leaves that do not exist.
-  dep ? segs: import (src segs) { },
+  src ? segs: fetch.locked lock.nodes.${fetch.node segs}.locked,
+  # ONE VALUE PER LOCK NODE (den-hoag-idhzc, owner-ruled arm X, 2026-10-20). This lock already states a
+  # single resolution: every member edge `follows` a root input. So a member is built with its lock
+  # edges answered by the HUB'S OWN values for those nodes — the formals below, so a caller's override
+  # of one reaches every member built on it, which is `follows` semantics — and never re-resolves its
+  # dependencies from its own lock. A member-relative path is a root path with the member's root input
+  # name prefixed, so `fetch.node` answers it with no second resolver.
+  #
+  # - A LEAF (a node with no lock edges) receives `{ }`: a zero-dependency member's root is a NULLARY
+  #   FUNCTION (den-hoag-iev2q). The construction keys on the lock's edges, never on `functionArgs`.
+  # - A NON-LEAF receives `inputs`, `src` and `dep`, which every non-leaf shim declares; with all three
+  #   supplied, no resolution inside it reads its own lock.
+  # - An edge reaching a node that is no roster member's root input is refused by name: answering it
+  #   with some root value would be a silent substitution.
+  # - The handed `src` refuses a roster member's node by name: importing it would build a second
+  #   instance of a member this entry already builds once. Any other node passes to `src`.
+  # - THE CYCLE CHECK runs as data over the lock's member edges, before the first build, because a cycle
+  #   there (Nix accepts a mutual `follows`) would otherwise read as a bare `infinite recursion`. It
+  #   prunes, from both ends, every member with no successor or no predecessor among those left; the
+  #   residue is empty iff the edges are acyclic, and with one cycle it is exactly that cycle's members
+  #   (with several, it also holds members on a path between two). COST: one pass is O(n²·d) over n
+  #   roster members of out-degree at most d, and at most n passes run, so O(n³·d), once per
+  #   application of this file, reading only the lock.
+  dep ?
+    let
+      roster = {
+        gen-algebra = algebra;
+        gen-aspects = aspects;
+        gen-assemble = assemble;
+        gen-bind = bind;
+        gen-class = class;
+        gen-delivery = delivery;
+        gen-dispatch = dispatch;
+        gen-graph = graph;
+        gen-identity = identity;
+        gen-inspect = inspect;
+        gen-link = link;
+        gen-memo = memo;
+        gen-merge = merge;
+        gen-prelude = prelude;
+        gen-product = product;
+        gen-program = program;
+        gen-rules = rules;
+        gen-schema = schema;
+        gen-scope = scope;
+        gen-select = select;
+        gen-settings = settings;
+        gen-types = types;
+        gen-view = view;
+      };
+      rootInputs = builtins.attrNames lock.nodes.${lock.root}.inputs;
+      # lock node ⇒ the root input name that reaches it
+      named = builtins.listToAttrs (
+        map (n: {
+          name = fetch.node [ n ];
+          value = n;
+        }) rootInputs
+      );
+      isMember = node: roster ? ${named.${node} or ""};
+      at =
+        segs:
+        let
+          node = fetch.node segs;
+        in
+        if isMember node then
+          roster.${named.${node}}
+        else
+          throw "gen: `${builtins.concatStringsSep " → " segs}` reaches lock node `${node}`, which is no roster member's root input; the standalone entry answers a member's edges only with the hub's own members";
+      seams =
+        segs:
+        let
+          edges = lock.nodes.${fetch.node segs}.inputs or { };
+        in
+        if edges == { } then
+          { }
+        else
+          {
+            inputs = builtins.mapAttrs (i: _: at (segs ++ [ i ])) edges;
+            src =
+              s:
+              let
+                node = fetch.node (segs ++ s);
+              in
+              if isMember node then
+                throw "gen: `${
+                  builtins.concatStringsSep " → " (segs ++ s)
+                }` is roster member `${named.${node}}`, which the standalone entry builds once and hands as `inputs`/`dep`; importing it through `src` would build a second instance"
+              else
+                src (segs ++ s);
+            dep = s: at (segs ++ s);
+          };
+      members = builtins.filter (n: roster ? ${n}) rootInputs;
+      succ = builtins.listToAttrs (
+        map (n: {
+          name = n;
+          value = builtins.filter (m: roster ? ${m}) (
+            map (
+              i:
+              named.${
+                fetch.node [
+                  n
+                  i
+                ]
+              } or ""
+            ) (builtins.attrNames (lock.nodes.${fetch.node [ n ]}.inputs or { }))
+          );
+        }) members
+      );
+      pred = builtins.listToAttrs (
+        map (n: {
+          name = n;
+          value = builtins.filter (m: builtins.elem n succ.${m}) members;
+        }) members
+      );
+      prune =
+        rem:
+        let
+          inRem = builtins.any (m: builtins.elem m rem);
+          keep = builtins.filter (n: inRem succ.${n} && inRem pred.${n}) rem;
+        in
+        if keep == rem then rem else prune keep;
+      cycle = prune members;
+      acyclic =
+        cycle == [ ]
+        || throw "gen: the hub lock's member edges form a cycle through ${builtins.concatStringsSep ", " cycle}; the standalone entry builds each member once from those edges, so a cycle has no construction";
+    in
+    builtins.seq acyclic (segs: import (src segs) (seams segs)),
   # `wire` IS THE THIRD SEAM, AND IT IS THE ONE CHANNEL BY WHICH THIS FILE PUBLISHES ANYTHING. Nix
   # publishes WHETHER a formal has a default and never WHAT it is, and a formal is an INPUT channel
   # that cannot carry a value outward — so the only place a member NAME and its resolved PATH are
-  # both in scope is this file's argument TO `wire`, and `resolve` leaves by that same argument
-  # rather than by a fourth formal. `wire` RECEIVES `{ deps, resolve, lock }`, and `./lib/mkGenLibs.nix`
+  # both in scope is this file's argument TO `wire`, and `fetch` leaves by that same argument
+  # rather than by a fourth formal. `wire` RECEIVES `{ deps, fetch, lock }`, and `./lib/mkGenLibs.nix`
   # sees only whatever `wire` chooses to hand it — here `deps`, but only because the default below
   # reads it that way. A cell injecting `dep = segs: segs` alongside `wire = args: args` reads this
   # shim's own member-to-path map AND its own resolver directly, with nothing fetched, no path
@@ -86,7 +239,7 @@ in
   wire ?
     {
       deps,
-      resolve,
+      fetch,
       lock,
     }:
     import ./lib/mkGenLibs.nix deps,
@@ -155,5 +308,5 @@ let
   forced = builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) deps) null;
 in
 builtins.seq forced (wire {
-  inherit deps resolve lock;
+  inherit deps fetch lock;
 })
