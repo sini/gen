@@ -661,9 +661,13 @@ let
   # `__typeSelf` (6 files), `__sealed` (6) and `__payload` (3); gen-schema reads `__mint` (31); gen-dispatch
   # reads gen-select's `__sel` (1). gen-demo cells read `__contract` (6) and `__mint` (15). Unpinned, a lost
   # `types.int.__typeSelf` left every gate green while gen-merge's `t ? __typeSelf` silently took its other
-  # branch. It is never descended because its interior is a representation, not a name a consumer
-  # addresses: a door's formals live under `__functionArgs`, and walking them would make a removed formal
-  # a "lost export". A C9 tombstone cannot remedy that, and for a `__` field it is HARMFUL, because
+  # branch. It is never descended because its interior is formals (`__functionArgs`) or variant tags
+  # (`__mint` / `__payload` are `minted | unmintable`, a door's `__contract.next` exists only on a chained
+  # door), so a descent would read a value change as a lost export. The fixed protocol fields under a
+  # leaf (`__contract.{name,open,optional,required}`, `__witness.checks`) are consumed by name and are NOT
+  # refused here: every reader of them reads unguarded (0 guarded reads, measured in
+  # reports/den-hoag-loadi-stale-after-loadmax-raise-5mq5q-m3-a7-delta-gate-v0.md), so their loss throws at
+  # that reader. A C9 tombstone is no remedy for a `__` field, and it is HARMFUL, because
   # `t ? __typeSelf` turns true and the read throws. A deliberate `__` removal is therefore admitted by a
   # register entry with `tombstone = false` (the register, above), never by a tombstone.
   pathsOf =
