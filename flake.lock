@@ -396,12 +396,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1790690629,
-        "narHash": "sha256-DtPPoPGa4riWD585AZG1Hwzq0K91FwN3alI+9MsA5RM=",
-        "owner": "sini",
-        "repo": "gen-schema",
-        "rev": "e249807479b3429fb3b3c059595f19147a411b9a",
-        "type": "github"
+        "lastModified": 1790695802,
+        "narHash": "sha256-fziHc66uKy0qyR1+tZc5sQuk/2R5hbLQfLp2JHeN1ng=",
+        "path": "/tmp/claude-1000/-home-sini-Documents-repos-sini-den-ag-design/3eaae1ec-e3dd-4470-95a3-cb9adb0a5a35/scratchpad/gs-proto-full",
+        "type": "path"
       },
       "original": {
         "owner": "sini",
