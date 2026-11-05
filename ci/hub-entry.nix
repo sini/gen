@@ -370,7 +370,16 @@ let
   };
   strayMessage = "gen: `${cycleFrom} → gen-prelude` reaches lock node `gen-prelude_stray`, which is no roster member's root input;.*";
   strayRefused = !(buildsOn lockStray strayMessage { src = fixtureSrc; });
-  # The live lock under the same harness builds every member: the two refusals above are the plants'.
+  # Handed-`src` plant: a member that imports its first lock edge through the `src` it is handed — a
+  # roster node, so a second instance of a member this entry builds once. Refused by name (P3).
+  handSrcFixture =
+    _:
+    builtins.toFile "hub-entry-fixture-handsrc.nix" ''
+      { inputs ? { }, src ? null, dep ? null }: if src == null then { } else builtins.seq (src [ (builtins.head (builtins.attrNames inputs)) ]) { }
+    '';
+  handSrcMessage = "gen: `[^`]*` is roster member `gen-[a-z]+`, which the standalone entry builds once and hands as .*";
+  handSrcRefused = !(buildsOn lock handSrcMessage { src = handSrcFixture; });
+  # The live lock under the same harness builds every member: the refusals above are the plants'.
   liveBuilds = buildsOn lock noRefusal { src = fixtureSrc; };
 
   arming = {
@@ -551,6 +560,7 @@ let
     standalone-entry-refuses-a-member-cycle-by-name =
       cyclePrecondition && cycleRefusedBeforeAnyFetch && liveBuilds;
     standalone-entry-refuses-a-stray-member-node-by-name = strayRefused && liveBuilds;
+    standalone-entry-refuses-a-handed-src-member-by-name = handSrcRefused && liveBuilds;
   };
 in
 {
@@ -586,6 +596,7 @@ in
         cyclePrecondition
         cycleRefusedBeforeAnyFetch
         strayRefused
+        handSrcRefused
         liveBuilds
         ;
     };
