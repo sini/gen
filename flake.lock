@@ -129,12 +129,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1790691231,
-        "narHash": "sha256-HvIIYo5CS1P1E9MoDryMFRYKZR6d7vm6KSAmSZdx+Y8=",
-        "owner": "sini",
-        "repo": "gen-delivery",
-        "rev": "a2bf0d0281a34ec71e6d89d41edcfb24743e7394",
-        "type": "github"
+        "lastModified": 1790699608,
+        "narHash": "sha256-TqPH3NzWIOaPs3ayyCgJsVioVV7cZDOZc+fW1gmY6DQ=",
+        "path": "/home/sini/Documents/repos/sini/.worktrees/xtrxn-delivery",
+        "type": "path"
       },
       "original": {
         "owner": "sini",
