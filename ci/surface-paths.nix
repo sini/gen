@@ -947,6 +947,9 @@
   # gen-merge f251ddb → 7fa8b34 (relock 13; den-hoag-1k5mi 5157af5, den-hoag-2wo5a 8e03a42): the
   # surface gained ONE name, `verifyValue`, a whole value judged against a composite option type.
   # Nothing was removed; the hash of the new list minus that name is the old line.
+  # gen-merge 99ddac8 → 352d784 (den-hoag-ien5k T3): the surface gained ONE name, `evalOptionValue`,
+  # nixpkgs' evaluated option record over a caller's definitions, with the single-survivor statement.
+  # Nothing was removed.
   merge = [
     "anything"
     "attrsOf"
@@ -969,6 +972,7 @@
     "evalModuleTree.__contract"
     "evalModuleTree.__functionArgs"
     "evalModuleTree.__functor"
+    "evalOptionValue"
     "importedCarried"
     "importedTypeWalkFuel"
     "lazyAttrsOf"
@@ -1361,6 +1365,10 @@
   # gen-schema cd204ee → d34de39 (relock 13; den-hoag-w523e e092a34): the surface gained ONE name,
   # `ancestorsForKind`, a kind's ancestors in a linear extension of inheritance. Nothing was
   # removed; the hash of the new list minus that name is the old line.
+  #
+  # gen-schema 250fc90 → 48fcbcd (den-hoag-ien5k T3): the surface gained ONE name, `declaredField`, a
+  # node's field read from what it declares where its declarations decide it alone. Nothing was
+  # removed.
   schema = [
     "_internal"
     "_internal.mkMethodsModule"
@@ -1375,6 +1383,7 @@
     "constructionRelation.__functionArgs"
     "constructionRelation.__functor"
     "declarationOf"
+    "declaredField"
     "defaultOnError"
     "emitModule"
     "entryReservation"
