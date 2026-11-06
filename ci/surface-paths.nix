@@ -19,10 +19,12 @@
   # gen-algebra e62747f → f1d208b (relock 68, den-hoag-dg8d1): the surface gained TWO names,
   # `hasMark` and `markOf`, the mark readers (decision and demand) beside `identityOf`. Nothing
   # was removed.
+  # gen-algebra 6f4a2ff → 3011dfc (den-hoag-28dnv): gained TWO names, `declaresSubject` and `subjectEntry`; nothing removed.
   algebra = [
     "comparisonSubject"
     "componentsPreimage"
     "conservativeEq"
+    "declaresSubject"
     "either"
     "either.chain"
     "either.collectErrors"
@@ -70,6 +72,7 @@
     "sealedCollisionEq"
     "sealedMarker"
     "sealedMarker.sealed"
+    "subjectEntry"
     "term"
   ];
   # gen-aspects → 7c983f45 (the lock-currency relock): the surface gained ONE name,
