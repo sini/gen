@@ -116,7 +116,8 @@ in
   # - The handed `src` refuses a roster member's node by name: importing it would build a second
   #   instance of a member this entry already builds once. Any other node passes to `src`.
   # - THE CYCLE CHECK runs as data over the lock's member edges, before the first build, because a cycle
-  #   there (Nix accepts a mutual `follows`) would otherwise read as a bare `infinite recursion`. It
+  #   there (a member edge following a member that depends back on it) would otherwise read as a bare
+  #   `infinite recursion`. It
   #   prunes, from both ends, every member with no successor or no predecessor among those left; the
   #   residue is empty iff the edges are acyclic, and with one cycle it is exactly that cycle's members
   #   (with several, it also holds members on a path between two). COST: one pass is O(n²·d) over n
