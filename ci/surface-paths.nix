@@ -1371,10 +1371,14 @@
   #
   # gen-schema 250fc90 → 48fcbcd (den-hoag-ien5k T3): the surface gained ONE name, `declaredField`, a
   # node's field read from what it declares where its declarations decide it alone. Nothing was
-  # removed.
+  # removed. 48fcbcd → d387507 (den-hoag-ien5k T3, the mkType ruling's arm (i)): TWO internal names,
+  # `_internal.instanceDefinitionsOf` and `_internal.stampInstanceDefinitions`, which a `mkType` caller
+  # (gen-aspects) uses to state its kind's datum. Nothing was removed.
   schema = [
     "_internal"
+    "_internal.instanceDefinitionsOf"
     "_internal.mkMethodsModule"
+    "_internal.stampInstanceDefinitions"
     "ancestorsForKind"
     "applyMixin"
     "beta"
