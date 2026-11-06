@@ -952,7 +952,9 @@
   # Nothing was removed; the hash of the new list minus that name is the old line.
   # gen-merge 99ddac8 → 352d784 (den-hoag-ien5k T3): the surface gained ONE name, `evalOptionValue`,
   # nixpkgs' evaluated option record over a caller's definitions, with the single-survivor statement.
-  # Nothing was removed.
+  # Nothing was removed. Then ONE more name (den-hoag-ien5k T3, lever (c)), `defaultOverridePriority`, nixpkgs'
+  # `lib.modules.defaultOverridePriority`: the priority a bare definition takes, which gen-schema's registry-level
+  # membership test reads so it restates no priority law. Nothing was removed.
   merge = [
     "anything"
     "attrsOf"
@@ -962,6 +964,7 @@
     "declaredOptions.__contract"
     "declaredOptions.__functionArgs"
     "declaredOptions.__functor"
+    "defaultOverridePriority"
     "deferredModule"
     "deriveType"
     "deriveType.__contract"
