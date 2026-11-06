@@ -226,6 +226,14 @@ let
 
   projected = genDelivery.project {
     selectNodes = selectNodeRegistry;
+    # A node's membership read from what it declares, without evaluating config, where its
+    # declarations decide it alone (gen-schema's `declaredField`, den-hoag-ien5k T3); `null`
+    # elsewhere, and `project` reads the node's `aspects`. A path that is not a gen-schema registry
+    # option (a view, `attrsOf raw`), or names no option record, carries no datum, so every node
+    # falls back.
+    membersOf = roster.schema.declaredField (lib.attrByPath nodeRegistryPath null
+      composedCore.options
+    ) "aspects";
   } cfg.aspectCnf composedCore.values;
 
   composed = composedCore // {

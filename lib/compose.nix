@@ -115,6 +115,11 @@ let
         # spelling for one object and make the surface appear to answer a question it did not.
         provenance = result.provenance;
 
+        # The evaluated option records, the field nixpkgs' `evalModules` result carries (`options`),
+        # projected verbatim: a producer's reader of its own registry option (gen-schema's
+        # `declaredField`) reads the served record, never a restatement of it (den-hoag-ien5k T3).
+        options = result.options;
+
         # `override edits` → a fresh compose of the ORIGINAL args merged with `edits`
         # (mergeComposeArgs). The admission is the plane's: `warmAdmits` is handed the key this
         # construct's own warm splice is defined against, as a LITERAL at the call site — a
