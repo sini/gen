@@ -335,10 +335,10 @@ GROWTH_MAX=5.5
 # The evaluator is the `pkgs.nix` this app prepends to PATH, so CI and a local run share it; the
 # allocator is the boehm-gc in that evaluator's closure, keyed because `gc.totalBytes` is its
 # counter and a nix rebuild can move it under an unchanged --version (gate C5).
-ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.34.9'
+ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.35.6'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=3011dfccd070fa003e0a6de2bab51778d83a327c gen-aspects=a659261beab4536665fab59f02a37360dc6d4106 gen-class=9817fcb79ff8059621c940d2050e183f1a43ca8f gen-graph=0604228edb1dc05a67c71af89e9fadd8c7ab87cf gen-identity=671987510bc4fc71162e8f1d40a921e8175ccfba gen-memo=0cf0544da6a54c580b8f3242147c55b7c3e2f15b gen-merge=ce467f91e4ed386419cebeafdf43cbee66d9f536 gen-prelude=4486065653e7948c63896abe1321c4f0462aab38 gen-schema=9f8708c5af6b41ee6fcd0d082dab41de94f65567 gen-scope=ddb3a4e552b7c6ac9c1074d4f1f8a02e86f005e8 gen-select=12705b6eeec62917bb013c82ac62f7fc86a5f7f3 gen-types=31b64dbb4bb85b6a223db66e09e053b7b2814c12'
+ANCHOR_MEMBERS='gen-algebra=f76e15e7f69414c8b1260500a5d7c1c73dc727a5 gen-aspects=2f1e980b0e88b00ce7e7a3135ac5c7469d6d51ff gen-class=7d00a803e0ac99ad2b9b85103e90b3a202a4053a gen-graph=e519bb88e496691d2851127f7f1e4c699aa25c21 gen-identity=5ab2e28f91022c869e0e5b98d928013ca0d9b155 gen-memo=167f80849197b3e80aaf7e80496d593b130f9a76 gen-merge=cd61b4c833d7688113104b368f5c2182c7ed21b9 gen-prelude=a451d8d15eb79d9e7bfc54ade61366cacf3637cc gen-schema=cc3af75db23e4090b9bd18af21d0763dfa692866 gen-scope=357ece95d4df2b67994ed0547587117a3c9e0cce gen-select=a6aba124a38e380386708930774593eb20c7910f gen-types=750e02c9cb03a7aadafba55464a6005354e2c53f'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -430,10 +430,10 @@ MARG_MAX[sameLocFanIn,a]=5716800/4339200
 LOAD_MAX[sameLocFanIn]=28730
 LOADM[sameLocFanIn]=76800
 LOADA[sameLocFanIn]=affine
-MARG_MAX[keyedFanIn,t]=110400/108000
-MARG_MAX[keyedFanIn,a]=7020600/5308800
-LOAD_MAX[keyedFanIn]=40069
-LOADM[keyedFanIn]=110400
+MARG_MAX[keyedFanIn,t]=106800/108000
+MARG_MAX[keyedFanIn,a]=6838200/5308800
+LOAD_MAX[keyedFanIn]=38867
+LOADM[keyedFanIn]=106800
 LOADA[keyedFanIn]=affine
 MARG_MAX[openNested,t]=1527000/2595000
 MARG_MAX[openNested,a]=81907500/138511000
@@ -493,7 +493,7 @@ LOAD_MAX[resolution,resolve]=1639
 LOADM[resolution,resolve]=125
 LOADA[resolution,resolve]=-
 LOAD_MAX[startup,t]=2485
-LOAD_MAX[startup,a]=134495
+LOAD_MAX[startup,a]=134527
 LOAD_MAX[member,gen-prelude,t]=198
 LOAD_MAX[member,gen-prelude,a]=18985
 LOAD_MAX[member,gen-algebra,t]=99
@@ -504,16 +504,16 @@ LOAD_MAX[member,gen-graph,t]=1826
 LOAD_MAX[member,gen-graph,a]=87861
 LOAD_MAX[member,gen-types,t]=495
 LOAD_MAX[member,gen-types,a]=30483
-LOAD_MAX[member,gen-scope,t]=1602
-LOAD_MAX[member,gen-scope,a]=82529
+LOAD_MAX[member,gen-scope,t]=1601
+LOAD_MAX[member,gen-scope,a]=82489
 LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
 LOAD_MAX[member,gen-merge,t]=1012
-LOAD_MAX[member,gen-merge,a]=60086
+LOAD_MAX[member,gen-merge,a]=60118
 LOAD_MAX[member,gen-schema,t]=551
 LOAD_MAX[member,gen-schema,a]=33150
 LOAD_MAX[member,gen-aspects,t]=617
-LOAD_MAX[member,gen-aspects,a]=34438
+LOAD_MAX[member,gen-aspects,a]=34429
 LOAD_MAX[member,gen-select,t]=53
 LOAD_MAX[member,gen-select,a]=4966
 LOAD_MAX[member,gen-class,t]=210
