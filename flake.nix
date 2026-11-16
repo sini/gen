@@ -246,6 +246,45 @@
           inherit (roster.memo) warmAdmits warmTrace;
         }).compose;
 
+      # THE LIB-INSTANTIATED DOOR (ADR-0039 S4; den-hoag-6v35f C-i): the engine-bound part of this
+      # surface (`mkGenLibs`, `compose`, the four buckets) rebuilt over an engine instantiated with the
+      # caller's `lib`, from ONE construction. It is `./default.nix` with `lib` given and `src` answered
+      # by this flake's own resolved inputs, so it fetches nothing and a consumer's root-level
+      # `--override-input` reaches it; a nested `follows` on a member's own edge does not, since each
+      # edge is answered by the hub-level node (den-hoag-idhzc arm X). It is a separate constructor
+      # because `mkGenLibs`'s argument stays vestigial: giving it meaning would move the value of every
+      # caller that passes `{ inherit lib; }`, and pair three of them with the no-lib `compose`. Every
+      # binding sits inside the lambda, so a consumer that never applies it pays only the attribute.
+      # One application is one construction: bind the result once.
+      lib.instantiate =
+        { lib }:
+        let
+          given = import ./. {
+            inherit lib;
+            src = segs: (builtins.foldl' (n: s: n.inputs.${s}) { inherit inputs; } segs).outPath;
+          };
+          over =
+            s:
+            builtins.listToAttrs (
+              map (n: {
+                name = n;
+                value = given.${n};
+              }) (builtins.filter (n: given.strata.${n} == s) (builtins.attrNames given.strata))
+            );
+        in
+        {
+          mkGenLibs = _: given;
+          compose =
+            (import ./lib/compose.nix {
+              engine = given.merge;
+              inherit (given.memo) warmAdmits warmTrace;
+            }).compose;
+          substrate = over "substrate";
+          modules = over "modules";
+          aspects = over "aspects";
+          framework = over "framework";
+        };
+
       # The stack layers, each selected by the roster's own stratum declaration. The `retiring`
       # declaration publishes no path here by design: inviting a consumer to select a library on its
       # way off the roster is the adoption that value exists to prevent, and its members stay

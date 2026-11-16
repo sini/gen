@@ -225,8 +225,25 @@ in
       acyclic =
         cycle == [ ]
         || throw "gen: the hub lock's member edges form a cycle through ${builtins.concatStringsSep ", " cycle}; the standalone entry builds each member once from those edges, so a cycle has no construction";
+      # A GIVEN `lib` ENTERS AT gen-merge's NODE AND NOWHERE ELSE. gen-merge is built from the same
+      # `seams` as every member, so its lock edges are the hub's own values, and `lib` rides its `wire`
+      # seam onto its L2 entry (the S4 carrier: gen-merge's shim declares no `lib`). Every member
+      # whose edges reach gen-merge then receives that engine as `inputs`, with no list of them.
+      instantiate =
+        segs:
+        if named.${fetch.node segs} or "" == "gen-merge" then
+          {
+            wire = { deps, ... }: import "${src segs}/lib" (deps // { inherit lib; });
+          }
+        else
+          { };
     in
-    builtins.seq acyclic (segs: import (src segs) (seams segs)),
+    builtins.seq acyclic (
+      if args ? lib then
+        segs: import (src segs) (seams segs // instantiate segs)
+      else
+        segs: import (src segs) (seams segs)
+    ),
   # `wire` IS THE THIRD SEAM, AND IT IS THE ONE CHANNEL BY WHICH THIS FILE PUBLISHES ANYTHING. Nix
   # publishes WHETHER a formal has a default and never WHAT it is, and a formal is an INPUT channel
   # that cannot carry a value outward — so the only place a member NAME and its resolved PATH are
@@ -244,6 +261,10 @@ in
       lock,
     }:
     import ./lib/mkGenLibs.nix deps,
+  # THE ENGINE'S INSTANTIATION PARAMETER (ADR-0039 S4), DECIDED BY THE KEY: `args ? lib`, never its
+  # value, so a given `lib = null` builds gen-merge's null-instance engine rather than reading as
+  # omitted. Only `dep` reads it, at gen-merge's node; omitted, this entry is unchanged.
+  lib ? null,
   algebra ? inputs.gen-algebra or (dep [ "gen-algebra" ]),
   aspects ? inputs.gen-aspects or (dep [ "gen-aspects" ]),
   assemble ? inputs.gen-assemble or (dep [ "gen-assemble" ]),
@@ -267,7 +288,7 @@ in
   settings ? inputs.gen-settings or (dep [ "gen-settings" ]),
   types ? inputs.gen-types or (dep [ "gen-types" ]),
   view ? inputs.gen-view or (dep [ "gen-view" ]),
-}:
+}@args:
 # THE BODY IS EAGER, AND THAT IS WHAT MAKES THE CHECK TOTAL RATHER THAN PARTIAL. `forced` forces
 # every wired member to WHNF before `./lib/mkGenLibs.nix` sees it, so a default that cannot resolve
 # is loud AT THE BOUNDARY rather than wherever a consumer first reaches an attribute. Without it a
@@ -308,6 +329,14 @@ let
   };
   forced = builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) deps) null;
 in
-builtins.seq forced (wire {
-  inherit deps fetch lock;
-})
+# A GIVEN `lib` IS CARRIED ONLY BY THIS ENTRY'S OWN `dep`, so beside a caller's `dep` or an already
+# built `merge` it would be dropped in silence. Both are refused by name, at the head, before any
+# member is built (the header's rule: an argument is never a silent drop).
+if args ? lib && (args ? merge || inputs ? gen-merge) then
+  throw "gen: `lib' instantiates the engine this entry builds, and `merge' was supplied already built; supply one of the two"
+else if args ? lib && args ? dep then
+  throw "gen: `lib' instantiates the engine through this entry's own `dep', and a caller's `dep' was supplied; supply one of the two"
+else
+  builtins.seq forced (wire {
+    inherit deps fetch lock;
+  })
