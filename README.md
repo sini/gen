@@ -245,6 +245,14 @@ flake inputs — and binds the roster. Stage two hands back that same value. Eve
 gen-algebra input, gen-settings its gen-algebra, gen-bind and gen-graph), so the hub does nothing but re-export
 `genInputs.gen-X.lib`. The second argument is vestigial and kept only for call compatibility.
 
+**An engine instantiated with nixpkgs' `lib` comes through a separate door.** `mkGenLibs { inherit lib; }`
+ignores its `lib`. `gen.lib.instantiate { inherit lib; }` returns `mkGenLibs`, `compose` and the four
+buckets rebuilt from one construction over a gen-merge built with that `lib`, with every member that
+depends on gen-merge rebuilt over it. It is the standalone entry applied with `lib` given and its
+sources read from the flake's own inputs, so it fetches nothing, and a root-level
+`--override-input` reaches it. A nested `follows` on one member's own edge does not, since every edge is
+answered by the hub-level node. Without flakes the same door is `import <gen> { inherit lib; }`.
+
 The roster is bound once rather than per application, so every route to it — a bucket, the
 flakeModule, a direct call — holds one value rather than several evaluations of the same source.
 Every member but `class` is shared that way anyway by input memoization; `class` is not, because it is
