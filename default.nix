@@ -225,22 +225,24 @@ in
       acyclic =
         cycle == [ ]
         || throw "gen: the hub lock's member edges form a cycle through ${builtins.concatStringsSep ", " cycle}; the standalone entry builds each member once from those edges, so a cycle has no construction";
-      # A GIVEN `lib` ENTERS AT gen-merge's NODE AND NOWHERE ELSE. gen-merge is built from the same
-      # `seams` as every member, so its lock edges are the hub's own values, and `lib` rides its `wire`
-      # seam onto its L2 entry (the S4 carrier: gen-merge's shim declares no `lib`). Every member
-      # whose edges reach gen-merge then receives that engine as `inputs`, with no list of them.
-      instantiate =
-        segs:
-        if named.${fetch.node segs} or "" == "gen-merge" then
-          {
-            wire = { deps, ... }: import "${src segs}/lib" (deps // { inherit lib; });
-          }
-        else
-          { };
     in
+    # A GIVEN `lib` ENTERS AT gen-merge AND NOWHERE ELSE, keyed by the path the `merge` formal's default
+    # asks for. gen-merge is built from the same `seams` as every member, so its lock edges are the hub's
+    # own values, and `lib` rides its `wire` seam onto its L2 entry (the S4 carrier: gen-merge's shim
+    # declares no `lib`). Every member whose edges reach gen-merge then receives that engine as
+    # `inputs`, with no list of them.
     builtins.seq acyclic (
       if args ? lib then
-        segs: import (src segs) (seams segs // instantiate segs)
+        segs:
+        if segs == [ "gen-merge" ] then
+          import (src segs) (
+            seams segs
+            // {
+              wire = { deps, ... }: import "${src segs}/lib" (deps // { inherit lib; });
+            }
+          )
+        else
+          import (src segs) (seams segs)
       else
         segs: import (src segs) (seams segs)
     ),
