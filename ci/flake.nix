@@ -333,6 +333,13 @@
       # `true`.
       hubEntryAgreement = import ./hub-entry-agreement.nix { inherit (inputs) gen; };
 
+      # ── lib-door — the lib-instantiated engine door (ADR-0039 S4, den-hoag-6v35f) ──
+      # `gen.lib.instantiate { lib }` and the standalone entry's `lib` formal, held to nixpkgs' answer
+      # at every place a module meets an engine, with every dependent rebuilt over the given-lib engine.
+      # It builds the standalone roster from the root lock, so it fetches. `.gate` is the per-cell
+      # record incl. the in-cell arming; `.gateKeys` the keys that MUST be `true`.
+      libDoor = import ./lib-door.nix { inherit (inputs) gen; };
+
       # The compose-parity oracle (den-hoag-i34de): warm ≡ cold through `gen.lib.compose`, at the
       # root lock's gen-merge and gen-memo. `.gate` is the per-cell record; `.overflowPin` is the one
       # cell whose green is an uncatchable abort, read by the `checks` job (see the file header).
@@ -393,6 +400,8 @@
       flake.lib.hubEntry = hubEntry;
       #   nix eval ./ci#lib.hubEntryAgreement.report --json | jq   (answers / arming)
       flake.lib.hubEntryAgreement = hubEntryAgreement;
+      #   nix eval ./ci#lib.libDoor.report --json | jq   (cells / census / arming)
+      flake.lib.libDoor = libDoor;
       #   nix eval ./ci#lib.hubSubstrate.report --json | jq   (rows / underSupplied / text / arming)
       flake.lib.hubSubstrate = hubSubstrate;
       #   nix eval ./ci#lib.architectureLibraryGraph.report --json | jq
@@ -1304,6 +1313,25 @@
                   cp "$reportPath" "$out"
                 '';
             hub-entry-agreement = mkHubEntryAgreementCheck "hub-entry-agreement" hubEntryAgreement;
+            lib-door =
+              let
+                failed = builtins.filter (k: libDoor.gate.${k} != true) libDoor.gateKeys;
+              in
+              pkgs.runCommand "lib-door"
+                {
+                  report = builtins.toJSON ({ inherit failed; } // libDoor.report);
+                  passAsFile = [ "report" ];
+                }
+                ''
+                  echo "── lib-door ──"
+                  cat "$reportPath"
+                  echo
+                  ${lib.optionalString (failed != [ ]) ''
+                    echo ${lib.escapeShellArg "LIB DOOR BROKEN — a door cell no longer serves nixpkgs' answer, the published surface moved, or an arm stopped firing: ${lib.concatStringsSep " " failed}"} >&2
+                    exit 1
+                  ''}
+                  cp "$reportPath" "$out"
+                '';
             hub-substrate = mkHubSubstrateCheck "hub-substrate" hubSubstrate;
             compose-parity =
               let
