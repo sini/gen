@@ -252,8 +252,9 @@
       # by this flake's own resolved inputs, so it fetches nothing and a consumer's root-level
       # `--override-input` reaches it; a nested `follows` on a member's own edge does not, since each
       # edge is answered by the hub-level node (den-hoag-idhzc arm X). It is a separate constructor
-      # because `mkGenLibs`'s argument stays vestigial: giving it meaning would move the value of every
-      # caller that passes `{ inherit lib; }`, and pair three of them with the no-lib `compose`. Every
+      # because `mkGenLibs`'s argument stays vestigial: giving it meaning would pair three of the callers
+      # that pass `{ inherit lib; }` with the no-lib `compose`, a mixed-engine state where a lib-built
+      # submodule is refused, and would move every such caller's roster value besides. Every
       # binding sits inside the lambda, so a consumer that never applies it pays only the attribute.
       # One application is one construction: bind the result once.
       lib.instantiate =
