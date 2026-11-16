@@ -480,7 +480,7 @@ let
     builtins.elem "inputs" m.received
     && m.edges == builtins.attrNames (lockExtraEdge.nodes.${mergeNode}.inputs);
   # The seed: gen-merge handed named formals instead of the seams (the hand-list shape).
-  handListText = seed "segs: import (src segs) (seams segs // instantiate segs)" "segs: import (src segs) (if named.\${fetch.node segs} or \"\" == \"gen-merge\" then { inherit prelude types memo scope; } // instantiate segs else seams segs)";
+  handListText = seed "            seams segs\n            // {\n              wire" "            { inherit prelude types memo scope; }\n            // {\n              wire";
 
   # C2 / construction precedence: `lib` beside an already-built `merge` or a caller's `dep`.
   mergeMsg = "gen: `lib' instantiates the engine this entry builds, and `merge' was supplied already built;.*";
