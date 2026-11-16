@@ -98,13 +98,20 @@ Entry: `inputs.gen`. Root outputs are `lib` and `flakeModules` — the Drift che
 
 **`lib`**
 
-| Export          | Signature                                                                       |
-| --------------- | ------------------------------------------------------------------------------- |
-| `lib.mkGenLibs` | `_ -> roster` — the argument is vestigial (`flake.nix` binds it as `_: roster`) |
-| `lib.substrate` | the S1 stratum bucket, selected from the flat roster                            |
-| `lib.modules`   | the S2 (module-system) stratum bucket                                           |
-| `lib.aspects`   | the S3 (aspect-layer) stratum bucket                                            |
-| `lib.framework` | the framework bucket                                                            |
+| Export            | Signature                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib.mkGenLibs`   | `_ -> roster` — the argument is vestigial (`flake.nix` binds it as `_: roster`)                                                                                                                               |
+| `lib.instantiate` | `{ lib } -> { mkGenLibs, compose, substrate, modules, aspects, framework }` — the engine-bound surface rebuilt over an engine instantiated with `lib`; the standalone twin is `import <gen> { inherit lib; }` |
+| `lib.substrate`   | the S1 stratum bucket, selected from the flat roster                                                                                                                                                          |
+| `lib.modules`     | the S2 (module-system) stratum bucket                                                                                                                                                                         |
+| `lib.aspects`     | the S3 (aspect-layer) stratum bucket                                                                                                                                                                          |
+| `lib.framework`   | the framework bucket                                                                                                                                                                                          |
+
+**`mkGenLibs { inherit lib; }` does not instantiate anything**: the argument is ignored, and every
+application returns the same no-lib roster. A consumer whose modules read `lib` takes
+`(inputs.gen.lib.instantiate { inherit lib; })` in place of `inputs.gen.lib`, and binds the result
+once: each application is a fresh construction. On the standalone entry, `lib` beside an
+already-built `merge` (formal or `inputs.gen-merge`) or a caller's `dep` is refused by name.
 
 **There is no `lib.mkCi` here.** It lives at `gen-harness.lib.mkCi`, on the signature
 `{ inputs, name, testModules, specialArgs ? {}, extraModules ? [] } -> flake outputs`, already
@@ -263,7 +270,7 @@ Current output (verbatim):
 <!-- gen-drift:begin -->
 
 ```json
-{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","rules","schema","scope","select","settings","strata","types","view"]}
+{"flakeModules":["default","genLibs"],"lib":["aspects","compose","flakePartsEvaluate","framework","instantiate","mkGenLibs","modules","substrate"],"outputs":["flakeModules","lib"],"roster":["algebra","aspects","assemble","bind","class","delivery","dispatch","graph","identity","inspect","link","memo","merge","prelude","product","program","rules","schema","scope","select","settings","strata","types","view"]}
 ```
 
 <!-- gen-drift:end -->
