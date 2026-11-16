@@ -439,9 +439,15 @@ let
     { received = builtins.attrNames a; edges = builtins.attrNames inputs; }
   '';
   fixtureSrc = segs: if segs == [ "gen-merge" ] then fixtureMerge else fixtureMember;
+  # Every member forced to WHNF, as the entry's own `forced` does, and no deeper: a deeper force reaches
+  # into a built engine, whose own failure would read as this entry's refusal.
   refused =
     entry: args:
-    !(builtins.tryEval (builtins.deepSeq (entry ({ wire = a: a.deps; } // args)) true)).success;
+    !(builtins.tryEval (
+      builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) (
+        entry ({ wire = a: a.deps; } // args)
+      )) true
+    )).success;
 
   # C1 — a planted extra gen-merge edge: the lib-given gen-merge must receive the hub lock's edges
   # (all of them, the planted one included) through the seams, never a named subset.
@@ -562,10 +568,13 @@ let
         inputs.gen-merge = { };
       }
     );
-    lib-beside-dep-refused = refused (entryWith { expected = depMsg; }) {
-      lib = nlib;
-      dep = segs: segs;
-    };
+    lib-beside-dep-refused = refused (entryWith { expected = depMsg; }) (
+      fixtureArgs
+      // {
+        lib = nlib;
+        dep = segs: segs;
+      }
+    );
     merge-alone-builds = !(refused (entryWith { }) (fixtureArgs // { merge = { }; }));
     dep-alone-builds = !(refused (entryWith { }) { dep = segs: segs; });
     lib-beside-schema-builds =
@@ -624,10 +633,13 @@ let
         }
       ));
     arming-dropped-dep-refusal =
-      !(refused (entryWith { text = noDepRefusal; }) {
-        lib = nlib;
-        dep = segs: segs;
-      });
+      !(refused (entryWith { text = noDepRefusal; }) (
+        fixtureArgs
+        // {
+          lib = nlib;
+          dep = segs: segs;
+        }
+      ));
   };
 in
 {
