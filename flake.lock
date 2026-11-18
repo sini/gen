@@ -127,6 +127,9 @@
         "gen-aspects": [
           "gen-aspects"
         ],
+        "gen-graph": [
+          "gen-graph"
+        ],
         "gen-prelude": [
           "gen-prelude"
         ],
@@ -135,11 +138,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795006241,
-        "narHash": "sha256-zzUO/n31Ebg004A4axK2l8DQDFQ9iLfqNMclKDp91p0=",
+        "lastModified": 1795015871,
+        "narHash": "sha256-vwQiwH23btyLVuuAwwgjQQ+er3AxTJkwlkNnTglA0dM=",
         "owner": "sini",
         "repo": "gen-delivery",
-        "rev": "c22fd6ab18c03f0e47ec372a1165699564c60fa7",
+        "rev": "b92573d23a53b581a97350ff870186cdb049e629",
         "type": "github"
       },
       "original": {

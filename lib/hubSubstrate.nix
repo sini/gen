@@ -13,6 +13,7 @@ members: {
       aspects
       prelude
       scope
+      graph
       ;
   };
   # ★★ THE FOLD IS WELL-FOUNDED ONLY WHILE THE UNAPPLIED MEMBERS' DEPENDENCIES ARE ACYCLIC. The
