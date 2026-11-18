@@ -99,6 +99,8 @@
   # gen-aspects 75e0acd → b2f4313 (relock 72, den-hoag-4akh9 5435ffa): the surface gained ONE name
   # back, `includeSitesOfEntry`, as a registered throwing tombstone naming `includeSitesOfInstance`
   # (law batch v1 C9). Nothing was removed; the hash of the new list minus that name is the old line.
+  # gen-aspects 04e4ac2 → 9c0ecf7 (relock 2026-11-18, den-hoag-children-bundle-node-zww0n): gained `childrenOf` and
+  # `childBundle` (each with its `__contract` / `__functionArgs` / `__functor` leaves), the node-children readers. Nothing removed.
   aspects = [
     "applyGuard"
     "aspectId"
@@ -126,6 +128,14 @@
     "canTake"
     "canTake.atLeast"
     "canTake.upTo"
+    "childBundle"
+    "childBundle.__contract"
+    "childBundle.__functionArgs"
+    "childBundle.__functor"
+    "childrenOf"
+    "childrenOf.__contract"
+    "childrenOf.__functionArgs"
+    "childrenOf.__functor"
     "cnfKeys"
     "flatten"
     "graphFacts"
@@ -950,6 +960,8 @@
   # gen-merge f251ddb → 7fa8b34 (relock 13; den-hoag-1k5mi 5157af5, den-hoag-2wo5a 8e03a42): the
   # surface gained ONE name, `verifyValue`, a whole value judged against a composite option type.
   # Nothing was removed; the hash of the new list minus that name is the old line.
+  # gen-merge 226ce18 → bebffe2 (relock 2026-11-18, den-hoag-zm7rd): gained `types.postFold`, the nested migration
+  # constructor. Nothing removed.
   merge = [
     "anything"
     "attrsOf"
@@ -1064,6 +1076,7 @@
     "types.path"
     "types.pathLike"
     "types.payloadOf"
+    "types.postFold"
     "types.raw"
     "types.refined"
     "types.refinements"
@@ -1255,6 +1268,8 @@
   # `groundInstances`, which resolves a terms-only policy body at a context, and
   # `codomainBreaches`, the per-firing codomain check the gen-rules door applies. Nothing was
   # removed.
+  # gen-program 94175fc → 844523b (relock 2026-11-18, den-hoag-rulesof-fold-w9vlp): gained `instanceDeclarations`
+  # (with its `__contract` / `__functionArgs` / `__functor` leaves), the caller-named constructor bridge. Nothing removed.
   program = [
     "adjudicate"
     "adjudicate.__contract"
@@ -1292,6 +1307,10 @@
     "groundInstances.__contract"
     "groundInstances.__functionArgs"
     "groundInstances.__functor"
+    "instanceDeclarations"
+    "instanceDeclarations.__contract"
+    "instanceDeclarations.__functionArgs"
+    "instanceDeclarations.__functor"
     "mkModel"
     "mkModel.__contract"
     "mkModel.__functionArgs"
