@@ -493,6 +493,10 @@
   ];
   delivery = [
     "defaultLayerOrder"
+    "forward"
+    "forward.__contract"
+    "forward.__functionArgs"
+    "forward.__functor"
     "project"
     "project.__contract"
     "project.__functionArgs"

@@ -85,6 +85,7 @@ flowchart TD
   gen_class --> gen_prelude
   gen_delivery --> gen_algebra
   gen_delivery --> gen_aspects
+  gen_delivery --> gen_graph
   gen_delivery --> gen_prelude
   gen_delivery --> gen_scope
   gen_dispatch --> gen_prelude
@@ -197,7 +198,7 @@ check prints the exception entry by entry on every run rather than hiding it in 
 | gen-inspect  | framework | interrogates a materialized graph: which nodes exist and of what kind, which edges are declared, which a policy program produced and **why**, what reaches what. Implements no semantics and never evaluates.                                                                                                                                  | C5                                           |
 | gen-program  | framework | turns a framework's policy declarations into a **program** and reaches the solver. Adjacent to assembly, never inside it.                                                                                                                                                                                                                      | C5                                           |
 | gen-rules    | framework | the one closure crossing: the loader lowering that turns a closure written to a framework surface into a first-order door node or door rule, the door that applies a registered closure and checks its output against the codomain declared at registration, and the rule-pattern catalogue.                                                   |                                              |
-| gen-delivery | framework | the delivery-class realization surface (ADR-0028): the projection that discovers which declared keys are delivery classes, and the fold that hands each class's collected content to a target-owned terminal.                                                                                                                                  | C6                                           |
+| gen-delivery | framework | the delivery-class realization surface (ADR-0028): the projection that discovers which declared keys are delivery classes, `forward` (the data-only transformation carrying routed occurrences between them), and the fold that hands each class's collected content to a target-owned terminal.                                               | C6                                           |
 | gen-settings | framework | stratified settings resolution: a static `{ default; merge }` schema folded over an ordered layer list, with identity-bearing cross-references as inert data and per-field provenance. Lattice-blind by design — the layer order arrives precomputed.                                                                                          | — none                                       |
 
 Three entries in that last column are honest gaps rather than omissions. gen-prelude is reached as
