@@ -86,9 +86,9 @@ composed-grammar ordering condition could be checked per extension.
 
 ### gen-scope: kinds minted in order
 
-gen-scope's demand cascade cites Fig. 7 and Theorem 3, which make termination follow from the existence of a well-founded ordering on the nonterminals. Söderberg and Hedin (2013, §7) restate the idea as ordering node types so that "each new NTA has a lower order than its host".
+gen-scope's demand cascade cites Fig. 7 and Theorem 3. A well-founded ordering on the nonterminals is one hypothesis of that theorem, beside completeness, non-circularity and terminating rewrite rules; it does not by itself give termination. Söderberg and Hedin (2013, §7) restate the idea as ordering node types so that "each new NTA has a lower order than its host".
 
-gen-scope constructs a witness for that ordering instead of deciding whether one exists. `mkKinds` mints kinds from a list in order, and a kind's `below` names resolve only against kinds minted earlier in the list. A kind that names itself, or a later kind, fails with an error naming the missing kind, so a cyclic `below` relation cannot be written. Each minted kind records `depth = 1 + max { depth b : b ∈ below }` (0 when `below` is empty), a natural number that strictly decreases along every edge. Every admissible order of one set of declarations mints the same depths. Where Procedure A can fail on a cycle in the condensation, the minting order makes that case inexpressible.
+gen-scope does not decide whether such an ordering exists. It uses a separate, stricter construction: kind depth strictly decreases along every generated-child edge. `mkKinds` mints kinds from a list in order, and a kind's `below` names resolve only against kinds minted earlier in the list. A kind that names itself, or a later kind, fails with an error naming the missing kind, so a cyclic `below` relation cannot be written. Each minted kind records `depth = 1 + max { depth b : b ∈ below }` (0 when `below` is empty), a natural number that strictly decreases along every edge. Every admissible order of one set of declarations mints the same depths. Where Procedure A can fail on a cycle in the condensation, the minting order makes that case inexpressible.
 
 ### Scope limits of the result
 
