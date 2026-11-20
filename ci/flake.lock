@@ -249,11 +249,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795083134,
-        "narHash": "sha256-7Z3P6YzH7mhRWRFVadO1A+ixfJzifxa/wkJVc+9qe8I=",
+        "lastModified": 1795154850,
+        "narHash": "sha256-BYn/r41DLMQTCsTaVgIkPxGOU29tck9KJCxhTPwKdzM=",
         "owner": "sini",
         "repo": "gen-harness",
-        "rev": "01815a58507927ad18e6ac4caf511042b3dd57ce",
+        "rev": "73062c4df84d655daecfe9a74b393d1cc7be8966",
         "type": "github"
       },
       "original": {
