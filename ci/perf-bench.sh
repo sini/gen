@@ -338,7 +338,7 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.35.6'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=89df8416eef2927c3eff6473decd330812963f6e gen-aspects=d27feca3f6bda20a3c142e9992b688752ca10ba7 gen-class=4ea70b19f15fc69eff1d14572290ee04a8fe3fde gen-graph=de2d352228da032020465f1799498c2051f2bd9c gen-identity=41587c43758c98803b3a2eff1408f816db7ff192 gen-memo=7f3f5001efeb95a0859bce61a246429ab9bfcf4d gen-merge=6f8250a19beb6d0ea29390c3a9aca82e248568a6 gen-prelude=c1ebc614a8cb57e56a65a16f986400dade0dc7f1 gen-schema=8284ae138b7a4522752fff7cac1f8a9517b57b38 gen-scope=6c32cb7d0b24fa24fb4609ee37d2ce20f0e9500b gen-select=d00887a532f6ff74b4dd690100cbf4159aa73fc7 gen-types=019ccc25e935434a7d14691a237d64a4732f70b0'
+ANCHOR_MEMBERS='gen-algebra=89df8416eef2927c3eff6473decd330812963f6e gen-aspects=89d2b8453c794b4caba6af85520a9e52464560b8 gen-class=2b732c052c5b8fff56d8063dc8dac37994049bba gen-graph=4c3f09a7181893080c6e0585d78091a3139c36b5 gen-identity=41587c43758c98803b3a2eff1408f816db7ff192 gen-memo=286b56feb30e1bfbe4a73230dc3edd2cdd8951d9 gen-merge=5bca9c89d7064874ad95ad126e0564ea0d9c1c71 gen-prelude=c1ebc614a8cb57e56a65a16f986400dade0dc7f1 gen-schema=e2f9654c435bbe7b66be8455befb4a72b4fe35ef gen-scope=a6d2038496ac74fac33348b6decca338c8a17a9a gen-select=567ba43618bc4dc090d65f3934b2b20714fc982e gen-types=019ccc25e935434a7d14691a237d64a4732f70b0'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -444,14 +444,14 @@ MARG_MAX[classShare,fixed,t]=596400
 LOAD_MAX[classShare,fixed]=205170
 LOADM[classShare,fixed]=596400
 LOADA[classShare,fixed]=affine
-MARG_MAX[overrideCount,warm,t]=8496
-MARG_MAX[overrideCount,warm,a]=470376
-LOAD_MAX[overrideCount,warm]=221270
-LOADM[overrideCount,warm]=8496
+MARG_MAX[overrideCount,warm,t]=8271
+MARG_MAX[overrideCount,warm,a]=458496
+LOAD_MAX[overrideCount,warm]=221195
+LOADM[overrideCount,warm]=8271
 LOADA[overrideCount,warm]=affine
 MARG_MAX[overrideWarm,warm,t]=640800
 MARG_MAX[overrideWarm,warm,a]=33692400
-LOAD_MAX[overrideWarm,warm]=224102
+LOAD_MAX[overrideWarm,warm]=223952
 LOADM[overrideWarm,warm]=640800
 LOADA[overrideWarm,warm]=affine
 MARG_MAX[kindMatch,migrated,kind,t]=915600
