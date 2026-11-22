@@ -249,11 +249,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795200262,
-        "narHash": "sha256-/cHoJ9Fmx3YY20jw589//fcJSIMbVDuqRkYqQZLRcc4=",
+        "lastModified": 1795302693,
+        "narHash": "sha256-EzIG4AF/KepGU8GLf+bNVQ5YWHBSx1UB/NYTEX6GQdQ=",
         "owner": "sini",
         "repo": "gen-harness",
-        "rev": "164a76396ba8de5ab85842b5884e1f51a6cd63ce",
+        "rev": "ce86ad57ecdce4d3a5b0324c0edd01d41515b4fa",
         "type": "github"
       },
       "original": {
@@ -766,11 +766,11 @@
     },
     "nixpkgs_6": {
       "locked": {
-        "lastModified": 1795085501,
-        "narHash": "sha256-kqy60mdSH4GQAv3kzSeefteaiCv9arf3P+auosZrpo0=",
-        "rev": "0bb8272318b4ca41bf0edc6224df3e3e3046b70d",
+        "lastModified": 1795234589,
+        "narHash": "sha256-pAEASBc6wof0S58XcSEdZoQ2iFQDkCnZwH+wFLrkd1Q=",
+        "rev": "2786a2a72088ecf32aea5b3ec52099e6a7cff78f",
         "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1124497.0bb8272318b4/nixexprs.tar.xz"
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1125864.2786a2a72088/nixexprs.tar.xz"
       },
       "original": {
         "type": "tarball",
