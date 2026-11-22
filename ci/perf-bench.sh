@@ -338,7 +338,7 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.35.6'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=665e12f4ad4fbe7e60bcb180d6ace59690fc06d1 gen-aspects=48c433c8dfc0f5fd87e600e425eb4750f6724cb5 gen-class=7878144db7ebdb2114ad78a3bbe5eb3ae45879a4 gen-graph=0248d7a6c9e60fd00670aa52e416a8996c21ea54 gen-identity=132f9a34f0b70e3c052693e8930f97bddfb738f0 gen-memo=3d95f792dbb42226b3e3a427b7b88ab889f963a9 gen-merge=fd7d1d763a01a4358cb973774867d7654da8ca4e gen-prelude=7c0ebf0d59f5f351d04678462fc9ebc2a9435a39 gen-schema=09f36981c8943801f72ff8a1662ccb7c112eddcd gen-scope=1e453bfbdf44a808f9c89749051a74eaffc96401 gen-select=0f4afb148af83e1ac8d4b45f17a936850413e535 gen-types=dad85965bf7906dc3b7a387580862ec832aead81'
+ANCHOR_MEMBERS='gen-algebra=0c7a896bade8b683e1e44fcb9fd958f7a5beca85 gen-aspects=18b2b5b4c5245a83512ef00df476fe235bd6e1f9 gen-class=8d84f3a8f4aa4e7ef38b2a445d21f496562ca928 gen-graph=7c8b30ba1669e934448ed8d3b244c085c0f48bc5 gen-identity=c5eaa4ec4906b0910db0ded60870d39698b1fcd0 gen-memo=84bdaef5474e8f9a9dfac9dcade651eece6afcb6 gen-merge=cb8ccbd5a71978cd1abd403f184bee0ca34847b4 gen-prelude=b8baff80650f4f00b06ad0ee1f999de91ea5504c gen-schema=c74a18913fdde9f5f1e0fbb4885b302fd2791af3 gen-scope=f16c445d001fb8401208f92fe9009aca0ffeb226 gen-select=cb157772155abc853b6b1c31356245d72645dd5a gen-types=b93313aa5d866aee39e919da8d3525f50c10a5f5'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -397,7 +397,7 @@ LOADM[steppedRegistry]=625239
 LOADA[steppedRegistry]=-
 MARG_MAX[schemaHosts,t]=1381600/2145200
 MARG_MAX[schemaHosts,a]=81050000/115548200
-LOAD_MAX[schemaHosts]=468102
+LOAD_MAX[schemaHosts]=468092
 LOADM[schemaHosts]=1381600
 LOADA[schemaHosts]=affine
 MARG_MAX[wideFreeform,t,band]=399000/512000
@@ -460,13 +460,13 @@ MARG_MAX[coordMatch,migrated,coord,t]=1998000
 MARG_MAX[kindMatch,migrated,kind,a]=58963200
 MARG_MAX[entityMatch,migrated,entity,a]=73668000/91557600
 MARG_MAX[coordMatch,migrated,coord,a]=110386800
-LOAD_MAX[kindMatch,migrated,kind]=316527
+LOAD_MAX[kindMatch,migrated,kind]=316501
 LOADM[kindMatch,migrated,kind]=915600
 LOADA[kindMatch,migrated,kind]=affine
-LOAD_MAX[entityMatch,migrated,entity]=428269
+LOAD_MAX[entityMatch,migrated,entity]=428243
 LOADM[entityMatch,migrated,entity]=1249800
 LOADA[entityMatch,migrated,entity]=affine
-LOAD_MAX[coordMatch,migrated,coord]=674042
+LOAD_MAX[coordMatch,migrated,coord]=674032
 LOADM[coordMatch,migrated,coord]=1998000
 LOADA[coordMatch,migrated,coord]=affine
 MARG_MAX[kindMatch,sealed,kind,t]=915600
@@ -475,13 +475,13 @@ MARG_MAX[coordMatch,sealed,coord,t]=2011200
 MARG_MAX[kindMatch,sealed,kind,a]=58963200
 MARG_MAX[entityMatch,sealed,entity,a]=74666400/91557600
 MARG_MAX[coordMatch,sealed,coord,a]=111385200
-LOAD_MAX[kindMatch,sealed,kind]=317175
+LOAD_MAX[kindMatch,sealed,kind]=317149
 LOADM[kindMatch,sealed,kind]=915600
 LOADA[kindMatch,sealed,kind]=affine
-LOAD_MAX[entityMatch,sealed,entity]=433604
+LOAD_MAX[entityMatch,sealed,entity]=433578
 LOADM[entityMatch,sealed,entity]=1263000
 LOADA[entityMatch,sealed,entity]=affine
-LOAD_MAX[coordMatch,sealed,coord]=680825
+LOAD_MAX[coordMatch,sealed,coord]=680815
 LOADM[coordMatch,sealed,coord]=2011200
 LOADA[coordMatch,sealed,coord]=affine
 MARG_MAX[resolution,4-5,t]=125/196
@@ -510,8 +510,8 @@ LOAD_MAX[member,gen-memo,t]=412
 LOAD_MAX[member,gen-memo,a]=24220
 LOAD_MAX[member,gen-merge,t]=1013
 LOAD_MAX[member,gen-merge,a]=60228
-LOAD_MAX[member,gen-schema,t]=553
-LOAD_MAX[member,gen-schema,a]=33237
+LOAD_MAX[member,gen-schema,t]=556
+LOAD_MAX[member,gen-schema,a]=33359
 LOAD_MAX[member,gen-aspects,t]=680
 LOAD_MAX[member,gen-aspects,a]=37356
 LOAD_MAX[member,gen-select,t]=53
