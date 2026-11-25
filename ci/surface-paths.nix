@@ -966,7 +966,7 @@
   # Nothing was removed; the hash of the new list minus that name is the old line.
   # gen-merge 226ce18 → bebffe2 (relock 2026-11-18, den-hoag-zm7rd): gained `types.postFold`, the nested migration
   # constructor. Nothing removed.
-  # gen-merge eb7f36e → 65070d5 (branch t5ndo-h1, den-hoag-t5ndo 1b H1): gained ONE name,
+  # gen-merge eb7f36e → 7e7f132 (branch t5ndo-h1-on-7115674, den-hoag-t5ndo 1b H1): gained ONE name,
   # `refusingSubmodulePaired`, the refusing submodule returned beside its own evaluator. Nothing removed.
   merge = [
     "anything"
@@ -1391,7 +1391,7 @@
   # `ancestorsForKind`, a kind's ancestors in a linear extension of inheritance. Nothing was
   # removed; the hash of the new list minus that name is the old line.
   #
-  # gen-schema 2bf1801 → 13aee41 (branch t5ndo-h1, den-hoag-t5ndo 1b H1): gained `mkInstancePaired`, a checked door
+  # gen-schema 2bf1801 → ffc436f (branch t5ndo-h1, den-hoag-t5ndo 1b H1): gained `mkInstancePaired`, a checked door
   # (`.__contract`, `.__functionArgs`, `.__functor`), mkInstanceType's construction beside its own evaluator. Nothing
   # removed.
   schema = [
