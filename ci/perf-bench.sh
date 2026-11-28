@@ -338,7 +338,7 @@ GROWTH_MAX=5.5
 ANCHOR_EVALUATOR='nix-instantiate (Nix) 2.35.6'
 ANCHOR_ALLOCATOR='boehm-gc-8.2.12'
 ANCHOR_REFERENCE='gen-graph-orig=0db4e73708f356024121336fcad1230ba0aed8d4 gen-prelude-orig=c471c9a12ef5495be5c50911ff45e3efa16cc67f gen-schema-orig=2b7c2d39ad30f8fa5165d6861c01374f7c9cf3f6 gen-select-orig=9285b5b8264a779894dd79e00fa0fe7683a9ffaf nixpkgs-lib=db3f255737b94216eb71cce308e2912cf6bc2d7c'
-ANCHOR_MEMBERS='gen-algebra=5b4b33aa33ac6dfc7be6104e70d0880aba840651 gen-aspects=62d2f93bada8a5522caa0bb904528a6b2d119931 gen-class=6c3f161e2dd1cd15a6e1ee3a42ad0eb462af123a gen-graph=401211ecce77474948fa183a50d7cda92decd272 gen-identity=86ac6687b6d9917286c685e2d6883625694abe20 gen-memo=0743eef640aa802650ff19fd7fbd6d1e87cdc38e gen-merge=eb7f36ec5d6fc8a57dad6b6188b9b6fdb4eb49dc gen-prelude=1178b8bce89fd80d3129ed182afd2df9c5236804 gen-schema=2bf1801c1d275576a96562f9f6f59f5d34a32d3d gen-scope=1e6482fc47ec1978906f189c0a398d2e1b23004d gen-select=29a873cd389afd7a65e265661ac87dfa6cf6e888 gen-types=1c040f101d64b2d835bdce6f318cfafa072c070f'
+ANCHOR_MEMBERS='gen-algebra=5b4b33aa33ac6dfc7be6104e70d0880aba840651 gen-aspects=62d2f93bada8a5522caa0bb904528a6b2d119931 gen-class=6c3f161e2dd1cd15a6e1ee3a42ad0eb462af123a gen-graph=02288f9ba90ffd528a574ee14e7bd112b4655764 gen-identity=86ac6687b6d9917286c685e2d6883625694abe20 gen-memo=0743eef640aa802650ff19fd7fbd6d1e87cdc38e gen-merge=eb7f36ec5d6fc8a57dad6b6188b9b6fdb4eb49dc gen-prelude=1178b8bce89fd80d3129ed182afd2df9c5236804 gen-schema=2bf1801c1d275576a96562f9f6f59f5d34a32d3d gen-scope=1e6482fc47ec1978906f189c0a398d2e1b23004d gen-select=29a873cd389afd7a65e265661ac87dfa6cf6e888 gen-types=1c040f101d64b2d835bdce6f318cfafa072c070f'
 
 # ── marginal and load bounds, read at the anchor (den-hoag-r8y89) ──────────────────────────────
 # Every bound is the EXACT reading at the anchor identity above, an integer count or, on a ratio row,
@@ -500,8 +500,8 @@ LOAD_MAX[member,gen-algebra,t]=99
 LOAD_MAX[member,gen-algebra,a]=7822
 LOAD_MAX[member,gen-identity,t]=13
 LOAD_MAX[member,gen-identity,a]=732
-LOAD_MAX[member,gen-graph,t]=1826
-LOAD_MAX[member,gen-graph,a]=87861
+LOAD_MAX[member,gen-graph,t]=1808
+LOAD_MAX[member,gen-graph,a]=87029
 LOAD_MAX[member,gen-types,t]=495
 LOAD_MAX[member,gen-types,a]=30483
 LOAD_MAX[member,gen-scope,t]=1599
